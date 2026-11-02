@@ -162,7 +162,7 @@ def test_planner_exposes_term_actions_and_action_endpoint(db, people):
     )
     assert response.status_code == 200
     db.expire_all()
-    term = db.get(SemarSession, term.id)
+    term = db.get(SeminarSession, term.id)
     assert term.published is False
     assert term.published_at is not None
 
