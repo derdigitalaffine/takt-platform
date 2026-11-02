@@ -65,6 +65,7 @@ def unpublish(db, row, term, user=None):
         raise HTTPException(409, 'Abgesagte Termine können nicht zurückgezogen werden.')
     if _records(db, row, term):
         raise HTTPException(409, 'Für diesen Termin bestehen bereits Einladungen oder Anmeldungen. Bitte verschieben oder absagen.')
+    term.published_at = term.published_at or utcnow()
     term.published = False
     # published_at bleibt absichtlich erhalten: der Termin war bereits öffentlich.
     term.revision += 1
@@ -81,6 +82,7 @@ def cancel(db, row, term, reason, user=None):
         raise HTTPException(409, 'Unveröffentlichten Termin bitte löschen oder unveröffentlicht lassen.')
     if term.cancelled:
         raise HTTPException(409, 'Der Termin ist bereits abgesagt.')
+    term.published_at = term.published_at or utcnow()
     term.cancelled = True
     term.reason = reason
     term.revision += 1
