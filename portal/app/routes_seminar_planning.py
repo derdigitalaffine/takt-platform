@@ -126,7 +126,7 @@ def save(db,user,data,row=None):
         if tid and before!=(t.starts_at,t.ends_at,t.title,t.location,t.lecturers_json,t.guests_json,t.delivery_mode,t.online_url,t.video_kind):changed.append(t)
         t.revision=(t.revision or 0)+1
     if existing.keys()-seen:raise HTTPException(409,'Bestehende Termine fehlen. Bitte die Planung neu laden; Termine werden nicht stillschweigend entfernt.')
-    if action!='draft' and not any(v.get('include') is not False for v in terms):raise HTTPException(422,'Bitte zuerst Termine in der Vorschau zusammenstellen.')
+    if action!='draft' and not was_published and not any(v.get('include') is not False for v in terms):raise HTTPException(422,'Bitte zuerst Termine in der Vorschau zusammenstellen.')
     row.planning_json=json.dumps({k:v for k,v in data.items() if k not in {'csrf','action','revision'}},ensure_ascii=False)
     for g in external:
         if g['save'] and not db.scalar(select(SeminarExternalLecturer.id).where(SeminarExternalLecturer.name==g['name'],SeminarExternalLecturer.email==g['email'],SeminarExternalLecturer.organization==g['organization'])):
