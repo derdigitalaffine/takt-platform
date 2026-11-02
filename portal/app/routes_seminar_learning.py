@@ -293,7 +293,16 @@ def seminar_participants_pdf(sid:int,tid:int=0,user:User=Depends(current_user),d
     rows=[['Name','Organisation','Teilnahmeart','Unterschrift']]
     for rec in db.scalars(select(SeminarEnrollment).where(SeminarEnrollment.seminar_id==sid,SeminarEnrollment.status=='confirmed').order_by(SeminarEnrollment.name)):
         if (not rec.scope_id or rec.scope_id in [t.id for t in terms]) and (not tid or not rec.scope_id or rec.scope_id==tid):rows.append([rec.name,rec.organization,hybrid.LABELS[hybrid.mode(rec,series.term_of(db,row,tid))] if tid else 'Siehe Einzeltermine',''])
-    paragraphs=[to_local(t.starts_at).strftime('%d.%m.%Y %H:%M')+' · '+t.location for t in terms if not tid or t.id==tid]
+    paragraphs=[]
+    for term in terms:
+        if tid and term.id!=tid:continue
+        paragraphs.extend([
+            'Einzeltermin: '+(term.title or row.title),
+            'Beginn: '+to_local(term.starts_at).strftime('%d.%m.%Y %H:%M')+' Uhr',
+            'Ende: '+to_local(term.ends_at).strftime('%d.%m.%Y %H:%M')+' Uhr',
+            'Durchführung: '+hybrid.LABELS[term.delivery_mode],
+        ])
+        if term.location:paragraphs.append('Ort: '+term.location)
     return protect(Response(learning.pdf_document(row.title+' · Teilnehmerliste',paragraphs,rows),media_type='application/pdf',headers={'Content-Disposition':'inline; filename="teilnehmerliste.pdf"'}))
 
 @app.post('/seminare/{sid:int}/preview',dependencies=[Depends(check_csrf)])

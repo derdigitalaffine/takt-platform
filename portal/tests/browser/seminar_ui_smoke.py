@@ -26,6 +26,18 @@ def exercise(browser,f):
         assert p.goto(BASE+f'/seminare/{sid}'+suffix).status==200
         capture(p,name+'-desktop');p.set_viewport_size({'width':390,'height':844});capture(p,name+'-mobile')
         p.emulate_media(color_scheme='dark');capture(p,name+'-mobile-dark');p.emulate_media(color_scheme='light');p.set_viewport_size({'width':1440,'height':1000})
+    for url in ('/seminare',f'/seminare/{sid}'):
+        p.goto(BASE+url)
+        preview=p.locator(f'details[data-participant-preview][data-term-id="{tid}"]')
+        expect(preview).not_to_have_attribute('open','')
+        expect(preview.locator('li')).not_to_be_visible()
+        preview.locator('summary').click()
+        expect(preview.locator('li')).to_have_text(['Alex Teilnahme'])
+        expect(preview.locator('li')).to_be_visible()
+        expect(preview.locator('a')).to_have_attribute('href',f'/seminare/{sid}/participants?tid={tid}')
+        p.set_viewport_size({'width':390,'height':844});capture(p,'term-participants-'+('overview' if url=='/seminare' else 'detail'))
+        preview.locator('summary').click();expect(preview.locator('li')).not_to_be_visible()
+        p.set_viewport_size({'width':1440,'height':1000})
     p.goto(BASE+f'/seminare/{sid}/mail');p.locator('#mail-kind').select_option('notice');p.locator('#mail-distributors').fill('Hausverteiler;alle@example.org')
     p.get_by_role('button',name='Vorschau & Empfänger prüfen').click();expect(p.get_by_role('heading',name='Versand prüfen')).to_be_visible();capture(p,'mail-preview-desktop')
     p.set_viewport_size({'width':390,'height':844});capture(p,'mail-preview-mobile');p.get_by_role('button',name='1 Nachrichten einreihen').click()
