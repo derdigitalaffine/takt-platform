@@ -75,6 +75,9 @@ def exercise(browser):
     assert response.value.ok,response.value.text()
     expect(p.locator('#kanban')).not_to_have_attribute('aria-busy','true')
     expect(p.locator('.kb-column').nth(3).locator(f'[data-card="{cardid}"]')).to_have_count(1)
+    p.get_by_role('button',name='Board verwalten',exact=True).click();p.get_by_role('button',name='Board löschen – Aufgaben behalten',exact=True).click()
+    expect(p.locator('.swal2-popup')).to_be_visible();p.get_by_role('button',name='Ja, ausführen',exact=True).click()
+    expect(p).to_have_url(BASE+'/tasks/boards')
     assert not errors,errors
     context.close();econtext.close()
 

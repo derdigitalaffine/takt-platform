@@ -164,10 +164,23 @@ async def board_action(request:Request,bid:int,user:User=Depends(current_user),d
                 ts.audit(db,row,user,'check','Checkliste über Board aktualisiert.')
         else:raise ts.Invalid('Aktion nicht verfügbar.')
         db.commit()
-    except (ts.Invalid,StaleDataError,HTTPException,OSError) as error:
+    except ts.Invalid as error:
         db.rollback();ts.discard_files(paths)
-        status=error.status_code if isinstance(error,HTTPException) else 409 if isinstance(error,StaleDataError) else 422
-        message=str(error.detail) if isinstance(error,HTTPException) else str(error) if isinstance(error,ts.Invalid) else 'Die Änderung konnte nicht gespeichert werden. Bitte aktuellen Stand laden.'
-        if request.headers.get('accept')=='application/json':return JSONResponse({'detail':message},status_code=status)
-        raise HTTPException(status,message)
+        message=error.args[0] if error.args and isinstance(error.args[0],str) else 'Bitte die Eingaben prüfen.'
+        if request.headers.get('accept')=='application/json':return JSONResponse({'detail':message},status_code=422)
+        raise HTTPException(422,message)
+    except HTTPException as error:
+        db.rollback();ts.discard_files(paths)
+        if request.headers.get('accept')=='application/json':return JSONResponse({'detail':error.detail},status_code=error.status_code)
+        raise
+    except StaleDataError:
+        db.rollback();ts.discard_files(paths)
+        message='Die Aufgabe wurde inzwischen geändert. Bitte den aktuellen Stand laden.'
+        if request.headers.get('accept')=='application/json':return JSONResponse({'detail':message},status_code=409)
+        raise HTTPException(409,message)
+    except OSError:
+        db.rollback();ts.discard_files(paths)
+        message='Die Dateien konnten nicht gespeichert werden. Bitte wählen Sie sie erneut aus.'
+        if request.headers.get('accept')=='application/json':return JSONResponse({'detail':message},status_code=422)
+        raise HTTPException(422,message)
     return JSONResponse({'ok':True}) if request.headers.get('accept')=='application/json' else redirect(f'/tasks/boards/{bid}')

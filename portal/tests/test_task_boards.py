@@ -156,3 +156,13 @@ def test_write_rechecks_membership_after_board_lock(db,task_people,monkeypatch):
     response=post(client_for(editor),db,b,'edit',card=card.id,version=t.version,priority='urgent')
     assert response.status_code==404
     db.refresh(t);assert t.priority=='normal'
+
+
+def test_upload_io_error_never_discloses_internal_paths(db,task_people,monkeypatch):
+    a=task_people[0];b=board(db,a);t=make(db,task_people);card=attach(db,b,t,a)
+    async def fail(*args,**kwargs):raise OSError('private database /secret/internal-path')
+    monkeypatch.setattr(ts,'attach_files',fail)
+    response=post(client_for(a),db,b,'upload',card=card.id,version=t.version)
+    assert response.status_code==422
+    assert 'Dateien konnten nicht gespeichert' in response.json()['detail']
+    assert 'internal-path' not in response.text and '/secret/' not in response.text
