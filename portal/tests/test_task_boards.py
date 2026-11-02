@@ -35,6 +35,7 @@ def test_private_board_and_reader_cannot_mutate_through_task_routes(db,task_peop
     assert client_for(outsider).get(f'/tasks/boards/{b.id}').status_code==404
     membership=member(db,b,reader,1);c=client_for(reader);page=c.get(f'/tasks/boards/{b.id}');assert page.status_code==200
     assert c.get(f'/tasks/boards/{b.id}/cards/{card.id}').status_code==200
+    assert '<fieldset disabled' in c.get(f'/aufgaben/{t.id}').text
     assert post(c,db,b,'edit',card=card.id,version=t.version,priority='urgent').status_code==404
     assert c.post(f'/aufgaben/{t.id}/aktion',data={'csrf':csrf_of(page.text),'version':t.version,'action':'check_add','check_title':'No'}).status_code==403
     db.delete(membership);db.commit()

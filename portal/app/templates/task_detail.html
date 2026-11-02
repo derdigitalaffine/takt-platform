@@ -7,7 +7,7 @@
 <form method="post" action="/aufgaben/{{task.id}}/aktion" {% if style=='primary' %}class="ds-primary"{% endif %}>{{hidden()}}<input type="hidden" name="action" value="{{action}}">{% if status %}<input type="hidden" name="status" value="{{status}}">{% endif %}<button class="btn btn-{{style}} w-100">{% if icon %}<i class="fa-solid {{icon}} me-1" aria-hidden="true"></i>{% endif %}{{label}}</button></form>
 {% endmacro %}
 {% block head %}<link rel="stylesheet" href="/static/tasks.css">{% endblock %}
-{% block content %}<div class="task-page">
+{% block content %}<div class="task-page">{% set readonly=not ts.may_collaborate(user,task) %}{% if readonly %}<p class="alert alert-info">Sie haben Leserechte für diese Aufgabe.</p><fieldset disabled class="border-0 p-0 m-0 w-100"><legend class="visually-hidden">Aufgabe schreibgeschützt</legend>{% endif %}
 <a href="{{back}}" class="d-inline-block mb-3"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Meine Aufgaben</a>
 {% call m.page_header(task.title, '') %}
 {% if ts.may_work(user,task) and not task.archived_at %}
@@ -53,6 +53,6 @@
 </div></details>
 <details class="card"><summary class="card-header">Aktivitätsverlauf</summary><ol class="list-group list-group-flush">{% for item in activity %}<li class="list-group-item small"><div class="text-secondary">{{item.created_at|local}} · {{item.actor_name}}</div><div class="text-break">{{item.text}}</div></li>{% endfor %}</ol></details>
 </aside></div>
-</div>{% endblock %}
+{% if readonly %}</fieldset>{% endif %}</div>{% endblock %}
 
 {% block scripts %}<script src="/static/task-views.js" defer></script>{% endblock %}
