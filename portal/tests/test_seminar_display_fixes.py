@@ -39,6 +39,9 @@ def test_participant_quick_view_is_staff_only_and_links_full_list(db, people):
     assert page.status_code == 200
     assert 'data-participant-preview' in page.text
     assert f'/seminare/{row.id}/participants' in page.text
+    overview = staff.get('/seminare')
+    assert overview.status_code == 200
+    assert f'data-url="/seminare/{row.id}/participants"' in overview.text
     script = staff.get('/static/seminar_participant_preview.js')
     assert script.status_code == 200
     assert 'Angemeldet' in script.text
@@ -46,8 +49,25 @@ def test_participant_quick_view_is_staff_only_and_links_full_list(db, people):
     public = client().get(f'/seminare/{row.id}')
     assert public.status_code == 200
     assert 'data-participant-preview' not in public.text
+    public_overview = client().get('/seminare')
+    assert f'data-url="/seminare/{row.id}/participants"' not in public_overview.text
 
     pdf = staff.get(f'/seminare/{row.id}/participants.pdf')
     assert pdf.status_code == 200
     assert pdf.headers['content-type'].startswith('application/pdf')
     assert pdf.content.startswith(b'%PDF')
+
+
+def test_admin_sees_participant_quick_view_in_seminar_overview(db, people):
+    row, term = make(db, people)
+    rec(db, row, term, people[1], status='confirmed')
+    people[3].is_admin = True
+    db.commit()
+
+    admin = login(people[3].email, 'passwort-test-123')
+    page = admin.get('/seminare')
+    assert page.status_code == 200
+    assert f'data-url="/seminare/{row.id}/participants"' in page.text
+    participants = admin.get(f'/seminare/{row.id}/participants')
+    assert participants.status_code == 200
+    assert people[1].name in participants.text
