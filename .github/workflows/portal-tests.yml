@@ -122,3 +122,32 @@ jobs:
           name: seminars-browser
           path: /tmp/takt-seminar-browser/
           retention-days: 7
+
+  kanban-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: portal
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: portal/requirements.txt
+      - name: Install browser test dependencies
+        run: python -m pip install -r requirements.txt playwright==1.62.0
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Exercise shared Kanban boards on desktop and touch mobile
+        run: python tests/browser/board_ui_smoke.py
+      - name: Save Kanban screenshots and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kanban-browser
+          path: /tmp/takt-board-browser/
+          retention-days: 7
