@@ -116,3 +116,33 @@ def test_preview_respects_effective_term_assignment(db,people):
         blocks=preview_blocks(teacher.get(url).text)
         assert term.id in blocks and second.id not in blocks
         assert 'Noch keine bestätigten Anmeldungen.' in blocks[term.id][1]
+
+
+
+def test_single_term_pdf_header_and_participants_are_scoped(db,people):
+    import io
+    import json
+    from datetime import timedelta
+    from pypdf import PdfReader
+    from app.db import SeminarSession, to_local
+    row,term=make(db,people)
+    row.title='Fortbildungsreihe Digitalisierung'
+    term.title='Dokumentenmanagement in der Praxis';term.location='Rathaus, Schulungsraum 2'
+    term.delivery_mode='hybrid';term.lecturers_json=json.dumps([people[2].id])
+    other=SeminarSession(seminar_id=row.id,title='Anderer Termin',location='Anderer Raum',starts_at=term.starts_at+timedelta(days=7),ends_at=term.ends_at+timedelta(days=7))
+    db.add(other);db.flush()
+    rec(db,row,term,people[1],status='confirmed');rec(db,row,other,people[3],status='confirmed');db.commit()
+    staff=login(people[0].email,'passwort-test-123')
+    response=staff.get(f'/seminare/{row.id}/participants.pdf?tid={term.id}')
+    assert response.status_code==200
+    reader=PdfReader(io.BytesIO(response.content))
+    text=' '.join(page.extract_text() for page in reader.pages)
+    for value in (row.title,'Einzeltermin: '+term.title,
+                  'Beginn: '+to_local(term.starts_at).strftime('%d.%m.%Y %H:%M')+' Uhr',
+                  'Ende: '+to_local(term.ends_at).strftime('%d.%m.%Y %H:%M')+' Uhr',
+                  'Ort: '+term.location,'Hybrid: vor Ort oder online',people[1].name):
+        assert value in text
+    assert other.title not in text and other.location not in text and people[3].name not in text
+    assert text.index(term.title)<text.index('Unterschrift')
+    teacher=login(people[2].email,'passwort-test-123')
+    assert teacher.get(f'/seminare/{row.id}/participants.pdf?tid={other.id}').status_code==404
