@@ -99,6 +99,7 @@ def save(db,user,data,row=None):
         if tid and (tid not in existing or tid in seen):raise HTTPException(422,'Ungültiger oder doppelter Termin.')
         if tid:seen.add(tid)
         if value.get('include') is False:
+            if tid and existing[tid].cancelled:continue
             if tid:seminar_terms.delete_draft(db,row,existing[tid],user)
             continue
         start=sm.parse_time(value.get('starts_at'));end=sm.parse_time(value.get('ends_at'))
