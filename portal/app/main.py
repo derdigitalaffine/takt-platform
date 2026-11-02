@@ -2805,3 +2805,7 @@ from . import routes_oidc  # noqa: E402,F401
 from . import routes_seminar_planning, routes_seminar_hybrid  # noqa: E402,F401
 
 from . import routes_tasks  # noqa: E402,F401
+
+from . import routes_seminar_operations  # noqa: E402,F401
+
+from . import routes_seminar_transfer  # noqa: E402,F401

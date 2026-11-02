@@ -130,13 +130,15 @@ def authorized_room(db,user,meeting):
 def invite_teacher(db,row,term,email):
     """Only explicit publication notifications create this separate guest entitlement."""
     from .security import encrypt, decrypt
+    from .seminar_operations import options
+    days=options(row)['teacher_days'] if options(row)['guest_materials'] else 1
     email=email.strip().lower()
     access=db.scalar(select(SeminarLecturerAccess).where(SeminarLecturerAccess.term_id==term.id,SeminarLecturerAccess.email==email))
     if not access:
         token=secrets.token_urlsafe(32)
-        access=SeminarLecturerAccess(term_id=term.id,email=email,token_hash=hashlib.sha256(token.encode()).hexdigest(),token_enc=encrypt(token),expires_at=term.ends_at+timedelta(days=1))
+        access=SeminarLecturerAccess(term_id=term.id,email=email,token_hash=hashlib.sha256(token.encode()).hexdigest(),token_enc=encrypt(token),expires_at=term.ends_at+timedelta(days=days))
         db.add(access)
-    else:access.expires_at=term.ends_at+timedelta(days=1)
+    else:access.expires_at=term.ends_at+timedelta(days=days)
     db.flush()
     return sm.links.module_url(db,'seminars','/seminare/dozent/'+decrypt(access.token_enc))
 

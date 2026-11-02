@@ -51,7 +51,11 @@ async def staff_mode(request:Request,sid:int,eid:int,tid:int,user:User=Depends(c
 def guest_teacher_page(request:Request,token:str,db:Session=Depends(get_db)):
     from .main import render
     row,term,access,teacher=hybrid.guest_teacher(db,token)
-    return protect(render(request,'seminar_guest_teacher.html',None,row=row,term=term,teacher=teacher,token=token))
+    from .seminar_operations import options
+    from .db import SeminarMaterial
+    from sqlalchemy import select
+    return protect(render(request,'seminar_guest_teacher.html',None,row=row,term=term,teacher=teacher,token=token,options=options(row),
+        materials=list(db.scalars(select(SeminarMaterial).where(SeminarMaterial.author_access_id==access.id,SeminarMaterial.seminar_id==row.id,SeminarMaterial.scope_id==term.id))),local_input=sm.local_input))
 
 
 @app.post('/seminare/dozent/{token}/video',dependencies=[Depends(check_csrf)])
