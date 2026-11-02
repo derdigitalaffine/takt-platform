@@ -91,3 +91,34 @@ jobs:
           name: surveys-browser
           path: portal/survey-browser-artifacts/
           retention-days: 7
+
+  seminars-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: portal
+    env:
+      SEMINAR_BROWSER_ARTIFACTS: /tmp/takt-seminar-browser
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: portal/requirements.txt
+      - name: Install browser test dependencies
+        run: python -m pip install -r requirements.txt playwright==1.62.0
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Exercise seminar workflows on desktop and mobile
+        run: python tests/browser/seminar_ui_smoke.py
+      - name: Save seminar screenshots and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seminars-browser
+          path: /tmp/takt-seminar-browser/
+          retention-days: 7

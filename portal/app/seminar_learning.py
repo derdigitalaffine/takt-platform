@@ -117,8 +117,11 @@ def certificate_covers_term(cert,enrollment,term):
                for date in snapshot.get('dates',[]))
 
 
-def mark_attendance(db,row,rec,term,user,present):
-    if not series.may_term(db,user,row,term):raise HTTPException(404)
+def mark_attendance(db,row,rec,term,user,present,*,self_service=False):
+    if self_service:
+        from .seminar_operations import checkin_enabled
+        if not user or rec.user_id!=user.id or not present or not checkin_enabled(row,term) or utcnow()>term.ends_at or row.status!="published":raise HTTPException(403)
+    elif not series.may_term(db,user,row,term):raise HTTPException(404)
     if rec.status!='confirmed' or term not in sm.enrollment_sessions(db,row,rec):raise HTTPException(409,'Nur bestätigte Teilnahme am passenden aktiven Termin erfassen.')
     if utcnow()<term.starts_at-timedelta(minutes=30):raise HTTPException(409,'Anwesenheit frühestens 30 Minuten vor Beginn erfassen.')
     related={r.id:r for r in series.history(db,row,rec.email)}
@@ -128,6 +131,7 @@ def mark_attendance(db,row,rec,term,user,present):
             raise HTTPException(409,'Zuerst die ausgestellte Bescheinigung widerrufen.')
     a=db.scalar(select(SeminarAttendance).where(SeminarAttendance.enrollment_id==rec.id,SeminarAttendance.session_id==term.id))
     if not a:a=SeminarAttendance(enrollment_id=rec.id,session_id=term.id,recorded_by=user.id);db.add(a)
+    a.source="self" if self_service else "staff"
     a.present=present;a.recorded_by=user.id;a.recorded_at=utcnow();sm.event(db,row,'attendance',user,f'{rec.id}/{term.id}: {present}')
 
 

@@ -32,7 +32,7 @@ Bei regelmäßigen Reihen Beginn, Uhrzeit, Dauer und Ende nach Terminanzahl oder
 
 Eine Ortsfolge wie **Otterbach → Otterberg** wird über die tatsächlich enthaltenen Termine wiederholt. Feiertage in Rheinland-Pfalz werden gekennzeichnet und können ausgelassen werden; sie werden nicht automatisch verschoben. Die Terminanzahl zählt die geplanten Wiederholungen, sodass ausgelassene Feiertage die Zahl der enthaltenen Termine vermindern können. Schulferien sind nicht automatisch hinterlegt; die Vorschau weist auf ihre zusätzliche Prüfung hin. Höchstens 100 Termine können zusammen geplant werden.
 
-Dozenten der Reihe werden als Vorgabe übernommen. Pro Termin sind eigene interne oder externe Dozenten möglich; ein Hauptdozent ist optional. Externe Dozenten können nur für die aktuelle Veranstaltung erfasst oder ausdrücklich in einer gemeinsamen Liste zur Wiederverwendung gespeichert werden. Eine E-Mail-Adresse erzeugt keinen Benutzerzugang. Das Benachrichtigen der Betreuung wird beim Veröffentlichen ausdrücklich angeboten. Die Nachricht an externe Dozenten nennt ihre Termine, Themen und Orte. Bei Online- oder Hybridterminen enthält sie einen persönlichen Konferenzzugang, der ausschließlich die Betreuung der zugeordneten Konferenz ermöglicht, keine Teilnehmerlisten, Unterlagenverwaltung oder Bescheinigungen. Der Zugang endet spätestens einen Tag nach dem Termin und wird bei entfernter Zuordnung, Absage oder zurückgenommener Veröffentlichung ungültig.
+Dozenten der Reihe werden als Vorgabe übernommen. Pro Termin sind eigene interne oder externe Dozenten möglich; ein Hauptdozent ist optional. Externe Dozenten können nur für die aktuelle Veranstaltung erfasst oder ausdrücklich in einer gemeinsamen Liste zur Wiederverwendung gespeichert werden. Eine E-Mail-Adresse erzeugt keinen Benutzerzugang. Das Benachrichtigen der Betreuung wird beim Veröffentlichen ausdrücklich angeboten. Die Nachricht an externe Dozenten nennt ihre Termine, Themen und Orte. Bei Online- oder Hybridterminen enthält sie einen persönlichen Konferenzzugang, der ausschließlich die Betreuung der zugeordneten Konferenz ermöglicht, keine Teilnehmerlisten oder Bescheinigungen. Eine zusätzliche Unterlagenverwaltung kann ausdrücklich unter **Organisation** aktiviert werden (siehe unten). Ohne zusätzliche Unterlagenverwaltung endet der Zugang spätestens einen Tag nach dem Termin und wird bei entfernter Zuordnung, Absage oder zurückgenommener Veröffentlichung ungültig.
 
 Eine gespeicherte Terminliste wird nicht durch eine neu erzeugte Wiederholung ersetzt; einzelne zusätzliche Termine können ergänzt werden. Gemeinsame Änderungen an Uhrzeit, Dauer, Orten, Dozenten oder Durchführung lassen sich auf diesen Termin, diesen und folgende zukünftige Termine oder alle zukünftigen Termine anwenden. Bereits individuell angepasste andere Termine bleiben geschützt; Änderungen veröffentlichter Termine benötigen eine ausdrückliche Bestätigung. Eine neue Dozentenvorgabe schreibt vergangene oder nicht ausgewählte Termine nicht um. Bereits veröffentlichte Termine ausdrücklich in der Terminverwaltung absagen. Neu hinzugefügte Termine einer veröffentlichten Reihe beginnen als Entwurf und können einzeln oder gesammelt freigegeben werden. Erst veröffentlichte Termine werden zur Buchung angeboten und an Abonnenten gemeldet.
 
@@ -93,3 +93,82 @@ Benachrichtigungen lassen sich getrennt für Anmeldung und Entscheidung, Änderu
 Die zusätzlichen Tabellen werden beim normalen Portalstart angelegt. Vor einem Update wie üblich Datenbank und Datenverzeichnis sichern. Seminar-Uploads liegen im bestehenden Datenverzeichnis unter `seminars`; sie gehören in dieselbe Sicherung wie Datenbank und andere Portaldateien. Bestehende Formulare, Raumfreigaben und Rechte werden weiterverwendet, nicht durch die Seminarrechte ersetzt.
 
 Automatisierte Prüfungen decken Platzvergabe, Zugriffsgrenzen, Pflichtformulare, Wartelisten, Kalender, Check-in, Bescheinigungen, Abonnements und Terminplanung ab. Ein echter Mailversand oder die Erreichbarkeit eines externen Konferenzanbieters wird dadurch nicht zugesichert; diese Betriebsfunktionen mit der eigenen Konfiguration prüfen.
+
+## Wissenshäppchen und wiederverwendbare Vorlagen
+
+Unter **Aus Vorlage planen** startet die Vorlage **Wissenshäppchen** mit einer internen Reihe im Vierzehntagesrhythmus, Einzelbuchungen, Abonnement, optionalem Selbst-Check-in, externem Dozentenupload mit Prüfung und Bescheinigungen pro Termin. Beginn, Themen, Orte und Betreuung werden anschließend in der Planung ergänzt. Die Daueranmeldung ist bei dieser Vorlage ausgeschaltet.
+
+Unter **Organisation & Vorlagen** sind die zusätzlichen Funktionen je Veranstaltung einstellbar. Die gespeicherten Einstellungen können als eigene Vorlage gesichert werden. Allgemeine Buchungs-, Benachrichtigungs-, Bescheinigungs- und Organisationseinstellungen sowie Wiederholungsregeln und Ortsvorgaben werden kopiert. Konkrete Termine, Teilnehmer, Dozentenzuordnungen, Dateien, Formulare, persönliche Links und Unterschriftsbilder werden nicht übernommen. Vorlagen gehören der erstellenden Person. Änderungen an Vorlage oder neuer Veranstaltung verändern keine vorhandene Veranstaltung.
+
+### Favoriten, Abonnement und Daueranmeldung
+
+Diese drei Funktionen sind voneinander getrennt:
+
+- **Favorit:** persönliche Merkliste ohne E-Mails und ohne Platzreservierung, erreichbar unter **Favoriten**.
+- **Abonnement:** Nachrichten über neue Termine und Änderungen; keine Buchung.
+- **Daueranmeldung:** ausdrücklich aktivierte Anmeldung auch für künftig veröffentlichte Termine. Sie ist nur verfügbar, wenn die Planung sie unter **Organisation** erlaubt. Sie funktioniert auch ohne Nachrichtenabonnement.
+
+Die Daueranmeldung wird im persönlichen Reihenzugang aktiviert. Bestehende veröffentlichte zukünftige Termine werden sofort berücksichtigt, später veröffentlichte Termine beim nächsten Seminar-Worker-Durchlauf. Jede neue Terminbuchung verwendet die normale Platzvergabe, Pflichtformulare, Zulassung und Warteliste. Falls eine Buchung nicht möglich ist, bleibt eine persönliche Einladung mit Handlungsbedarf bestehen. Individuelle Absagen werden nicht überschrieben; Entwürfe und vergangene Termine werden nicht gebucht. Gruppen mit festem Teilnehmerkreis verwenden weiterhin ihre ausdrücklichen Veröffentlichungseinladungen.
+
+Bei Online-Terminen wird Online-Teilnahme, bei Hybridterminen zunächst Vor-Ort-Teilnahme gewählt. Eine spätere Änderung verwendet die bestehenden Platz- und Fristprüfungen. Das Beenden der Daueranmeldung storniert keine vorhandenen Buchungen. Ausschalten durch die Planung pausiert weitere automatische Buchungen. Abonnement und Daueranmeldung können unabhängig beendet werden. Ganze Reihenbuchungen behalten ihr bisheriges Verhalten: spätere Termine werden darüber nicht automatisch ergänzt.
+
+### Hinweise und persönliche Einladungen per Sammelmail
+
+**Einladen & Informieren** bietet frei bearbeitbare Betreff- und Nachrichtentexte mit `{name}`, `{titel}`, `{termine}` und `{link}`. Die Vorgabe wird unter **Organisation** gespeichert und kann pro Versand geändert werden. Ein Hinweis enthält einen allgemeinen Veranstaltungslink und erzeugt keine Buchung. Eine persönliche Einladung erzeugt beziehungsweise verwendet eine persönliche Anmeldung, reserviert aber keinen Platz. Bei Einzelbuchung einen Termin auswählen; Reihenbuchungen verwenden die ganze Reihe.
+
+Als Empfänger sind aktive Portalnutzer, Portalgruppen und externe Adresslisten möglich, beispielsweise `Name;adresse@example.org` je Zeile. **Mailverteiler immer im eigenen Feld eintragen.** Ein Verteiler erhält ausschließlich den allgemeinen Veranstaltungslink, selbst beim Versand persönlicher Einladungen. Adressen werden zusammengeführt; eine zusätzlich als Verteiler markierte Adresse bleibt ein Verteiler. Bis zu 500 Empfängeradressen sind gleichzeitig möglich. Der Inhalt eines externen Mailverteilers ist dem Portal nicht bekannt; die Planung muss Verteiler deshalb ausdrücklich kennzeichnen.
+
+Die Vorschau zeigt Empfänger, Betreff und ein Nachrichtenbeispiel. Erst die abschließende Aktion reiht Nachrichten einzeln in die bestehende Versandwarteschlange ein; andere Empfängeradressen werden nicht offengelegt. Bereits eingereihte Entwürfe können nicht erneut gesendet werden. Nach relevanten Veranstaltungsänderungen oder nach einer Stunde ist eine neue Vorschau erforderlich. SMTP und Versandlimits werden geprüft; ein fehlgeschlagener Einreihungsversuch speichert keinen Teilversand dieses Entwurfs. Zustellfehler und Wiederholungen werden über die bestehende Benachrichtigungsverwaltung bearbeitet. Ein erfolgreicher Warteschlangeneintrag ist keine Zustellbestätigung.
+
+### Externe Dozenten mit Unterlagenzugang
+
+Standardmäßig behalten externe Dozenten ihren bisherigen Konferenzzugang. Die Planung kann zusätzlich **Unterlagen über persönlichen Dozentenzugang hochladen** aktivieren. Unter **Organisation → Externe Zugänge** werden persönliche Links je zugeordnetem Termin versendet und widerrufen, auch für reine Präsenzveranstaltungen. Ohne diese Zusatzfunktion endet der Konferenzzugang weiterhin einen Tag nach Terminende. Bei aktivierter Unterlagenverwaltung gilt für neu versendete Zugänge die eingestellte Frist von 1 bis 365 Tagen, voreingestellt 30 Tage nach Terminende.
+
+Der Zugang benötigt kein Portalkonto und erlaubt ausschließlich Upload und Abruf eigener Dateien zum zugeordneten Termin. Er gewährt keine Teilnehmerdaten, Anwesenheitsverwaltung oder Bescheinigungsrechte. Entfernte Dozentenzuordnung, Absage, zurückgenommene Veröffentlichung, Ablauf oder ausdrücklicher Widerruf sperren den Zugang. Nach einem Widerruf erzeugt erneutes Einladen einen neuen Link.
+
+Externe können sofortige, geplante oder manuelle Freischaltung wünschen. Standardmäßig müssen die Unterlagen zunächst von der Planung unter **Unterlagen & Abfragen** geprüft werden. Dort ist der gewünschte Zeitpunkt sichtbar; für geplante Freigabe ausdrücklich den Modus **Geplant** speichern. Nur mit der zusätzlichen Erlaubnis **selbst veröffentlichen** dürfen Externe ihre eigenen Dateien direkt freischalten und den Freigabezeitpunkt ändern. Die bestehenden Formatgrenzen und 20 MB pro Datei bleiben wirksam.
+
+### Durchführung und Selbst-Check-in
+
+Die Terminansicht **Termin durchführen & QR-Check-in** bündelt bestätigte Teilnehmer, Namens-/Organisationssuche, Anwesenheit sowie PDF- und CSV-Listen. **Noch nicht erfasst**, **Anwesend** und **Nicht anwesend** sind getrennt sichtbar. Jede Erfassung zeigt Zeitpunkt und Herkunft (Betreuung oder Selbst-Check-in). Die Betreuung kann Einträge korrigieren; der bestehende Schutz aktiver Bescheinigungen bleibt erhalten.
+
+Optional kann Selbst-Check-in für die Veranstaltung und abweichend je Termin aktiviert werden. Der dort angezeigte gemeinsame QR-Code gilt 15 Minuten; **QR-Code erneuern & Stand aktualisieren** erzeugt einen aktuellen Code. Scannen alleine bestätigt nichts. Portalteilnehmer müssen angemeldet sein, eine bestätigte Buchung des Termins besitzen und ausdrücklich ihre Anwesenheit bestätigen. Das Zeitfenster beginnt 30 Minuten vor Beginn und endet mit Terminende. Externe Teilnehmer ohne Portalkonto werden weiterhin durch die Betreuung erfasst.
+
+Bereits durch Betreuung erfasste Anwesenheiten können durch Selbst-Check-in nicht überschrieben werden. Wiederholte eigene Bestätigungen erzeugen keine Doppeleinträge. Änderungen der Check-in-Einstellung oder der maßgeblichen Termin-/Veranstaltungsrevision machen angezeigte Codes ungültig. Der QR-Code ist kein Nachweis des physischen Aufenthalts; für eine kontrollierte Teilnahmebestätigung die Betreuung verwenden.
+
+### Abnahme und Betrieb der Erweiterungen
+
+Die Migration ergänzt Spalten und Tabellen beim Portalstart; vorher Datenbank und Datenverzeichnis sichern. Bestehende Veranstaltungen erhalten ausgeschaltete Daueranmeldung, ausgeschalteten Selbst-Check-in und keine zusätzlichen externen Unterlagenrechte. Der vorhandene Seminar-Worker muss für spätere Daueranmeldungen und Nachrichten laufen.
+
+Automatisierte Tests: `cd portal && ../.venv/bin/python -m pytest -q tests`. Die Browserabnahme liegt in `portal/tests/browser/seminar_ui_smoke.py`; sie verwendet temporäre Daten, einen eigenen Server ohne Worker und keinen echten Mailversand. Mit installiertem Playwright und Chromium aus `portal` starten: `../.venv/bin/python tests/browser/seminar_ui_smoke.py`. Alternativ `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium` setzen. Artefakte liegen standardmäßig unter `/tmp/takt-seminar-browser`; `SEMINAR_BROWSER_ARTIFACTS` überschreibt den Pfad. Die Prüfung umfasst Desktop, Smartphone, Farbschemata, Buchungen einer Reihe und eines Einzeltermins, Favoriten, Daueranmeldung, Check-in, Mailvorschau und externen Unterlagenupload. Produktiven SMTP-Versand und Wiederherstellung mit der eigenen Betriebskonfiguration separat abnehmen.
+
+## Seminarreihen als JSON importieren und exportieren
+
+In **Organisation & Vorlagen → JSON-Export** können Planungsberechtigte eine Reihe oder einen Einzeltermin als JSON-Datei herunterladen. **JSON importieren** in der Seminarübersicht beziehungsweise im Organisationsbereich legt daraus eine **neue Veranstaltung im Entwurfszustand** an. Vorhandene Reihen werden nicht überschrieben; jeder bestätigte Import erzeugt eine neue Kopie. Es werden keine Nachrichten versendet und keine Teilnehmer angemeldet. Nach dem Import Termine und Zuordnungen prüfen und ausdrücklich veröffentlichen.
+
+Übertragen werden Titel, Beschreibung, Wiederholungsregeln und Ortsfolgen der Planung, gespeicherte Termine einschließlich abgesagter Termine und Absagegrund, Orte, interne und externe Dozenten, terminbezogene Einstellungen sowie Buchungs-, Benachrichtigungs-, Bescheinigungs- und Organisationseinstellungen einschließlich Nachrichtenvorlage. Interne Dozenten werden über ihre E-Mail-Adresse aktiven Portalbenutzern zugeordnet. Nicht vorhandene oder deaktivierte interne Dozenten verhindern den Import mit einer Fehlermeldung. Externe werden ausschließlich für die importierte Reihe erfasst, nicht automatisch in die gemeinsame Dozentenliste eingetragen.
+
+Nicht übertragen werden Teilnehmerdaten, Anmeldungen, Anwesenheit, Abonnements, Favoriten, ausgestellte Bescheinigungen, persönliche Zugangstoken, Dateien oder Unterschriftsbilder. Verknüpfungen zu Formularen, Umfragen, festen Teilnehmergruppen, Portalräumen, Raumreservierungen und Konferenzen werden nicht übernommen. Auch externe Konferenzlinks werden ausgelassen, da sie Zugangsdaten enthalten können. Diese Verknüpfungen und Onlinezugänge nach dem Import neu einstellen. Der JSON-Export ist eine Übertragung der Reihenplanung, kein vollständiges Datenbank- oder Dateibackup. Dozentennamen und E-Mail-Adressen sind in der Datei enthalten; entsprechend vertraulich behandeln.
+
+Das versionierte Format heißt `takt.seminar-series`, aktuell Version `1`. Zeitpunkte benötigen eine Zeitzonenangabe; der Export verwendet UTC. Der Import rechnet in die interne UTC-Speicherung um, die Oberfläche zeigt weiterhin die Portal-Zeitzone. Maximal 100 Termine und 2 MB pro Datei. Ungültige Versionen, unbekannte Felder, doppelte JSON-Schlüssel, unzulässige Feldtypen und ungültige Terminzeiträume werden abgewiesen; ein fehlerhafter Import erzeugt keinen Teilbestand.
+
+Minimales Beispiel einer manuell vorbereiteten Datei:
+
+```json
+{
+  "format": "takt.seminar-series",
+  "version": 1,
+  "seminar": {
+    "title": "Wissenshäppchen",
+    "description": "Unsere hausinterne Wissensreihe",
+    "terms": [
+      {
+        "title": "Wissen gemeinsam nutzen",
+        "starts_at": "2027-03-15T12:00:00+01:00",
+        "ends_at": "2027-03-15T12:30:00+01:00",
+        "location": "Besprechungsraum 1"
+      }
+    ]
+  }
+}
+```

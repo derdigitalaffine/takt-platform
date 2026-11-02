@@ -146,6 +146,7 @@ class SeminarExternalLecturer(Base):
 
 
 class Seminar(Base):
+    operations_json: Mapped[str] = mapped_column(Text, default="{}")
     __tablename__ = "seminars"
     planning_json: Mapped[str] = mapped_column(Text, default='{}')
     guests_json: Mapped[str] = mapped_column(Text, default='[]')
@@ -258,6 +259,7 @@ class SeminarEnrollment(Base):
 
 
 class SeminarAttendance(Base):
+    source: Mapped[str] = mapped_column(String(20), default="staff")
     __tablename__ = "seminar_attendance"
     __table_args__ = (UniqueConstraint("enrollment_id", "session_id"),)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -269,6 +271,7 @@ class SeminarAttendance(Base):
 
 
 class SeminarMaterial(Base):
+    author_access_id: Mapped[int | None] = mapped_column(ForeignKey("seminar_lecturer_access.id", ondelete="SET NULL"), nullable=True)
     __tablename__ = "seminar_materials"
     scope_id: Mapped[int] = mapped_column(Integer, default=0)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -327,6 +330,7 @@ class SeminarDelivery(Base):
 
 
 class SeminarSubscription(Base):
+    standing: Mapped[bool] = mapped_column(Boolean, default=False)
     __tablename__ = "seminar_subscriptions"
     __table_args__ = (UniqueConstraint("seminar_id", "email"),)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -339,6 +343,32 @@ class SeminarSubscription(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=False)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SeminarFavorite(Base):
+    __tablename__ = "seminar_favorites"
+    __table_args__ = (UniqueConstraint("seminar_id", "user_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    seminar_id: Mapped[int] = mapped_column(ForeignKey("seminars.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+
+
+class SeminarMailDraft(Base):
+    __tablename__ = "seminar_mail_drafts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    seminar_id: Mapped[int] = mapped_column(ForeignKey("seminars.id", ondelete="CASCADE"))
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SeminarTemplate(Base):
+    __tablename__ = "seminar_templates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(255))
+    config_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
 class SeminarNotice(Base):
@@ -2888,14 +2918,16 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "seminar_subscriptions": {"standing": "BOOLEAN NOT NULL DEFAULT 0"},
+    "seminar_attendance": {"source": "VARCHAR(20) NOT NULL DEFAULT 'staff'"},
     "circulation_bundles": {"archived": "BOOLEAN NOT NULL DEFAULT 0"},
     "group_members": {"manual": "BOOLEAN NOT NULL DEFAULT 1"},
     "user_sessions": {"oidc_identity_id": "INTEGER REFERENCES oidc_identities(id) ON DELETE CASCADE", "oidc_sid": "VARCHAR(255) NOT NULL DEFAULT ''", "oidc_token_enc": "TEXT NOT NULL DEFAULT ''", "expires_at": "DATETIME"},
 
     'seminar_enrollments': {'modes_json': "TEXT NOT NULL DEFAULT '{}'"},
-    'seminars': {'planning_json': "TEXT NOT NULL DEFAULT '{}'", 'guests_json': "TEXT NOT NULL DEFAULT '[]'", 'lead_id': 'INTEGER', 'fixed_groups_json': "TEXT NOT NULL DEFAULT '[]'", 'fixed_confirmation': 'BOOLEAN NOT NULL DEFAULT 1', 'video_room': "VARCHAR(128) NOT NULL DEFAULT ''", 'subscriptions': 'BOOLEAN NOT NULL DEFAULT 1', 'digest_mode': "VARCHAR(16) NOT NULL DEFAULT 'daily'", 'notifications_json': "TEXT NOT NULL DEFAULT '{}'", 'certificate_scope': "VARCHAR(16) NOT NULL DEFAULT 'enrollment'", 'certificate_auto': 'BOOLEAN NOT NULL DEFAULT 0', 'certificate_options_json': "TEXT NOT NULL DEFAULT '{}'", 'form_once': 'BOOLEAN NOT NULL DEFAULT 0'},
+    'seminars': {'operations_json': "TEXT NOT NULL DEFAULT '{}'", 'planning_json': "TEXT NOT NULL DEFAULT '{}'", 'guests_json': "TEXT NOT NULL DEFAULT '[]'", 'lead_id': 'INTEGER', 'fixed_groups_json': "TEXT NOT NULL DEFAULT '[]'", 'fixed_confirmation': 'BOOLEAN NOT NULL DEFAULT 1', 'video_room': "VARCHAR(128) NOT NULL DEFAULT ''", 'subscriptions': 'BOOLEAN NOT NULL DEFAULT 1', 'digest_mode': "VARCHAR(16) NOT NULL DEFAULT 'daily'", 'notifications_json': "TEXT NOT NULL DEFAULT '{}'", 'certificate_scope': "VARCHAR(16) NOT NULL DEFAULT 'enrollment'", 'certificate_auto': 'BOOLEAN NOT NULL DEFAULT 0', 'certificate_options_json': "TEXT NOT NULL DEFAULT '{}'", 'form_once': 'BOOLEAN NOT NULL DEFAULT 0'},
     'seminar_sessions': {'delivery_mode': "VARCHAR(16) NOT NULL DEFAULT 'onsite'", 'online_capacity': 'INTEGER NOT NULL DEFAULT 0', 'video_kind': "VARCHAR(16) NOT NULL DEFAULT 'manual'", 'meeting_id': 'INTEGER', 'published': 'BOOLEAN NOT NULL DEFAULT 1', 'lecturers_json': "TEXT NOT NULL DEFAULT ''", 'guests_json': "TEXT NOT NULL DEFAULT '[]'", 'lead_id': 'INTEGER', 'lecturer_description': "TEXT NOT NULL DEFAULT ''", 'show_contact': 'BOOLEAN NOT NULL DEFAULT 0', 'participants_visible': 'BOOLEAN NOT NULL DEFAULT 0', 'overrides_json': "TEXT NOT NULL DEFAULT '{}'", 'published_at': 'DATETIME'},
-    'seminar_materials': {'scope_id': 'INTEGER NOT NULL DEFAULT 0'},
+    'seminar_materials': {'author_access_id': 'INTEGER REFERENCES seminar_lecturer_access(id) ON DELETE SET NULL', 'scope_id': 'INTEGER NOT NULL DEFAULT 0'},
     'seminar_activities': {'scope_id': 'INTEGER NOT NULL DEFAULT 0', 'once_per_series': 'BOOLEAN NOT NULL DEFAULT 0'},
     'seminar_certificates': {'scope_id': 'INTEGER NOT NULL DEFAULT 0'},
 

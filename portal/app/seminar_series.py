@@ -75,7 +75,8 @@ def subscription_mail(db,row,sub,action,message):
 
 
 def subscribe(db,row,user,name,email):
-    if not row.subscriptions:raise HTTPException(409,'Abonnement deaktiviert.')
+    from .seminar_operations import options
+    if not row.subscriptions and not options(row)['standing']:raise HTTPException(409,'Abonnement und Daueranmeldung deaktiviert.')
     email=(user.email if user else email).strip().lower();name=(user.name if user else name).strip()
     if not name or len(name)>255 or not sm.re.fullmatch(r'[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+',email) or len(email)>255:raise HTTPException(422,'Name und gültige E-Mail-Adresse erforderlich.')
     sub=db.scalar(select(SeminarSubscription).where(SeminarSubscription.seminar_id==row.id,SeminarSubscription.email==email))
@@ -85,7 +86,7 @@ def subscribe(db,row,user,name,email):
             token_hash=hashlib.sha256(token.encode()).hexdigest(),token_enc=encrypt(token));db.add(sub);db.flush()
     if user:
         if sub.user_id not in (None,user.id):raise HTTPException(409)
-        sub.user_id=user.id;sub.active=True;sub.confirmed_at=sub.confirmed_at or utcnow()
+        sub.user_id=user.id;sub.active=row.subscriptions;sub.confirmed_at=sub.confirmed_at or utcnow()
     else:
         if not notify.mail_configured(get_settings(db)):raise HTTPException(503,'E-Mail-Versand zuerst einrichten.')
         subscription_mail(db,row,sub,'Reihenabonnement bestätigen','Bitte bestätigen Sie das Abonnement ausdrücklich. Es reserviert keine Seminarplätze.')
@@ -127,6 +128,7 @@ def staff_message(db,row,action,message,terms=None,only_owner=False,include_exte
 
 
     if include_external and not only_owner:
+        from .seminar_operations import options
         external={}
         for term in terms or sm.sessions(db,row):
             for guest in json.loads(term.guests_json or row.guests_json or '[]'):
@@ -136,7 +138,7 @@ def staff_message(db,row,action,message,terms=None,only_owner=False,include_exte
             dates='\n'.join(to_local(t.starts_at).strftime('%d.%m.%Y %H:%M')+' · '+(t.title or row.title)+' · '+t.location for t in assigned)
             from . import seminar_hybrid
             # Each explicitly invited guest gets only their own term's conference access.
-            private='\n'.join('Persönlicher Dozentenzugang: '+seminar_hybrid.invite_teacher(db,row,t,email) for t in assigned if t.delivery_mode!='onsite')
+            private='\n'.join('Persönlicher Dozentenzugang: '+seminar_hybrid.invite_teacher(db,row,t,email) for t in assigned if t.delivery_mode!='onsite' or options(row)['guest_materials'])
             notify.enqueue(db,email,row.title+' · '+action,message+'\n'+dates+('\n'+private if private else '')+'\nBitte geben Sie persönliche Links nicht weiter.', 'seminar',per_hour=20)
 
 
@@ -146,6 +148,8 @@ def registration_staff(db,row,rec):
 
 
 def tick(db,row):
+    from . import seminar_operations
+    seminar_operations.standing_bookings(db,row)
     now=utcnow()
     for sub in db.scalars(select(SeminarSubscription).where(SeminarSubscription.seminar_id==row.id,SeminarSubscription.active.is_(True))):
         notices=list(db.scalars(select(SeminarNotice).where(SeminarNotice.seminar_id==row.id,

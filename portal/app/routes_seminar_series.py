@@ -35,25 +35,33 @@ def seminar_invited_subscribe(request:Request,token:str,db:Session=Depends(get_d
     row,rec,user=personal_of(request,db,token);sm.lock(db,row)
     if not rec.verified_at and not user:raise HTTPException(403,'Bitte zuerst die Einladung bestätigen.')
     sub=series.subscribe(db,row,user,rec.name,rec.email)
-    if not user:sub.active=True;sub.confirmed_at=sub.confirmed_at or utcnow()
+    if not user:sub.active=row.subscriptions;sub.confirmed_at=sub.confirmed_at or utcnow()
     db.commit();return redirect(series.subscription_path(sub))
 
 
 @app.get('/seminare/abo/{token}')
 def seminar_subscription(request:Request,token:str,db:Session=Depends(get_db)):
     row,sub,user=sub_of(request,db,token)
+    from .seminar_operations import options
     return protect(render(request,'seminar_subscription.html',user,row=row,sub=sub,token=token,
-        terms=sm.sessions(db,row),records=series.history(db,row,sub.email),statuses=sm.STATUSES,now=utcnow(),personal_path=sm.personal_path))
+        terms=sm.sessions(db,row),records=series.history(db,row,sub.email),statuses=sm.STATUSES,now=utcnow(),personal_path=sm.personal_path,operations=options(row)))
 
 
 @app.post('/seminare/abo/{token}',dependencies=[Depends(check_csrf)])
 async def seminar_subscription_action(request:Request,token:str,db:Session=Depends(get_db)):
     row,sub,user=sub_of(request,db,token);data=await request.form();sm.lock(db,row)
     action=data.get('action')
+    from .seminar_operations import options
     if action=='confirm':
-        if not row.subscriptions or row.status!='published':raise HTTPException(409)
-        sub.active=True;sub.confirmed_at=sub.confirmed_at or utcnow();sm.event(db,row,'subscribed',user,str(sub.id))
+        if (not row.subscriptions and not options(row)['standing']) or row.status!='published':raise HTTPException(409)
+        sub.active=row.subscriptions;sub.confirmed_at=sub.confirmed_at or utcnow();sm.event(db,row,'subscribed',user,str(sub.id))
     elif action=='unsubscribe':sub.active=False;sm.event(db,row,'unsubscribed',user,str(sub.id))
+    elif action=='standing':
+        from . import seminar_operations as ops
+        if data.get('enabled')=='1' and (not sub.confirmed_at or not ops.options(row)['standing'] or row.status!='published'):raise HTTPException(409,'Daueranmeldung ist nicht verfügbar.')
+        sub.standing=data.get('enabled')=='1'
+        ops.standing_bookings(db,row,sub)
+        sm.event(db,row,'standing_consent',user,str(sub.standing))
     elif action=='book':
         if not sub.confirmed_at:raise HTTPException(403,'Zuerst E-Mail-Adresse bestätigen.')
         records=series.book(db,row,sub,data);db.commit()
@@ -93,7 +101,7 @@ async def seminar_term_settings(request:Request,sid:int,tid:int,user:User=Depend
     term.guests_json=json.dumps(guests,ensure_ascii=False);term.lecturer_description=str(data.get('lecturer_description',''))[:10000]
     term.show_contact=data.get('show_contact')=='1';term.participants_visible=data.get('participants_visible')=='1'
     term.title=str(data.get('title','')).strip()[:255]
-    overrides={}
+    overrides={k:v for k,v in json.loads(term.overrides_json).items() if k not in {"capacity","cancel_hours","manual_admission","registration_until"}}
     for key,high in [('capacity',10000),('cancel_hours',8760)]:
         if str(data.get(key,'')).strip():overrides[key]=sm.integer(data[key],0,high)
     if data.get('manual_admission') in ('yes','no'):overrides['manual_admission']=data.get('manual_admission')=='yes'
