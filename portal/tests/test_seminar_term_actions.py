@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -89,6 +89,22 @@ def test_only_never_published_unreferenced_drafts_are_deleted(db, people):
     assert exc.value.status_code == 409
 
 
+def test_cancelled_term_survives_later_planner_saves(db, people):
+    row, term = make(db, people)
+    term.cancelled = True
+    term.reason = 'Fällt aus'
+    term.published_at = utcnow()
+    db.commit()
+    loaded = state(db, row)
+    assert loaded['terms'][0]['include'] is False
+    loaded.update(action='save', channels=['internal'])
+    save(db, people[0], loaded, row)
+    db.commit()
+    db.expire_all()
+    term = db.get(SeminarSession, term.id)
+    assert term is not None and term.cancelled is True and term.reason == 'Fällt aus'
+
+
 def test_planner_exposes_term_actions_and_action_endpoint(db, people):
     row, term = make(db, people)
     # Simulate legacy data which was visible before published_at was consistently set.
@@ -97,7 +113,7 @@ def test_planner_exposes_term_actions_and_action_endpoint(db, people):
     c = login(people[0].email, 'passwort-test-123')
     page = c.get(f'/seminare/{row.id}/planen')
     assert page.status_code == 200
-    assert 'Sichtbarkeit &amp; Zugang' in page.text
+    assert 'Sichtbarkeit & Zugang' in page.text
     assert 'Änderungen speichern' in page.text
     assert '/static/seminar_planner_actions.js' in page.text
     config = json.loads(re.search(r'<script[^>]*id="sp-data"[^>]*>(.*?)</script>', page.text, re.S).group(1))
