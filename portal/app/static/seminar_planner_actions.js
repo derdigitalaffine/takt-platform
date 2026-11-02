@@ -23,6 +23,10 @@ function run(term,name,question,extra={}){
   if(question&&!window.confirm(question))return;
   action(term,name,extra).catch(err=>error(err.message));
 }
+function deleteQuestion(term){
+  const notify=initial.status==='published'&&term.published&&!term.cancelled?' Betroffene Personen erhalten vorher eine Kalender-Stornierung.':'';
+  return `Diesen Termin endgültig löschen? Der Termin verschwindet vollständig aus der Reihe; terminbezogene Buchungen und Daten werden entfernt.${notify} Diese Aktion kann nicht rückgängig gemacht werden. Ungespeicherte Änderungen auf dieser Seite gehen verloren.`;
+}
 function cancelPanel(card,term){
   const old=card.querySelector('[data-sp-cancel-panel]');if(old){old.remove();return;}
   const panel=document.createElement('div');panel.dataset.spCancelPanel='1';panel.className='border rounded p-3 mt-2';
@@ -49,16 +53,22 @@ function enhance(){
     card.dataset.spActions='1';
     const bar=document.createElement('div');bar.className='d-flex gap-2 flex-wrap align-items-center mt-2';
     const label=document.createElement('span');label.className='small text-secondary me-auto';
-    if(term.cancelled){label.textContent='Abgesagt'+(term.reason?`: ${term.reason}`:'');bar.append(label);card.append(bar);return;}
+    if(term.cancelled){
+      label.textContent='Abgesagt'+(term.reason?`: ${term.reason}`:'');bar.append(label);
+      bar.append(button('Reaktivieren','btn btn-sm btn-outline-success',()=>run(term,'reactivate','Diesen abgesagten Termin wieder aktivieren? Betroffene Personen erhalten eine aktualisierte Kalenderdatei. Ungespeicherte Änderungen auf dieser Seite gehen verloren.')));
+      bar.append(button('Termin löschen','btn btn-sm btn-outline-danger',()=>run(term,'delete',deleteQuestion(term))));
+      card.append(bar);return;
+    }
     if(initial.status==='published'&&term.published){
       label.textContent='Veröffentlichter Termin';bar.append(label);
       bar.append(button('Verschieben','btn btn-sm btn-outline-primary',()=>focusMove(card)));
       bar.append(button('Veröffentlichung zurücknehmen','btn btn-sm btn-outline-secondary',()=>run(term,'unpublish','Termin aus der veröffentlichten Reihe zurücknehmen? Das ist nur möglich, solange keine Einladungen oder Anmeldungen bestehen. Ungespeicherte Änderungen auf dieser Seite gehen verloren.')));
       bar.append(button('Absagen','btn btn-sm btn-outline-danger',()=>cancelPanel(card,term)));
+      bar.append(button('Termin löschen','btn btn-sm btn-danger',()=>run(term,'delete',deleteQuestion(term))));
     }else{
       label.textContent=term.ever_published?'Unveröffentlicht':'Entwurf';bar.append(label);
       if(initial.status==='published')bar.append(button('Veröffentlichen','btn btn-sm btn-outline-success',()=>run(term,'publish','Diesen Termin jetzt veröffentlichen? Ungespeicherte Änderungen auf dieser Seite gehen verloren.')));
-      if(!term.ever_published)bar.append(button('Entwurf löschen','btn btn-sm btn-outline-danger',()=>run(term,'delete','Diesen noch nie veröffentlichten Termin endgültig löschen? Ungespeicherte Änderungen auf dieser Seite gehen verloren.')));
+      bar.append(button('Termin löschen','btn btn-sm btn-outline-danger',()=>run(term,'delete',deleteQuestion(term))));
     }
     card.append(bar);
   });
