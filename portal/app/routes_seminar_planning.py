@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from . import seminars as sm, seminar_planning as plan, seminar_series
+from . import seminars as sm, seminar_planning as plan, seminar_series, seminar_terms
 from .db import Seminar, SeminarSession, SeminarEnrollment, SeminarExternalLecturer, User, Group, utcnow
 from .main import app, current_user, get_db, render, enabled_modules, csrf_valid
 from .routes_seminars import staff_of, edit_context, protect
@@ -25,11 +25,11 @@ async def payload(request):
 def state(db,row):
     if not row:return {}
     data=plan.json_object(row.planning_json)
-    data.update(title=row.title,description=row.description,revision=row.revision,booking_mode=row.booking_mode,capacity=row.capacity,manual_admission=row.manual_admission,channels=row.channels.split(','),lecturers=json.loads(row.lecturers_json),guests=json.loads(row.guests_json),lead_id=row.lead_id)
+    data.update(title=row.title,description=row.description,revision=row.revision,status=row.status,booking_mode=row.booking_mode,capacity=row.capacity,manual_admission=row.manual_admission,channels=row.channels.split(','),lecturers=json.loads(row.lecturers_json),guests=json.loads(row.guests_json),lead_id=row.lead_id)
     # An incomplete draft preserves its raw fields. Saved terms always reflect the current database.
     actual=sm.sessions(db,row,False)
     if actual:
-        data['terms']=[dict(id=t.id,revision=t.revision,starts_at=sm.local_input(t.starts_at),ends_at=sm.local_input(t.ends_at),title=t.title,location=t.location,include=not t.cancelled,lecturers=json.loads(t.lecturers_json) if t.lecturers_json else None,guests=json.loads(t.guests_json) if t.lecturers_json else None,lead_id=t.lead_id if t.lecturers_json else None,delivery_mode=t.delivery_mode,online_capacity=t.online_capacity,online_url=t.online_url,video_mode={'manual':'external','term':'new','series':'shared'}.get(t.video_kind,'external'),published=t.published and row.status=='published',customized=bool(plan.json_object(t.overrides_json).get('planning_customized'))) for t in actual]
+        data['terms']=[dict(id=t.id,revision=t.revision,starts_at=sm.local_input(t.starts_at),ends_at=sm.local_input(t.ends_at),title=t.title,location=t.location,include=not t.cancelled,lecturers=json.loads(t.lecturers_json) if t.lecturers_json else None,guests=json.loads(t.guests_json) if t.lecturers_json else None,lead_id=t.lead_id if t.lecturers_json else None,delivery_mode=t.delivery_mode,online_capacity=t.online_capacity,online_url=t.online_url,video_mode={'manual':'external','term':'new','series':'shared'}.get(t.video_kind,'external'),published=t.published and row.status=='published',ever_published=bool(t.published_at),cancelled=t.cancelled,reason=t.reason,customized=bool(plan.json_object(t.overrides_json).get('planning_customized'))) for t in actual]
     return data
 
 
@@ -73,6 +73,8 @@ def save(db,user,data,row=None):
     if row is None:row=Seminar(owner_id=user.id);db.add(row);db.flush()
     else:sm.lock(db,row,sm.integer(data.get('revision',-1),-1))
     if row.status=='cancelled':raise HTTPException(409,'Abgesagte Veranstaltungen können nicht neu geplant werden.')
+    was_published=row.status=='published';previous_channels=row.channels
+    if action=='publish' and was_published:raise HTTPException(409,'Die Seminarreihe ist bereits veröffentlicht. Änderungen bitte speichern; neue Einzeltermine separat veröffentlichen.')
     previous_lecturers=json.loads(row.lecturers_json);previous_guests=json.loads(row.guests_json);previous_lead=row.lead_id
     title=str(data.get('title','')).strip()[:255]
     if not title and action!='draft':raise HTTPException(422,'Bitte einen Titel eingeben.')
@@ -97,8 +99,7 @@ def save(db,user,data,row=None):
         if tid and (tid not in existing or tid in seen):raise HTTPException(422,'Ungültiger oder doppelter Termin.')
         if tid:seen.add(tid)
         if value.get('include') is False:
-            if tid and ((existing[tid].published and row.status=='published') or records):raise HTTPException(409,'Bestehende veröffentlichte Termine bitte ausdrücklich über die Terminverwaltung absagen.')
-            if tid:db.delete(existing[tid])
+            if tid:seminar_terms.delete_draft(db,row,existing[tid],user)
             continue
         start=sm.parse_time(value.get('starts_at'));end=sm.parse_time(value.get('ends_at'))
         if end<=start or end-start>sm.timedelta(days=7):raise HTTPException(422,'Terminende muss nach Beginn liegen, Dauer maximal sieben Tage.')
@@ -134,11 +135,10 @@ def save(db,user,data,row=None):
         row.status='published'
         for t in sm.sessions(db,row,False):
             if not t.cancelled:t.published=True;t.published_at=t.published_at or utcnow()
-    if changed and row.status=='published':
-        for rec in records:
-            if rec.status not in {'cancelled','rejected'} and (not rec.scope_id or rec.scope_id in [t.id for t in changed]):sm.mail(db,row,rec,'Termin geändert','Bitte prüfen Sie die aktualisierten Termine, Themen und Orte.',calendar_file=True)
+    if changed and row.status=='published':seminar_terms.notify_changed(db,row,changed,'Bitte prüfen Sie die aktualisierten Termine, Themen und Orte.')
     if action=='publish':seminar_fixed.enroll_published(db,row,sm.sessions(db,row),user)
     if action=='publish' and data.get('notify_lecturers'):seminar_series.staff_message(db,row,'Seminar veröffentlicht','Bitte prüfen Sie Ihre zugeordneten Termine.',sm.sessions(db,row),include_external=True)
+    if was_published and previous_channels!=row.channels:sm.event(db,row,'visibility_changed',user,row.channels)
     row.updated_at=utcnow();sm.event(db,row,'planning_saved',user,action);db.flush()
     return row
 
@@ -157,3 +157,19 @@ async def update_planner(request:Request,sid:int,user:User=Depends(current_user)
     from . import access
     access.sync(db)
     return JSONResponse({'redirect':f'/seminare/{row.id}'+('' if data.get('action')=='publish' else '/planen'),'revision':row.revision})
+
+
+@app.post('/seminare/{sid:int}/terms/{tid:int}/action')
+async def planner_term_action(request:Request,sid:int,tid:int,user:User=Depends(current_user),db:Session=Depends(get_db)):
+    row=staff_of(db,user,sid,True);data=await payload(request)
+    sm.lock(db,row,sm.integer(data.get('row_revision',-1),-1))
+    term=seminar_series.term_of(db,row,tid)
+    if sm.integer(data.get('term_revision',-1),-1)!=term.revision:raise HTTPException(409,'Termin wurde inzwischen geändert. Bitte neu laden.')
+    action=data.get('action')
+    if action=='publish':seminar_terms.publish(db,row,term,user)
+    elif action=='unpublish':seminar_terms.unpublish(db,row,term,user)
+    elif action=='cancel':seminar_terms.cancel(db,row,term,data.get('reason'),user)
+    elif action=='delete':seminar_terms.delete_draft(db,row,term,user)
+    else:raise HTTPException(422,'Unbekannte Terminaktion.')
+    row.updated_at=utcnow();db.commit()
+    return JSONResponse({'redirect':f'/seminare/{sid}/planen','revision':row.revision})
