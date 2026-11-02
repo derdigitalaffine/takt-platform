@@ -2809,3 +2809,5 @@ from . import routes_tasks  # noqa: E402,F401
 from . import routes_seminar_operations  # noqa: E402,F401
 
 from . import routes_seminar_transfer  # noqa: E402,F401
+
+from . import routes_task_boards  # noqa: E402,F401

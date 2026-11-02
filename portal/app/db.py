@@ -2918,6 +2918,7 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "task_board_cards": {"shareable": "BOOLEAN NOT NULL DEFAULT 0"},
     "seminar_subscriptions": {"standing": "BOOLEAN NOT NULL DEFAULT 0"},
     "seminar_attendance": {"source": "VARCHAR(20) NOT NULL DEFAULT 'staff'"},
     "circulation_bundles": {"archived": "BOOLEAN NOT NULL DEFAULT 0"},

@@ -176,6 +176,7 @@ async def task_edit_save(request: Request, task_id: int, user: User = Depends(cu
 async def task_action(request: Request, task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     module_on()
     row = ts.get(db, user, task_id)
+    if not ts.may_collaborate(user,row):raise HTTPException(403)
     form = await request.form()
     data = dict(form)
     data['repeat_days'] = ','.join(str(d) for d in form.getlist('repeat_days'))
@@ -333,6 +334,7 @@ async def task_action(request: Request, task_id: int, user: User = Depends(curre
 async def task_upload(request: Request, task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     module_on()
     row = ts.get(db, user, task_id)
+    if not ts.may_collaborate(user,row):raise HTTPException(403)
     data = await request.form()
     created_paths = []
     try:

@@ -172,3 +172,45 @@ class TaskRuleRun(Base):
     version: Mapped[int] = mapped_column(Integer)
     result: Mapped[str] = mapped_column(String(500), default='Ausgeführt')
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class TaskBoard(Base):
+    __tablename__ = 'task_boards'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default='')
+    mode: Mapped[str] = mapped_column(String(16), default='status')
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    __mapper_args__ = {'version_id_col': version}
+
+
+class TaskBoardMember(Base):
+    __tablename__ = 'task_board_members'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey('task_boards.id', ondelete='CASCADE'), index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), nullable=True)
+    group_id: Mapped[int | None] = mapped_column(ForeignKey('groups.id', ondelete='CASCADE'), nullable=True)
+    level: Mapped[int] = mapped_column(Integer, default=1)
+    __table_args__ = (CheckConstraint('(user_id IS NOT NULL AND group_id IS NULL) OR (user_id IS NULL AND group_id IS NOT NULL)'),UniqueConstraint('board_id','user_id'),UniqueConstraint('board_id','group_id'))
+
+
+class TaskBoardColumn(Base):
+    __tablename__ = 'task_board_columns'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey('task_boards.id', ondelete='CASCADE'), index=True)
+    title: Mapped[str] = mapped_column(String(100))
+    status: Mapped[str] = mapped_column(String(20), default='open')
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class TaskBoardCard(Base):
+    shareable: Mapped[bool] = mapped_column(Boolean, default=True)
+    __tablename__ = 'task_board_cards'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey('task_boards.id', ondelete='CASCADE'), index=True)
+    column_id: Mapped[int] = mapped_column(ForeignKey('task_board_columns.id', ondelete='CASCADE'), index=True)
+    task_id: Mapped[int | None] = mapped_column(ForeignKey('tasks.id', ondelete='CASCADE'), nullable=True,index=True)
+    source_key: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    __table_args__ = (CheckConstraint('(task_id IS NOT NULL AND source_key IS NULL) OR (task_id IS NULL AND source_key IS NOT NULL)'),UniqueConstraint('board_id','task_id'),UniqueConstraint('board_id','source_key'))

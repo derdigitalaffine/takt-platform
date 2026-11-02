@@ -108,3 +108,55 @@ Regeln behalten Ersteller und Version. Ausführung prüft dessen aktuelle Rechte
 Automatisierte Tests decken Rechte/CSRF/Modulabschaltung, Status und Review, parallele Versionen, Parser, sichere Darstellung, Dateien, DMS-Rechtewechsel, Ansichten, Serien/DST/Retry, externe Links, SpeechMind-Übernahme sowie Regeln ab. JavaScript wird zusätzlich auf Syntax geprüft.
 
 Der zusätzliche CI-Job **tasks-browser** prüft die tatsächliche Oberfläche in Chromium: Formular mit Checkliste und Dateien, Rückkehr zur Übersicht, Dateidownload, Tastaturbedienung, Boardstatus, Kalender und Schnellfeld. Desktop- und Mobilansichten sowie helles/dunkles Design werden mit Screenshots dokumentiert; der Job legt diese zusammen mit dem Serverlog als Artefakt **tasks-browser** ab. Eine manuelle Prüfung mit einem Screenreader wird dadurch nicht ersetzt.
+
+## Persönliche und gemeinsame Kanbanboards
+
+Über **Meine Aufgaben → Meine Kanbanboards** persönliche und gemeinsame Boards anlegen. Neue Boards sind privat und starten mit den fünf Aufgabenstatus als Spalten. Boardname, Beschreibung, Spaltennamen, Spaltenreihenfolge und Rollen liegen unter **Board verwalten**. Aufgaben bleiben eigenständige Datensätze: dieselbe Aufgabe kann auf mehreren Boards liegen. Titel, Priorität, Zuständigkeit, Checkliste, Kommentare und Status sind überall gemeinsam; Kartenposition und Spaltenorganisation werden je Board gespeichert. Entfernen einer Karte oder Löschen eines Boards löscht keine Aufgabe.
+
+### Spalten und Sortierung
+
+- **Statusmodus:** Spalten sind Aufgabenstatus zugeordnet. Verschieben verwendet die vorhandenen Statusregeln. Eine nötige Freigabe führt beim Abschluss zur Freigabespalte. Offene Checklisten und Vorgänger blockieren den Abschluss weiterhin. Änderungen aus einer anderen Ansicht werden beim Aktualisieren entsprechend dem tatsächlichen Status angezeigt.
+- **Freier Modus:** Spalten dienen ausschließlich der Organisation, etwa „Diese Woche“, „Rückfrage“ oder „Später“. Verschieben verändert keinen fachlichen Aufgabenstatus. Diesen bei Bedarf in der Detailansicht separat ändern.
+
+Der Modus ist pro Board umschaltbar. Der Wechsel ändert keine Aufgabenstatus. Für den Statusmodus muss jeder Status mindestens einer Spalte zugeordnet sein. Mehrere Spalten mit derselben Statuszuordnung sind möglich; eine Karte bleibt innerhalb ihres passenden Statusbereichs in ihrer gewählten Spalte. Nur leere Spalten können gelöscht werden, im Statusmodus bleibt für jeden Status mindestens eine Spalte erhalten. Höchstens 30 Spalten je Board.
+
+**Manuelle Reihenfolge**, **Automatisch: Priorität** und **Automatisch: Frist** sind ausdrücklich unterscheidbar. Drag & Drop steht bei manueller Reihenfolge zur Verfügung. Eine automatische Ansicht verändert die gespeicherte manuelle Reihenfolge nicht. Filter nach Text, verantwortlicher Person und Priorität lassen sich kombinieren. Kein Treffer wird von einer leeren Spalte unterschieden.
+
+### Direkt arbeiten
+
+**Aufgabe hinzufügen** legt direkt in einer Spalte eine Aufgabe mit Priorität und optionaler Checkliste an. Die verantwortliche Person ist zunächst die anlegende Person. Bestehende Aufgaben können über **Vorhandene Aufgabe oder Fachkarte hinzufügen** verknüpft werden. Eine Aufgabe erscheint höchstens einmal je Board.
+
+Auf Karten die Priorität direkt ändern und Checklistenpunkte aufklappen und abhaken. Öffnen einer Karte zeigt am Desktop eine seitliche Detailansicht und am Smartphone eine Vollbildansicht. Dort sind Titel, Beschreibung, Zuständigkeit (intern oder extern), Priorität, Frist, Tags, Checkliste, Kommentare und Dateiupload verfügbar. Freigaberegeln können Boardmitwirkende nicht umgehen. Die vollständige Aufgabenansicht bleibt für ergänzende Verwaltungsfunktionen erreichbar.
+
+Speichern aktualisiert das Board ohne vollständigen Seitenwechsel und erhält seine Scrollposition. Ungespeicherte Texte in der Detailansicht bleiben während derselben geöffneten Seite beim Schließen oder Aktualisieren im Arbeitsspeicher erhalten; ein Neuladen der gesamten Seite verwirft diese lokalen Eingaben. Veraltete Aufgaben- oder Boardversionen werden mit einem Konflikthinweis abgelehnt. **Aktualisieren** lädt den aktuellen Stand; fehlgeschlagene Änderungen werden nicht automatisch wiederholt.
+
+### Maus, Tastatur und Smartphone
+
+Mobil ist die Trello-artige horizontale Spaltenansicht voreingestellt. **Eine Spalte** mit Spaltentabs und **Liste** sind optionale, auf diesem Gerät gespeicherte Darstellungen. Normales Wischen scrollt das Board. Zum Ziehen per Touch den sichtbaren Griff einer Karte verwenden; alternativ unter **Verschieben & weitere Aktionen** Zielspalte und Position auswählen. Diese Formularaktion ist auch vollständig mit Tastatur bedienbar. Spaltentabs navigieren ebenfalls durch das horizontale Board.
+
+Nach einer Drag-&-Drop-Verschiebung ist **Letztes Verschieben rückgängig** verfügbar. Die Rückbewegung verwendet dieselben Rechte und Statusregeln; ein inzwischen erforderlicher Freigabeschritt kann sie verhindern. Der Abschluss einer Aufgabe oder eine Freigabe wird nicht durch einen ungeprüften Undo umgangen. Helles und dunkles Design verwenden die vorhandenen Portalvariablen, keine zusätzliche UI-Bibliothek.
+
+### Rollen und Freigabegrenzen
+
+Boardmitglieder können einzeln oder über Portalgruppen berechtigt werden. Gruppenmitgliedschaften werden bei jedem Zugriff neu berücksichtigt.
+
+| Rolle | Befugnisse |
+| --- | --- |
+| Lesen | Alle nativen Boardaufgaben und ihre Inhalte ansehen, filtern und Detailansicht öffnen |
+| Mitarbeit | Zusätzlich Aufgaben im Board anlegen, zuweisen, priorisieren, Checklisten und Kommentare bearbeiten, Dateien hinzufügen und zulässige Statuswechsel ausführen |
+| Boardverwaltung | Zusätzlich Board, Spalten und Mitgliedschaften verwalten |
+| Eigentümer | Boardverwaltung und Board löschen |
+
+Boardmitarbeit gilt für das betreffende Board auch ohne globale Berechtigung zum Anlegen freier Aufgaben. Sie erlaubt keine administrative Freigabe von Aufgaben, keine Änderung ihrer Abschlussregeln und keine allgemeine Aufgabenverwaltung. Bestehende persönliche Rechte bleiben unabhängig davon bestehen. Der Zugriff über ein Board wird auch beim Öffnen der normalen Aufgabenansicht und ihrer Dateien berücksichtigt. Eine reine Board-Leseberechtigung eröffnet dort keine neuen Schreibrechte.
+
+Eine native Aufgabe für zusätzliche Personen freigeben dürfen ihre Ersteller und die Aufgabenverwaltung. Beim Hinzufügen zu einem geteilten Board wird das geprüft. Eine nur persönlich sichtbare, fremd erstellte Aufgabe kann im eigenen privaten Board organisiert werden; sie verhindert anschließend eine Freigabe dieses Boards. Bereits vom Aufgabenberechtigten für das Board freigegebene Aufgaben dürfen Boardverwaltungen durch neue Boardmitgliedschaften weiterhin teilen. Beim Entfernen einer Mitgliedschaft entfallen ausschließlich die darüber vermittelten Rechte; Verantwortung, ursprüngliche Mitwirkung oder andere Boards können weiter Zugriff gewähren.
+
+### Fachkarten aus anderen Modulen
+
+Antrags-, Umlauf- und Ressourcenaufgaben können aus dem persönlichen berechtigten Aufgabenbestand als Fachkarten verknüpft werden. Der Boardeintrag speichert nur die Quellenreferenz. Titel und weitere Informationen werden bei jedem Aufruf aus dem aktuell berechtigten Bestand ermittelt. Ohne aktuelle Quellenrechte erscheinen weder Karte noch Titel; eine Boardfreigabe ersetzt diese Rechte nicht. Fachliche Bearbeitung führt zur Quelle. Im freien Modus kann die Karte organisatorisch verschoben werden, im Statusmodus verändert das Board ihren fachlichen Zustand nicht. Nach Abschluss oder Wegfall aus dem aktuellen Fachaufgabenbestand kann die Karte dort nicht mehr angezeigt werden.
+
+### Betrieb und Abnahme
+
+Die neuen Boardtabellen werden beim regulären Portalstart additiv angelegt. Bestehende Aufgaben und die bisherigen Ansichten bleiben erhalten. Vor Updates wie üblich Datenbank und Dateiverzeichnis sichern.
+
+Python-Prüfungen: `cd portal && ../.venv/bin/python -m pytest -q tests`. Die reale Browserabnahme liegt unter `tests/browser/board_ui_smoke.py` und verwendet temporäre Daten ohne Worker oder Mailversand. Aus `portal` mit installiertem Playwright/Chromium ausführen; optional `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium` setzen. Artefakte werden unter `/tmp/takt-board-browser` abgelegt. Der CI-Job `kanban-browser` prüft Rollen, Detailbearbeitung, Checklisten, Kommentare, Drag & Drop mit Maus und Touch, Rückgängig sowie Desktop-, Mobil- und Farbansichten. Eine vollständige manuelle Screenreader-Abnahme ist dadurch nicht ersetzt.

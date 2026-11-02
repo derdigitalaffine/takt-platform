@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from markdown_it import MarkdownIt
 from markupsafe import Markup
 from sqlalchemy import func, or_, select, text
+from sqlalchemy.orm import object_session
 
 from .db import LOCAL_TZ, Group, GroupMember, User, to_local, utcnow
 from .task_models import Task, TaskActivity, TaskAttachment, TaskCheck, TaskComment, TaskDependency, TaskParticipant
@@ -44,9 +45,10 @@ def may_create(user):
 
 
 def visible_query(user):
+    from .task_boards import task_ids
     q = select(Task)
     if not manager(user):
-        q = q.where(or_(Task.creator_id == user.id, Task.assignee_id == user.id,
+        q = q.where(or_(Task.id.in_(task_ids(user)), Task.creator_id == user.id, Task.assignee_id == user.id,
                         Task.id.in_(select(TaskParticipant.task_id).where(TaskParticipant.user_id == user.id))))
     return q
 
@@ -63,7 +65,13 @@ def may_edit(user, row):
 
 
 def may_work(user, row):
-    return may_edit(user, row) or row.assignee_id == user.id
+    from .task_boards import editor
+    return may_edit(user, row) or row.assignee_id == user.id or editor(user,row)
+
+
+def may_collaborate(user,row):
+    db=object_session(row)
+    return may_work(user,row) or bool(db and db.get(TaskParticipant,(row.id,user.id)))
 
 
 def status_choices(user, row, *, blocked=False, unfinished=False):
@@ -142,7 +150,7 @@ def local_date(value, *, date_only=False):
         raise Invalid('Bitte ein gültiges Datum und eine im Portal eindeutige Uhrzeit eingeben.') from None
 
 
-def values(db, data, user):
+def values(db, data, user, *, existing=None):
     title = str(data.get('title', '')).strip()
     if not title or len(title) > 300:
         raise Invalid('Geben Sie einen Aufgabentitel mit höchstens 300 Zeichen ein.')
@@ -165,7 +173,7 @@ def values(db, data, user):
     group = db.get(Group, int(group_id)) if group_id.isdigit() else None
     if group_id and group is None:
         raise Invalid('Bitte eine gültige Gruppe auswählen.')
-    if group and not manager(user) and not db.get(GroupMember, (group.id, user.id)):
+    if group and not manager(user) and not db.get(GroupMember, (group.id, user.id)) and (existing is None or existing.group_id!=group.id):
         raise Invalid('Sie können nur eine Ihrer eigenen Gruppen als Kontext wählen.')
     day = str(data.get('due_date', '')).strip()
     clock = str(data.get('due_time', '')).strip()
@@ -182,8 +190,9 @@ def values(db, data, user):
                 tags=tags(data.get('tags', '')), requires_review=str(data.get('requires_review', '')) in {'1', 'on', 'true'})
 
 
-def create(db, user, data, *, source_type='', source_id='', source_key=None, schedule=None):
-    if not may_create(user):
+def create(db, user, data, *, source_type='', source_id='', source_key=None, schedule=None, board=None):
+    from . import task_boards
+    if not may_create(user) and (board is None or task_boards.level(db,user,board)<2):
         raise HTTPException(403, 'Für neue Aufgaben fehlt die Berechtigung „Aufgaben erstellen“.')
     clean = values(db, data, user)
     if schedule is not None:
@@ -205,10 +214,13 @@ def create(db, user, data, *, source_type='', source_id='', source_key=None, sch
 
 
 def update(db, user, row, data):
-    if not may_edit(user, row):
+    from .task_boards import editor
+    if not may_edit(user, row) and not editor(user,row):
         raise HTTPException(403, 'Nur Ersteller und Aufgabenverwaltung können die Planung ändern.')
     check_version(row, data)
-    clean = values(db, data, user)
+    clean = values(db, data, user, existing=row)
+    if not may_edit(user,row) and clean['requires_review']!=row.requires_review:
+        raise HTTPException(403,'Nur Ersteller und Aufgabenverwaltung können die Freigaberegel ändern.')
     if row.status == 'review' and clean['requires_review'] != row.requires_review:
         raise Invalid('Während einer Freigabe kann die Abschlussregel nicht geändert werden.')
     labels = {'title': 'Titel', 'description': 'Beschreibung', 'assignee_id': 'Verantwortlichkeit', 'group_id': 'Gruppe',
