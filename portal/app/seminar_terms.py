@@ -107,7 +107,7 @@ def reactivate(db, row, term, user=None):
     term.revision += 1
     message = 'Der zuvor abgesagte Termin findet wieder statt. Bitte beachten Sie die aktualisierte Kalenderdatei.'
     for rec in _records(db, row, term):
-        sm.mail(db, row, rec, 'Termin reaktiviert', message, calendar_file=True)
+        sm.mail(db, row, rec, 'Termin geändert – reaktiviert', message, calendar_file=True)
     series.staff_message(db, row, 'Termin reaktiviert', message, [term])
     series.announce(db, row, 'changes', f'Termin reaktiviert: {term.title or row.title} · {sm.local_input(term.starts_at).replace("T", " ")}')
     sm.event(db, row, 'session_reactivated', user, str(term.id))
@@ -137,7 +137,7 @@ def delete_term(db, row, term, user=None):
         db.flush()
         message = 'Dieser Termin wurde aus der Seminarreihe gelöscht.'
         for rec in _records(db, row, term):
-            sm.mail(db, row, rec, 'Termin gelöscht', message, calendar_file=True)
+            sm.mail(db, row, rec, 'Termin geändert – gelöscht', message, calendar_file=True)
         series.staff_message(db, row, 'Termin gelöscht', message, [term])
         series.announce(db, row, 'changes', f'Termin gelöscht: {label}')
 
