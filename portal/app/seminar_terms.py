@@ -51,6 +51,8 @@ def publish(db, row, term, user=None):
     term.published = True
     term.published_at = term.published_at or utcnow()
     term.revision += 1
+    from . import seminar_fixed
+    seminar_fixed.enroll_published(db, row, [term], user)
     series.announce(db, row, 'new_terms', f'{term.title or "Termin"} · {sm.local_input(term.starts_at).replace("T", " ")}\nJetzt buchbar.')
     sm.event(db, row, 'session_published', user, str(term.id))
     return True
@@ -91,7 +93,7 @@ def cancel(db, row, term, reason, user=None):
 
 
 def delete_draft(db, row, term, user=None):
-    if term.published_at is not None:
+    if (row.status == 'published' and term.published) or term.published_at is not None:
         raise HTTPException(409, 'Ein bereits veröffentlichter Termin bleibt aus Nachweisgründen erhalten. Bitte Veröffentlichung zurücknehmen oder absagen.')
     refs = _delete_references(db, term)
     if refs:
