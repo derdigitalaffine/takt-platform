@@ -143,3 +143,15 @@ def test_board_edit_keeps_foreign_group_context_and_can_reassign(db,task_people)
     assert post(client_for(editor),db,b,'edit',card=card.id,version=t.version,priority='high',assignee_id=editor.id).status_code==200
     db.refresh(t);assert t.group_id==g.id and t.assignee_id==editor.id and t.priority=='high'
     t.group_id=None;db.delete(g);db.commit()
+
+
+def test_write_rechecks_membership_after_board_lock(db,task_people,monkeypatch):
+    a,_,editor,_=task_people;b=board(db,a);t=make(db,task_people);card=attach(db,b,t,a);membership=member(db,b,editor)
+    original=kb.lock
+    def revoke(connection,board,version):
+        original(connection,board,version)
+        connection.delete(connection.get(TaskBoardMember,membership.id));connection.flush()
+    monkeypatch.setattr(kb,'lock',revoke)
+    response=post(client_for(editor),db,b,'edit',card=card.id,version=t.version,priority='urgent')
+    assert response.status_code==404
+    db.refresh(t);assert t.priority=='normal'

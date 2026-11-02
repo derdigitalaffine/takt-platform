@@ -66,10 +66,13 @@ def card_detail(request:Request,bid:int,cid:int,user:User=Depends(current_user),
 
 @app.post('/tasks/boards/{bid:int}/action',dependencies=[Depends(check_csrf)])
 async def board_action(request:Request,bid:int,user:User=Depends(current_user),db:Session=Depends(get_db)):
-    module_on();data=await request.form();action=str(data.get('action',''));board=boards.get(db,user,bid,3 if action in {'settings','column','column_delete','member','member_remove','delete'} else 2)
+    module_on();data=await request.form();action=str(data.get('action',''))
+    required=3 if action in {'settings','column','column_delete','member','member_remove','delete'} else 2
+    board=boards.get(db,user,bid,required)
     paths=[]
     try:
         boards.lock(db,board,data.get('board_version'))
+        board=boards.get(db,user,bid,required)
         def column(value):
             col=db.get(TaskBoardColumn,number(value))
             if not col or col.board_id!=bid:raise HTTPException(404)
