@@ -4,7 +4,7 @@ from datetime import timedelta
 from fastapi import HTTPException
 from sqlalchemy import select
 from . import seminars as sm, seminar_series as series, seminar_hybrid as hybrid
-from .db import SeminarEnrollment, SeminarSubscription, User, utcnow
+from .db import SeminarEnrollment, SeminarSubscription, User, to_local, utcnow
 
 DEFAULTS = dict(standing=False, self_checkin=False, guest_materials=False,
                 guest_publish=False, teacher_days=30, mail_subject='Einladung: {titel}',
@@ -104,7 +104,7 @@ def template_values(row):
 
 def render_message(text, row, name, link, terms):
     values = {'name': name, 'titel': row.title, 'link': link,
-              'termine': '\n'.join((t.title or row.title)+' · '+sm.local_input(t.starts_at).replace('T',' ')+' · '+t.location for t in terms)}
+              'termine': '\n'.join((t.title or row.title)+' · '+to_local(t.starts_at).strftime('%d.%m.%Y %H:%M')+' · '+t.location for t in terms)}
     # Only these literal placeholders are expanded; no format expressions or HTML.
     for key, value in values.items():
         text = text.replace('{'+key+'}', value)
