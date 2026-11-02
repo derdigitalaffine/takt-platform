@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from app import seminar_terms, seminars as sm
-from app.db import SeminarEnrollment, SeminarEvent, SeminarSession, utcnow
+from app.db import Notification, SeminarEnrollment, SeminarEvent, SeminarSession, utcnow
 from app.routes_seminar_planning import save, state
 from conftest import client, login
 from test_seminars import make, people, rec
@@ -66,6 +66,19 @@ def test_term_unpublish_publish_cancel_and_reactivate_preserve_history(db, peopl
     assert term.cancelled is False and term.reason == ''
     assert term.published_at == published_at
     assert 'STATUS:CANCELLED' not in sm.calendar_text(db, row, attendee)
+
+
+def test_reactivation_uses_change_notification_channel(db, people):
+    row, term = make(db, people)
+    attendee = rec(db, row, term, people[1], status='confirmed')
+    row.notifications_json = json.dumps({'registration': False, 'changes': True})
+    term.cancelled = True
+    term.reason = 'Fällt aus'
+    term.published_at = utcnow()
+    db.flush()
+
+    assert seminar_terms.reactivate(db, row, term, people[0]) is True
+    assert db.scalar(select(Notification.id).where(Notification.to_addr == attendee.email)) is not None
 
 
 def test_only_never_published_unreferenced_drafts_are_implicitly_deleted(db, people):
