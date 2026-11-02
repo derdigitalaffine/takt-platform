@@ -12,7 +12,8 @@ import reportlab
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate,Paragraph,Spacer,Table,TableStyle
 from . import circulations as cl, seminars as sm, seminar_series as series, forms as fm, shares
 from .config import settings
@@ -168,20 +169,35 @@ def issue_certificate(db,row,rec,user,scope=0):
     return cert
 
 
+def _table_widths(columns, available):
+    presets={3:(.35,.35,.30),4:(.29,.24,.21,.26)}
+    weights=presets.get(columns,tuple(1/columns for _ in range(columns)))
+    return [available*weight for weight in weights]
+
+
 def pdf_document(title,paragraphs,table=None,images=None):
-    output=io.BytesIO();styles=getSampleStyleSheet();styles['Title'].fontName='SeminarBold';styles['BodyText'].fontName='SeminarRegular';story=[Paragraph(escape(title),styles['Title']),Spacer(1,18)]
+    output=io.BytesIO();styles=getSampleStyleSheet();styles['Title'].fontName='SeminarBold';styles['BodyText'].fontName='SeminarRegular'
+    doc=SimpleDocTemplate(output,title=title,pagesize=A4,rightMargin=36,leftMargin=36,topMargin=40,bottomMargin=45)
+    story=[Paragraph(escape(title),styles['Title']),Spacer(1,18)]
     from reportlab.platypus import Image
     for path in (images or []):
         if Path(path).is_file():
             picture=Image(str(path));picture._restrictSize(180,60);story.extend([picture,Spacer(1,10)])
     for p in paragraphs:story.extend([Paragraph(escape(str(p)),styles['BodyText']),Spacer(1,10)])
     if table:
-        rows=[[Paragraph(escape(str(x)),styles['BodyText']) for x in r] for r in table]
-        grid=Table(rows,repeatRows=1,colWidths=[180,180,150]);grid.setStyle(TableStyle([('GRID',(0,0),(-1,-1),.5,colors.lightgrey),('BACKGROUND',(0,0),(-1,0),colors.whitesmoke),('VALIGN',(0,0),(-1,-1),'TOP'),('BOTTOMPADDING',(0,0),(-1,-1),14)]));story.append(grid)
+        columns=max(len(r) for r in table)
+        body_style=ParagraphStyle('SeminarTableText',parent=styles['BodyText'],fontName='SeminarRegular',fontSize=8.5,leading=10)
+        head_style=ParagraphStyle('SeminarTableHead',parent=body_style,fontName='SeminarBold')
+        rows=[]
+        for index,raw in enumerate(table):
+            values=list(raw)+['']*(columns-len(raw));style=head_style if index==0 else body_style
+            rows.append([Paragraph(escape(str(x)),style) for x in values])
+        grid=Table(rows,repeatRows=1,colWidths=_table_widths(columns,doc.width),hAlign='LEFT')
+        grid.setStyle(TableStyle([('GRID',(0,0),(-1,-1),.5,colors.lightgrey),('BACKGROUND',(0,0),(-1,0),colors.whitesmoke),('VALIGN',(0,0),(-1,-1),'TOP'),('LEFTPADDING',(0,0),(-1,-1),5),('RIGHTPADDING',(0,0),(-1,-1),5),('TOPPADDING',(0,0),(-1,-1),5),('BOTTOMPADDING',(0,0),(-1,-1),12)]));story.append(grid)
     def footer(canvas,doc):
         canvas.saveState();canvas.setFont('SeminarRegular',8);canvas.setFillColor(colors.HexColor('#64748b'))
-        canvas.drawString(40,25,'Seminare und Lehrgänge');canvas.drawRightString(doc.pagesize[0]-40,25,f'Seite {doc.page}');canvas.restoreState()
-    SimpleDocTemplate(output,title=title,rightMargin=40,leftMargin=40,bottomMargin=45).build(story,onFirstPage=footer,onLaterPages=footer)
+        canvas.drawString(36,25,'Seminare und Lehrgänge');canvas.drawRightString(doc.pagesize[0]-36,25,f'Seite {doc.page}');canvas.restoreState()
+    doc.build(story,onFirstPage=footer,onLaterPages=footer)
     return output.getvalue()
 
 

@@ -7,6 +7,7 @@ function setup(channel){
  const root=get('seminar-planner');root.querySelectorAll=()=>all.filter(n=>n!==root);
  get('sp-data').textContent=JSON.stringify({initial:{title:'Reihe',channels:[channel],schedule:{first:'2027-01-01',kind:'once',time:'09:00',duration:60}},people:[],groups:[],resources:[],csrf:'csrf'});
  for(const [id,value]of Object.entries({kind:'once',booking:'individual',channel:'internal',delivery:'onsite','video-mode':'new',time:'09:00',duration:'60',count:'6',nth:'1',weekday:'0','end-mode':'count'}))get('sp-'+id).value=value;
+ get('sp-planners').selectedOptions=[{value:'12'},{value:'19'}];
  const panels=[0,1,2,3].map(i=>node({dataset:{panel:String(i)}}));
  const document={getElementById:get,createElement:()=>node(),createTextNode:t=>node({textContent:t}),querySelectorAll:s=>s==='[data-panel]'?panels:[],querySelector:s=>panels.find(n=>s.includes(n.dataset.panel))};
  const window=node();let sent,complete,navigation='';window.location={pathname:'/seminare/planen',assign:p=>navigation=p};window.confirm=()=>true;
@@ -17,6 +18,7 @@ function setup(channel){
 (async()=>{
  for(const [channel,expected]of [['internal',['internal']],['guest',['internal','guest']],['public',['internal','guest','public']]]){
    const app=setup(channel);await app.fire(app.get('sp-form'),'input');const pending=app.fire(app.get('sp-save-draft'),'click');
+   assert.deepEqual(app.sent.planner_ids,[12,19],'Selected planners are sent as numeric IDs.');
    assert.deepEqual(app.sent.channels,expected,'Browser must send the backend channel list contract.');
    assert.equal(app.get('sp-title').disabled,true,'Inputs remain protected during save.');
    assert.equal((await app.fire(app.window,'beforeunload')).defaultPrevented,true,'In-flight save must not silently discard unsaved input.');

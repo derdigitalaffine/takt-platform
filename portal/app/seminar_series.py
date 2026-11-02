@@ -31,11 +31,11 @@ def lecturer_ids(row, term):
 
 
 def whole_staff(db, user, row):
-    return bool(sm.may_plan(db,user,row) or (user and user.id in json.loads(row.lecturers_json)))
+    return sm.may_plan(db,user,row)
 
 
 def may_term(db, user, row, term):
-    return bool(whole_staff(db,user,row) or (user and user.id in lecturer_ids(row,term)))
+    return bool(whole_staff(db,user,row) or (user and user.active and user.id in lecturer_ids(row,term)))
 
 
 def staff_terms(db, user, row):
@@ -117,9 +117,9 @@ def announce(db,row,kind,message):
 
 def staff_message(db,row,action,message,terms=None,only_owner=False,include_external=False):
     if not enabled(row,'staff'):return
-    ids={row.owner_id}
+    ids={row.owner_id,*sm.planner_ids(row)}
+    if row.lead_id:ids.add(row.lead_id)
     if not only_owner:
-        ids.update(json.loads(row.lecturers_json))
         for term in (terms or sm.sessions(db,row)):ids.update(lecturer_ids(row,term))
     for uid in ids:
         user=db.get(User,uid)

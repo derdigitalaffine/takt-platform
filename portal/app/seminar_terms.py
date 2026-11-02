@@ -12,10 +12,14 @@ from . import seminars as sm, seminar_series as series
 from .db import (
     Meeting, Recording, SeminarActivity, SeminarAttendance, SeminarCertificate,
     SeminarEnrollment, SeminarLecturerAccess, SeminarMaterial, SeminarSession,
-    utcnow,
+    to_local, utcnow,
 )
 
 ACTIVE_RECORDS = {'confirmed', 'offered', 'waitlist', 'pending', 'invited', 'form', 'unverified'}
+
+
+def _when(term):
+    return to_local(term.starts_at).strftime('%d.%m.%Y %H:%M')
 
 
 def _records(db, row, term, active_only=True):
@@ -56,7 +60,7 @@ def publish(db, row, term, user=None):
     term.revision += 1
     from . import seminar_fixed
     seminar_fixed.enroll_published(db, row, [term], user)
-    series.announce(db, row, 'new_terms', f'{term.title or "Termin"} · {sm.local_input(term.starts_at).replace("T", " ")}\nJetzt buchbar.')
+    series.announce(db, row, 'new_terms', f'{term.title or "Termin"} · {_when(term)}\nJetzt buchbar.')
     sm.event(db, row, 'session_published', user, str(term.id))
     return True
 
@@ -72,7 +76,7 @@ def unpublish(db, row, term, user=None):
     term.published = False
     # published_at bleibt absichtlich erhalten: der Termin war bereits öffentlich.
     term.revision += 1
-    series.announce(db, row, 'changes', f'Termin zurückgezogen: {term.title or row.title} · {sm.local_input(term.starts_at).replace("T", " ")}')
+    series.announce(db, row, 'changes', f'Termin zurückgezogen: {term.title or row.title} · {_when(term)}')
     sm.event(db, row, 'session_unpublished', user, str(term.id))
     return True
 
@@ -92,7 +96,7 @@ def cancel(db, row, term, reason, user=None):
     for rec in _records(db, row, term):
         sm.mail(db, row, rec, 'Termin abgesagt', reason, calendar_file=True)
     series.staff_message(db, row, 'Termin abgesagt', reason, [term])
-    series.announce(db, row, 'changes', f'Termin abgesagt: {term.title or row.title} · {sm.local_input(term.starts_at).replace("T", " ")}\n{reason}')
+    series.announce(db, row, 'changes', f'Termin abgesagt: {term.title or row.title} · {_when(term)}\n{reason}')
     sm.event(db, row, 'session_cancelled', user, f'{term.id}: {reason}')
     return True
 
@@ -109,7 +113,7 @@ def reactivate(db, row, term, user=None):
     for rec in _records(db, row, term):
         sm.mail(db, row, rec, 'Termin geändert – reaktiviert', message, calendar_file=True)
     series.staff_message(db, row, 'Termin reaktiviert', message, [term])
-    series.announce(db, row, 'changes', f'Termin reaktiviert: {term.title or row.title} · {sm.local_input(term.starts_at).replace("T", " ")}')
+    series.announce(db, row, 'changes', f'Termin reaktiviert: {term.title or row.title} · {_when(term)}')
     sm.event(db, row, 'session_reactivated', user, str(term.id))
     return True
 
@@ -125,7 +129,7 @@ def delete_term(db, row, term, user=None):
     term_id = term.id
     meeting = db.get(Meeting, term.meeting_id) if term.meeting_id else None
     meeting_id = meeting.id if meeting else None
-    label = f'{term.title or row.title} · {sm.local_input(term.starts_at).replace("T", " ")}'
+    label = f'{term.title or row.title} · {_when(term)}'
 
     if row.status == 'published' and term.published and not term.cancelled:
         # Build cancellation attachments while the term still exists. The queued
@@ -205,5 +209,5 @@ def notify_changed(db, row, terms, message='Bitte beachten Sie den aktualisierte
             sm.mail(db, row, rec, 'Termin geändert', message, calendar_file=True)
     series.staff_message(db, row, 'Termin geändert', message, terms)
     series.announce(db, row, 'changes', 'Terminänderung: ' + ', '.join(
-        (term.title or row.title) + ' · ' + sm.local_input(term.starts_at).replace('T', ' ') for term in terms
+        (term.title or row.title) + ' · ' + _when(term) for term in terms
     ))
