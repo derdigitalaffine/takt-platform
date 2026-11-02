@@ -42,6 +42,17 @@ def staff_terms(db, user, row):
     return [t for t in sm.sessions(db,row,False) if may_term(db,user,row,t)]
 
 
+def participant_previews(db,user,row,terms):
+    """Confirmed names per permitted term, including whole-series bookings."""
+    allowed=[term for term in terms if may_term(db,user,row,term)]
+    if not allowed:return {}
+    records=list(db.execute(select(SeminarEnrollment.name,SeminarEnrollment.scope_id).where(
+        SeminarEnrollment.seminar_id==row.id,SeminarEnrollment.status=='confirmed',
+        SeminarEnrollment.scope_id.in_([0,*[term.id for term in allowed]])
+    ).order_by(SeminarEnrollment.name,SeminarEnrollment.id)))
+    return {term.id:[name for name,scope in records if scope in (0,term.id)] for term in allowed}
+
+
 def scope_access(db,user,row,scope):
     return whole_staff(db,user,row) if not scope else may_term(db,user,row,term_of(db,row,scope))
 

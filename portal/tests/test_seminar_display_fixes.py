@@ -41,16 +41,13 @@ def test_participant_quick_view_is_staff_only_and_links_full_list(db, people):
     assert f'/seminare/{row.id}/participants' in page.text
     overview = staff.get('/seminare')
     assert overview.status_code == 200
-    assert f'data-url="/seminare/{row.id}/participants"' in overview.text
-    script = staff.get('/static/seminar_participant_preview.js')
-    assert script.status_code == 200
-    assert 'Angemeldet' in script.text
+    assert f'/seminare/{row.id}/participants?tid={term.id}' in overview.text
 
     public = client().get(f'/seminare/{row.id}')
     assert public.status_code == 200
     assert 'data-participant-preview' not in public.text
     public_overview = client().get('/seminare')
-    assert f'data-url="/seminare/{row.id}/participants"' not in public_overview.text
+    assert 'data-participant-preview' not in public_overview.text
 
     pdf = staff.get(f'/seminare/{row.id}/participants.pdf')
     assert pdf.status_code == 200
@@ -67,7 +64,55 @@ def test_admin_sees_participant_quick_view_in_seminar_overview(db, people):
     admin = login(people[3].email, 'passwort-test-123')
     page = admin.get('/seminare')
     assert page.status_code == 200
-    assert f'data-url="/seminare/{row.id}/participants"' in page.text
+    assert f'/seminare/{row.id}/participants?tid={term.id}' in page.text
     participants = admin.get(f'/seminare/{row.id}/participants')
     assert participants.status_code == 200
     assert people[1].name in participants.text
+
+
+def preview_blocks(html):
+    return {int(tid):(attributes,body) for attributes,tid,body in re.findall(
+        r'<details([^>]*data-participant-preview[^>]*data-term-id="(\d+)"[^>]*)>(.*?)</details>',html,re.S)}
+
+
+def test_preview_is_per_term_collapsed_and_one_person_per_line(db,people):
+    from datetime import timedelta
+    from app.db import SeminarSession
+    row,term=make(db,people,booking_mode='both')
+    second=SeminarSession(seminar_id=row.id,title='Zweiter Termin',starts_at=term.starts_at+timedelta(days=7),ends_at=term.ends_at+timedelta(days=7))
+    db.add(second);db.flush()
+    rec(db,row,term,people[1],status='confirmed')
+    rec(db,row,second,people[2],status='confirmed')
+    from app import seminars as sm
+    sm.new_enrollment(db,row,0,'Ganze Reihe','series@example.org',status='confirmed')
+    rec(db,row,term,people[3],status='pending');db.commit()
+    staff=login(people[0].email,'passwort-test-123')
+    for url in ('/seminare',f'/seminare/{row.id}'):
+        blocks=preview_blocks(staff.get(url).text)
+        assert term.id in blocks and second.id in blocks
+        first_attrs,first=blocks[term.id];second_attrs,last=blocks[second.id]
+        assert 'open' not in first_attrs and 'open' not in second_attrs
+        assert people[1].name in first and people[1].name not in last
+        assert people[2].name in last and people[2].name not in first
+        for body in (first,last):
+            assert 'Ganze Reihe' in body
+            assert people[3].name not in body
+            assert len(re.findall(r'<li\b',body))==2
+            assert '(2)' in body
+        assert f'participants?tid={term.id}' in first
+        assert f'participants?tid={second.id}' in last
+
+
+def test_preview_respects_effective_term_assignment(db,people):
+    import json
+    from datetime import timedelta
+    from app.db import SeminarSession
+    row,term=make(db,people);row.lecturers_json=json.dumps([people[2].id])
+    second=SeminarSession(seminar_id=row.id,starts_at=term.starts_at+timedelta(days=7),ends_at=term.ends_at+timedelta(days=7),lecturers_json='[]')
+    db.add(second);db.flush()
+    rec(db,row,second,people[1],status='confirmed');db.commit()
+    teacher=login(people[2].email,'passwort-test-123')
+    for url in ('/seminare',f'/seminare/{row.id}'):
+        blocks=preview_blocks(teacher.get(url).text)
+        assert term.id in blocks and second.id not in blocks
+        assert 'Noch keine bestätigten Anmeldungen.' in blocks[term.id][1]

@@ -3,3 +3,11 @@
 {% macro csrf_input(csrf) %}<input type="hidden" name="csrf" value="{{csrf}}">{% endmacro %}
 {% macro term(t) %}<div class="sem-term"><strong>{{t.title or 'Seminartermin'}}</strong><div>{{time(t)}}</div>{% if t.location %}<div><i class="fa-solid fa-location-dot me-1" aria-hidden="true"></i>{{t.location}}</div>{% endif %}<div class="small text-secondary">{{'Hybrid · vor Ort oder online' if t.delivery_mode=='hybrid' else 'Online' if t.delivery_mode=='online' else 'Vor Ort'}}</div>{% if t.cancelled %}<div class="text-danger">Abgesagt: {{t.reason}}</div>{% endif %}</div>{% endmacro %}
 {% macro mode_select(t,selected='onsite',name='',id='') %}{% if t.delivery_mode=='hybrid' %}<label class="form-label" for="{{id or ('mode-'~t.id)}}">Teilnahmeart · {{t.title or 'Termin'}} · {{t.starts_at|local}}</label><select class="form-select mb-3" id="{{id or ('mode-'~t.id)}}" name="{{name or ('mode_'~t.id)}}"><option value="onsite" {{'selected' if selected=='onsite'}}>Vor Ort{% if t.location %} · {{t.location}}{% endif %}</option><option value="online" {{'selected' if selected=='online'}}>Online</option></select>{% elif t.delivery_mode=='online' %}<input type="hidden" name="{{name or ('mode_'~t.id)}}" value="online">{% endif %}{% endmacro %}
+
+{% macro participant_preview(row,term,names) %}
+<details class="sem-participant-preview border-top mt-2 pt-2 small" data-participant-preview data-term-id="{{term.id}}">
+  <summary>Teilnehmer · {{term.starts_at|local}}{% if term.title %} · {{term.title}}{% endif %} <span class="text-secondary">({{names|length}})</span></summary>
+  {% if names %}<ul class="list-unstyled my-2" data-participant-preview-list>{% for name in names %}<li class="border-bottom py-1 text-break">{{name}}</li>{% endfor %}</ul>{% else %}<p class="text-secondary my-2">Noch keine bestätigten Anmeldungen.</p>{% endif %}
+  <a class="d-inline-block mb-2" href="/seminare/{{row.id}}/participants?tid={{term.id}}">Teilnehmerverwaltung für diesen Termin</a>
+</details>
+{% endmacro %}

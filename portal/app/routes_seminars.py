@@ -80,7 +80,7 @@ def seminar_list(request:Request,db:Session=Depends(get_db)):
         if q and q not in (row.title+' '+row.description).lower():continue
         terms=sm.sessions(db,row)
         upcoming=[t for t in terms if t.ends_at>utcnow()]
-        cards.append(dict(row=row,terms=terms,next_term=upcoming[0] if upcoming else (terms[-1] if terms else None),role=staff,mine=mine,subscription=sub,favorite=bool(favorite)))
+        cards.append(dict(row=row,terms=terms,next_term=upcoming[0] if upcoming else (terms[-1] if terms else None),role=staff,mine=mine,subscription=sub,favorite=bool(favorite),participant_previews=seminar_series.participant_previews(db,user,row,terms)))
     return protect(render(request,'seminars.html',user,cards=cards,tab=tab,q=q,statuses=sm.STATUSES,
         subscription_path=seminar_series.subscription_path,period=period,personal_path=sm.personal_path,participation_mode=seminar_hybrid.mode,can_create=bool(user and user.can('seminars'))))
 
@@ -235,7 +235,7 @@ def seminar_detail(request:Request,sid:int,db:Session=Depends(get_db)):
     mine=list(db.scalars(select(SeminarEnrollment).where(SeminarEnrollment.seminar_id==sid,SeminarEnrollment.user_id==user.id,SeminarEnrollment.status.notin_(['cancelled','rejected'])))) if user else []
     booked={t.id:r for r in mine for t in sm.enrollment_sessions(db,row,r)}
     favorite=bool(user and db.scalar(select(SeminarFavorite.id).where(SeminarFavorite.seminar_id==sid,SeminarFavorite.user_id==user.id)))
-    return protect(render(request,'seminar.html',user,row=row,terms=sm.sessions(db,row),role=sm.role(db,user,row),teachers=teachers,places=places,booked=booked,personal_path=sm.personal_path,statuses=sm.STATUSES,favorite=favorite,operations=options(row),organization=profile.get('organization','') if profile.get('prefill_enabled') else '',open_registration=bool(not json.loads(row.fixed_groups_json or '[]') and row.status=='published' and sm.sessions(db,row) and (not row.registration_until or row.registration_until>utcnow()) and (all(t.starts_at>utcnow() for t in sm.sessions(db,row)) if row.booking_mode=='series' else any(t.starts_at>utcnow() for t in sm.sessions(db,row)))),now=utcnow()))
+    return protect(render(request,'seminar.html',user,row=row,terms=sm.sessions(db,row),role=sm.role(db,user,row),participant_previews=seminar_series.participant_previews(db,user,row,sm.sessions(db,row)),teachers=teachers,places=places,booked=booked,personal_path=sm.personal_path,statuses=sm.STATUSES,favorite=favorite,operations=options(row),organization=profile.get('organization','') if profile.get('prefill_enabled') else '',open_registration=bool(not json.loads(row.fixed_groups_json or '[]') and row.status=='published' and sm.sessions(db,row) and (not row.registration_until or row.registration_until>utcnow()) and (all(t.starts_at>utcnow() for t in sm.sessions(db,row)) if row.booking_mode=='series' else any(t.starts_at>utcnow() for t in sm.sessions(db,row)))),now=utcnow()))
 
 
 @app.post('/seminare/{sid:int}/register',dependencies=[Depends(check_csrf)])
