@@ -53,9 +53,19 @@ def safe_url(value):
     return value[:1000]
 
 
+def planner_ids(row):
+    """Read only canonical IDs; malformed legacy planning data grants no rights."""
+    try:
+        value=json.loads(row.planning_json or '{}').get('planner_ids',[])
+        return [uid for uid in value if type(uid) is int and uid>0] if isinstance(value,list) else []
+    except (ValueError,TypeError,AttributeError):return []
+
+
 def may_plan(db,user,row):
-    if not user or not row:return False
+    if not user or not user.active or not row:return False
+    # Preserve the explicit global management permission and existing owner delegation.
     if user.can('seminars_manage'):return True
+    if user.id==row.lead_id or user.id in planner_ids(row):return True
     owner=db.get(User,row.owner_id)
     return bool(owner and owner.active and owner.can('seminars') and row.owner_id in absence.acting_ids(db,user))
 

@@ -25,7 +25,7 @@ async def payload(request):
 def state(db,row):
     if not row:return {}
     data=plan.json_object(row.planning_json)
-    data.update(title=row.title,description=row.description,revision=row.revision,status=row.status,booking_mode=row.booking_mode,capacity=row.capacity,manual_admission=row.manual_admission,channels=row.channels.split(','),lecturers=json.loads(row.lecturers_json),guests=json.loads(row.guests_json),lead_id=row.lead_id)
+    data.update(title=row.title,description=row.description,revision=row.revision,status=row.status,booking_mode=row.booking_mode,capacity=row.capacity,manual_admission=row.manual_admission,channels=row.channels.split(','),lecturers=json.loads(row.lecturers_json),guests=json.loads(row.guests_json),lead_id=row.lead_id,planner_ids=sm.planner_ids(row))
     # An incomplete draft preserves its raw fields. Saved terms always reflect the current database.
     actual=sm.sessions(db,row,False)
     if actual:
@@ -55,14 +55,17 @@ def edit_planner(request:Request,sid:int,user:User=Depends(current_user),db:Sess
 
 
 @app.post('/seminare/planen/vorschau')
-async def preview_planner(request:Request,user:User=Depends(current_user)):
-    allowed(user);return JSONResponse(plan.preview(await payload(request)))
+async def preview_planner(request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
+    data=await payload(request)
+    if data.get('seminar_id'):staff_of(db,user,sm.integer(data['seminar_id'],1),True)
+    else:allowed(user)
+    return JSONResponse(plan.preview(data))
 
 
-def user_ids(db,raw):
-    if not isinstance(raw,list) or len(raw)>100:raise HTTPException(422,'Ungültige Dozentenauswahl.')
+def user_ids(db,raw,label='Dozent'):
+    if not isinstance(raw,list) or len(raw)>100:raise HTTPException(422,f'Ungültige Auswahl ({label}).')
     ids=list(dict.fromkeys(sm.integer(x,1) for x in raw))
-    if ids and set(db.scalars(select(User.id).where(User.id.in_(ids),User.active.is_(True))))!=set(ids):raise HTTPException(422,'Dozent nicht mehr verfügbar.')
+    if ids and set(db.scalars(select(User.id).where(User.id.in_(ids),User.active.is_(True))))!=set(ids):raise HTTPException(422,f'{label} nicht mehr verfügbar.')
     return ids
 
 
@@ -127,7 +130,9 @@ def save(db,user,data,row=None):
         t.revision=(t.revision or 0)+1
     if existing.keys()-seen:raise HTTPException(409,'Bestehende Termine fehlen. Bitte die Planung neu laden; Termine werden nicht stillschweigend entfernt.')
     if action!='draft' and not was_published and not any(v.get('include') is not False for v in terms):raise HTTPException(422,'Bitte zuerst Termine in der Vorschau zusammenstellen.')
-    row.planning_json=json.dumps({k:v for k,v in data.items() if k not in {'csrf','action','revision'}},ensure_ascii=False)
+    planning_data={k:v for k,v in data.items() if k not in {'csrf','action','revision','seminar_id'}}
+    planning_data['planner_ids']=user_ids(db,data.get('planner_ids',sm.planner_ids(row)),'Planer')
+    row.planning_json=json.dumps(planning_data,ensure_ascii=False)
     for g in external:
         if g['save'] and not db.scalar(select(SeminarExternalLecturer.id).where(SeminarExternalLecturer.name==g['name'],SeminarExternalLecturer.email==g['email'],SeminarExternalLecturer.organization==g['organization'])):
             db.add(SeminarExternalLecturer(name=g['name'],email=g['email'],organization=g['organization'],created_by=user.id))

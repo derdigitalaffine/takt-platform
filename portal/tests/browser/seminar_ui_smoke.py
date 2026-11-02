@@ -56,6 +56,16 @@ def exercise(browser,f):
     p.locator('#seminar-json').set_input_files({'name':'seminarreihe.json','mimeType':'application/json','buffer':exported})
     p.get_by_role('button',name='Als neuen Entwurf importieren').click()
     expect(p).to_have_url(re.compile(r'/seminare/\d+/planen$'));capture(p,'json-imported-planner-mobile')
+    # Assign multiple planners through the real UI; a member gains only this series.
+    p.goto(BASE+f'/seminare/{sid}/planen')
+    p.locator('#sp-planners').select_option(label=['Mara Planung','Alex Teilnahme'])
+    with p.expect_navigation():
+        p.get_by_role('button',name='Änderungen speichern',exact=True).click()
+    expect(p.locator('#sp-planners option:checked')).to_have_count(2)
+    assert m.goto(BASE+f'/seminare/{sid}/planen').status==200
+    capture(m,'assigned-planner-mobile')
+    assert m.goto(BASE+f'/seminare/{f["single"]}/planen').status==404
+    assert m.goto(BASE+'/seminare/planen').status==403
     assert not errors,errors
     staff.close();member.close();guest.close()
 
