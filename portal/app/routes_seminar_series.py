@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from . import seminars as sm, seminar_series as series, seminar_learning as learning
 from .db import (Seminar, SeminarSession, SeminarEnrollment, SeminarSubscription, SeminarCertificate,
-                 SeminarEvent, User, utcnow)
+                 SeminarEvent, User, to_local, utcnow)
 from .main import app, check_csrf, current_user, get_db, render, redirect, session_user, rate_limit, flash
 from .routes_seminars import staff_of, row_of, can_read, personal_of, protect
 
@@ -124,7 +124,7 @@ async def seminar_term_settings(request:Request,sid:int,tid:int,user:User=Depend
     flash(request,'Termin gespeichert.');return redirect(f'/seminare/{sid}/terms/{tid}')
 
 
-def to_date(term):return sm.local_input(term.starts_at).replace('T',' ')
+def to_date(term):return to_local(term.starts_at).strftime('%d.%m.%Y %H:%M')
 
 
 @app.post('/seminare/{sid:int}/publish-terms',dependencies=[Depends(check_csrf)])
