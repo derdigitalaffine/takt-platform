@@ -22,7 +22,7 @@ def test_published_series_visibility_can_change_without_republishing(db, people)
     db.refresh(row)
     assert row.status == 'published'
     assert row.channels == 'internal'
-    assert client().get(f'/seminare/{row.id}').status_code == 404
+    assert client().get(f'/seminare/{row.id}').status_code == 401
 
     loaded = state(db, row)
     loaded.update(action='save', channels=['internal', 'guest', 'public'])
