@@ -166,3 +166,30 @@ def test_upload_io_error_never_discloses_internal_paths(db,task_people,monkeypat
     assert response.status_code==422
     assert 'Dateien konnten nicht gespeichert' in response.json()['detail']
     assert 'internal-path' not in response.text and '/secret/' not in response.text
+
+
+def test_survey_cards_keep_live_status_and_source_permissions(db,task_people,monkeypatch):
+    import secrets
+    from app import main
+    from app.db import Vote,VoteShare
+    a,_,reader,_=task_people
+    monkeypatch.setattr(main,'enabled_modules',lambda:{'tasks','polls'})
+    vote=Vote(owner_id=a.id,title='Teamentscheidung',public_token=secrets.token_hex(20));db.add(vote);db.commit()
+    try:
+        b=board(db,a,mode='free');member(db,b,reader,1)
+        key=f'survey:vote:{vote.id}'
+        assert key in kb.source_items(db,a) and key not in kb.source_items(db,reader)
+        assert post(client_for(a),db,b,'attach',column=kb.columns(db,b)[0].id,source=key).status_code==200
+        vote.title='Aktualisierte Entscheidung';vote.status='closed';db.commit()
+        visible=kb.visible_cards(db,a,b)
+        assert visible[0]['source']['title']==vote.title
+        assert visible[0]['source']['status']!='Entwurf'
+        page=client_for(a).get(f'/tasks/boards/{b.id}?kind=task')
+        assert page.status_code==200 and 'data-kind="source"' not in page.text
+        page=client_for(a).get(f'/tasks/boards/{b.id}?kind=survey&q=Aktualisierte')
+        assert page.status_code==200 and 'data-kind="source"' in page.text
+        assert not kb.visible_cards(db,reader,b)
+        share=VoteShare(vote_id=vote.id,user_id=reader.id,level=1);db.add(share);db.commit()
+        assert kb.visible_cards(db,reader,b)[0]['source']['title']==vote.title
+        db.delete(share);db.commit();assert not kb.visible_cards(db,reader,b)
+    finally:db.delete(vote);db.commit()

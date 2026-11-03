@@ -20,7 +20,12 @@ def number(value):
 @app.get('/tasks/boards')
 def board_list(request:Request,user:User=Depends(current_user),db:Session=Depends(get_db)):
     module_on()
-    return render(request,'task_boards.html',user,boards=list(db.scalars(select(TaskBoard).where(TaskBoard.id.in_(boards.board_ids(user))).order_by(TaskBoard.title))),can_create=ts.may_create(user))
+    items=list(db.scalars(select(TaskBoard).where(TaskBoard.id.in_(boards.board_ids(user))).order_by(TaskBoard.title)))
+    summaries={}
+    for item in items:
+        visible=boards.visible_cards(db,user,item)
+        summaries[item.id]=dict(total=len(visible),done=sum(bool(v['task'] and v['task'].status=='done') for v in visible),columns=boards.columns(db,item))
+    return render(request,'task_boards.html',user,boards=items,summaries=summaries,can_create=ts.may_create(user))
 
 
 @app.post('/tasks/boards',dependencies=[Depends(check_csrf)])
@@ -37,17 +42,19 @@ async def board_create(request:Request,user:User=Depends(current_user),db:Sessio
 @app.get('/tasks/boards/{bid:int}')
 def board_page(request:Request,bid:int,user:User=Depends(current_user),db:Session=Depends(get_db)):
     module_on();board=boards.get(db,user,bid);cols=boards.columns(db,board);cards=boards.visible_cards(db,user,board)
+    kind=request.query_params.get('kind','')
+    if kind not in {'','task','survey','form','application','circulation','resource'}:kind=''
     query=request.query_params.get('q','').strip().lower()[:200];sort=request.query_params.get('sort','manual')
     if sort not in {'manual','priority','due'}:sort='manual'
     priority=request.query_params.get('priority','');person=request.query_params.get('person','')
-    cards=[v for v in cards if (not query or query in (v['task'].title+' '+v['task'].description+' '+v['task'].tags if v['task'] else v['source']['title']).lower()) and (not priority or v['task'] and v['task'].priority==priority) and (not person or v['task'] and str(v['task'].assignee_id)==person)]
+    cards=[v for v in cards if (not query or query in (v['task'].title+' '+v['task'].description+' '+v['task'].tags if v['task'] else v['source']['title']+' '+v['source']['source_label']+' '+v['source'].get('status','')+' '+v['source']['detail']).lower()) and (not kind or (kind=='task' if v['task'] else v['source']['source']==kind)) and (not priority or v['task'] and v['task'].priority==priority) and (not person or v['task'] and str(v['task'].assignee_id)==person)]
     if sort=='priority':cards.sort(key=lambda v:({'urgent':0,'high':1,'normal':2,'low':3}.get(v['task'].priority,2) if v['task'] else 4,v['card'].position,v['card'].id))
     elif sort=='due':cards.sort(key=lambda v:(v['task'].due_at if v['task'] else v['source'].get('due')) or datetime.max)
     checks={}
     for v in cards:
         if v['task']:checks[v['task'].id]=list(db.scalars(select(TaskCheck).where(TaskCheck.task_id==v['task'].id).order_by(TaskCheck.position,TaskCheck.id)))
     level=boards.level(db,user,board)
-    return render(request,'task_board.html',user,board=board,columns=cols,cards=cards,checks=checks,level=level,ts=ts,sort=sort,q=query,priority=priority,person=person,now=utcnow(),people=ts.users(db),groups=list(db.scalars(select(Group).order_by(Group.name))) if level==3 else [],members=list(db.scalars(select(TaskBoardMember).where(TaskBoardMember.board_id==bid))) if level==3 else [],
+    return render(request,'task_board.html',user,board=board,columns=cols,cards=cards,checks=checks,level=level,ts=ts,sort=sort,q=query,kind=kind,priority=priority,person=person,now=utcnow(),people=ts.users(db),groups=list(db.scalars(select(Group).order_by(Group.name))) if level==3 else [],members=list(db.scalars(select(TaskBoardMember).where(TaskBoardMember.board_id==bid))) if level==3 else [],
         candidates=list(db.scalars(ts.visible_query(user).where(Task.archived_at.is_(None)).order_by(Task.updated_at.desc()).limit(200))) if level>=2 else [],sources=boards.source_items(db,user) if level>=2 else {})
 
 

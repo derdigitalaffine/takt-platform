@@ -87,7 +87,9 @@ def _krank_badge(c: Ctx) -> tuple[int, str]:
 ITEMS: list[Item] = [
     # Mein Arbeitsplatz
     Item("tasks", "work", "/tasks", "fa-list-check", "Meine Aufgaben",
-         lambda c: _apps(c) or c.res_nav or "circulations" in c.modules or "tasks" in c.modules, _pre("/tasks", "/aufgaben"), _tasks_badge),
+         lambda c: _apps(c) or c.res_nav or "circulations" in c.modules or "tasks" in c.modules, lambda p: _pre("/tasks", "/aufgaben")(p) and not p.startswith("/tasks/boards"), _tasks_badge),
+    Item("kanban", "work", "/tasks/boards", "fa-table-columns", "Kanbanboards",
+         lambda c: "tasks" in c.modules, _pre("/tasks/boards")),
     Item("inbox", "work", "/forms/inbox", "fa-inbox", "Zum Ausfüllen", lambda c: "forms" in c.modules, _pre("/forms/inbox")),
     Item("absences", "work", "/abwesenheiten", "fa-umbrella-beach", "Abwesenheiten", lambda c: True,
          _pre("/abwesenheiten"), lambda c: _absence_badge(c)),

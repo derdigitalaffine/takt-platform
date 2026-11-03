@@ -54,6 +54,23 @@ def source_items(db,user):
     for key in ('ready','pool','waiting','delegated','history'):
         for item in work[key]:
             if item['source']!='native':result[item['source']+':'+item['href']]=item
+    # Reuse the survey hub's visibility checks and live status, never public tokens.
+    if 'polls' in enabled_modules():
+        from . import surveys
+        for state in ('active','archive'):
+            for item in surveys.collect(db,user,enabled_modules(),state=state):
+                key=f"survey:{item['kind']}:{item['id']}"
+                result[key]=dict(source='survey',source_label=surveys.KINDS[item['kind']][0],
+                    title=item['title'],href=item['href'],detail=f"{item['count']} {item['unit']}",
+                    status=item['status'],due=None,icon='fa-square-poll-vertical')
+    if 'forms' in enabled_modules():
+        from . import forms as fm
+        from .db import Form
+        for form in db.scalars(select(Form).where(Form.kind=='survey',Form.deleted_at.is_(None))):
+            if fm.access_level(db,form,user):
+                result[f'form:{form.id}']=dict(source='form',source_label='Formularumfrage',title=form.title,
+                    href=f'/forms/{form.id}',status='Archiviert' if form.archived_at else 'Offen' if fm.is_open(form) else 'Geschlossen',
+                    detail='Fragebogen',due=None,icon='fa-file-lines')
     return result
 
 
