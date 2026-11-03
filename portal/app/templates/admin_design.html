@@ -72,7 +72,7 @@
         <select class="form-select js-select" id="nv" name="ui_navbar">
           {% for key, label in navbars.items() %}<option value="{{ key }}" {% if cfg.ui_navbar == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select></div>
-      <div class="col-md-6"><label class="form-label" for="th">Farbschema</label>
+      <div class="col-md-6"><label class="form-label" for="th">Standard-Farbschema</label>
         <select class="form-select js-select" id="th" name="ui_theme">
           {% for key, label in themes.items() %}<option value="{{ key }}" {% if cfg.ui_theme == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>

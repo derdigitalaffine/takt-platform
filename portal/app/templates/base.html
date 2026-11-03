@@ -8,10 +8,12 @@
   <script>
     (function () {
       var t = '{{ ui.theme }}';
-      // Ist im Design ein festes Farbschema eingestellt, gilt es für alle; sonst die eigene Wahl
-      if (t === 'auto') { try { t = localStorage.getItem('theme') || t; } catch (e) {} }
+      try { var saved = localStorage.getItem('theme'); if (['light','dark','auto'].includes(saved)) t = saved; } catch (e) {}
+      if (!['light','dark','auto'].includes(t)) t = 'auto';
+      document.documentElement.dataset.themeMode = t;
       if (t === 'auto') { t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
       document.documentElement.setAttribute('data-bs-theme', t);
+      document.documentElement.style.colorScheme = t;
     })();
   </script>
   <link rel="icon" href="{{ ui.favicon or 'data:,' }}">
@@ -45,16 +47,7 @@
       </a>
     </div>
     <div class="d-flex align-items-center gap-1">
-      {% if ui.theme == 'auto' %}
-      <div class="dropdown">
-        <button class="btn btn-link" data-bs-toggle="dropdown" aria-label="Farbschema" title="Farbschema"><i class="fa-solid fa-circle-half-stroke"></i></button>
-        <ul class="dropdown-menu dropdown-menu-end">
-          <li><button class="dropdown-item" data-theme-set="light"><i class="fa-regular fa-sun fa-fw me-2"></i>Hell</button></li>
-          <li><button class="dropdown-item" data-theme-set="dark"><i class="fa-regular fa-moon fa-fw me-2"></i>Dunkel</button></li>
-          <li><button class="dropdown-item" data-theme-set="auto"><i class="fa-solid fa-desktop fa-fw me-2"></i>Automatisch</button></li>
-        </ul>
-      </div>
-      {% endif %}
+      {% include '_theme_switch.html' %}
       {% if user %}
       <div class="dropdown">
         <button class="btn btn-link d-flex align-items-center gap-2" data-bs-toggle="dropdown" aria-label="Benutzermenü für {{ user.name }}">

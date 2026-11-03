@@ -5,22 +5,40 @@
   var $ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
 
   /* ---- Hell/Dunkel ---------------------------------------------------- */
+  var themeRoot = document.documentElement;
+  var themeMedia = matchMedia('(prefers-color-scheme: dark)');
+  var themeModes = ['light','dark','auto'];
+  var themeMode = themeRoot.dataset.themeMode || themeRoot.dataset.defaultTheme || 'auto';
   function applyTheme(mode) {
-    var t = mode === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : mode;
-    document.documentElement.setAttribute('data-bs-theme', t);
+    themeMode = themeModes.includes(mode) ? mode : 'auto';
+    var t = themeMode === 'auto' ? (themeMedia.matches ? 'dark' : 'light') : themeMode;
+    themeRoot.dataset.themeMode = themeMode;
+    themeRoot.setAttribute('data-bs-theme', t);
+    themeRoot.style.colorScheme = t;
+    $('[data-theme-set]').forEach(function(btn) {
+      var active = btn.dataset.themeSet === themeMode;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', String(active));
+    });
   }
   $('[data-theme-set]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var mode = btn.dataset.themeSet;
-      try { localStorage.setItem('theme', mode); } catch (e) { /* privater Modus */ }
+      try { localStorage.setItem('theme', mode); } catch (e) { /* Auswahl gilt weiter für diese Seite. */ }
       applyTheme(mode);
     });
   });
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
-    var saved = null;
-    try { saved = localStorage.getItem('theme'); } catch (e) { /* ignorieren */ }
-    if ((saved || document.documentElement.dataset.defaultTheme) === 'auto') applyTheme('auto');
+  themeMedia.addEventListener('change', function () {
+    if (themeMode === 'auto') applyTheme('auto');
   });
+  window.addEventListener('storage', function(event) {
+    if (event.key === 'theme' || event.key === null) {
+      var saved = null;
+      try { saved = localStorage.getItem('theme'); } catch (e) {}
+      applyTheme(themeModes.includes(saved) ? saved : themeRoot.dataset.defaultTheme);
+    }
+  });
+  applyTheme(themeMode);
 
   /* ---- Bestätigungsdialoge (SweetAlert2) ------------------------------ */
   document.addEventListener('click', function (ev) {
