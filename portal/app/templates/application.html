@@ -9,7 +9,7 @@
 {% block content %}
 {% set overdue = resp.due_at and not resp.closed_at and resp.due_at < now %}
 {% set act = '/forms/' ~ form.id ~ '/applications/' ~ resp.id %}
-<nav aria-label="Pfad" class="small mb-2"><a href="/forms/applications">Antragseingang</a> › {{ form.title }}</nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/forms/applications">Antragseingang</a> › {{ form.title }}</nav>
 {% call m.page_head(resp.ref_no, form.title) %}
 <a class="btn btn-outline-secondary" href="{{ act }}/pdf"><i class="fa-regular fa-file-pdf me-1"></i>PDF</a>
 <button class="btn btn-outline-secondary" type="button" data-copy-text="{{ track_link }}" title="Link der Statusseite kopieren (nur an die antragstellende Person geben)"><i class="fa-solid fa-link me-1"></i>Statuslink</button>

@@ -188,7 +188,7 @@ FAMILIES = [
     ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"),
     ("absences",), ("krank_me", "krank_mine", "krank_staff"),
 ]
-CONTEXTS = [family for family in FAMILIES if len(family) > 1 and family[0] != "surveys"]
+CONTEXTS = [family for family in FAMILIES if len(family) > 1 and family[0] not in {"surveys", "resources"}]
 CONTEXT_ONLY = {i for family in FAMILIES for i in family[1:]}
 ADMIN_SECTIONS = {
     "Menschen & Organisation": ["users", "orgs"],

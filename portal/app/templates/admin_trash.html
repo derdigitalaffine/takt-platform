@@ -6,7 +6,7 @@
 <a class="btn btn-outline-secondary" href="#papierkorb"><i class="fa-solid fa-trash-can-arrow-up me-1"></i>Papierkorb ({{ total }})</a>
 {% endcall %}
 
-<ul class="nav nav-pills flex-nowrap overflow-auto small mb-3" aria-label="Bereich">
+<ul class="ds-nav nav nav-pills small mb-3" aria-label="Bereich">
   {% for k, v in kinds.items() %}<li class="nav-item"><a class="nav-link text-nowrap {{ 'active' if k == kind }}" href="?kind={{ k }}" {% if k == kind %}aria-current="page"{% endif %}><i class="fa-solid {{ v.icon }} me-1"></i>{{ v.label }}</a></li>{% endfor %}
 </ul>
 {% set k = kinds[kind] %}

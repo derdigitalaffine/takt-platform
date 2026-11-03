@@ -50,7 +50,7 @@
 {% block content %}
 {% if law.internal %}<div class="alert alert-info"><i class="fa-solid fa-lock me-2"></i>Interner Text – nur für angemeldete Portal-Benutzer.</div>{% endif %}
 
-<nav aria-label="Pfad" class="small mb-2 lex-noprint">
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2 lex-noprint">
   <a href="{{ R }}">Rechtstexte</a>{% for p in path %} › <a href="{{ R }}/ebene/{{ p.id }}">{{ p.name }}</a>{% endfor %}
   {% if current or version %} › <a href="{{ R }}/{{ law.slug }}">{{ law.short_title or law.title }}</a>{% endif %}{% if version %} › <a href="{{ base }}">Fassung bis {{ fmt_date(version.valid_until) or version.saved_at | local('%d.%m.%Y') }}</a>{% endif %}{% if current %}{% for a in current.ancestors %} › <a href="{{ base }}/{{ a.section.anchor }}">{{ a.section.number or a.section.title }}</a>{% endfor %}{% endif %}
 </nav>
@@ -83,7 +83,7 @@
 </div>
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-4 lex-noprint">
-  <div class="btn-group" role="group" aria-label="Ansicht">
+  <div class="ds-view-switch btn-group" role="group" aria-label="Ansicht">
     <a class="btn btn-sm {{ 'btn-primary' if not current else 'btn-outline-primary' }}" href="{{ base }}{{ ('#' ~ current.section.anchor) if current }}"><i class="fa-solid fa-align-justify me-1"></i>Volltext</a>
     <a class="btn btn-sm {{ 'btn-primary' if current else 'btn-outline-primary' }}" href="{{ base }}/{{ flat[0].section.anchor if flat and not current else (current.section.anchor if current else '') }}" {% if not flat %}aria-disabled="true"{% endif %}><i class="fa-solid fa-list-ol me-1"></i>Einzelne Abschnitte</a>
   </div>
@@ -137,7 +137,7 @@
       {% endif %}
     </article>
     {% if current %}
-    <nav class="d-flex justify-content-between gap-2 mt-4 pt-3 border-top lex-noprint" aria-label="Blättern" style="max-width: 50rem">
+    <nav class="ds-view-switch d-flex justify-content-between gap-2 mt-4 pt-3 border-top lex-noprint" aria-label="Blättern" style="max-width: 50rem">
       {% if prev %}<a class="btn btn-outline-secondary text-start" href="{{ base }}/{{ prev.section.anchor }}"><i class="fa-solid fa-chevron-left me-2"></i>{{ prev.section.number or prev.label }}</a>{% else %}<span></span>{% endif %}
       {% if next %}<a class="btn btn-outline-secondary text-end" href="{{ base }}/{{ next.section.anchor }}">{{ next.section.number or next.label }}<i class="fa-solid fa-chevron-right ms-2"></i></a>{% endif %}
     </nav>

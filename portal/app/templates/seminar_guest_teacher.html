@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% import '_seminar_macros.html' as s %}
+{% extends 'base.html' %}{% import '_seminar_macros.html' as s with context %}
 {% block title %}Dozentenzugang · {{row.title}}{% endblock %}{% block head %}<link rel="stylesheet" href="/static/seminars.css">{% endblock %}
 {% block content %}<p class="text-secondary">Persönlicher Dozentenzugang · Hallo {{teacher.name}}</p><h1>{{row.title}}</h1><h2 class="h4">{{term.title or 'Seminartermin'}}</h2><p>{{s.time(term)}}{% if term.location %}<br>{{term.location}}{% endif %}</p><p>Dieser persönliche Zugang gilt nur für Ihren Termin. Bitte geben Sie den Link nicht weiter.</p>
 {% if term.delivery_mode!='onsite' %}<form class="mb-4" method="post" action="/seminare/dozent/{{token}}/video">{{s.csrf_input(csrf)}}<button class="btn btn-primary"><i class="fa-solid fa-video me-1" aria-hidden="true"></i>Konferenz als Dozent öffnen</button></form>{% endif %}

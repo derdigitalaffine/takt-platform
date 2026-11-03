@@ -12,7 +12,7 @@
 {% endmacro %}
 {% block content %}
 {% call m.page_head('Einstellungen: ' ~ page.title if page else 'Neue Buchungsseite', '' if page else 'Danach legen Sie im Kalender fest, wann gebucht werden kann.') %}
-  <a class="btn btn-outline-secondary" href="{{ '/bookings/' ~ page.id if page else '/bookings' }}"><i class="fa-solid fa-arrow-left me-1"></i>Zurück</a>
+  <a class="ds-back btn btn-outline-secondary" href="{{ '/bookings/' ~ page.id if page else '/bookings' }}"><i class="fa-solid fa-arrow-left me-1"></i>Zurück</a>
 {% endcall %}
 <form method="post" class="row g-4">
   <input type="hidden" name="csrf" value="{{ csrf }}">

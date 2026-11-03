@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% import '_seminar_macros.html' as s %}
+{% extends 'base.html' %}{% import '_seminar_macros.html' as s with context %}
 {% block title %}Durchführung · {{row.title}}{% endblock %}{% block head %}<link rel="stylesheet" href="/static/seminars.css">{% endblock %}
 {% block content %}{{s.nav(row,'planner' if planner else 'lecturer')}}<h1>{{term.title or row.title}}</h1><p>{{s.time(term)}} · {{term.location}}</p><div class="d-flex flex-wrap gap-2 mb-4"><a class="btn btn-outline-secondary" href="/seminare/{{row.id}}/participants.pdf?tid={{term.id}}">Unterschriftenliste PDF</a><a class="btn btn-outline-secondary" href="/seminare/{{row.id}}/participants.csv?tid={{term.id}}">CSV exportieren</a><a class="btn btn-outline-primary" href="/seminare/{{row.id}}/participants?tid={{term.id}}">Bescheinigungen & Verwaltung</a></div>
 <div class="sem-layout"><section><h2 class="h4">Anwesenheit · {{records|length}} bestätigte Teilnehmer</h2><label class="form-label" for="attendance-search">Teilnehmer suchen</label><input id="attendance-search" type="search" class="form-control mb-3" placeholder="Name oder Organisation" data-seminar-search>

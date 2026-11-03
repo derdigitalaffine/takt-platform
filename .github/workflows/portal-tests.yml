@@ -117,6 +117,8 @@ jobs:
         run: node tests/test_seminar_planner_client.js
       - name: Check module discovery and responsive navigation
         run: python tests/browser/navigation_ui_smoke.py
+      - name: Check consistent navigation controls across modules
+        run: python tests/browser/navigation_controls_smoke.py
       - name: Check theme selection in Chromium
         run: python tests/browser/theme_ui_smoke.py
       - name: Exercise seminar workflows on desktop and mobile

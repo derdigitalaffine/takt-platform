@@ -2,7 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}{{ 'Neuer Eintrag' if new else org.name }} · Körperschaften{% endblock %}
 {% block content %}
-<nav aria-label="Pfad" class="small mb-2"><a href="/admin/orgs">Körperschaften</a> › {{ 'Neu' if new else org.name }}</nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/admin/orgs">Körperschaften</a> › {{ 'Neu' if new else org.name }}</nav>
 {{ m.page_head('Neuer Eintrag' if new else org.name, 'Körperschaft, Zweckverband oder Einrichtung') }}
 <form method="post" action="{{ '/admin/orgs/new' if new else '/admin/orgs/' ~ org.id }}" enctype="multipart/form-data">
 <input type="hidden" name="csrf" value="{{ csrf }}">

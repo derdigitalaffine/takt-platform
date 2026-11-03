@@ -3,7 +3,7 @@
 {% block head %}<link rel="stylesheet" href="/static/laws.css">{% endblock %}
 {% macro label(v) -%}{% if v %}Fassung {% if v.valid_from %}{{ fmt_date(v.valid_from) }} – {% else %}bis {% endif %}{{ fmt_date(v.valid_until) or (v.saved_at | local('%d.%m.%Y')) }}{% if not v.public %} (interne Sicherung){% endif %}{% else %}aktuelle Fassung{% endif %}{%- endmacro %}
 {% block content %}
-<nav aria-label="Pfad" class="small mb-2"><a href="{{ R }}">Rechtstexte</a> › <a href="{{ R }}/{{ law.slug }}">{{ law.short_title or law.title }}</a> › Änderungen</nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="{{ R }}">Rechtstexte</a> › <a href="{{ R }}/{{ law.slug }}">{{ law.short_title or law.title }}</a> › Änderungen</nav>
 {% if not versions %}<div class="alert alert-info">Noch keine frühere ausdrücklich angelegte Fassung vorhanden.</div>{% endif %}<h1 class="h3 mb-1"><i class="fa-solid fa-code-compare me-2 text-primary"></i>Was hat sich geändert?</h1>
 <p class="text-secondary">{{ law.title }}</p>
 <form method="get" class="card card-body mb-3 lex-noprint"><div class="row g-2 align-items-end">

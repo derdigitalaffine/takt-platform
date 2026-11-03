@@ -2,7 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}{{ vote.title if vote else 'Neue Abstimmung' }}{% endblock %}
 {% block content %}
-<nav aria-label="Pfad" class="small mb-2"><a href="/umfragen">Umfragen & Abstimmungen</a>{% if vote %} › <a href="/votes/{{ vote.id }}">{{ vote.title }}</a>{% endif %}</nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/umfragen">Umfragen & Abstimmungen</a>{% if vote %} › <a href="/votes/{{ vote.id }}">{{ vote.title }}</a>{% endif %}</nav>
 {{ m.page_head(vote.title if vote else 'Neue Abstimmung', 'Fragen, Antwortmöglichkeiten und Regeln festlegen. Wahlberechtigte tragen Sie danach auf der Seite der Abstimmung ein.') }}
 {% if vote %}{{ m.survey_nav([('build','/votes/' ~ vote.id ~ '/edit','Fragen','fa-pen-ruler'),('share','/votes/' ~ vote.id ~ '?tab=share','Teilnahme','fa-share-nodes'),('conduct','/votes/' ~ vote.id ~ '?tab=conduct','Durchführung','fa-sliders'),('results','/votes/' ~ vote.id ~ '?tab=results','Ergebnisse','fa-chart-column'),('settings','/votes/' ~ vote.id ~ '?tab=settings','Einstellungen','fa-gear')], 'build') }}{% endif %}
 {% set d = draft or {} %}

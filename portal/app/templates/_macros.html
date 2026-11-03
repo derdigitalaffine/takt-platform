@@ -202,7 +202,7 @@
 
 {# Shared workflow navigation for polls, votes and live surveys. Anchors stay native links. #}
 {% macro survey_nav(items, active) -%}
-<nav class="nav nav-tabs ds-section-nav mb-4" aria-label="Umfragebereiche">
+<nav class="ds-nav nav nav-tabs ds-section-nav mb-4" aria-label="Umfragebereiche">
 {% for key,href,label,icon in items %}<a class="nav-link {{ 'active' if key == active }}" href="{{ href }}" {% if key == active %}aria-current="page"{% endif %}><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a>{% endfor %}
 </nav>
 {%- endmacro %}

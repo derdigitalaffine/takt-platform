@@ -8,7 +8,7 @@
   {% if org_list | length > 1 %}<select class="form-select form-select-lg" id="cat-org" aria-label="Zuständige Stelle" style="flex: 0 1 18rem"><option value="">Alle Stellen</option>{% for o in org_list %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select>{% endif %}</div>
 </div>
 {% if total %}
-<div class="d-flex justify-content-end mb-3"><div class="btn-group btn-group-sm" role="group" aria-label="Darstellung">
+<div class="d-flex justify-content-end mb-3"><div class="ds-view-switch btn-group btn-group-sm" role="group" aria-label="Darstellung">
   <a class="btn {{ 'btn-secondary' if view == 'karten' else 'btn-outline-secondary' }}" href="?ansicht=karten" {% if view == 'karten' %}aria-current="true"{% endif %}><i class="fa-solid fa-grip me-1"></i>Kacheln</a>
   <a class="btn {{ 'btn-secondary' if view == 'tabelle' else 'btn-outline-secondary' }}" href="?ansicht=tabelle" {% if view == 'tabelle' %}aria-current="true"{% endif %}><i class="fa-solid fa-table-list me-1"></i>Tabelle</a>
 </div></div>

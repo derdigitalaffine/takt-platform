@@ -31,7 +31,7 @@
 </div></section>
 {% endfor %}
 <section class="card" id="neu"><div class="card-header"><h2 class="h5 mb-0">Frage hinzufügen</h2></div><div class="card-body">
-<nav class="live-question-type mb-4" aria-label="Frageart">{% for k,v in kinds.items() %}<a class="btn btn-sm {{ 'btn-secondary' if selected_kind == k else 'btn-outline-secondary' }}" href="{{ base }}?tab=build&amp;kind={{ k }}#neu" {% if selected_kind == k %}aria-current="true"{% endif %}><i class="fa-solid {{ v[1] }} me-1" aria-hidden="true"></i>{{ v[0] }}</a>{% endfor %}</nav>
+<nav class="ds-nav live-question-type mb-4" aria-label="Frageart">{% for k,v in kinds.items() %}<a class="  {{ 'active' if selected_kind == k else '' }}" href="{{ base }}?tab=build&amp;kind={{ k }}#neu" {% if selected_kind == k %}aria-current="true"{% endif %}><i class="fa-solid {{ v[1] }} me-1" aria-hidden="true"></i>{{ v[0] }}</a>{% endfor %}</nav>
 {% if question_error %}<div class="alert alert-danger" role="alert">{{ question_error }}</div>{% endif %}
 {{ lf.qform(None, selected_kind) }}
 </div></section>

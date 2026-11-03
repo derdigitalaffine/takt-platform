@@ -1,0 +1,2 @@
+{% set current_state='trash' if request.url.path=='/dms/trash' else request.query_params.get('state','active') %}
+<nav class="ds-nav mb-3" aria-label="Ablagestatus">{% for key,href,label,icon in [('active','/dms','Ablage','fa-box-archive'),('archive','/dms?state=archive','Archiv','fa-box-archive'),('trash','/dms/trash','Papierkorb','fa-trash-can')] %}<a href="{{href}}" {% if current_state==key %}aria-current="page"{% endif %}><i class="fa-solid {{icon}}" aria-hidden="true"></i>{{label}}</a>{% endfor %}</nav>
