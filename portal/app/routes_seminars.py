@@ -225,7 +225,12 @@ def seminar_adopt_date(sid:int,user:User=Depends(current_user),db:Session=Depend
 @app.get('/seminare/{sid:int}')
 def seminar_detail(request:Request,sid:int,db:Session=Depends(get_db)):
     row=row_of(db,sid);user=session_user(request,db)
-    if not can_read(db,user,row):raise HTTPException(404)
+    if not can_read(db,user,row):
+        if not user:
+            response=render(request,'seminar_login.html',user,login_url=f'/login?next=%2Fseminare%2F{sid}')
+            response.status_code=401
+            return protect(response)
+        raise HTTPException(404)
     profile=profiles.read(user) if user else {}
     from . import seminar_series
     teachers={t.id:seminar_series.teachers(db,row,t) for t in sm.sessions(db,row)}

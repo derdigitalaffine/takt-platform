@@ -146,3 +146,15 @@ def test_single_term_pdf_header_and_participants_are_scoped(db,people):
     assert text.index(term.title)<text.index('Unterschrift')
     teacher=login(people[2].email,'passwort-test-123')
     assert teacher.get(f'/seminare/{row.id}/participants.pdf?tid={other.id}').status_code==404
+
+
+def test_internal_seminar_requires_login_without_disclosing_content(db,people):
+    row,term=make(db,people);row.channels='internal';row.title='Vertrauliches Seminarthema';db.commit()
+    page=client().get(f'/seminare/{row.id}')
+    assert page.status_code==401
+    assert 'Dieser Bereich erfordert eine Anmeldung' in page.text
+    assert f'/login?next=%2Fseminare%2F{row.id}' in page.text
+    assert row.title not in page.text
+    assert page.headers['cache-control']=='no-store'
+    assert login(people[1].email,'passwort-test-123').get(f'/seminare/{row.id}').status_code==200
+    assert client().get('/seminare/999999999').status_code==404
