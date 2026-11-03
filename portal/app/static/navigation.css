@@ -138,3 +138,4 @@
 .ds-nav.ds-nav.sp-steps button { width: 100%; }
 .ds-view-switch > span { align-self: center; padding: .5rem; color: var(--bs-secondary-color); }
 @media (max-width: 575.98px) { .ds-nav.ds-nav.sp-steps { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+.ds-nav[hidden], .ds-nav [hidden], .ds-view-switch[hidden] { display: none !important; }
