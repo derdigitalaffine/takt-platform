@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Administration{% endblock %}
+{% block content %}
+{% call m.page_head('Administration', 'Verwalten Sie die für Sie freigegebenen Einstellungen und Fachbereiche.') %}{% endcall %}
+<div class="module-catalog">{% for section in sections if section['items'] %}<section class="card card-body"><h2 class="h5">{{section.label}}</h2><ul class="list-group list-group-flush">{% for it in section['items'] %}<li class="list-group-item px-0"><a href="{{it.url}}"><i class="fa-solid {{it.icon}} fa-fw me-2" aria-hidden="true"></i>{{it.label}}</a></li>{% endfor %}</ul></section>{% endfor %}</div>
+{% endblock %}

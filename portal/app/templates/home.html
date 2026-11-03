@@ -8,6 +8,7 @@
     <div class="text-secondary small">{{ now | local('%A, %d.%m.%Y') | replace('Monday', 'Montag') | replace('Tuesday', 'Dienstag') | replace('Wednesday', 'Mittwoch') | replace('Thursday', 'Donnerstag') | replace('Friday', 'Freitag') | replace('Saturday', 'Samstag') | replace('Sunday', 'Sonntag') }}</div></div>
   <button class="btn btn-sm btn-outline-secondary" type="button" id="dash-edit" aria-pressed="false"><i class="fa-solid fa-sliders me-1"></i>Anpassen</button>
 </div>
+<p><a href="/module">Alle verfügbaren Module entdecken <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>
 {% if quick %}
 <nav class="dash-quick d-flex flex-wrap gap-2 mb-3" aria-label="Schnellaktionen">
   {% for href, icon, label in quick %}<a class="btn btn-sm btn-outline-primary" href="{{ href }}"><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a>{% endfor %}

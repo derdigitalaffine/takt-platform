@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Ihre Module{% endblock %}
+{% block content %}
+{% call m.page_head('Ihre Module', 'Hier finden Sie die Bereiche, die Sie mit Ihrem Konto nutzen können. Die verfügbaren Funktionen richten sich nach Ihren Rechten und Freigaben.') %}{% endcall %}
+<form method="get" action="/module" role="search" class="row g-2 mb-4">
+  <div class="col-md-6"><label class="form-label" for="module-q">Modul oder Tätigkeit suchen</label><input id="module-q" class="form-control" type="search" name="q" value="{{q}}" placeholder="Zum Beispiel DMS, Raum oder Feedback"></div>
+  <div class="col-md-4"><label class="form-label" for="module-category">Fachbereich</label><select id="module-category" name="category" class="form-select"><option value="">Alle verfügbaren</option>{% for key,label in categories.items() %}<option value="{{key}}" {% if category==key %}selected{% endif %}>{{label}}</option>{% endfor %}</select></div>
+  <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Suchen</button></div>
+</form>
+<p class="small text-secondary">{{rows|length}} verfügbare Bereiche{% if q or category %} · <a href="/module">Filter zurücksetzen</a>{% endif %}</p>
+<div class="module-catalog">
+{% for row in rows %}<article class="card"><div class="card-body">
+  <div class="small text-secondary">{{row.category}}</div><h2 class="h5"><i class="fa-solid {{row.icon}} me-2 text-primary" aria-hidden="true"></i>{{row.label}}</h2>
+  <p class="module-description mb-0">{{row.description}}</p><p class="small text-secondary mb-0">{{row.examples}}</p>
+  <div class="d-flex flex-wrap gap-2 align-items-center"><a class="btn btn-outline-primary" href="{{row.url}}">Öffnen<span class="visually-hidden">: {{row.label}}</span></a>
+  <form method="post" action="/module/favorite"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="id" value="{{row.id}}"><input type="hidden" name="on" value="{{'0' if row.fav else '1'}}"><button class="btn btn-outline-secondary" aria-pressed="{{'true' if row.fav else 'false'}}" aria-label="{{row.label}}: {{'Favorit entfernen' if row.fav else 'Als Favorit merken'}}"><i class="fa-{{'solid' if row.fav else 'regular'}} fa-star" aria-hidden="true"></i></button></form></div>
+  {% if row.links %}<details><summary class="small">Verfügbare Ansichten</summary><ul class="small mt-2 mb-0">{% for link in row.links %}<li><a href="{{link.url}}">{{link.label}}</a></li>{% endfor %}</ul></details>{% endif %}
+</div></article>{% else %}<div class="card card-body"><h2 class="h5">Keine passenden Module gefunden</h2><p>Setzen Sie die Suche zurück, um alle für Sie verfügbaren Bereiche zu sehen.</p><a href="/module">Alle verfügbaren Module</a></div>{% endfor %}
+</div>
+{% if admin_available %}<aside class="card card-body mt-4"><h2 class="h5">Administration</h2><p>Benutzer, Fachkonfiguration und Portalbetrieb – entsprechend Ihren Verwaltungsrechten.</p><a href="/admin">Administration öffnen</a></aside>{% endif %}
+{% endblock %}
