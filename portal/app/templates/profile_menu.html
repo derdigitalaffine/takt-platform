@@ -2,7 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}Menü anpassen{% endblock %}
 {% block content %}
-{% call m.page_head('Menü anpassen', 'Ihr persönliches Menü: Favoriten stehen ganz oben, nicht benötigte Bereiche blenden Sie aus. Die Einstellung gilt nur für Sie. Tipp: Im Menü heften Sie einen Eintrag auch direkt mit dem Stern an.') %}{% endcall %}
+{% call m.page_head('Menü anpassen', 'Ihr persönliches Menü: Favoriten stehen ganz oben, nicht benötigte Bereiche blenden Sie in der Seitenleiste aus. Über „Module entdecken“ bleiben sie erreichbar. Die Einstellung gilt nur für Sie. Tipp: Im Menü heften Sie einen Eintrag auch direkt mit dem Stern an.') %}{% endcall %}
 <form method="post" action="/profile/menu" id="pm-form">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="row g-4">
@@ -19,7 +19,7 @@
           {% endfor %}
         </div></div></div>
       {% endfor %}
-      <div class="form-text">Haken = Favorit. Ein ausgeblendeter Bereich erscheint trotzdem, solange Sie gerade eine seiner Seiten geöffnet haben; über die Menüsuche (Taste <kbd>/</kbd>) finden Sie nur sichtbare Einträge.</div>
+      <div class="form-text">Haken = Favorit. Ein ausgeblendeter Bereich erscheint trotzdem, solange Sie gerade eine seiner Seiten geöffnet haben; über „Module entdecken“ finden Sie auch ausgeblendete Bereiche.</div>
     </div>
     <div class="col-12 col-xl-5">
       <div class="card"><div class="card-header"><i class="fa-solid fa-star me-2 text-warning"></i>Reihenfolge der Favoriten <span class="small text-secondary fw-normal">– höchstens {{ max_fav }}</span></div>

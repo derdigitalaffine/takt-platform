@@ -3,7 +3,7 @@
 {% block title %}Aufnahme {{ rec.created_at | local('%d.%m.%Y') }}{% endblock %}
 {% block content %}
 <div {% if rec.status in active_statuses %}data-autorefresh="20"{% endif %}>
-<nav aria-label="breadcrumb"><ol class="breadcrumb">
+<nav aria-label="breadcrumb" class="ds-breadcrumb"><ol class="breadcrumb">
   <li class="breadcrumb-item"><a href="{{ '/meetings/%d' % rec.meeting_id if rec.meeting_id else '/admin/recordings' }}">{{ rec.meeting.title if rec.meeting else 'Aufnahmen' }}</a></li>
   <li class="breadcrumb-item active">{{ rec.created_at | local }} Uhr</li>
 </ol></nav>

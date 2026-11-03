@@ -5,7 +5,7 @@
 <div class="survey-workspace">
 {% call m.page_header('Umfragen & Abstimmungen', 'Feedback sammeln, gemeinsam abstimmen oder einen Termin finden. Alle Umfragen an einem Ort.', '/umfragen/neu' if create_kinds else '', 'Neu erstellen') %}
 {% endcall %}
-<nav class="nav nav-tabs ds-section-nav mb-4" aria-label="Umfragestatus">
+<nav class="ds-nav nav nav-tabs ds-section-nav mb-4" aria-label="Umfragestatus">
 {% for key,label,icon in [('active','Aktuell','fa-layer-group'),('archive','Archiv','fa-box-archive'),('trash','Papierkorb','fa-trash-can')] %}
 <a class="nav-link {{ 'active' if state == key }}" href="{{ survey_url(state=key) }}" {% if state == key %}aria-current="page"{% endif %}><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a>
 {% endfor %}

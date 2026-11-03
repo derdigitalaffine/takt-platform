@@ -2,7 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}{{ block.name }} · Datenblöcke{% endblock %}
 {% block content %}
-<nav aria-label="Pfad" class="small mb-2"><a href="/forms">Formulare</a> › <a href="/forms/blocks">Datenblöcke</a> › {{ block.name }}</nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/forms">Formulare</a> › <a href="/forms/blocks">Datenblöcke</a> › {{ block.name }}</nav>
 <div class="alert alert-info small d-flex gap-2 align-items-start"><i class="fa-solid fa-link mt-1"></i><div>Ein Datenblock ist <strong>verknüpft</strong>: Änderungen gelten sofort für alle Formulare, die ihn nutzen{% if used_in %} – zurzeit {% for f in used_in %}<a href="/forms/{{ f.id }}">{{ f.title }}</a>{{ ', ' if not loop.last }}{% endfor %}{% endif %}. Bereits eingegangene Antworten bleiben erhalten; gelöschte Felder fehlen danach in Auswertung und Export.</div></div>
 
 <form method="post" action="/forms/blocks/{{ block.id }}/schema" id="builder-form">

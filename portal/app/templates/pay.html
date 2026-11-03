@@ -30,7 +30,7 @@
     <span class="text-success fs-3"><i class="fa-solid fa-circle-check"></i></span>
     <div><h2 class="h5 mb-1">Vielen Dank – die Zahlung ist eingegangen.</h2>
       <p class="mb-0 small text-secondary">{{ methods.get(p.method, ('', ''))[0] }}{% if p.paid_at %} am {{ p.paid_at | local('%d.%m.%Y, %H:%M') }} Uhr{% endif %}{% if p.refunded_cents %} · erstattet: {{ money(p.refunded_cents) }}{% endif %}</p>
-      {% if p.back_url %}<a class="btn btn-sm btn-outline-primary mt-2" href="{{ p.back_url }}"><i class="fa-solid fa-arrow-left me-1"></i>Zurück zum Vorgang</a>{% endif %}</div>
+      {% if p.back_url %}<a class="ds-back btn btn-sm btn-outline-primary mt-2" href="{{ p.back_url }}"><i class="fa-solid fa-arrow-left me-1"></i>Zurück zum Vorgang</a>{% endif %}</div>
   </div></div>
   {% elif p.status == 'cancelled' %}
   <div class="alert alert-secondary"><i class="fa-solid fa-ban me-1"></i>Diese Zahlung wurde storniert – es ist nichts mehr zu bezahlen.</div>

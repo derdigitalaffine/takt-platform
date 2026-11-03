@@ -3,7 +3,7 @@
 {% block title %}Aktenplan · Ablage{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/dms-browser.css">{% endblock %}
 {% block content %}
-<nav aria-label="Pfad" class="small mb-2"><a href="/dms">Ablage</a> › Aktenplan</nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/dms">Ablage</a> › Aktenplan</nav>
 {% call m.page_head('Aktenplan', 'Ablagebereiche mit Lese- und Schreibrechten für Gruppen und Personen. Rechte und Löschfristen gelten auch für alle Unterbereiche. Admins sehen immer alles.') %}
 <a class="btn btn-outline-secondary" href="/dms/retention"><i class="fa-regular fa-calendar-xmark me-1"></i>Löschfristen</a>
 <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#neu"><i class="fa-solid fa-plus me-1"></i>Bereich anlegen</button>

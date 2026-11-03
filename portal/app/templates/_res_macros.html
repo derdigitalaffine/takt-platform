@@ -4,7 +4,7 @@
    Aufruf:  {% call rm.head('bookings', [('Buchungen', '/resources/bookings'), (b.ref, '')], 'Titel', 'Beschreibung') %}…Knöpfe…{% endcall %}
    tab: home | planner | bookings | stats | clubs | caretakers | calendars | holidays | look #}
 {% macro head(tab, crumbs, title, lede='') -%}
-<ul class="nav nav-pills flex-nowrap overflow-auto small res-nav" aria-label="Ressourcen">
+<ul class="ds-nav nav nav-pills small res-nav" aria-label="Ressourcen">
   {% for key, href, icon, label, need in (('home', '/resources', 'fa-building', 'Übersicht', ''), ('planner', '/resources/planner', 'fa-table-cells', 'Planer', ''),
      ('bookings', '/resources/bookings', 'fa-list', 'Buchungen', ''), ('stats', '/resources/stats', 'fa-chart-column', 'Auswertung', ''),
      ('clubs', '/resources/clubs', 'fa-people-group', 'Vereine', 'resources'), ('caretakers', '/resources/caretakers', 'fa-user-gear', 'Hausmeister', 'resources'), ('calendars', '/resources/calendars', 'fa-calendar-week', 'Kalender-Links', ''),
@@ -12,7 +12,7 @@
   <li class="nav-item"><a class="nav-link text-nowrap {{ 'active' if tab == key }}" href="{{ href }}" {% if tab == key %}aria-current="page"{% endif %}><i class="fa-solid {{ icon }} me-1"></i>{{ label }}</a></li>
   {% endfor %}
 </ul>
-<nav class="res-crumbs small text-truncate" aria-label="Pfad">{% if crumbs %}<a href="/resources">Ressourcen</a>{% else %}<span aria-current="page">Ressourcen</span>{% endif %}{% for label, href in crumbs %} <span class="text-secondary" aria-hidden="true">›</span> {% if href and not loop.last %}<a href="{{ href }}">{{ label }}</a>{% else %}<span aria-current="page">{{ label }}</span>{% endif %}{% endfor %}</nav>
+<nav class="ds-breadcrumb res-crumbs small text-truncate" aria-label="Pfad">{% if crumbs %}<a href="/resources">Ressourcen</a>{% else %}<span aria-current="page">Ressourcen</span>{% endif %}{% for label, href in crumbs %} <span class="text-secondary" aria-hidden="true">›</span> {% if href and not loop.last %}<a href="{{ href }}">{{ label }}</a>{% else %}<span aria-current="page">{{ label }}</span>{% endif %}{% endfor %}</nav>
 {% import '_macros.html' as m %}
 {% set actions=caller() if caller else '' %}
 {% call m.page_header(title, lede) %}{{ actions }}{% endcall %}
@@ -23,7 +23,7 @@
    crumbs wie oben, beginnend nach „Räume & Plätze“. Optional im Kontext: cart (Liste), club, embed. #}
 {% macro pub_head(crumbs, title, lede='', kicker='') -%}
 <div class="res-pub-bar small">
-  <nav class="res-crumbs text-truncate flex-grow-1" aria-label="Pfad">{% if crumbs %}<a href="/r">Räume &amp; Plätze</a>{% else %}<span aria-current="page">Räume &amp; Plätze</span>{% endif %}{% for label, href in crumbs %} <span class="text-secondary" aria-hidden="true">›</span> {% if href and not loop.last %}<a href="{{ href }}">{{ label }}</a>{% else %}<span aria-current="page">{{ label }}</span>{% endif %}{% endfor %}</nav>
+  <nav class="ds-breadcrumb res-crumbs text-truncate flex-grow-1" aria-label="Pfad">{% if crumbs %}<a href="/r">Räume &amp; Plätze</a>{% else %}<span aria-current="page">Räume &amp; Plätze</span>{% endif %}{% for label, href in crumbs %} <span class="text-secondary" aria-hidden="true">›</span> {% if href and not loop.last %}<a href="{{ href }}">{{ label }}</a>{% else %}<span aria-current="page">{{ label }}</span>{% endif %}{% endfor %}</nav>
   {% if not embed %}
   {% if cart %}<a class="text-nowrap" href="/r/merkliste" title="Merkliste"><i class="fa-solid fa-basket-shopping me-1"></i><span class="d-none d-sm-inline">Merkliste </span>({{ cart | length }})</a>{% endif %}
   {% if club %}<a class="text-nowrap" href="/r/mein" title="{{ club.name }}" aria-label="Mein Bereich: {{ club.name }}"><i class="fa-solid fa-people-group me-1"></i><span class="d-none d-sm-inline">{{ club.name | truncate(30) }}</span></a>{% elif not crumbs or crumbs[0][0] != 'Vereinszugang' %}<a class="text-nowrap" href="/r/login" title="Vereinszugang" aria-label="Vereinszugang"><i class="fa-solid fa-right-to-bracket"></i><span class="d-none d-sm-inline ms-1">Vereinszugang</span></a>{% endif %}

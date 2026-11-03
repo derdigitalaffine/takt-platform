@@ -2,7 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}Vorgang ablegen · Ablage{% endblock %}
 {% block content %}
-<nav aria-label="Pfad" class="small mb-2"><a href="/dms">Ablage</a> › Vorgang ablegen</nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/dms">Ablage</a> › Vorgang ablegen</nav>
 {% call m.page_head('Vorgang ablegen', 'Schriftverkehr, Scans oder Papieranträge in den Aktenplan aufnehmen – recherchierbar wie Online-Anträge.') %}{% endcall %}
 <form method="post" enctype="multipart/form-data" class="card" style="max-width: 52rem"><input type="hidden" name="csrf" value="{{ csrf }}">
   {% if person %}<input type="hidden" name="person_id" value="{{ person.id }}"><div class="alert alert-info small m-3 mb-0"><i class="fa-regular fa-circle-user me-1"></i>Wird <a href="/dms/persons/{{ person.id }}">{{ person.name }}</a> zugeordnet.</div>{% endif %}

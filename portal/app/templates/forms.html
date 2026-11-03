@@ -7,9 +7,9 @@
   {% if user.is_admin %}<a class="btn btn-outline-secondary" href="?{{ '' if show_all else 'all=1' }}">{{ 'Nur meine' if show_all else 'Alle Formulare' }}</a>{% endif %}
 {% endcall %}
 
-<nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Formularstatus">
+<nav class="ds-nav d-flex flex-wrap gap-2 mb-3" aria-label="Formularstatus">
 {% for key, label, icon in [('active', 'Formulare', 'fa-clipboard-list'), ('archive', 'Archiv', 'fa-box-archive'), ('trash', 'Papierkorb', 'fa-trash-can')] %}
-<a class="btn btn-sm {{ 'btn-primary' if state == key else 'btn-outline-secondary' }}" href="/forms?state={{ key }}{% if show_all %}&amp;all=1{% endif %}"><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a>
+<a class="  {{ 'active' if state == key else '' }}" href="/forms?state={{ key }}{% if show_all %}&amp;all=1{% endif %}" {% if state == key %}aria-current="page"{% endif %}><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a>
 {% endfor %}
 </nav>
 {% if state == 'trash' %}<p class="small text-secondary">Ungenutzte Entwürfe können 30 Tage lang wiederhergestellt werden. Danach werden sie automatisch gelöscht.</p>{% elif state == 'archive' %}<p class="small text-secondary">Archivierte Formulare nehmen keine neuen Antworten an. Antworten, Dateien und Vorgänge bleiben verfügbar.</p>{% endif %}

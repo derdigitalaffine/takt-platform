@@ -2,7 +2,7 @@
 {% block title %}{{ req.title }} – {{ resp.ref_no }}{% endblock %}
 {% block content %}
 <div class="form-fill">
-  <nav aria-label="Pfad" class="small mb-2"><a href="/a/{{ resp.track_token }}"><i class="fa-solid fa-arrow-left me-1"></i>Zurück zu Ihrem Antrag {{ resp.ref_no }}</a></nav>
+  <nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/a/{{ resp.track_token }}"><i class="ds-back fa-solid fa-arrow-left me-1"></i>Zurück zu Ihrem Antrag {{ resp.ref_no }}</a></nav>
   <div class="card mb-3 border-top border-warning border-4"><div class="card-body">
     <div class="small text-secondary mb-1"><i class="fa-solid fa-file-circle-question me-1"></i>{{ form.title }} · {{ resp.ref_no }}</div>
     <h1 class="h3 mb-2">{{ req.title }}</h1>
@@ -23,7 +23,7 @@
       {% endif %}
     </section>
     <div class="d-flex flex-wrap gap-2 mt-4 mb-5">
-      <button type="button" class="btn btn-outline-secondary js-prev d-none">Zurück</button>
+      <button type="button" class="ds-back btn btn-outline-secondary js-prev d-none">Zurück</button>
       <button type="button" class="btn btn-primary js-next d-none">Weiter</button>
       <button type="submit" class="btn btn-primary btn-lg js-submit"><i class="fa-solid fa-paper-plane me-1"></i>Nachreichen</button>
       <a class="btn btn-link" href="/a/{{ resp.track_token }}">Abbrechen</a>

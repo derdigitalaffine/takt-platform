@@ -6,10 +6,10 @@
   <h1 class="h5 mb-1"><i class="fa-solid fa-shield-halved me-2 text-primary"></i>Anmeldung bestätigen</h1>
   <p class="small text-secondary">Ihr Konto ist mit einem zweiten Faktor geschützt.</p>
   {% if methods | length > 1 or has_recovery %}
-  <ul class="nav nav-pills nav-fill small mb-3">
-    {% if 'totp' in methods %}<li class="nav-item"><a class="nav-link {{ 'active' if active == 'totp' }}" href="?m=totp"><i class="fa-solid fa-mobile-screen me-1"></i>App</a></li>{% endif %}
-    {% if 'email' in methods %}<li class="nav-item"><a class="nav-link {{ 'active' if active == 'email' }}" href="?m=email"><i class="fa-regular fa-envelope me-1"></i>E-Mail</a></li>{% endif %}
-    {% if has_recovery %}<li class="nav-item"><a class="nav-link {{ 'active' if active == 'recovery' }}" href="?m=recovery"><i class="fa-solid fa-life-ring me-1"></i>Notfallcode</a></li>{% endif %}
+  <ul class="ds-nav nav nav-pills small mb-3" aria-label="Bereiche">
+    {% if 'totp' in methods %}<li class="nav-item"><a class="nav-link {{ 'active' if active == 'totp' }}" href="?m=totp" {% if active == 'totp' %}aria-current="page"{% endif %}><i class="fa-solid fa-mobile-screen me-1"></i>App</a></li>{% endif %}
+    {% if 'email' in methods %}<li class="nav-item"><a class="nav-link {{ 'active' if active == 'email' }}" href="?m=email" {% if active == 'email' %}aria-current="page"{% endif %}><i class="fa-regular fa-envelope me-1"></i>E-Mail</a></li>{% endif %}
+    {% if has_recovery %}<li class="nav-item"><a class="nav-link {{ 'active' if active == 'recovery' }}" href="?m=recovery" {% if active == 'recovery' %}aria-current="page"{% endif %}><i class="fa-solid fa-life-ring me-1"></i>Notfallcode</a></li>{% endif %}
   </ul>
   {% endif %}
   {% if active == 'email' and not sent %}

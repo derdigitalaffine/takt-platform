@@ -30,10 +30,10 @@
   <div class="col-6 col-lg-3">{{ m.stat('fa-clock', (link.last_visit_at | local('%d.%m. %H:%M')) or '–', 'letzter Aufruf') }}</div>
 </div>
 
-<ul class="nav nav-tabs mb-3" role="tablist">
-  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#t-stats" type="button"><i class="fa-solid fa-chart-column me-1"></i>Statistik</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-qr" type="button" id="qr"><i class="fa-solid fa-qrcode me-1"></i>QR-Code</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-edit" type="button"><i class="fa-solid fa-pen me-1"></i>Bearbeiten</button></li>
+<ul class="ds-nav nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#t-stats" type="button" role="tab" aria-controls="t-stats" aria-selected="true"><i class="fa-solid fa-chart-column me-1"></i>Statistik</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-qr" type="button" role="tab" aria-controls="t-qr" aria-selected="false" id="qr"><i class="fa-solid fa-qrcode me-1"></i>QR-Code</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-edit" type="button" role="tab" aria-controls="t-edit" aria-selected="false"><i class="fa-solid fa-pen me-1"></i>Bearbeiten</button></li>
 </ul>
 <div class="tab-content">
   <div class="tab-pane fade show active" id="t-stats">

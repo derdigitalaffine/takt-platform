@@ -1,6 +1,6 @@
 """Hauptmenü im angemeldeten Portal: Einträge, Gruppen und persönliche Anpassung (Favoriten, ausgeblendete Gruppen).
 
-Sechs Aufgabenbereiche mit Kontextnavigation und persönlichen Favoriten.
+Fünf Fachbereiche und ein eigener Administrationsbereich mit Kontextnavigation und persönlichen Favoriten.
 Expansion und ausgeblendete Bereiche werden im Benutzerkonto gespeichert.
 """
 
@@ -9,11 +9,11 @@ from dataclasses import dataclass
 from typing import Callable
 
 GROUPS = {
-    "work": "Mein Arbeitsplatz",
+    "work": "Zusammenarbeit",
+    "schedule": "Termine & Veranstaltungen",
     "service": "Formulare & Vorgänge",
-    "schedule": "Termine & Räume",
-    "comm": "Kommunikation",
     "know": "Wissen & Dokumente",
+    "personal": "Personal & Vertretung",
     "admin": "Administration",
 }
 MAX_FAVORITES = 12
@@ -178,14 +178,74 @@ ITEMS.append(Item("oidc", "admin", "/admin/oidc", "fa-key", "Nextcloud / OIDC-An
 ITEMS.append(Item("seminars", "schedule", "/seminare", "fa-chalkboard-user", "Seminare & Lehrgänge", lambda c: "seminars" in c.modules, _pre("/seminare")))
 ITEMS.append(Item("circulation_reports", "work", "/umlaeufe/auswertung", "fa-chart-column", "Meine Umläufe & Rückmeldungen", lambda c: "circulations" in c.modules, _pre("/umlaeufe/auswertung")))
 BY_ID = {it.id: it for it in ITEMS}
-CONTEXTS = [("resources", "res_planner", "res_bookings"), ("meetings", "meeting_plan"), ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"), ("krank_me", "krank_mine")]
-CONTEXT_ONLY = {i for group in CONTEXTS for i in group[1:]} | {"polls", "votes"}
+# Stable entry IDs preserve bookmarks and personal favorites.
+FAMILIES = [
+    ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
+    ("surveys", "polls", "votes"), ("shortlinks",),
+    ("meetings", "meeting_plan"), ("seminars",),
+    ("resources", "res_planner", "res_bookings"), ("bookings",),
+    ("forms", "inbox", "blocks", "locations"), ("app_inbox",), ("processes",),
+    ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"),
+    ("absences",), ("krank_me", "krank_mine", "krank_staff"),
+]
+CONTEXTS = [family for family in FAMILIES if len(family) > 1 and family[0] not in {"surveys", "resources"}]
+CONTEXT_ONLY = {i for family in FAMILIES for i in family[1:]}
 ADMIN_SECTIONS = {
-    "Menschen & Organisation": ["users", "orgs", "recordings"],
+    "Menschen & Organisation": ["users", "orgs"],
     "Finanzen": ["payments", "expense_rules", "pay_settings"],
-    "Integrationen & Versand": ["oidc", "map_layers", "notifications", "mail_templates", "speechmind"],
-    "Portal & System": ["modules", "design", "public_nav", "sessions", "https", "domains", "trash"],
+    "Inhalte & Fachkonfiguration": ["map_layers", "recordings"],
+    "Integrationen & Versand": ["oidc", "notifications", "mail_templates", "speechmind"],
+    "Portal & Betrieb": ["modules", "design", "public_nav", "sessions", "https", "domains", "trash"],
 }
+DESCRIPTIONS = {
+    "tasks": ("Sehen Sie, was Sie als Nächstes erledigen können. Eigene Aufgaben und Aufgaben aus Ihren Fachbereichen an einem Ort.", "Aufgaben bearbeiten · Zuständigkeiten prüfen", "Aufgaben Arbeitsplatz"),
+    "kanban": ("Organisieren Sie gemeinsame Arbeit in übersichtlichen Spalten. Verknüpfte Aufgaben und Umfragen zeigen ihren aktuellen Status.", "Boards öffnen · Arbeit organisieren", "Board Projekt"),
+    "circulations": ("Teilen Sie Informationen und verfolgen Sie Rückmeldungen und Kenntnisnahmen.", "Aushänge lesen · Rückmeldungen geben", "Umlauf Sammelmappe Kenntnisnahme"),
+    "surveys": ("Sammeln Sie Feedback, stimmen Sie gemeinsam ab oder finden Sie einen passenden Termin.", "Umfragen öffnen · Gemeinsam entscheiden", "Poll Vote Live Feedback Terminumfrage"),
+    "shortlinks": ("Machen Sie lange Links leichter teilbar und erstellen Sie passende QR-Codes.", "Links verwalten · QR-Codes erstellen", "Link verkürzen QR"),
+    "meetings": ("Planen und nutzen Sie Online-Besprechungen. Verfügbare Aufnahmen und Transkripte finden Sie beim jeweiligen Meeting.", "Besprechungen öffnen · Meetings planen", "Video Konferenz Transkript Aufnahme"),
+    "seminars": ("Finden Sie Veranstaltungen und verwalten Sie Ihre Teilnahmen. Zugewiesene Planer und Dozenten finden hier ihre Planung und Durchführung.", "Angebot ansehen · Teilnahmen öffnen", "Seminar Lehrgang Reihe Veranstaltung Dozent"),
+    "resources": ("Finden Sie Räume, Plätze und Geräte. Prüfen Sie die Belegung und bearbeiten Sie freigegebene Buchungen.", "Ressourcen ansehen · Belegung prüfen", "Raumbuchung Ressourcen Belegungsplan Geräte"),
+    "bookings": ("Organisieren Sie buchbare Gesprächs- und Sprechstundentermine über Buchungsseiten.", "Buchungsseiten öffnen · Termine organisieren", "Sprechstunde Terminbuchung"),
+    "forms": ("Füllen Sie bereitgestellte Formulare aus. Berechtigte Personen erstellen Formulare und bearbeiten Antworten.", "Formulare öffnen · Zum Ausfüllen", "Formular Datenblock Antworten"),
+    "app_inbox": ("Bearbeiten Sie freigegebene Anträge, prüfen Sie Rückfragen und verfolgen Sie den Bearbeitungsstand.", "Antragseingang öffnen · Vorgänge bearbeiten", "Antrag Eingang Vorgang"),
+    "processes": ("Gestalten Sie Bearbeitungsschritte und Zuständigkeiten für Antragsverfahren.", "Prozesse öffnen · Abläufe gestalten", "Workflow Verfahren"),
+    "dms": ("Recherchieren und bearbeiten Sie Dokumente in Ihren freigegebenen Ablagebereichen.", "Dokumente suchen · Ablage öffnen", "DMS Ablage Recherche Aktenplan"),
+    "recht": ("Lesen und durchsuchen Sie Satzungen und Rechtstexte. Berechtigte Personen pflegen die Inhalte.", "Ortsrecht lesen · Rechtstexte suchen", "Gesetz Satzung Recht"),
+    "map": ("Nutzen Sie geografische Informationen im Kartenbrowser und arbeiten Sie mit Ihren Karten.", "Kartenbrowser öffnen · Karten ansehen", "Karte Maps Geografie"),
+    "absences": ("Planen Sie Abwesenheiten und stimmen Sie Vertretungen ab.", "Abwesenheiten öffnen · Vertretung abstimmen", "Urlaub Vertretung"),
+    "krank_me": ("Erstellen und verfolgen Sie eigene Krankmeldungen. Zuständige Personen finden hier die freigegebene Bearbeitung.", "Krankmeldung erstellen · Eigene Meldungen", "Krank melden Krankmelder"),
+}
+for family in FAMILIES:
+    head = BY_ID[family[0]]
+    group = ("personal" if head.id in {"absences", "krank_me"} else
+             "schedule" if head.id in {"meetings", "seminars", "resources", "bookings"} else
+             "work" if head.id in {"tasks", "kanban", "circulations", "surveys", "shortlinks"} else head.group)
+    for key in family:
+        BY_ID[key].group = group
+for key, label in {"resources": "Räume & Ressourcen", "dms": "Dokumentenablage",
+                   "map": "Karten", "absences": "Abwesenheiten & Vertretung",
+                   "krank_me": "Krankmeldungen", "modules": "Modulverwaltung",
+                   "app_inbox": "Anträge & Vorgänge"}.items():
+    BY_ID[key].label = label
+
+
+def catalog(c: Ctx) -> list[dict]:
+    """Available module families, independent of sidebar preferences; no new permissions."""
+    allowed = {it.id for it in visible(c)}
+    pinned = set(prefs(c.user)["fav"])
+    result = []
+    for family in FAMILIES:
+        members = [BY_ID[key] for key in family if key in allowed]
+        if not members:
+            continue
+        head = members[0]
+        description, examples, keywords = DESCRIPTIONS[family[0]]
+        result.append(dict(id=head.id, label=("Geteilte Formulare" if head.id == "forms" and not c.can("forms") else head.label), url=head.url, icon=head.icon,
+                           group=head.group, category=GROUPS[head.group], description=description,
+                           examples=examples, keywords=keywords, fav=head.id in pinned,
+                           links=[dict(label=it.label, url=it.url) for it in members[1:]]))
+    return result
 
 
 def prefs(user) -> dict:
@@ -200,7 +260,8 @@ def prefs(user) -> dict:
         if key in data and not isinstance(data[key],list): data.pop(key)
         elif key in data: data[key]=[v for v in data[key] if isinstance(v,str)]
     fav = [i for i in data.get("fav", []) if i in BY_ID][:MAX_FAVORITES]
-    hidden = [g for g in data.get("hidden", []) if g in GROUPS]
+    # Legacy communication group was split across work and schedule: keep both discoverable.
+    hidden = [g for g in data.get("hidden", []) if g in GROUPS and g != "admin"]
     return {"fav": list(dict.fromkeys(fav)), "hidden": hidden, "closed": [g for g in data.get("closed", [g for g in GROUPS if g != "work"]) if g in GROUPS]}
 
 
@@ -215,7 +276,7 @@ def _entry(it: Item, c: Ctx, fav: set) -> dict:
     badge, title = it.badge(c) if it.badge else (0, "")
     label = "Geteilte Formulare" if it.id == "forms" and not c.can("forms") else it.label
     return {"id": it.id, "url": it.url, "icon": it.icon, "label": label, "active": it.active(c.path),
-            "context_only": it.id in CONTEXT_ONLY, "badge": badge, "badge_title": title, "fav": it.id in fav}
+            "keywords": next((DESCRIPTIONS[f[0]][2] for f in FAMILIES if it.id in f), ""), "context_only": it.id in CONTEXT_ONLY, "badge": badge, "badge_title": title, "fav": it.id in fav}
 
 
 def visible(c: Ctx) -> list[Item]:
@@ -226,7 +287,7 @@ def build(c: Ctx) -> dict:
     """Menü für die Vorlage: Favoriten, sichtbare Gruppen (nur mit Einträgen), Zahl ausgeblendeter Gruppen."""
     p = prefs(c.user)
     fav = set(p["fav"])
-    items = visible(c)
+    items = sorted(visible(c), key=lambda it: next((n for n, f in enumerate(FAMILIES) if it.id in f), len(FAMILIES)))
     entries = {it.id: _entry(it, c, fav) for it in items}
     # Bei mehreren passenden Einträgen nur den genauesten markieren (z. B. /forms/inbox nicht auch /forms)
     hits = [e for e in entries.values() if e["active"]]
@@ -245,15 +306,25 @@ def build(c: Ctx) -> dict:
             continue
         if key in p["hidden"] and not any(r["active"] for r in rows):
             hidden += 1
-            continue
-        groups.append({"key": key, "label": label, "items": rows, "sections": [{"label": title, "items": [r for r in rows if r["id"] in ids]} for title, ids in ADMIN_SECTIONS.items()] if key == "admin" else []})
+        groups.append({"key": key, "label": label, "items": rows, "hidden": key in p["hidden"] and not any(r["active"] for r in rows), "sections": [{"label": title, "items": [r for r in rows if r["id"] in ids]} for title, ids in ADMIN_SECTIONS.items()] if key == "admin" else []})
     favorites = [entries[i] for i in p["fav"] if i in entries]
     context = []
     for family in CONTEXTS:
         if any(entries[i]["active"] for i in family if i in entries):
             context = [entries[i] for i in family if i in entries]
             break
-    return {"groups": groups, "favorites": favorites, "hidden": hidden, "closed": p["closed"], "context": context}
+    active_id = next((key for key, entry in entries.items() if entry["active"]), None)
+    for family in FAMILIES:
+        if any(entries[i]["active"] for i in family if i in entries):
+            for i in family:
+                if i in entries:
+                    entries[i]["active"] = i == next((j for j in family if j in entries), None)
+    admin_active = any(entries[it.id]["active"] for it in items if it.group == "admin")
+    breadcrumb = next((dict(entries[family[0]]) for family in FAMILIES if family[0] in entries and active_id in family), None)
+    for it in items:
+        if it.group == "admin":
+            entries[it.id]["active"] = False
+    return {"groups": groups, "breadcrumb": breadcrumb, "admin_active": admin_active, "admin_available": any(it.group == "admin" for it in items), "favorites": favorites, "hidden": hidden, "closed": p["closed"], "context": [dict(it, active=it["id"] == active_id) for it in context]}
 
 
 def options(c: Ctx) -> list[dict]:

@@ -30,7 +30,7 @@
 
   // --- Gruppen -------------------------------------------------------------------------------------------
   function closedGroups() {
-    return Array.prototype.filter.call(nav.querySelectorAll('.nav-group'), function (g) {
+    return Array.prototype.filter.call(nav.querySelectorAll('.nav-group[data-group]'), function (g) {
       return !g.classList.contains('is-open') && !g.classList.contains('nav-favs');
     }).map(function (g) { return g.dataset.group; });
   }
@@ -47,7 +47,7 @@
   document.querySelectorAll('[data-nav-expand]').forEach(function (button) {
     button.addEventListener('click', function () {
       var open = button.dataset.navExpand === '1';
-      nav.querySelectorAll('.nav-group:not(.nav-favs)').forEach(function (group) {
+      nav.querySelectorAll('.nav-group[data-group]:not(.nav-favs)').forEach(function (group) {
         group.classList.toggle('is-open', open);
         group.querySelector('.nav-group-toggle').setAttribute('aria-expanded', String(open));
       });
@@ -98,7 +98,7 @@
         var head = node.querySelector('.nav-group-toggle, .nav-group-title');
         var groupHit = q && head && norm(head.textContent).indexOf(q) >= 0, shown = 0;
         node.querySelectorAll('.nav-item').forEach(function (it) {
-          var ok = !q || groupHit || norm(it.textContent).indexOf(q) >= 0;
+          var ok = !q || groupHit || norm(it.textContent + ' ' + (it.dataset.keywords || '')).indexOf(q) >= 0;
           it.hidden = !ok; if (ok) shown++;
         });
         node.hidden = (q && !shown) || (node.classList.contains('nav-favs') && !node.querySelector('.nav-item'));

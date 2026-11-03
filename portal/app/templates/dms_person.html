@@ -2,7 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}{{ person.name }} · Personen{% endblock %}
 {% block content %}
-<nav aria-label="Pfad" class="small mb-2"><a href="/dms">Ablage</a> › <a href="/dms/persons">Personen</a></nav>
+<nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/dms">Ablage</a> › <a href="/dms/persons">Personen</a></nav>
 {% call m.page_head(person.name or person.email, 'Person seit ' ~ (person.created_at | local('%d.%m.%Y')) ~ ' im Portal') %}
 <a class="btn btn-outline-secondary" href="/dms?person={{ person.id }}"><i class="fa-solid fa-magnifying-glass me-1"></i>In der Recherche</a>
 <a class="btn btn-primary" href="/dms/new?person={{ person.id }}"><i class="fa-solid fa-plus me-1"></i>Vorgang für diese Person ablegen</a>

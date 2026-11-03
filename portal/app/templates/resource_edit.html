@@ -21,11 +21,11 @@
   <ul class="res-check d-flex flex-wrap gap-3 small mb-0 mt-2 ps-0">{% for text, ok, tab in checklist %}<li>{% if ok %}<i class="fa-solid fa-circle-check text-success me-1"></i>{{ text }}{% else %}<a href="#{{ tab }}" class="js-tab-link" data-tab="{{ tab }}"><i class="fa-regular fa-circle me-1"></i>{{ text }}</a>{% endif %}</li>{% endfor %}</ul>
 </div></div>
 {% endif %}
-<ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto" role="tablist" id="res-tabs">
+<ul class="ds-nav nav nav-tabs mb-3" role="tablist" id="res-tabs">
   {% for id, label, icon in [('allgemein', 'Allgemein', 'fa-circle-info'), ('zeiten', 'Zeiten & Regeln', 'fa-clock'), ('preise', 'Räume & Preise', 'fa-euro-sign'),
      ('extras', 'Tarife & Zusatzleistungen', 'fa-plus'), ('formular', 'Angaben', 'fa-list-check'), ('zahlung', 'Zahlung & Storno', 'fa-credit-card'),
      ('zustaendig', 'Zuständig & Ablage', 'fa-user-tie'), ('hinweise', 'Erinnerungen & Warteliste', 'fa-bell'), ('sperren', 'Sperrzeiten', 'fa-ban'), ('fotos', 'Fotos & Nutzungsordnung', 'fa-image')] %}
-  <li class="nav-item" role="presentation"><button class="nav-link text-nowrap {{ 'active' if loop.first }}" data-bs-toggle="tab" data-bs-target="#{{ id }}" type="button" role="tab"><i class="fa-solid {{ icon }} me-1"></i>{{ label }}</button></li>
+  <li class="nav-item" role="presentation"><button class="nav-link text-nowrap {{ 'active' if loop.first }}" data-bs-toggle="tab" data-bs-target="#{{ id }}" type="button" role="tab" id="res-tab-{{id}}" aria-controls="{{id}}" aria-selected="{{'true' if loop.first else 'false'}}"><i class="fa-solid {{ icon }} me-1"></i>{{ label }}</button></li>
   {% endfor %}
 </ul>
 <div class="tab-content">

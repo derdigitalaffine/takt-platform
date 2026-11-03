@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% import '_seminar_macros.html' as s %}
+{% extends 'base.html' %}{% import '_seminar_macros.html' as s with context %}
 {% block title %}Organisation · {{row.title}}{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/seminars.css">{% endblock %}
 {% block content %}{{s.nav(row,'planner')}}<h1>Organisation</h1><p class="text-secondary">{{row.title}} · Einstellungen für diese Veranstaltung. Vorlagen und andere Veranstaltungen bleiben unverändert.</p>

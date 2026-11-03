@@ -508,8 +508,8 @@ def test_list_as_table_remembered_and_consistent_head():
     for url in ("/resources", "/resources/planner", "/resources/bookings", "/resources/stats", f"/resources/{rid}",
                 f"/resources/{rid}/edit", f"/resources/{rid}/book", "/resources/new", "/resources/calendars"):
         html = c.get(url).text
-        assert html.count('class="nav nav-pills flex-nowrap overflow-auto small res-nav"') == 1, url
-        assert 'class="res-crumbs' in html and 'class="ds-page-header"' in html, url
+        assert html.count('aria-label="Ressourcen"') == 1, url
+        assert re.search(r'class="[^"]*\bres-crumbs\b', html) and 'class="ds-page-header"' in html, url
     # Öffentlicher Katalog ebenfalls als Tabelle, Filter bleiben in den Umschalt-Links erhalten
     pub = client().get("/r?ansicht=tabelle&q=Tabellen")
     assert "res-table" in pub.text and "ansicht=karten" in pub.text and "q=Tabellen" in pub.text

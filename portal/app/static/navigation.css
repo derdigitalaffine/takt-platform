@@ -1,0 +1,144 @@
+/* One navigation language. Module styles load before this file.
+   .ds-nav = page/section links; .ds-view-switch = local view selection.
+   Action buttons, map tools, answer choices and the main sidebar stay independent. */
+.ds-nav.ds-nav,
+.ds-view-switch.ds-view-switch {
+  --nav-radius: var(--bs-border-radius);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  max-width: 100%;
+  padding: 0 0 .75rem;
+  margin-left: 0;
+  list-style: none;
+  border: 0;
+  border-bottom: 1px solid var(--bs-border-color);
+  background: transparent;
+  overflow: visible;
+}
+.ds-view-switch.ds-view-switch {
+  display: inline-flex;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.ds-nav.ds-nav > .nav-item { display: flex; max-width: 100%; }
+.ds-nav.ds-nav a,
+.ds-nav.ds-nav > button,
+.ds-nav.ds-nav > .nav-item > button,
+.ds-nav.ds-nav > details > summary,
+.ds-view-switch.ds-view-switch > :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 44px;
+  max-width: 100%;
+  padding: .55rem .85rem;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--nav-radius);
+  background: transparent;
+  color: var(--bs-body-color);
+  font: inherit;
+  font-size: .875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+.ds-view-switch.ds-view-switch > :is(a, button) { border-radius: var(--nav-radius) !important; }
+.ds-nav.ds-nav :is(a, button, summary):hover,
+.ds-view-switch.ds-view-switch > :is(a, button):hover {
+  color: var(--bs-emphasis-color);
+  background: var(--bs-tertiary-bg);
+  border-color: var(--bs-border-color);
+}
+.ds-nav.ds-nav :is(a, button):is(.active, [aria-current="page"], [aria-current="true"], [aria-current="step"], [aria-selected="true"], [aria-pressed="true"]),
+.ds-nav.ds-nav > details:has([aria-current="page"]) > summary,
+.ds-view-switch.ds-view-switch > :is(a, button):is(.active, .btn-secondary, [aria-current="page"], [aria-current="true"], [aria-selected="true"], [aria-pressed="true"]) {
+  color: var(--bs-primary-text-emphasis);
+  background: var(--bs-primary-bg-subtle);
+  border-color: var(--bs-primary-border-subtle);
+  font-weight: 650;
+  box-shadow: inset 0 -2px 0 var(--bs-primary);
+}
+.ds-nav.ds-nav :is(a, button, summary):focus-visible,
+.ds-view-switch.ds-view-switch > :is(a, button):focus-visible,
+.ds-back:focus-visible,
+.ds-breadcrumb a:focus-visible {
+  outline: 3px solid var(--bs-primary);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+.ds-nav.ds-nav :is(button:disabled, [aria-disabled="true"]),
+.ds-view-switch.ds-view-switch > :is(button:disabled, [aria-disabled="true"]) {
+  color: var(--bs-secondary-color);
+  background: var(--bs-secondary-bg);
+  border-color: var(--bs-border-color);
+  cursor: default;
+  box-shadow: none;
+}
+.ds-nav.ds-nav a > i,
+.ds-view-switch.ds-view-switch > :is(a,button) > i { margin: 0 !important; flex: 0 0 auto; }
+.ds-nav.ds-nav > details { max-width: 100%; font-size: inherit; }
+.ds-nav.ds-nav > details > summary { list-style: none; }
+.ds-nav.ds-nav > details > summary::-webkit-details-marker { display: none; }
+.ds-nav.ds-nav > details > summary::after { content: '\2304'; margin-left: .4rem; }
+.ds-nav.ds-nav > details[open] > summary::after { transform: rotate(180deg); }
+.ds-nav.ds-nav > details > div { min-width: min(18rem, 100%); }
+.ds-nav.ds-nav > details > div a { justify-content: flex-start; width: 100%; }
+.ds-breadcrumb.ds-breadcrumb {
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  color: var(--bs-secondary-color);
+}
+.ds-breadcrumb a { text-underline-offset: .2em; }
+.ds-back.ds-back {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 44px;
+  padding: .5rem .75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  font-size: .875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.ds-back.ds-back:hover { background: var(--bs-tertiary-bg); border-color: var(--bs-secondary-color); }
+.ds-back:not(:has(i))::before { content: '\2190'; flex-shrink: 0; }
+@media (max-width: 575.98px) {
+  .ds-nav.ds-nav { gap: .375rem; }
+  .ds-nav.ds-nav a { flex: 0 1 auto; }
+  .ds-nav.ds-nav > details { width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-nav.ds-nav *, .ds-view-switch.ds-view-switch > * { transition: none; }
+}
+@media (forced-colors: active) {
+  .ds-nav.ds-nav [aria-current], .ds-nav.ds-nav .active,
+  .ds-view-switch.ds-view-switch [aria-pressed="true"] { outline: 2px solid Highlight; }
+}
+/* The planner keeps its ordered step layout using the same control states. */
+.ds-nav.ds-nav.sp-steps { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
+.ds-nav.ds-nav.sp-steps button { width: 100%; }
+.ds-view-switch > span { align-self: center; padding: .5rem; color: var(--bs-secondary-color); }
+@media (max-width: 575.98px) { .ds-nav.ds-nav.sp-steps { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+.ds-nav[hidden], .ds-nav [hidden], .ds-view-switch[hidden] { display: none !important; }
+
+.ds-pagination.ds-pagination { border-bottom: 0; padding-bottom: 0; }
+.ds-pagination.ds-pagination .page-item .page-link { border-radius: var(--nav-radius); margin: 0; min-width: 44px; }

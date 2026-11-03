@@ -568,10 +568,20 @@ def _update_hint(user: User | None) -> str:
         return updates.available(get_settings(db))
 
 
+def _navigation_context(request: Request, user: User | None) -> dict:
+    """Reuse access adapters within one request, never across accounts or requests."""
+    key = user.id if user else None
+    cached = getattr(request.state, "navigation_context", None)
+    if cached is None or cached[0] != key:
+        values = {"shared_nav": _shared_nav(user), "task_badge": _task_badge(user),
+                  "dms_nav": _dms_nav(user), "res_nav": _res_nav(user), "krank_nav": _krank_nav(user)}
+        request.state.navigation_context = (key, values)
+    return request.state.navigation_context[1]
+
+
 def nav_ctx(request: Request, user: User, navctx: dict | None = None):
     from . import nav
-    n = navctx or {"shared_nav": _shared_nav(user), "task_badge": _task_badge(user), "dms_nav": _dms_nav(user),
-                   "res_nav": _res_nav(user), "krank_nav": _krank_nav(user)}
+    n = navctx if navctx is not None else _navigation_context(request, user)
     return nav.Ctx(user=user, path=request.url.path, modules=enabled_modules(), shared=n["shared_nav"],
                    task_badge=n["task_badge"], dms_nav=n["dms_nav"], res_nav=n["res_nav"], krank_nav=n["krank_nav"])
 
@@ -600,8 +610,7 @@ def _pnav_active(item: dict, path: str) -> bool:
 def render(request: Request, name: str, user: User | None = None, **ctx) -> HTMLResponse:
     messages = request.session.pop("flash", [])
     ui = branding.load()
-    navctx = {"shared_nav": _shared_nav(user), "task_badge": _task_badge(user), "dms_nav": _dms_nav(user),
-              "res_nav": _res_nav(user), "krank_nav": _krank_nav(user)}
+    navctx = _navigation_context(request, user)
     return templates.TemplateResponse(request, name, {
         "user": user,
         "ui": ui, "brand": ui["name"], "product": ui["product"],
@@ -1103,6 +1112,53 @@ async def nav_pin(request: Request, user: User = Depends(current_user), db: Sess
     target.nav_json = nav.dump(fav, p["hidden"], p["closed"])
     db.commit()
     return JSONResponse({"ok": True, "fav": nav.prefs(target)["fav"]})
+
+
+@app.get("/module")
+def module_catalog(request: Request, q: str = "", category: str = "", user: User = Depends(current_user)):
+    from . import nav
+    import unicodedata
+    def norm(value):
+        return "".join(ch for ch in unicodedata.normalize("NFKD", value.casefold()) if not unicodedata.combining(ch))
+    c = nav_ctx(request, user)
+    rows = nav.catalog(c)
+    categories = {row["group"]: row["category"] for row in rows}
+    rows = [row for row in rows if (not category or row["group"] == category)
+            and norm(q) in norm(" ".join(str(row[k]) for k in ("label", "description", "keywords", "examples")))]
+    return render(request, "module_catalog.html", user, rows=rows, categories=categories, q=q,
+                  category=category, admin_available=any(it.group == "admin" for it in nav.visible(c)))
+
+
+@app.post("/module/favorite", dependencies=[Depends(check_csrf)])
+async def module_favorite(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    from . import nav
+    data = await request.form()
+    item = str(data.get("id", ""))
+    if item not in {it.id for it in nav.visible(nav_ctx(request, user))}:
+        raise HTTPException(403, "Dieser Bereich ist nicht verfügbar")
+    target = db.get(User, user.id)
+    p = nav.prefs(target)
+    fav = [key for key in p["fav"] if key != item]
+    if data.get("on") == "1":
+        if len(fav) >= nav.MAX_FAVORITES:
+            flash(request, f"Höchstens {nav.MAX_FAVORITES} Favoriten.")
+            return redirect("/module")
+        fav.append(item)
+    target.nav_json = nav.dump(fav, p["hidden"], p["closed"])
+    db.commit()
+    return redirect("/module")
+
+
+@app.get("/admin")
+def administration_overview(request: Request, user: User = Depends(current_user)):
+    from . import nav
+    c = nav_ctx(request, user)
+    entries = [nav._entry(it, c, set()) for it in nav.visible(c) if it.group == "admin"]
+    if not entries:
+        raise HTTPException(403, "Kein Zugriff auf die Administration")
+    sections = [{"label": label, "items": [it for it in entries if it["id"] in ids]}
+                for label, ids in nav.ADMIN_SECTIONS.items()]
+    return render(request, "administration.html", user, sections=sections)
 
 
 @app.get("/profile/menu")

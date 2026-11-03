@@ -3,7 +3,7 @@
 {% import "_res_macros.html" as rm with context %}
 {% block title %}Ressourcen{% endblock %}
 {% block content %}
-{% call rm.head('home', [], 'Ressourcen & Belegung', 'Buchungen, Anfragen und Belegung aller Räume, Plätze und Geräte.') %}
+{% call rm.head('home', [], 'Räume & Ressourcen', 'Buchungen, Anfragen und Belegung aller Räume, Plätze und Geräte.') %}
   {% call m.action_menu() %}<a class="btn btn-outline-secondary" href="/r" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>Öffentlicher Katalog</a>{{ m.qr_button(public_url('resources', '/r'), 'Räume & Plätze buchen') }}
   {% if user.can('resources') %}<button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#res-import">Importieren</button>{% endif %}{% endcall %}
   {% if user.can('resources') %}<a class="btn btn-primary ds-primary" href="/resources/new"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neue Ressource</a>{% endif %}
@@ -44,7 +44,7 @@
 {{ m.result_summary(items|length,'Ressourcen') }}
 <div class="res-list-bar">
   <h2 class="h6 mb-0 flex-grow-1">Alle Ressourcen <span class="badge rounded-pill text-bg-light border ms-1">{{ items | length }}</span></h2>
-  <div class="btn-group btn-group-sm" role="group" aria-label="Ansicht">
+  <div class="ds-view-switch btn-group btn-group-sm" role="group" aria-label="Ansicht">
     <a class="btn {{ 'btn-secondary' if view == 'karten' else 'btn-outline-secondary' }}" href="?ansicht=karten&amp;q={{ q|urlencode }}" {% if view == 'karten' %}aria-current="true"{% endif %}><i class="fa-solid fa-grip me-1"></i>Karten</a>
     <a class="btn {{ 'btn-secondary' if view == 'tabelle' else 'btn-outline-secondary' }}" href="?ansicht=tabelle&amp;q={{ q|urlencode }}" {% if view == 'tabelle' %}aria-current="true"{% endif %}><i class="fa-solid fa-table-list me-1"></i>Tabelle</a>
   </div>

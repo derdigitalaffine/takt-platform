@@ -1,4 +1,4 @@
-{% extends 'base.html' %}{% import '_seminar_macros.html' as s %}
+{% extends 'base.html' %}{% import '_seminar_macros.html' as s with context %}
 {% block title %}Reihenabonnement · {{row.title}}{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/seminars.css">{% endblock %}
 {% block content %}<a href="/seminare/{{row.id}}">Zur Seminarreihe</a><h1 class="mt-3">{{row.title}}</h1>

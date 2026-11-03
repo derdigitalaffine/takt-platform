@@ -6,10 +6,10 @@
 {%- endmacro %}
 {% block head %}<link rel="stylesheet" href="/static/dms-browser.css">{% endblock %}
 {% block content %}
-<nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Ablagestatus"><a href="/dms" class="btn btn-sm btn-outline-primary">Ablage</a><a href="/dms?state=archive" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-box-archive me-1"></i>Archiv</a><a href="/dms/trash" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-trash-can me-1"></i>Papierkorb</a></nav>
+{% include '_dms_nav.html' %}
 {% if may_delete_folder %}<form method="post" action="/dms/areas/{{ selected_folder.id }}/delete" class="mb-3"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger" data-confirm="Leeren Ordner 30 Tage in den Papierkorb verschieben?"><i class="fa-solid fa-trash-can me-1"></i>Leeren Ordner entfernen</button></form>{% endif %}
 {% import "_dms_folders.html" as folders_ui with context %}
-{% call m.page_header('Ablage', 'Ordner öffnen, Vorgänge finden und Dokumente lesen – mit Ihren vorhandenen Ablagerechten.', '/dms/new' ~ ('?area=' ~ f.area if f.area else '') if can_write else '', 'Vorgang ablegen') %}
+{% call m.page_header('Dokumentenablage', 'Ordner öffnen, Vorgänge finden und Dokumente lesen – mit Ihren vorhandenen Ablagerechten.', '/dms/new' ~ ('?area=' ~ f.area if f.area else '') if can_write else '', 'Vorgang ablegen') %}
 {% call m.action_menu() %}<a class="btn btn-outline-secondary" href="/dms/persons">Personen</a>{% if manager %}<a class="btn btn-outline-secondary" href="/dms/areas">Aktenplan</a><a class="btn btn-outline-secondary" href="/dms/retention">Löschfristen</a>{% endif %}{% endcall %}
 {% endcall %}
 {% set reset_url=folder_url(selected_folder) %}
@@ -62,7 +62,7 @@
   </div>
 
   <div class="col-12 col-xl-9">
-    <nav class="dms-breadcrumb mb-3" aria-label="Ordnerpfad"><a href="/dms"><i class="fa-solid fa-house me-1"></i>Ablage</a>{% for a in breadcrumbs %}<span aria-hidden="true">›</span><a href="{{ folder_url(a) }}" {{ 'aria-current=page' if loop.last }}>{{ a.code ~ ' ' if a.code }}{{ a.name }}</a>{% endfor %}</nav>
+    <nav class="ds-breadcrumb dms-breadcrumb mb-3" aria-label="Ordnerpfad"><a href="/dms"><i class="fa-solid fa-house me-1"></i>Ablage</a>{% for a in breadcrumbs %}<span aria-hidden="true">›</span><a href="{{ folder_url(a) }}" {{ 'aria-current=page' if loop.last }}>{{ a.code ~ ' ' if a.code }}{{ a.name }}</a>{% endfor %}</nav>
     <div class="d-flex flex-wrap justify-content-between gap-2 mb-3"><h2 class="h4 mb-0">{{ selected_folder.name if selected_folder else 'Meine Ordner' }}</h2>{% if breadcrumbs %}<a class="btn btn-sm btn-outline-secondary" href="{{ folder_url(breadcrumbs[-2] if breadcrumbs|length>1 else None) }}">↑ Übergeordneter Ordner</a>{% endif %}</div>
     {% if selected_folder and selected_folder.description %}<p class="text-secondary">{{ selected_folder.description }}</p>{% endif %}
     {% if folders %}<div class="dms-folder-grid" aria-label="Unterordner">{% for a in folders %}<a class="dms-folder-card" href="{{ folder_url(a) }}"><i class="fa-solid fa-folder" aria-hidden="true"></i><span><strong>{{ a.code ~ ' ' if a.code }}{{ a.name }}</strong><small class="d-block text-secondary">Ordner öffnen</small></span></a>{% endfor %}</div>{% endif %}
@@ -108,8 +108,8 @@
       {% endfor %}
     </div></div>
     {% if pages > 1 %}
-    <nav class="mt-3" aria-label="Seiten"><ul class="pagination pagination-sm flex-wrap">
-      {% for n in range(1, pages + 1) if n <= 3 or n > pages - 2 or (n - page) | abs <= 2 %}<li class="page-item {{ 'active' if n == page }}"><a class="page-link" href="/dms?{{ qs }}&page={{ n }}">{{ n }}</a></li>{% endfor %}
+    <nav class="mt-3" aria-label="Seiten"><ul class="ds-nav ds-pagination pagination pagination-sm flex-wrap">
+      {% for n in range(1, pages + 1) if n <= 3 or n > pages - 2 or (n - page) | abs <= 2 %}<li class="page-item {{ 'active' if n == page }}"><a class="page-link" {% if n == page %}aria-current="page"{% endif %} href="/dms?{{ qs }}&page={{ n }}">{{ n }}</a></li>{% endfor %}
     </ul></nav>
     {% endif %}
     {% else %}

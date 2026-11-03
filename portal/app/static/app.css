@@ -570,3 +570,10 @@ a.dash-num:hover > span { text-decoration: underline; }
 .nav-admin-section summary {padding:.5rem .8rem; font-size:.82rem; color:var(--bs-secondary-color); cursor:pointer}
 .module-context {display:flex; gap:.5rem; flex-wrap:wrap; padding-bottom:.75rem; border-bottom:1px solid var(--bs-border-color)}
 .is-rail .nav-expand-tools {display:none!important}
+
+/* Personal hiding never removes discovery. */
+.app-nav:not(.is-searching) [data-personal-hidden="1"] { display:none; }
+.module-catalog { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr)); gap:1rem; }
+.module-catalog .card { min-width:0; }
+.module-catalog .card-body { display:flex; flex-direction:column; gap:.75rem; }
+.module-catalog .module-description { flex:1; }

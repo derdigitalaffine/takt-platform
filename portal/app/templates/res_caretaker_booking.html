@@ -3,7 +3,7 @@
 {% block content %}
 {% set out = h.get('out') %}{% set back = h.get('back') %}
 <div class="mx-auto" style="max-width: 46rem">
-  <nav class="small mb-2" aria-label="Pfad"><a href="/r/hausmeister/{{ token }}"><i class="fa-solid fa-arrow-left me-1"></i>Alle Termine</a></nav>
+  <nav class="ds-breadcrumb small mb-2" aria-label="Pfad"><a href="/r/hausmeister/{{ token }}"><i class="fa-solid fa-arrow-left me-1"></i>Alle Termine</a></nav>
   <h1 class="h4 mb-1">{{ b.resource.name }}{% if units %} <span class="text-secondary fw-normal">– {{ units }}</span>{% endif %}</h1>
   <p class="mb-3">{{ when }}</p>
   <div class="card mb-3"><div class="card-body small">
