@@ -155,3 +155,20 @@ def test_restricted_user_catalog_and_delegated_admin():
     assert c.get('/admin').status_code==403
     assert 'Administration öffnen' not in c.get('/module').text
     assert c.post('/module/favorite',data={'csrf':csrf_of(c.get('/module').text),'id':'users','on':'1'}).status_code==403
+
+
+def test_navigation_context_is_request_scoped(monkeypatch):
+    from app import main
+    from starlette.requests import Request
+    from types import SimpleNamespace
+    calls=[]
+    for name in ('_shared_nav','_task_badge','_dms_nav','_res_nav','_krank_nav'):
+        monkeypatch.setattr(main,name,lambda user,name=name: calls.append((name,user.id)) or False)
+    req=Request({'type':'http'})
+    one=SimpleNamespace(id=1)
+    assert main._navigation_context(req,one) is main._navigation_context(req,one)
+    assert len(calls)==5
+    main._navigation_context(req,SimpleNamespace(id=2))
+    assert len(calls)==10
+    main._navigation_context(Request({'type':'http'}),one)
+    assert len(calls)==15

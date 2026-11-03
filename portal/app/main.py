@@ -568,10 +568,20 @@ def _update_hint(user: User | None) -> str:
         return updates.available(get_settings(db))
 
 
+def _navigation_context(request: Request, user: User | None) -> dict:
+    """Reuse access adapters within one request, never across accounts or requests."""
+    key = user.id if user else None
+    cached = getattr(request.state, "navigation_context", None)
+    if cached is None or cached[0] != key:
+        values = {"shared_nav": _shared_nav(user), "task_badge": _task_badge(user),
+                  "dms_nav": _dms_nav(user), "res_nav": _res_nav(user), "krank_nav": _krank_nav(user)}
+        request.state.navigation_context = (key, values)
+    return request.state.navigation_context[1]
+
+
 def nav_ctx(request: Request, user: User, navctx: dict | None = None):
     from . import nav
-    n = navctx or {"shared_nav": _shared_nav(user), "task_badge": _task_badge(user), "dms_nav": _dms_nav(user),
-                   "res_nav": _res_nav(user), "krank_nav": _krank_nav(user)}
+    n = navctx if navctx is not None else _navigation_context(request, user)
     return nav.Ctx(user=user, path=request.url.path, modules=enabled_modules(), shared=n["shared_nav"],
                    task_badge=n["task_badge"], dms_nav=n["dms_nav"], res_nav=n["res_nav"], krank_nav=n["krank_nav"])
 
@@ -600,8 +610,7 @@ def _pnav_active(item: dict, path: str) -> bool:
 def render(request: Request, name: str, user: User | None = None, **ctx) -> HTMLResponse:
     messages = request.session.pop("flash", [])
     ui = branding.load()
-    navctx = {"shared_nav": _shared_nav(user), "task_badge": _task_badge(user), "dms_nav": _dms_nav(user),
-              "res_nav": _res_nav(user), "krank_nav": _krank_nav(user)}
+    navctx = _navigation_context(request, user)
     return templates.TemplateResponse(request, name, {
         "user": user,
         "ui": ui, "brand": ui["name"], "product": ui["product"],
