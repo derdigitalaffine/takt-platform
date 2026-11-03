@@ -16,10 +16,11 @@
     <div class="card-body row g-3">
       <div class="col-12"><label class="form-label" for="t">Titel</label>
         <input class="form-control" id="t" name="title" type="text" maxlength="200" required placeholder="z. B. Teamrunde Bauamt"></div>
-      <div class="col-md-7"><label class="form-label" for="s">Beginn</label>
-        <input class="form-control" id="s" name="start" type="datetime-local" required value="{{ default_start }}"></div>
+      <div class="col-12"><label class="form-label" for="timing-mode">Zeitraum angeben</label><select id="timing-mode" name="timing_mode" class="form-select" data-time-mode><option value="duration">Beginn + Dauer</option><option value="end">Beginn + Ende</option></select></div>
+      <div class="col-md-6" data-time-end-wrap><label class="form-label" for="meeting-end">Ende (bei Beginn + Ende)</label><input id="meeting-end" name="end" type="datetime-local" class="form-control" data-time-end></div><div class="col-md-7"><label class="form-label" for="s">Beginn</label>
+        <input class="form-control" id="s" data-time-start name="start" type="datetime-local" required value="{{ default_start }}"></div>
       <div class="col-md-5"><label class="form-label" for="d">Dauer</label>
-        <select class="form-select js-select" id="d" name="duration">
+        <select class="form-select js-select" id="d" data-time-duration name="duration">
           {% for d in durations %}<option value="{{ d }}" {% if d == 60 %}selected{% endif %}>{{ d }} Minuten{% if d >= 60 and d % 60 == 0 %} ({{ d // 60 }} h){% endif %}</option>{% endfor %}
         </select></div>
       <div class="col-12"><label class="form-label" for="desc">Beschreibung / Tagesordnung</label>
@@ -43,3 +44,5 @@
   </div></div>
 </form>
 {% endblock %}
+
+{% block scripts %}<script src="/static/time-range.js" defer></script>{% endblock %}
