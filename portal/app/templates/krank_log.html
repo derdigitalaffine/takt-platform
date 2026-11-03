@@ -8,7 +8,7 @@
   <thead><tr><th>Zeit</th><th>Aktenzeichen</th><th>Person</th><th>Aktion</th><th>Details</th></tr></thead>
   <tbody>{% for r in rows %}<tr><td class="text-nowrap">{{ r.at | local('%d.%m.%Y %H:%M:%S') }}</td><td class="font-monospace">{% if r.ref_no.startswith('KM-') %}<a href="?ref={{ r.ref_no }}">{{ r.ref_no }}</a>{% else %}{{ r.ref_no }}{% endif %}</td><td>{{ r.user_name }}</td><td>{{ r.action }}</td><td>{{ r.detail }}</td></tr>{% else %}<tr><td colspan="5" class="text-secondary">Keine Einträge.</td></tr>{% endfor %}</tbody>
 </table></div></div>
-{% if pages > 1 %}<nav><ul class="pagination pagination-sm">{% for p in range(1, pages + 1) %}<li class="page-item {{ 'active' if p == page }}"><a class="page-link" href="?ref={{ ref }}&page={{ p }}">{{ p }}</a></li>{% endfor %}</ul></nav>{% endif %}
+{% if pages > 1 %}<nav aria-label="Protokollseiten"><ul class="ds-nav ds-pagination pagination pagination-sm">{% for p in range(1, pages + 1) %}<li class="page-item {{ 'active' if p == page }}"><a class="page-link" {% if p == page %}aria-current="page"{% endif %} href="?ref={{ ref }}&page={{ p }}">{{ p }}</a></li>{% endfor %}</ul></nav>{% endif %}
 <h2 class="h5" id="mails">Versandte Mails (letzte 100)</h2>
 <p class="small text-secondary">Text und Anhänge werden nach dem Versand aus Datenschutzgründen entfernt; Empfänger, Betreff und Ergebnis bleiben sichtbar.</p>
 <div class="card mb-3"><div class="table-responsive"><table class="table table-sm align-middle mb-0 small">
