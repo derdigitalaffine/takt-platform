@@ -25,9 +25,18 @@ def holiday(d):
 def preview(data):
     s=data.get('schedule') or {};kind=s.get('kind','once')
     if kind not in {'once','weekly','fortnightly','monthly','monthly_weekday','dates'}:raise HTTPException(422,'Unbekannte Wiederholung.')
-    first=day(s.get('first'));duration=sm.integer(s.get('duration',60),1,10080)
+    first=day(s.get('first'));duration=60 if s.get('timing_mode')=='end' else sm.integer(s.get('duration',60),1,10080)
     try:clock=datetime.strptime(str(s.get('time','09:00')),'%H:%M').time()
     except ValueError:raise HTTPException(422,'Bitte eine gültige Uhrzeit eingeben.')
+    if s.get('timing_mode','duration') not in {'duration','end'}:raise HTTPException(422,'Ungültige Zeiteingabe.')
+    if s.get('timing_mode')=='end':
+        try:
+            end=datetime.fromisoformat(str(s.get('ends_at','')))
+            if end.tzinfo is not None:raise ValueError()
+            seconds=(end-datetime.combine(first,clock)).total_seconds()
+            if seconds%60 or not 60<=seconds<=10080*60:raise ValueError()
+            duration=int(seconds/60)
+        except (ValueError,TypeError):raise HTTPException(422,'Ende muss nach Beginn und innerhalb von sieben Tagen liegen.')
     count=sm.integer(s.get('count',6),1,100);until=day(s.get('until')) if s.get('end_mode')=='until' else None
     if until and (until<first or until>first+timedelta(days=366*5)):raise HTTPException(422,'Enddatum muss innerhalb von fünf Jahren ab Beginn liegen.')
     nth=sm.integer(s.get('nth',1),-1,5);weekday=sm.integer(s.get('weekday',0),0,6)

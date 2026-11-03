@@ -9,7 +9,7 @@ from app.security import hash_password
 init_db()
 with SessionLocal() as db:
     set_setting(db,'module_seminars','1');set_setting(db,'smtp_host','localhost');set_setting(db,'mail_from','test@example.org')
-    planner=User(name='Mara Planung',email='planner@example.org',password_hash=hash_password('browser-test-password'),permissions='seminars')
+    planner=User(name='Mara Planung',email='planner@example.org',password_hash=hash_password('browser-test-password'),permissions='seminars,video')
     member=User(name='Alex Teilnahme',email='member@example.org',password_hash=hash_password('browser-test-password'))
     db.add_all([planner,member]);db.flush()
     row=Seminar(owner_id=planner.id,title='Wissenshäppchen',description='Gemeinsam lernen – alle 14 Tage an wechselnden Orten.',status='published',channels='internal,guest',booking_mode='individual',certificates=True,certificate_scope='term',operations_json=json.dumps({**ops.DEFAULTS,'standing':True,'self_checkin':True,'guest_materials':True}))

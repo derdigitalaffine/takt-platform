@@ -1169,11 +1169,21 @@ def _users_json(db: Session) -> list[dict]:
             for u in db.scalars(select(User).where(User.active.is_(True)).order_by(User.name))]
 
 
-def _plan_values(start: str, duration: str) -> tuple[datetime | None, int, str | None]:
+def _plan_values(start: str, duration: str, end: str = "", timing_mode: str = "duration") -> tuple[datetime | None, int, str | None]:
     starts_at = planning.parse_local(start)
     minutes = int(duration) if duration.isdigit() and 5 <= int(duration) <= 1440 else 60
     if starts_at is None:
         return None, minutes, "Bitte Datum und Uhrzeit angeben."
+    if timing_mode not in {'duration','end'}:
+        return None, minutes, "Ungültige Zeiteingabe."
+    if timing_mode == 'end':
+        ends_at = planning.parse_local(end)
+        if ends_at is None or ends_at <= starts_at:
+            return None, minutes, "Das Ende muss nach dem Beginn liegen."
+        seconds = (ends_at-starts_at).total_seconds()
+        if seconds % 60 or not 5 <= seconds/60 <= 1440:
+            return None, minutes, "Die Dauer muss zwischen 5 Minuten und 24 Stunden liegen."
+        minutes = int(seconds/60)
     return starts_at, minutes, None
 
 
@@ -1195,11 +1205,11 @@ def meeting_plan_form(request: Request, user: User = Depends(video_user), db: Se
 
 
 @app.post("/meetings/plan", dependencies=[Depends(check_csrf)])
-def meeting_plan(request: Request, title: str = Form(...), start: str = Form(""), duration: str = Form("60"),
+def meeting_plan(request: Request, title: str = Form(...), start: str = Form(""), duration: str = Form("60"), end: str = Form(""), timing_mode: str = Form("duration"),
                  description: str = Form(""), invitees: str = Form(""), copy_me: str = Form(""),
                  user: User = Depends(video_user), db: Session = Depends(get_db)):
     title = title.strip()[:200] or "Besprechung"
-    starts_at, minutes, error = _plan_values(start, duration)
+    starts_at, minutes, error = _plan_values(start, duration, end, timing_mode)
     emails, bad = planning.parse_emails(invitees)
     if error or bad:
         flash(request, error or ("Ungültige E-Mail-Adresse: " + ", ".join(bad)), "error")
@@ -1293,11 +1303,11 @@ def meeting_join(meeting_id: int, user: User = Depends(video_user), db: Session 
 
 
 @app.post("/meetings/{meeting_id}/schedule", dependencies=[Depends(check_csrf)])
-def meeting_schedule(request: Request, meeting_id: int, start: str = Form(""), duration: str = Form("60"),
+def meeting_schedule(request: Request, meeting_id: int, start: str = Form(""), duration: str = Form("60"), end: str = Form(""), timing_mode: str = Form("duration"),
                      description: str = Form(""), notify_invitees: str = Form(""),
                      user: User = Depends(video_user), db: Session = Depends(get_db)):
     meeting = own_meeting(db, meeting_id, user)
-    starts_at, minutes, error = _plan_values(start, duration)
+    starts_at, minutes, error = _plan_values(start, duration, end, timing_mode)
     if error:
         flash(request, error, "error")
         return redirect(f"/meetings/{meeting.id}")
