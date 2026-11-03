@@ -4,7 +4,7 @@
   const root=document.getElementById('kanban');if(!root)return;
   const message=document.getElementById('kb-message'),feedback=document.getElementById('kb-feedback');
   const drawer=document.getElementById('kb-detail'),body=document.getElementById('kb-detail-body');
-  let activeCard=null,busy=false,drag=null,focusId=null,undo=null;
+  let refreshSequence=0;let activeCard=null,busy=false,drag=null,focusId=null,undo=null;
   const drafts=new Map();let openSequence=0;
   const draftKey=form=>form.elements.card?.value+":"+form.elements.action?.value;
   root.addEventListener('input',e=>{
@@ -19,7 +19,7 @@
     const area=document.getElementById('kb-columns');area.dataset.layout=value;
     if(!focusId)focusId=area.querySelector('[data-column]')?.dataset.column;
     area.querySelectorAll('[data-column]').forEach(c=>c.classList.toggle('kb-focused',c.dataset.column===focusId));
-    root.querySelectorAll('[data-kb-layout]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.kbLayout===value)));
+    root.querySelectorAll('[data-kb-layout]').forEach(b=>{const active=b.dataset.kbLayout===value;b.setAttribute('aria-pressed',String(active));b.classList.toggle('active',active);});
     try{localStorage.setItem(key+'-layout',value);}catch{}
   }
   async function openCard(id,show=true){
@@ -36,14 +36,16 @@
     if(show)bootstrap.Offcanvas.getOrCreateInstance(drawer).show();
   }
   async function refresh(){
+    const sequence=++refreshSequence;
     const area=document.getElementById('kb-columns'),scroll=area.scrollLeft;
     const vertical=Object.fromEntries([...area.querySelectorAll('[data-column]')].map(c=>[c.dataset.column,c.querySelector('.kb-card-list').scrollTop]));
     const openChecks=[...area.querySelectorAll('details[open]')].map(d=>({card:d.closest('[data-card]')?.dataset.card,index:[...d.closest('[data-card]')?.querySelectorAll('details')||[]].indexOf(d)}));
     const response=await fetch(location.href,{credentials:'same-origin'});
     if(!response.ok||response.redirected)throw Error('Board nicht mehr zugänglich. Bitte Seite neu laden.');
     const doc=new DOMParser().parseFromString(await response.text(),'text/html'),next=doc.getElementById('kanban');
+    if(sequence!==refreshSequence)return;
     if(!next)throw Error('Board konnte nicht aktualisiert werden.');
-    root.dataset.version=next.dataset.version;root.dataset.level=next.dataset.level;
+    const overview=root.querySelector('.kb-overview');if(overview)overview.innerHTML=next.querySelector('.kb-overview').innerHTML;root.dataset.version=next.dataset.version;root.dataset.level=next.dataset.level;
     area.innerHTML=doc.getElementById('kb-columns').innerHTML;
     root.querySelectorAll('input[name=board_version]').forEach(i=>i.value=root.dataset.version);
     area.scrollLeft=scroll;
@@ -53,7 +55,7 @@
     if(activeCard&&drawer.classList.contains('show'))await openCard(activeCard,false);
   }
   async function save(data,form){
-    if(busy)return;busy=true;error('');root.setAttribute('aria-busy','true');
+    if(busy)return;busy=true;++refreshSequence;error('');root.setAttribute('aria-busy','true');
     data.set('csrf',document.querySelector('meta[name=csrf]').content);data.set('board_version',root.dataset.version);
     const submit=form?.querySelector('button[type=submit],button:not([type])');if(submit)submit.disabled=true;
     try{
@@ -63,7 +65,7 @@
       if(result.redirect){location.assign(result.redirect);return;}
       if(form?.closest('#board-settings')){try{sessionStorage.setItem(key+'-settings','1');}catch{}location.reload();return;}
       if(form?.closest('#kb-detail'))drafts.delete(draftKey(form));
-      if(data.get('action')==='create')form?.reset();
+      if(data.get('action')==='create')form?.reset();if(data.get('action')==='attach'){form?.reset();if(library)bootstrap.Offcanvas.getOrCreateInstance(library).hide();}
       await refresh();if(data.get('action')==='move'&&data.get('undo')!=='1'){const previous=data.get('previous');if(previous){undo=JSON.parse(previous);root.querySelector('[data-kb-undo]').hidden=false;}}feedback.textContent='Gespeichert.';
     }catch(e){error(e.message);if(form?.closest('.offcanvas')){let note=form.querySelector('[data-kb-error]');if(!note){note=document.createElement('p');note.dataset.kbError='';note.className='alert alert-danger mt-2';note.setAttribute('role','alert');form.append(note);}note.textContent=e.message;}}
     finally{busy=false;root.removeAttribute('aria-busy');if(submit)submit.disabled=false;}
@@ -93,5 +95,39 @@
   function finishTouch(e,cancel=false){if(!touch)return;if(!cancel)moveTo(targetAt(e.clientX,e.clientY));touch.ghost.remove();root.querySelectorAll('.kb-dragging,.kb-drop-target').forEach(c=>c.classList.remove('kb-dragging','kb-drop-target'));touch=null;drag=null;}
   root.addEventListener('pointerup',e=>finishTouch(e));root.addEventListener('pointercancel',e=>finishTouch(e,true));
   let saved='board';try{saved=localStorage.getItem(key+'-layout')||'board';if(sessionStorage.getItem(key+'-settings')){sessionStorage.removeItem(key+'-settings');bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('board-settings')).show();}}catch{}
+  const library=root.querySelector('#kb-library');
+  function renderLibrary(){
+    if(!library)return;
+    let results=library.querySelector('.kb-library-results');
+    if(!results){results=document.createElement('div');results.className='kb-library-results list-group mb-3';results.setAttribute('aria-label','Vorhandene Inhalte');library.querySelector('[data-kb-library-search]').after(results);}
+    results.replaceChildren();
+    for(const select of library.querySelectorAll('[data-kb-library]')){
+      select.hidden=true;library.querySelector(`label[for="${select.id}"]`).hidden=true;
+      for(const option of select.options){if(!option.value)continue;
+        const button=document.createElement('button');button.type='button';button.className='list-group-item list-group-item-action';
+        const kind=document.createElement('span');kind.className='kb-card-type';kind.textContent=select.id==='attach-task'?'Aufgabe':option.textContent.split(' · ')[0];
+        const title=document.createElement('strong');title.textContent=select.id==='attach-task'?option.textContent:option.textContent.split(' · ').slice(1).join(' · ');
+        button.append(kind,title);button.setAttribute('aria-pressed',String(option.selected));button.classList.toggle('active',option.selected);
+        button.addEventListener('click',()=>{select.value=option.value;select.dispatchEvent(new Event('change',{bubbles:true}));results.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});});
+        results.append(button);
+      }
+    }
+    if(!results.children.length){const empty=document.createElement('p');empty.className='small text-secondary p-3';empty.textContent='Keine zugänglichen Inhalte. Legen Sie zunächst eine Aufgabe oder Umfrage an.';results.append(empty);}
+  }
+  library?.addEventListener('show.bs.offcanvas',()=>{renderLibrary();library.querySelector('[data-kb-library-search]').value='';const empty=library.querySelector('[data-kb-no-results]');if(empty)empty.hidden=true;});
+  library?.addEventListener('input',event=>{
+    if(!event.target.matches('[data-kb-library-search]'))return;
+    const query=event.target.value.trim().toLocaleLowerCase();
+    library.querySelectorAll('[data-kb-library]').forEach(select=>select.value='');
+    let matches=0;library.querySelectorAll('.kb-library-results button').forEach(button=>{button.hidden=!button.textContent.toLocaleLowerCase().includes(query);button.classList.remove('active');button.setAttribute('aria-pressed','false');if(!button.hidden)matches++;});
+    let empty=library.querySelector('[data-kb-no-results]');if(!empty){empty=document.createElement('p');empty.dataset.kbNoResults='';empty.className='small text-secondary';empty.setAttribute('role','status');empty.textContent='Keine passenden Inhalte. Versuchen Sie einen anderen Suchbegriff.';library.querySelector('.kb-library-results').after(empty);}empty.hidden=matches>0;
+    library.querySelectorAll('[data-kb-library] option').forEach(option=>{option.hidden=!!option.value&&!option.textContent.toLocaleLowerCase().includes(query);});
+  });
+  library?.addEventListener('change',event=>{
+    if(event.target.id==='attach-task'&&event.target.value)library.querySelector('#attach-source').value='';
+    if(event.target.id==='attach-source'&&event.target.value)library.querySelector('#attach-task').value='';
+  });
+  const liveRefresh=()=>{if(document.hidden||busy||drag||activeCard||document.activeElement?.closest('form')||root.querySelector('.offcanvas.show'))return;refresh().catch(()=>{});};
+  const timer=setInterval(liveRefresh,30000);window.addEventListener('focus',liveRefresh);window.addEventListener('pagehide',()=>clearInterval(timer));
   layout(saved);grips();
 })();
