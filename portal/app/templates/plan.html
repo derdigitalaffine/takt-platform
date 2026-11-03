@@ -16,13 +16,10 @@
     <div class="card-body row g-3">
       <div class="col-12"><label class="form-label" for="t">Titel</label>
         <input class="form-control" id="t" name="title" type="text" maxlength="200" required placeholder="z. B. Teamrunde Bauamt"></div>
-      <div class="col-12"><label class="form-label" for="timing-mode">Zeitraum angeben</label><select id="timing-mode" name="timing_mode" class="form-select" data-time-mode><option value="duration">Beginn + Dauer</option><option value="end">Beginn + Ende</option></select></div>
-      <div class="col-md-6" data-time-end-wrap><label class="form-label" for="meeting-end">Ende (bei Beginn + Ende)</label><input id="meeting-end" name="end" type="datetime-local" class="form-control" data-time-end></div><div class="col-md-7"><label class="form-label" for="s">Beginn</label>
-        <input class="form-control" id="s" data-time-start name="start" type="datetime-local" required value="{{ default_start }}"></div>
-      <div class="col-md-5"><label class="form-label" for="d">Dauer</label>
-        <select class="form-select js-select" id="d" data-time-duration name="duration">
-          {% for d in durations %}<option value="{{ d }}" {% if d == 60 %}selected{% endif %}>{{ d }} Minuten{% if d >= 60 and d % 60 == 0 %} ({{ d // 60 }} h){% endif %}</option>{% endfor %}
-        </select></div>
+      <input type="hidden" name="timing_mode" value="duration" data-time-mode>
+      <div class="col-md-6"><label class="form-label" for="s">Beginn</label><input class="form-control" id="s" data-time-start name="start" type="datetime-local" required value="{{ default_start }}"></div>
+      <div class="col-md-6"><label class="form-label" for="meeting-end">Ende</label><input id="meeting-end" name="end" type="datetime-local" class="form-control" data-time-end></div>
+      <div class="col-md-6"><label class="form-label" for="d">Dauer in Minuten</label><input class="form-control" id="d" name="duration" data-time-duration type="number" min="5" max="1440" step="1" required value="60"></div>
       <div class="col-12"><label class="form-label" for="desc">Beschreibung / Tagesordnung</label>
         <textarea class="form-control" id="desc" name="description" rows="6" maxlength="5000" placeholder="Optional. Erscheint in der Einladung und im Kalendereintrag."></textarea></div>
     </div>

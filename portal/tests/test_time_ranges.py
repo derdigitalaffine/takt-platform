@@ -28,7 +28,7 @@ def test_create_edit_and_calendar_use_explicit_end(db):
     mid=int(response.headers['location'].split('/')[2]);meeting=db.get(Meeting,mid)
     try:
         assert meeting.duration_minutes==75
-        assert 'value="75" selected' in c.get(f'/meetings/{mid}').text
+        assert 'value="75"' in c.get(f'/meetings/{mid}').text
         assert c.get(f'/meetings/{mid}/calendar.ics').status_code==200
         assert c.post(f'/meetings/{mid}/schedule',data={'csrf':token,'start':'2027-01-02T23:30','timing_mode':'end','end':'2027-01-03T01:00'}).status_code==303
         db.refresh(meeting);assert meeting.duration_minutes==90
