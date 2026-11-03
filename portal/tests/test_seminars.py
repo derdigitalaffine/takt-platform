@@ -93,7 +93,7 @@ def test_public_email_consent_and_personal_privacy(db,people):
 
 def test_internal_access_csrf_and_manual_admission(db,people):
     row,t=make(db,people,manual_admission=True);row.channels='internal';db.commit()
-    assert client().get(f'/seminare/{row.id}').status_code==404
+    assert client().get(f'/seminare/{row.id}').status_code==401
     c=login(people[1].email,'passwort-test-123');p=c.get(f'/seminare/{row.id}')
     assert c.post(f'/seminare/{row.id}/register',data={'sessions':[t.id]}).status_code==400
     assert c.post(f'/seminare/{row.id}/register',data={'csrf':csrf_of(p.text),'sessions':[t.id],'email':'spoof@example.org'}).status_code==303

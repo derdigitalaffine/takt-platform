@@ -22,12 +22,25 @@ def exercise(browser,f):
     staff=browser.new_context(viewport={'width':1440,'height':1000},color_scheme='light',reduced_motion='reduce')
     p=staff.new_page();p.on('pageerror',lambda error:errors.append(str(error)));login(p,'planner@example.org')
     sid,tid=f['sid'],f['tid']
+    anonymous=browser.new_context(viewport={'width':390,'height':844})
+    gate=anonymous.new_page()
+    assert gate.goto(BASE+f'/seminare/{sid}').status==401
+    expect(gate.get_by_role('heading',name='Dieser Bereich erfordert eine Anmeldung')).to_be_visible()
+    capture(gate,'login-required-mobile')
+    gate.get_by_role('link',name='Anmelden und Seminar öffnen').click()
+    gate.get_by_label('E-Mail',exact=True).fill('member@example.org')
+    gate.get_by_label('Passwort',exact=True).fill('browser-test-password')
+    gate.get_by_role('button',name='Anmelden',exact=True).click()
+    expect(gate).to_have_url(BASE+f'/seminare/{sid}')
+    anonymous.close()
     for suffix,name in [('/organisation','organisation'),('/mail','mail'),(f'/durchfuehrung/{tid}','conduct'),('/planen','planner'),('/participants','participants')]:
         assert p.goto(BASE+f'/seminare/{sid}'+suffix).status==200
         capture(p,name+'-desktop');p.set_viewport_size({'width':390,'height':844});capture(p,name+'-mobile')
         p.emulate_media(color_scheme='dark');capture(p,name+'-mobile-dark');p.emulate_media(color_scheme='light');p.set_viewport_size({'width':1440,'height':1000})
     for url in ('/seminare',f'/seminare/{sid}'):
         p.goto(BASE+url)
+        if url=='/seminare':capture(p,'overview-polished-collapsed')
+        if url=='/seminare':p.locator('.sem-card-participants').filter(has=p.locator(f'[data-term-id="{tid}"]')).locator(':scope > summary').click()
         preview=p.locator(f'details[data-participant-preview][data-term-id="{tid}"]')
         expect(preview).not_to_have_attribute('open','')
         expect(preview.locator('li')).not_to_be_visible()

@@ -2,3 +2,17 @@
 .sem-option[hidden]{display:none!important}.sem-bundle-choices{max-height:22rem;overflow-y:auto}
 
 .sem-checkin-qr{display:block;width:100%;max-width:20rem;height:auto;align-self:center;background:#fff}.sem-attendance-list [hidden]{display:none!important}.sem-layout input[type=file]{max-width:100%}.sem-nav a,.sem-layout button,.sem-attendance-list button{min-height:44px}.sem-grid .card-body{min-width:0}.sem-grid form,.sem-layout form{min-width:0}@media(max-width:575px){.sem-layout .d-flex>button{flex:1 1 9rem}.sem-nav{gap:.35rem}.sem-nav a{flex:1 1 auto;text-align:center}.sem-checkin-qr{max-width:16rem}}
+
+/* Quiet secondary actions and a consistent hierarchy across seminar screens. */
+.sem-nav{align-items:flex-start;border-bottom:1px solid var(--bs-border-color);padding-bottom:.75rem}
+.sem-nav-more{position:relative;font-size:.9rem}.sem-nav-more summary{cursor:pointer;padding:.65rem .8rem;border-radius:.5rem;background:var(--bs-tertiary-bg)}
+.sem-nav-more>div{display:flex;flex-direction:column;gap:.25rem;padding:.5rem;border:1px solid var(--bs-border-color);border-radius:.5rem;margin-top:.35rem;background:var(--bs-body-bg)}
+.sem-nav-more a{display:block;padding:.5rem .75rem;text-decoration:none}
+.sem-create{display:flex;gap:.75rem;align-items:flex-start;flex-wrap:wrap}
+.sem-card .card-body{padding:1.25rem}.sem-card h2{font-size:1.2rem;line-height:1.4}.sem-card h2 a{text-decoration:none}.sem-card h2 a:hover{text-decoration:underline}
+.sem-card .sem-term{border:0;border-left:3px solid var(--bs-border-color);border-radius:0;padding:.65rem .85rem;background:transparent;font-size:.9rem}
+.sem-card-participants{margin-top:1rem;border-block:1px solid var(--bs-border-color);padding:.65rem 0;font-size:.9rem}.sem-card-participants>summary{cursor:pointer;font-weight:600}
+.sem-participant-preview summary{cursor:pointer;line-height:1.5}.sem-participant-preview li{line-height:1.4}
+.sem-card form .btn{border-color:transparent;color:var(--bs-secondary-color);padding-left:0}
+.sem-nav summary:focus-visible,.sem-card summary:focus-visible{outline:2px solid var(--bs-primary);outline-offset:3px}
+@media(max-width:575px){.sem-nav-more{width:100%}.sem-create{width:100%}.sem-card .card-body{padding:1rem}.sem-nav a{font-size:.875rem}}
