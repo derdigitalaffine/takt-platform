@@ -127,6 +127,8 @@ PERMISSIONS = {
     "resources": ("Ressourcen", "fa-building", "Bürgerhäuser, Räume, Grillplätze, Geräte anlegen, Buchungen bearbeiten, Belegungskalender teilen"),
     "krank": ("Krankmeldungen", "fa-notes-medical", "Krankmeldungen der Arbeitgeber bearbeiten, für die man (oder die eigene Gruppe) zuständig ist"),
     "krank_admin": ("Krankmelder verwalten", "fa-user-nurse", "Alle Krankmeldungen sehen; Arbeitgeber, Empfänger, Zuständige, Zugang, Texte, Löschfrist und Import verwalten"),
+    "org_members": ("Organisationszuordnungen verwalten", "fa-users-gear", "Haupt- und zusätzliche Organisationseinheiten aller Personen zuordnen; keine Konten oder Rollen ändern"),
+    "org_roles": ("Organisationsrollen vergeben", "fa-user-shield", "Bereichsrollen für Personen und Gruppen vergeben; keine globalen Portalrechte"),
     "orgs": ("Körperschaften (Stammdaten)", "fa-landmark-flag", "Gebietskörperschaften, Zweckverbände und ihre Einrichtungen (Abteilungen, Kitas …) mit Wappen und Kontakt pflegen – genutzt von Ressourcen, Krankmelder, Rechtstexten und Anträgen"),
     "absences": ("Vertretungen verwalten", "fa-user-clock", "Abwesenheiten (z. B. Krankheit) mit Vertretung für andere eintragen – ohne Angabe eines Grundes"),
     "users": ("Benutzerverwaltung", "fa-users-gear", "Benutzer und Gruppen anlegen, bearbeiten und löschen"),
@@ -3060,6 +3062,7 @@ def _migrate() -> None:
 
 
 def init_db() -> None:
+    from . import org_models  # noqa: F401
     from . import task_models  # noqa: F401 – register additive native-task tables
     Base.metadata.create_all(engine)
     _migrate()
@@ -3069,6 +3072,8 @@ def init_db() -> None:
                 db.add(Setting(key=key, value=value))
         seed_law_levels(db)
         seed_orgs(db)
+        from .organization import seed as seed_organization
+        seed_organization(db)
         seed_map_layers(db)
         seed_form_blocks(db)
         if db.get(Setting, "migrated_app_create") is None:

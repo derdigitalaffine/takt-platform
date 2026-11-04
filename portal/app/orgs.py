@@ -63,14 +63,17 @@ def tree(db, active_only: bool = False) -> list[tuple[Organization, int]]:
     for o in items:
         kids.setdefault(o.parent_id if o.parent_id in ids else None, []).append(o)
     out: list[tuple[Organization, int]] = []
-
-    def walk(parent_id, depth):
-        for o in kids.get(parent_id, []):
-            out.append((o, depth))
-            if depth < 8:
-                walk(o.id, depth + 1)
-    walk(None, 0)
+    seen = set()
+    stack = [(o, 0) for o in reversed(kids.get(None, []))]
+    while stack:
+        node, depth = stack.pop()
+        if node.id in seen:
+            continue
+        seen.add(node.id)
+        out.append((node, depth))
+        stack.extend((child, depth + 1) for child in reversed(kids.get(node.id, [])))
     return out
+
 
 
 def options(db, bodies_only: bool = False, active_only: bool = True) -> list[tuple[int, str]]:
@@ -81,24 +84,31 @@ def options(db, bodies_only: bool = False, active_only: bool = True) -> list[tup
 
 def body_of(org: Organization | None) -> Organization | None:
     """Die Körperschaft, zu der eine Einrichtung gehört (sie selbst, wenn sie eine ist)."""
-    seen = 0
-    while org is not None and not is_body(org) and org.parent is not None and seen < 10:
-        org, seen = org.parent, seen + 1
+    seen = set()
+    while org is not None and not is_body(org) and org.parent is not None:
+        if org.id in seen:
+            return None
+        seen.add(org.id)
+        org = org.parent
     return org
 
 
 def path(org: Organization | None) -> list[Organization]:
-    out, seen = [], 0
-    while org is not None and seen < 10:
+    out, seen = [], set()
+    while org is not None and org.id not in seen:
         out.insert(0, org)
-        org, seen = org.parent, seen + 1
+        seen.add(org.id)
+        org = org.parent
     return out
 
 
 def usage(db, org: Organization) -> dict[str, int]:
     """Wo eine Körperschaft verwendet wird (vor dem Löschen anzeigen)."""
     from .db import Form, KrankEmployer, LawLevel, Resource
-    return {"Ressourcen": db.scalar(select(func.count(Resource.id)).where(Resource.provider_id == org.id)) or 0,
+    from .org_models import OrgMembership, OrgRoleGrant
+    return {"Personenzuordnungen": db.scalar(select(func.count(OrgMembership.id)).where(OrgMembership.org_id == org.id)) or 0,
+            "Bereichsrollen": db.scalar(select(func.count(OrgRoleGrant.id)).where(OrgRoleGrant.org_id == org.id)) or 0,
+            "Ressourcen": db.scalar(select(func.count(Resource.id)).where(Resource.provider_id == org.id)) or 0,
             "Krankmelder-Arbeitgeber": db.scalar(select(func.count(KrankEmployer.id)).where(KrankEmployer.org_id == org.id)) or 0,
             "Rechtstext-Ebenen": db.scalar(select(func.count(LawLevel.id)).where(LawLevel.org_id == org.id)) or 0,
             "Formulare/Anträge": db.scalar(select(func.count(Form.id)).where(Form.org_id == org.id)) or 0,
@@ -106,15 +116,18 @@ def usage(db, org: Organization) -> dict[str, int]:
 
 
 def would_cycle(org: Organization, parent: Organization | None) -> bool:
-    seen = 0
-    while parent is not None and seen < 20:
+    seen = set()
+    while parent is not None:
+        if parent.id in seen:
+            return True
+        seen.add(parent.id)
         if parent.id == org.id:
             return True
-        parent, seen = parent.parent, seen + 1
+        parent = parent.parent
     return False
 
 
-def clean(data, org: Organization | None = None) -> tuple[dict, list[str]]:
+def clean(data, org: Organization | None = None, available_kinds=None) -> tuple[dict, list[str]]:
     def txt(key, n):
         return " ".join(str(data.get(key, "") or "").split())[:n]
     values = {"name": txt("name", 200), "short_name": txt("short_name", 80), "ags": txt("ags", 20),
@@ -122,7 +135,7 @@ def clean(data, org: Organization | None = None) -> tuple[dict, list[str]]:
               "email": txt("email", 255).lower(), "website": txt("website", 255), "contact": txt("contact", 255),
               "note": str(data.get("note", "") or "").strip()[:4000]}
     kind = str(data.get("kind", "") or "")
-    values["kind"] = kind if kind in KINDS else "einrichtung"
+    values["kind"] = kind if kind in (available_kinds or KINDS) else "einrichtung"
     color = str(data.get("color", "") or "").strip()
     values["color"] = color if COLOR_RE.match(color) else ""
     if values["website"] and not values["website"].startswith(("http://", "https://")):

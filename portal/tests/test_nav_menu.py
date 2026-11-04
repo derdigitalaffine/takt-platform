@@ -162,13 +162,13 @@ def test_navigation_context_is_request_scoped(monkeypatch):
     from starlette.requests import Request
     from types import SimpleNamespace
     calls=[]
-    for name in ('_shared_nav','_task_badge','_dms_nav','_res_nav','_krank_nav'):
+    for name in ('_shared_nav','_task_badge','_dms_nav','_res_nav','_krank_nav','_org_nav'):
         monkeypatch.setattr(main,name,lambda user,name=name: calls.append((name,user.id)) or False)
     req=Request({'type':'http'})
     one=SimpleNamespace(id=1)
     assert main._navigation_context(req,one) is main._navigation_context(req,one)
-    assert len(calls)==5
+    assert len(calls)==6
     main._navigation_context(req,SimpleNamespace(id=2))
-    assert len(calls)==10
+    assert len(calls)==12
     main._navigation_context(Request({'type':'http'}),one)
-    assert len(calls)==15
+    assert len(calls)==18
