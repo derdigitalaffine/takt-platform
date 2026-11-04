@@ -44,6 +44,7 @@
     if(!force&&guardColumn())return;
     const sequence=++refreshSequence;
     const area=document.getElementById('kb-columns'),scroll=area.scrollLeft;
+    const focusedControlId=area.contains(document.activeElement)?document.activeElement.id:null;
     const vertical=Object.fromEntries([...area.querySelectorAll('[data-column]')].map(c=>[c.dataset.column,c.querySelector('.kb-card-list').scrollTop]));
     const openChecks=[...area.querySelectorAll('details[open]')].map(d=>({card:d.closest('[data-card]')?.dataset.card,index:[...d.closest('[data-card]')?.querySelectorAll('details')||[]].indexOf(d)}));
     const response=await fetch(location.href,{credentials:'same-origin'});
@@ -59,6 +60,8 @@
     area.querySelectorAll('[data-column]').forEach(c=>{c.querySelector('.kb-card-list').scrollTop=vertical[c.dataset.column]||0;});
     for(const d of openChecks){const card=area.querySelector(`[data-card="${d.card}"]`);const detail=card?.querySelectorAll('details')[d.index];if(detail)detail.open=true;}
     layout(area.dataset.layout);grips();
+    const focused=focusedControlId&&document.getElementById(focusedControlId);
+    if(focused&&document.activeElement===document.body){if(area.dataset.layout==='focus'){focusId=focused.closest('[data-column]')?.dataset.column;layout('focus');}focused.focus({preventScroll:true});focused.scrollIntoView({block:'nearest',inline:'nearest'});}
     if(activeCard&&drawer.classList.contains('show'))await openCard(activeCard,false);
   }
   async function save(data,form){

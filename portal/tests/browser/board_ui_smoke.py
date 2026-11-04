@@ -57,12 +57,13 @@ def exercise(browser):
     move=card.locator('form').filter(has=p.locator('[name=action][value=move]'))
     move.locator('[name=column]').select_option(index=5)
     save(p,move.get_by_role('button',name='Verschieben',exact=True))
-    neutral=p.locator('.kb-column').last;status=neutral.locator('[data-card] .kb-card-status select')
+    neutral=p.locator('.kb-column').last;status=neutral.locator('[data-card] .kb-card-status select');status.focus()
     with p.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/action')) as response:status.select_option('in_progress')
     assert response.value.ok,response.value.text()
     expect(p.locator('#kanban')).not_to_have_attribute('aria-busy','true')
     expect(neutral.locator('[data-card]')).to_have_count(1)
     expect(neutral.locator('.kb-card-status select')).to_have_value('in_progress')
+    expect(neutral.locator('.kb-card-status select')).to_be_focused()
     # A blocked completion leaves the selector and card at their actual status.
     with p.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/action')) as response:neutral.locator('.kb-card-status select').select_option('done')
     assert response.value.status==422
