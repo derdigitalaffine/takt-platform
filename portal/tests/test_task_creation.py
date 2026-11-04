@@ -19,19 +19,19 @@ def task_files():
 
 def test_form_is_visible_next_to_quick_capture_and_keeps_return_context(db,task_people):
     c,token=client_for(task_people[0])
-    html=c.get('/tasks?perspective=delegated&view=board&tag=Planung').text
+    html=c.get('/tasks?perspective=delegated&view=list&tag=Planung').text
     assert 'id="capture-text"' in html and 'Mit Formular anlegen' in html
     path=unescape(re.search(r'href="([^"]*/aufgaben/neu\?[^\"]+)"',html).group(1))
     response=c.get(path)
     assert response.status_code==200
     assert all(f'name="{key}"' in response.text for key in ['title','description','assignee_id','due_date','checklist','files'])
     assert 'enctype="multipart/form-data"' in response.text and 'zur bisherigen Aufgabenübersicht' in response.text
-    assert 'perspective=delegated&amp;tag=Planung&amp;view=board' in response.text
+    assert 'perspective=delegated&amp;tag=Planung&amp;view=list' in response.text
 
 
 def test_create_with_checklist_and_files_returns_to_the_filtered_overview(db,task_people):
     c,token=client_for(task_people[0])
-    back='/tasks?perspective=delegated&view=board'
+    back='/tasks?perspective=delegated&view=list'
     data={'csrf':token,'title':'Besprechung vorbereiten','description':'Bitte die Zahlen und Unterlagen zusammenstellen.',
           'assignee_id':str(task_people[1].id),'due_date':'2026-12-01','due_time':'14:30',
           'checklist':'  Unterlagen sammeln  \n\nZahlen prüfen\nRückmeldung einholen','back':back}

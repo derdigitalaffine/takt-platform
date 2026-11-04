@@ -83,7 +83,7 @@ def visible_cards(db,user,board):
         if task:
             if task.archived_at:continue
             col=mapping.get(card.column_id)
-            if board.mode=='status' and (not col or col.status!=task.status):col=next((c for c in cols if c.status==task.status),col)
+            if board.mode=='status' and (not col or col.status and col.status!=task.status):col=next((c for c in cols if c.status==task.status),col)
             result.append(dict(card=card,task=task,column=col,source=None))
         elif card.source_key:
             if sources is None:sources=source_items(db,user)
@@ -103,7 +103,7 @@ def add_native(db,user,board,column,task):
         raise HTTPException(403,'Nur Ersteller und Aufgabenverwaltung dürfen eine Aufgabe für weitere Boardmitglieder freigeben.')
     old=db.scalar(select(TaskBoardCard).where(TaskBoardCard.board_id==board.id,TaskBoardCard.task_id==task.id))
     if old:return old
-    if board.mode=='status':column=next((c for c in columns(db,board) if c.status==task.status),None)
+    if board.mode=='status' and column.status and column.status!=task.status:column=next((c for c in columns(db,board) if c.status==task.status),column)
     if not column:raise HTTPException(422,'Für diesen Aufgabenstatus fehlt eine Spalte.')
     card=TaskBoardCard(board_id=board.id,column_id=column.id,task_id=task.id,shareable=ts.may_edit(user,task),position=1000000)
     db.add(card);ts.audit(db,task,user,'board','Zum Board „'+board.title+'“ hinzugefügt.');db.flush();return card
@@ -112,15 +112,15 @@ def add_native(db,user,board,column,task):
 def move(db,user,board,card,target,index=0):
     from . import tasks as ts
     if card.board_id!=board.id or target.board_id!=board.id:raise HTTPException(404)
-    if card.task_id and board.mode=='status':
+    if card.task_id and board.mode=='status' and target.status:
         task=ts.get(db,user,card.task_id)
         ts.transition(db,user,task,target.status)
         # A completion requiring review lands in its actual resulting column.
-        target=next((c for c in columns(db,board) if c.status==task.status),None)
+        if target.status!=task.status:
+            target=next((c for c in columns(db,board) if c.status==task.status),None) or db.get(TaskBoardColumn,card.column_id)
         if not target:raise HTTPException(422,'Für den resultierenden Aufgabenstatus fehlt eine Spalte.')
     elif card.source_key:
         if card.source_key not in source_items(db,user):raise HTTPException(404)
-        if board.mode!='free' and target.id!=card.column_id:raise HTTPException(422,'Fachaufgaben lassen sich nur im freien Modus umordnen; den Status in der Quelle ändern.')
     card.column_id=target.id
     db.flush()
     items=list(db.scalars(select(TaskBoardCard).where(TaskBoardCard.board_id==board.id,TaskBoardCard.column_id==target.id,TaskBoardCard.id!=card.id).order_by(TaskBoardCard.position,TaskBoardCard.id)))

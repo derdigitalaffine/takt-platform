@@ -11,3 +11,26 @@
 .kb-library-results{max-height:42vh;overflow-y:auto;border-radius:.75rem}.kb-library-results .list-group-item{padding:.85rem 1rem;text-align:left}.kb-library-results strong{display:block;font-size:.85rem;line-height:1.5;overflow-wrap:anywhere}.kb-library-results .active .kb-card-type{color:inherit;opacity:.85}.kb-library-results button[hidden]{display:none}.kb-library-results:empty:after{content:'Keine passenden Inhalte';padding:1rem}.kb-library-results button:focus-visible{outline:3px solid var(--bs-primary);outline-offset:-3px}
 
 .kb-meta .badge{background:var(--bs-secondary-bg)!important;color:var(--bs-body-color)!important}.kb-settings-section{border:1px solid var(--bs-border-color);padding:1rem;border-radius:.75rem}.kb-settings-section summary{cursor:pointer}
+/* Editable column heads: native details keeps keyboard and no-JS access. */
+.kb-column-heading{display:flex;align-items:center;gap:.65rem;min-height:48px;width:100%;list-style:none;border-radius:.5rem;padding:.35rem;cursor:default}
+summary.kb-column-heading{cursor:pointer}
+summary.kb-column-heading::-webkit-details-marker{display:none}
+.kb-column-label{flex:1;min-width:0;display:flex;flex-direction:column;gap:.25rem}
+.kb-column-name{font-weight:650;font-size:.95rem;line-height:1.4;overflow-wrap:anywhere}
+.kb-column-kind{color:var(--bs-secondary-color);font-size:.75rem;line-height:1.4}
+.kb-column-count{font-size:.75rem;font-weight:600;border:1px solid var(--bs-border-color);background:var(--bs-body-bg);border-radius:2rem;padding:.2rem .5rem}
+.kb-column-gear{display:grid;place-items:center;min-width:32px;min-height:32px;color:var(--bs-secondary-color);opacity:0;transition:opacity .12s ease;background:var(--bs-body-bg);border-radius:.5rem}
+.kb-column-heading:hover,.kb-column-heading:focus-visible,.kb-column-editor[open]>.kb-column-heading{background:var(--bs-secondary-bg)}
+.kb-column-heading:hover .kb-column-gear,.kb-column-heading:focus-visible .kb-column-gear,.kb-column-editor:focus-within .kb-column-gear,.kb-column-editor[open] .kb-column-gear{opacity:1}
+.kb-column-heading:focus-visible{outline:3px solid var(--bs-primary);outline-offset:3px}
+.kb-column-editor[open]{padding-bottom:.5rem;border-bottom:1px solid var(--bs-border-color)}
+.kb-column-form .form-control,.kb-column-form .form-select,.kb-card-status .form-select{min-height:40px}
+.kb-column-form .form-text{line-height:1.5}
+.kb-column-header:has(.kb-column-editor[open]){max-height:65vh;overflow-y:auto}
+@media(hover:none),(pointer:coarse){.kb-column-gear{opacity:1;min-width:44px;min-height:44px}.kb-card-status .form-select{min-height:44px}}
+@media(prefers-reduced-motion:reduce){.kb-column-gear{transition:none}}
+/* Anchor accessible, visually hidden card labels inside the board scroll area. */
+.kb-columns{position:relative}
+
+.kb-column-tabs.ds-nav.ds-nav{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;padding-bottom:.5rem}
+.kb-column-tabs.ds-nav.ds-nav>button{flex:0 0 auto;white-space:nowrap}

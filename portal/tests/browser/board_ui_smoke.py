@@ -7,7 +7,10 @@ BASE='http://127.0.0.1:8767';OUTPUT=Path('/tmp/takt-board-browser');OUTPUT.mkdir
 
 
 def capture(page,name):
-    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Page overflow: '+page.url
+    if not page.evaluate('document.documentElement.scrollWidth <= innerWidth'):
+        print(page.evaluate("({w:innerWidth,scroll:document.documentElement.scrollWidth,body:document.body.scrollWidth,x:scrollX,drawers:[...document.querySelectorAll('.kb-drawer')].map(e=>({id:e.id,cls:e.className,d:getComputedStyle(e).display,v:getComputedStyle(e).visibility,w:e.scrollWidth,rect:e.getBoundingClientRect().toJSON()})),outside:[...document.querySelectorAll('body *')].filter(e=>!e.closest('#kb-columns')&&getComputedStyle(e).display!=='none'&&getComputedStyle(e).visibility!=='hidden'&&e.getBoundingClientRect().right>innerWidth+1).slice(0,20).map(e=>({tag:e.tagName,cls:e.className,rect:e.getBoundingClientRect().toJSON()}))})"))
+        page.screenshot(path=str(OUTPUT/'overflow-debug.png'),full_page=True)
+        raise AssertionError(str(page.evaluate("[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1 && getComputedStyle(e).position!=='fixed').slice(0,16).map(e=>({tag:e.tagName,cls:e.className,w:e.getBoundingClientRect().width,x:e.getBoundingClientRect().x,scroll:e.scrollWidth}))")))
     page.screenshot(path=str(OUTPUT/(name+'.png')),full_page=True,animations='disabled')
 
 
@@ -23,11 +26,55 @@ def save(page,button):
 
 def exercise(browser):
     context=browser.new_context(viewport={'width':1440,'height':1000},reduced_motion='reduce');p=context.new_page();errors=[];p.on('pageerror',lambda e:errors.append(str(e)))
-    login(p,'owner@example.org');p.goto(BASE+'/tasks/boards');expect(p.get_by_role('link',name='Kanbanboards',exact=True)).to_be_visible();capture(p,'workspace-empty');p.get_by_role('button',name='Neues Board',exact=True).click();p.get_by_label('Boardname',exact=True).fill('Projekt Wissenshäppchen');p.get_by_role('button',name='Privates Board anlegen').click()
+    login(p,'owner@example.org');p.goto(BASE+'/tasks/boards');expect(p.get_by_role('link',name='Aufgabenboards',exact=True)).to_be_visible();capture(p,'workspace-empty');p.get_by_role('button',name='Neues Board',exact=True).click();p.get_by_label('Boardname',exact=True).fill('Projekt Wissenshäppchen');p.get_by_role('button',name='Privates Board anlegen').click()
     path=p.url.replace(BASE,'');expect(p.locator('.kb-column')).to_have_count(5)
-    first=p.locator('.kb-column').first;first.locator('.kb-add summary').click();first.locator('[name=title]').fill('Präsentation vorbereiten');first.locator('[name=checklist]').fill('Inhalte sammeln\nPräsentation prüfen')
+    # Header editing works with keyboard; unsaved input cannot disappear on refresh.
+    first=p.locator('.kb-column').first;header=first.locator('.kb-column-heading')
+    header.hover();expect(first.locator('.kb-column-gear')).to_have_css('opacity','1')
+    header.focus();header.press('Enter')
+    first.locator('[data-column-form] [name=title]').fill('Eingang')
+    first.locator('[data-column-form] [name=status]').select_option('')
+    save(p,first.get_by_role('button',name='Spalte speichern',exact=True))
+    expect(first.locator('.kb-column-name')).to_have_text('Eingang')
+    expect(first.locator('.kb-column-kind')).to_have_text('Ohne Status')
+    header.click();first.locator('[data-column-form] [name=title]').fill('Ungespeicherter Entwurf')
+    p.get_by_role('button',name='Aktualisieren',exact=True).click()
+    expect(first.locator('[data-column-form] [name=title]')).to_have_value('Ungespeicherter Entwurf')
+    first.locator('[data-column-form] [name=title]').press('Escape')
+    header.click();expect(first.locator('[data-column-form] [name=title]')).to_have_value('Eingang')
+    first.locator('[data-column-form] [name=status]').select_option('open')
+    save(p,first.get_by_role('button',name='Spalte speichern',exact=True))
+    first=p.locator('.kb-column').first;first.locator('.kb-add summary').click();first.locator('.kb-add [name=title]').fill('Präsentation vorbereiten');first.locator('[name=checklist]').fill('Inhalte sammeln\nPräsentation prüfen')
     save(p,first.get_by_role('button',name='Aufgabe anlegen'))
     card=p.locator('[data-card]').first;expect(card.get_by_role('button',name='Präsentation vorbereiten',exact=True)).to_be_visible()
+    # A card in a neutral column keeps its place when its own status changes.
+    p.get_by_role('button',name='Board verwalten',exact=True).click()
+    p.get_by_text('Spalten & Workflow verwalten',exact=True).click()
+    p.locator('#column-new').fill('Ideenspeicher');p.locator('#column-new-status').select_option('')
+    with p.expect_navigation():p.get_by_role('button',name='Spalte hinzufügen',exact=True).click()
+    p.locator('#board-settings [data-bs-dismiss]').click()
+    card=p.locator('[data-card]').first;card.locator('summary').last.click()
+    move=card.locator('form').filter(has=p.locator('[name=action][value=move]'))
+    move.locator('[name=column]').select_option(index=5)
+    save(p,move.get_by_role('button',name='Verschieben',exact=True))
+    neutral=p.locator('.kb-column').last;status=neutral.locator('[data-card] .kb-card-status select')
+    with p.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/action')) as response:status.select_option('in_progress')
+    assert response.value.ok,response.value.text()
+    expect(p.locator('#kanban')).not_to_have_attribute('aria-busy','true')
+    expect(neutral.locator('[data-card]')).to_have_count(1)
+    expect(neutral.locator('.kb-card-status select')).to_have_value('in_progress')
+    # A blocked completion leaves the selector and card at their actual status.
+    with p.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/action')) as response:neutral.locator('.kb-card-status select').select_option('done')
+    assert response.value.status==422
+    expect(p.locator('#kanban')).not_to_have_attribute('aria-busy','true')
+    expect(neutral.locator('.kb-card-status select')).to_have_value('in_progress')
+    expect(p.locator('#kb-message')).to_contain_text('Checkliste')
+    capture(p,'neutral-column-and-card-status')
+    card=neutral.locator('[data-card]')
+    if card.locator('details').last.get_attribute('open') is None:card.locator('summary').last.click()
+    move=card.locator('form').filter(has=p.locator('[name=action][value=move]'))
+    move.locator('[name=column]').select_option(index=0)
+    save(p,move.get_by_role('button',name='Verschieben',exact=True))
     p.get_by_role('button',name='Inhalte hinzufügen',exact=True).click()
     expect(p.locator('#kb-library')).to_have_class(re.compile('show'))
     p.locator('[data-kb-library-search]').fill('Teamentscheidung')
@@ -58,19 +105,19 @@ def exercise(browser):
     assert response.value.ok,response.value.text();expect(p.locator('.kb-column').nth(1).locator('[data-card]')).to_have_count(1)
     save(p,p.get_by_role('button',name='Letztes Verschieben rückgängig'));expect(p.locator('.kb-column').first.locator('[data-card]')).to_have_count(1)
     # Reader can open task, but receives no write controls.
-    rcontext=browser.new_context();r=rcontext.new_page();login(r,'reader@example.org');r.goto(BASE+path);r.locator('[data-kb-open]').click();expect(r.locator('#kb-detail-body h3').first).to_have_text('Präsentation vorbereiten');expect(r.locator('#kb-detail-body form button:enabled')).to_have_count(0);rcontext.close()
+    rcontext=browser.new_context();r=rcontext.new_page();login(r,'reader@example.org');r.goto(BASE+path);expect(r.locator('[data-column-editor]')).to_have_count(0);r.locator('[data-kb-open]').click();expect(r.locator('#kb-detail-body h3').first).to_have_text('Präsentation vorbereiten');expect(r.locator('#kb-detail-body form button:enabled')).to_have_count(0);rcontext.close()
     # Editor without global creation permission can create on this board.
     econtext=browser.new_context(viewport={'width':390,'height':844},has_touch=True,is_mobile=True,reduced_motion='reduce');e=econtext.new_page();e.on('pageerror',lambda x:errors.append(str(x)));login(e,'editor@example.org');e.goto(BASE+path)
     capture(e,'board-mobile');e.locator('[data-kb-open]').first.click();expect(e.locator('#drawer-title')).to_be_visible();capture(e,'drawer-mobile');e.locator('#kb-detail [data-bs-dismiss]').click()
-    first=e.locator('.kb-column').first;first.locator('.kb-add summary').click();first.locator('[name=title]').fill('Teamaufgabe');save(e,first.get_by_role('button',name='Aufgabe anlegen'));expect(first.locator('[data-card]')).to_have_count(2)
+    first=e.locator('.kb-column').first;first.locator('.kb-add summary').click();first.locator('.kb-add [name=title]').fill('Teamaufgabe');save(e,first.get_by_role('button',name='Aufgabe anlegen'));expect(first.locator('[data-card]')).to_have_count(2)
     # Touch drag by the explicit grip, leaving normal scrolling available elsewhere.
     grip=e.locator('[data-card]').nth(1).locator('.kb-grip');grip.scroll_into_view_if_needed();box=grip.bounding_box();x,y=box['x']+box['width']/2,box['y']+box['height']/2
-    target=e.locator('[data-card]').first.bounding_box();target_y=target['y']+10
+    target=e.locator('[data-card]').first.bounding_box();target_y=max(e.locator('[data-drop-column]').first.bounding_box()['y']+12,80)
     session=econtext.new_cdp_session(e)
     with e.expect_response(lambda r:r.request.method=='POST' and r.url.endswith('/action')) as response:
         session.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y}]})
-        for step in range(8):
-            session.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x-25,'y':y+(target_y-y)*(step+1)/8}]});time.sleep(.02)
+        for step in range(16):
+            session.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x-25,'y':y+(target_y-y)*(step+1)/16}]});time.sleep(.02)
         session.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
     assert response.value.ok,response.value.text()
     expect(e.locator('#kanban')).not_to_have_attribute('aria-busy','true');expect(e.locator('.kb-drag-ghost')).to_have_count(0)
@@ -88,6 +135,21 @@ def exercise(browser):
     assert response.value.ok,response.value.text()
     expect(p.locator('#kanban')).not_to_have_attribute('aria-busy','true')
     expect(p.locator('.kb-column').nth(3).locator(f'[data-card="{cardid}"]')).to_have_count(1)
+    touchadmin=browser.new_context(viewport={'width':390,'height':844},has_touch=True,is_mobile=True,storage_state=context.storage_state())
+    mobile=touchadmin.new_page();mobile.goto(BASE+path)
+    expect(mobile.locator('.kb-column-gear').first).to_have_css('opacity','1')
+    mobile.locator('.kb-column-heading').first.tap()
+    expect(mobile.locator('[data-column-form] [name=title]').first).to_be_visible()
+    capture(mobile,'column-editor-touch')
+    mobile.get_by_role('button',name='Abbrechen',exact=True).first.tap()
+    touchadmin.close()
+    plain=browser.new_context(storage_state=context.storage_state(),java_script_enabled=False)
+    fallback=plain.new_page();fallback.goto(BASE+path)
+    fallback.locator('.kb-column-heading').first.click()
+    fallback.locator('[data-column-form] [name=title]').first.fill('Eingang ohne JavaScript')
+    fallback.get_by_role('button',name='Spalte speichern',exact=True).first.click()
+    expect(fallback.locator('.kb-column-name').first).to_have_text('Eingang ohne JavaScript')
+    plain.close();p.reload()
     p.get_by_role('button',name='Board verwalten',exact=True).click();p.get_by_role('button',name='Board löschen – Aufgaben behalten',exact=True).click()
     expect(p.locator('.swal2-popup')).to_be_visible();p.get_by_role('button',name='Ja, ausführen',exact=True).click()
     expect(p).to_have_url(BASE+'/tasks/boards')

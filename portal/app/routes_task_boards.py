@@ -91,15 +91,13 @@ async def board_action(request:Request,bid:int,user:User=Depends(current_user),d
         if action=='settings':
             title=str(data.get('title','')).strip();mode=data.get('mode')
             if not title or len(title)>255 or mode not in {'status','free'}:raise ts.Invalid('Boardname und Modus prüfen.')
-            if mode=='status' and set(ts.STATUSES)-{c.status for c in boards.columns(db,board)}:raise ts.Invalid('Für den Statusmodus muss jeder Aufgabenstatus mindestens einer Spalte zugeordnet sein.')
             board.title=title;board.mode=mode;board.description=str(data.get('description',''))[:10000]
         elif action=='column':
-            title=str(data.get('title','')).strip();status=data.get('status','open')
-            if not title or len(title)>100 or status not in ts.STATUSES:raise ts.Invalid('Spaltenname und Status prüfen.')
+            title=str(data.get('title','')).strip();status=str(data.get('status','')).strip()
+            if not title or len(title)>100 or status not in {'', *ts.STATUSES}:raise ts.Invalid('Spaltenname und Status prüfen.')
             cols=boards.columns(db,board)
             if data.get('column'):
                 col=column(data['column'])
-                if board.mode=='status' and col.status!=status:raise ts.Invalid('Statuszuordnung im freien Modus ändern; danach bewusst zum Statusmodus wechseln.')
                 col.title=title;col.status=status
                 index=max(0,min(number(data.get('position',col.position)),len(cols)-1));cols.remove(col);cols.insert(index,col)
                 for i,c in enumerate(cols):c.position=i
@@ -109,7 +107,6 @@ async def board_action(request:Request,bid:int,user:User=Depends(current_user),d
         elif action=='column_delete':
             col=column(data['column'])
             if len(boards.columns(db,board))<=1 or db.scalar(select(TaskBoardCard.id).where(TaskBoardCard.column_id==col.id)):raise ts.Invalid('Nur leere Spalten löschen; mindestens eine Spalte bleibt erhalten.')
-            if board.mode=='status' and not any(c.id!=col.id and c.status==col.status for c in boards.columns(db,board)):raise ts.Invalid('Die letzte Spalte eines Aufgabenstatus bleibt im Statusmodus erhalten.')
             db.delete(col)
         elif action in {'member','member_remove'}:
             if action=='member_remove':
@@ -137,7 +134,7 @@ async def board_action(request:Request,bid:int,user:User=Depends(current_user),d
             if action=='create':
                 row=ts.create(db,user,{**dict(data),'assignee_id':data.get('assignee_id') or str(user.id)},board=board)
                 ts.add_initial_checks(db,user,row,ts.initial_checklist(data.get('checklist','')))
-                if board.mode=='status' and col.status!='open':ts.transition(db,user,row,col.status)
+                if board.mode=='status' and col.status and col.status!='open':ts.transition(db,user,row,col.status)
             elif data.get('task'):row=ts.get(db,user,number(data['task']))
             else:
                 key=str(data.get('source',''))
@@ -147,7 +144,10 @@ async def board_action(request:Request,bid:int,user:User=Depends(current_user),d
             if row:boards.add_native(db,user,board,col,row)
         elif action=='move' and card:
             if card.task_id:ts.check_version(ts.get(db,user,card.task_id),data)
-            boards.move(db,user,board,card,column(data.get('column')),number(data.get('position',0)))
+            target=column(data.get('column'))
+            if data.get('undo')=='1' and data.get('restore_status') and card.task_id:
+                ts.transition(db,user,ts.get(db,user,card.task_id),str(data['restore_status']))
+            boards.move(db,user,board,card,target,number(data.get('position',0)))
         elif action=='remove' and card:
             if card.source_key and card.source_key not in boards.source_items(db,user):raise HTTPException(404)
             db.delete(card)

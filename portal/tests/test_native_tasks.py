@@ -143,7 +143,7 @@ def test_common_workplace_delegation_and_view_consistency(db, task_people):
     assert owner['count'] == 0 and len(owner['delegated']) == 1
     assert assigned['count'] == assigned['overdue'] == 1
     c, csrf = client_for(task_people[1])
-    for mode in ['list', 'board', 'calendar', 'timeline']:
+    for mode in ['list', 'calendar', 'timeline']:
         r = c.get(f'/tasks?view={mode}&tag=Planung&date=2026-01-01')
         assert r.status_code == 200 and row.title in r.text and f'/aufgaben/{row.id}' in r.text
     assert 'tag=Planung' in c.get('/tasks').text

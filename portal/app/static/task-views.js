@@ -16,7 +16,7 @@
     });
     card.addEventListener('dragend', () => { drag = null; });
   });
-  document.querySelectorAll('[data-task-column],[data-task-date]').forEach(zone => {
+  document.querySelectorAll('[data-task-date]').forEach(zone => {
     zone.addEventListener('dragover', event => { if (drag) event.preventDefault(); });
     zone.addEventListener('drop', event => {
       if (!drag) return;
@@ -25,7 +25,7 @@
       if (!form) return;
       form.elements.task_id.value = drag.id;
       form.elements.version.value = drag.version;
-      form.elements.status.value = zone.dataset.taskColumn || '';
+      form.elements.status.value = '';
       form.elements.due_date.value = zone.dataset.taskDate || '';
       form.requestSubmit();
     });

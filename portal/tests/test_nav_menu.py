@@ -102,7 +102,7 @@ def test_catalog_discovery_filter_favorite_and_disabled_modules():
     c = login(*ADMIN)
     page = c.get('/module')
     assert page.status_code == 200
-    assert 'Ihre Module' in page.text and 'Kanbanboards' in page.text
+    assert 'Ihre Module' in page.text and 'Aufgabenboards' in page.text
     assert 'Dokumentenablage' in c.get('/module?q=DMS').text
     assert 'Keine passenden Module' in c.get('/module?q=nothingmatches123').text
     assert 'Räume &amp; Ressourcen' not in c.get('/module?category=work').text.split('module-catalog')[1]
@@ -113,10 +113,10 @@ def test_catalog_discovery_filter_favorite_and_disabled_modules():
         assert 'kanban' in nav.prefs(u)['fav']
         u.nav_json = nav.dump(['kanban'], ['work'])
         db.commit()
-    assert 'Kanbanboards' in c.get('/module').text
+    assert 'Aufgabenboards' in c.get('/module').text
     assert 'data-personal-hidden="1"' in c.get('/').text
     settings(module_tasks='0')
-    assert 'Kanbanboards' not in c.get('/module').text
+    assert 'Aufgabenboards' not in c.get('/module').text
     assert c.post('/module/favorite', data={'csrf':token,'id':'kanban','on':'1'}).status_code == 403
     settings(module_tasks='1')
 
