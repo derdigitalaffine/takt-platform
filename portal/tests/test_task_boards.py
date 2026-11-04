@@ -193,3 +193,101 @@ def test_survey_cards_keep_live_status_and_source_permissions(db,task_people,mon
         assert kb.visible_cards(db,reader,b)[0]['source']['title']==vote.title
         db.delete(share);db.commit();assert not kb.visible_cards(db,reader,b)
     finally:db.delete(vote);db.commit()
+
+
+def test_neutral_column_preserves_status_on_move_create_attach_and_status_change(db,task_people):
+    a=task_people[0];b=board(db,a);c=client_for(a)
+    assert post(c,db,b,'column',title='Ideenspeicher',status='').status_code==200
+    neutral=kb.columns(db,b)[-1]
+    assert neutral.status==''
+    task=make(db,task_people);card=attach(db,b,task,a)
+    assert post(c,db,b,'move',card=card.id,version=task.version,column=neutral.id).status_code==200
+    db.refresh(task);db.refresh(card);assert task.status=='open' and card.column_id==neutral.id
+    assert post(c,db,b,'status',card=card.id,version=task.version,status='in_progress').status_code==200
+    db.refresh(task);assert task.status=='in_progress'
+    assert next(v for v in kb.visible_cards(db,a,b) if v['card'].id==card.id)['column'].id==neutral.id
+    assert post(c,db,b,'create',column=neutral.id,title='Neutrale Aufgabe').status_code==200
+    created=db.scalar(select(Task).where(Task.title=='Neutrale Aufgabe'))
+    assert created.status=='open'
+    assert db.scalar(select(TaskBoardCard).where(TaskBoardCard.task_id==created.id)).column_id==neutral.id
+    other=make(db,task_people)
+    assert post(c,db,b,'attach',column=neutral.id,task=other.id).status_code==200
+    assert db.scalar(select(TaskBoardCard).where(TaskBoardCard.task_id==other.id)).column_id==neutral.id
+
+
+def test_column_mapping_can_be_changed_inline_without_mutating_tasks(db,task_people):
+    a,_,editor,reader=task_people;b=board(db,a);t=make(db,task_people);card=attach(db,b,t,a);col=kb.columns(db,b)[0];c=client_for(a)
+    member(db,b,editor,2);member(db,b,reader,1)
+    for person in (editor,reader):
+        assert post(client_for(person),db,b,'column',column=col.id,title='Unzulässig',status='').status_code==404
+    version=b.version
+    assert post(c,db,b,'column',column=col.id,title='Eingang',status='').status_code==200
+    db.refresh(t);db.refresh(col);assert t.status=='open' and col.title=='Eingang' and col.status==''
+    assert post(c,db,b,'column',column=col.id,title='Erledigungen',status='done').status_code==200
+    db.refresh(t);assert t.status=='open'
+    assert post(c,db,b,'column',column=col.id,title='Falsch',status='invalid').status_code==422
+    assert post(c,db,b,'column',column=col.id,title='',status='').status_code==422
+    response=c.post(f'/tasks/boards/{b.id}/action',data={'csrf':csrf_of(c.get(f'/tasks/boards/{b.id}').text),'board_version':version,'action':'column','column':col.id,'title':'Alt','status':''},headers={'Accept':'application/json'})
+    assert response.status_code==409
+
+
+def test_neutral_move_still_checks_version_and_status_rules(db,task_people):
+    a=task_people[0];b=board(db,a);t=make(db,task_people);card=attach(db,b,t,a);c=client_for(a)
+    assert post(c,db,b,'column',title='Ablage',status='').status_code==200
+    neutral=kb.columns(db,b)[-1]
+    old=t.version
+    assert post(c,db,b,'status',card=card.id,version=t.version,status='in_progress').status_code==200
+    assert post(c,db,b,'move',card=card.id,version=old,column=neutral.id).status_code==422
+    db.refresh(t)
+    check=TaskCheck(task_id=t.id,title='Pflichtpunkt');db.add(check);db.commit()
+    assert post(c,db,b,'move',card=card.id,version=t.version,column=neutral.id).status_code==200
+    db.refresh(t)
+    assert post(c,db,b,'status',card=card.id,version=t.version,status='done').status_code==422
+    db.refresh(t);assert t.status=='in_progress'
+
+
+def test_legacy_board_view_preserves_task_filters_without_second_board_ui(db,task_people):
+    c=client_for(task_people[0])
+    response=c.get('/tasks?view=board&perspective=delegated&tag=Planung',follow_redirects=False)
+    assert response.status_code==303
+    target=response.headers['location']
+    assert 'view=list' in target and 'perspective=delegated' in target and 'tag=Planung' in target
+    page=c.get(target)
+    assert page.status_code==200 and 'Aufgabenboards öffnen' in page.text
+    assert 'data-task-column=' not in page.text
+
+
+def test_undo_from_status_column_restores_status_in_neutral_column(db,task_people):
+    a=task_people[0];b=board(db,a);c=client_for(a);t=make(db,task_people)
+    assert post(c,db,b,'column',title='Sammlung',status='').status_code==200
+    neutral=kb.columns(db,b)[-1];card=kb.add_native(db,a,b,neutral,t);db.commit()
+    progress=next(col for col in kb.columns(db,b) if col.status=='in_progress')
+    assert post(c,db,b,'move',card=card.id,version=t.version,column=progress.id).status_code==200
+    db.refresh(t);assert t.status=='in_progress'
+    assert post(c,db,b,'move',card=card.id,version=t.version,column=neutral.id,undo='1',restore_status='open').status_code==200
+    db.refresh(t);db.refresh(card);assert t.status=='open' and card.column_id==neutral.id
+
+
+def test_status_board_source_placement_does_not_change_source(db,task_people,monkeypatch):
+    a=task_people[0];b=board(db,a);c=client_for(a)
+    key='survey:vote:example';source=dict(title='Umfrage',source='survey',source_label='Umfrage',href='/umfragen',detail='Offen',status='Offen',due=None)
+    monkeypatch.setattr(kb,'source_items',lambda db,u:{key:source})
+    assert post(c,db,b,'column',title='Sammlung',status='').status_code==200
+    cols=kb.columns(db,b)
+    assert post(c,db,b,'attach',column=cols[-1].id,source=key).status_code==200
+    card=db.scalar(select(TaskBoardCard).where(TaskBoardCard.board_id==b.id))
+    assert post(c,db,b,'move',card=card.id,column=cols[3].id).status_code==200
+    assert source['status']=='Offen'
+    monkeypatch.setattr(kb,'source_items',lambda db,u:{})
+    assert post(c,db,b,'move',card=card.id,column=cols[-1].id).status_code==404
+
+
+def test_duplicate_status_columns_honor_selected_destination(db,task_people):
+    a=task_people[0];b=board(db,a);c=client_for(a);t=make(db,task_people)
+    assert post(c,db,b,'column',title='Zweiter Eingang',status='open').status_code==200
+    duplicate=kb.columns(db,b)[-1]
+    card=kb.add_native(db,a,b,duplicate,t);db.commit();assert card.column_id==duplicate.id
+    assert post(c,db,b,'move',card=card.id,version=t.version,column=kb.columns(db,b)[0].id).status_code==200
+    db.refresh(t)
+    assert post(c,db,b,'move',card=card.id,version=t.version,column=duplicate.id).status_code==200
+    db.refresh(card);assert card.column_id==duplicate.id

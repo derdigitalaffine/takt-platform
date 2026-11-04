@@ -56,6 +56,11 @@ def tasks_page(request: Request, user: User = Depends(current_user), db: Session
         request.session['task_filters'] = chosen
     else:
         chosen = request.session.get('task_filters', {})
+    if chosen.get('view') == 'board':
+        chosen = {**chosen, 'view': 'list'}
+        request.session['task_filters'] = chosen
+        if request.query_params.get('view') == 'board':
+            return redirect('/tasks?' + urlencode({k:v for k,v in chosen.items() if v}))
     if chosen.get('perspective') == 'managed' and not native.manager(user):
         chosen['perspective'] = 'all'
     view = task_overview.collect(db, user, mods, now=utcnow())
@@ -64,7 +69,7 @@ def tasks_page(request: Request, user: User = Depends(current_user), db: Session
                                   status=chosen.get('status') or 'all', tag=chosen.get('tag', ''), query=chosen.get('q', ''),
                                   sort=chosen.get('sort', 'due'), since=chosen.get('since', ''), until=chosen.get('until', ''))
     mode = chosen.get('view', 'list')
-    mode = mode if mode in {'list', 'board', 'calendar', 'timeline'} else 'list'
+    mode = mode if mode in {'list', 'calendar', 'timeline'} else 'list'
     def task_url(**changes):
         values = {**chosen, **changes}
         return '/tasks?' + urlencode({k: v for k, v in values.items() if v})
