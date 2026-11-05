@@ -121,10 +121,21 @@ def visible_people(db, actor, unit):
     ]
 
 
+LEAVE_SECTIONS = {"planer", "mein-urlaub", "genehmigungen", "schliesszeiten", "verwaltung"}
+LEAVE_TOPICS = {"verfahren", "besetzung", "arbeitsmodelle", "feiertage", "urlaubskonten"}
+
+
 @app.get("/urlaub")
+@app.get("/urlaub/planer")
+@app.get("/urlaub/mein-urlaub")
+@app.get("/urlaub/genehmigungen")
+@app.get("/urlaub/schliesszeiten")
+@app.get("/urlaub/verwaltung")
+@app.get("/urlaub/verwaltung/{topic}")
 def page(
     request: Request,
     unit: int | None = None,
+    topic: str | None = None,
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -140,6 +151,22 @@ def page(
             )
         )
         unit = own or (units[0].id if units else None)
+    path = request.url.path
+    if topic is not None and topic not in LEAVE_TOPICS:
+        raise HTTPException(404)
+    section = (
+        "verwaltung" if path.startswith("/urlaub/verwaltung") else
+        path.removeprefix("/urlaub/") if path != "/urlaub" else
+        ("planer" if unit and org.allows(db, user, unit, "plan") else "mein-urlaub")
+    )
+    if section not in LEAVE_SECTIONS:
+        raise HTTPException(404)
+    can_settings = bool(unit and org.allows(db, user, unit, "leave_settings"))
+    can_approve = bool(unit and org.allows(db, user, unit, "approve"))
+    if section == "verwaltung" and not can_settings:
+        raise HTTPException(403)
+    if section == "genehmigungen" and not can_approve:
+        raise HTTPException(403)
     people = visible_people(db, user, unit) if unit else []
     ids = [p.id for p in people]
     rows = list(
@@ -164,6 +191,9 @@ def page(
             json.loads(leave.policy(db, unit).approval_units or "[]") if unit else []
         ),
         unit=unit,
+        active_section=section,
+        config_topic=topic or "verfahren",
+        can_approve=can_approve,
         current_year=date.today().year,
         holiday_states=STATES,
         portal_holiday_state=get_settings(db).get("leave_holiday_state", "RP"),
@@ -237,7 +267,7 @@ def page(
             else []
         ),
         policy=leave.policy(db, unit) if unit else None,
-        can_settings=bool(unit and org.allows(db, user, unit, "leave_settings")),
+        can_settings=can_settings,
         planners={p.id: leave.can_plan(db, user, p.id) for p in people},
         approvers={
             r.id: org.allows(db, user, leave.decision_unit(r), "approve") for r in rows
@@ -292,6 +322,20 @@ def data(unit: int, user: User = Depends(current_user), db: Session = Depends(ge
     )
 
 
+def _return_to(request, fallback, unit):
+    # Only fixed leave pages on the same host are valid return destinations.
+    from urllib.parse import urlsplit
+    ref = urlsplit(request.headers.get("referer", ""))
+    path = ref.path
+    valid = path in {"/urlaub", *(f"/urlaub/{s}" for s in LEAVE_SECTIONS)} or (
+        path.startswith("/urlaub/verwaltung/") and
+        path.rsplit("/", 1)[-1] in LEAVE_TOPICS
+    )
+    if ref.netloc == request.url.netloc and valid:
+        return path + "?unit=" + str(unit)
+    return fallback + "?unit=" + str(unit)
+
+
 @app.post("/urlaub/preview", dependencies=[Depends(check_csrf)])
 async def preview(
     request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)
@@ -330,7 +374,7 @@ async def create(
     if request.headers.get("accept") == "application/json":
         return leave.serialize(row)
     flash(request, "Urlaubsentwurf gespeichert.")
-    return redirect("/urlaub?unit=" + str(row.org_id))
+    return redirect(_return_to(request, "/urlaub/planer", row.org_id))
 
 
 @app.post("/urlaub/{rid:int}", dependencies=[Depends(check_csrf)])
@@ -352,7 +396,7 @@ async def update(
     if request.headers.get("accept") == "application/json":
         return leave.serialize(row)
     flash(request, "Urlaub gespeichert.")
-    return redirect("/urlaub?unit=" + str(row.org_id))
+    return redirect(_return_to(request, "/urlaub/planer", row.org_id))
 
 
 @app.post("/urlaub/regeln/{unit:int}", dependencies=[Depends(check_csrf)])
@@ -437,7 +481,7 @@ async def settings_save(
     org.audit(db, user, unit, "leave_policy")
     db.commit()
     flash(request, "Urlaubsregeln gespeichert.")
-    return redirect("/urlaub?unit=" + str(unit))
+    return redirect(_return_to(request, "/urlaub/verwaltung/verfahren", unit))
 
 
 @app.get("/urlaub/{rid:int}/verlauf")
