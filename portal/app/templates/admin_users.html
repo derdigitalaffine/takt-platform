@@ -111,7 +111,7 @@
   {% for u in users %}
   <tr>
     <td><div class="d-flex align-items-center gap-2"><span class="avatar">{{ m.initials(u.name) }}</span><span class="fw-semibold">{{ u.name }}</span></div></td>
-    <td>{{ u.email }}{% for item in org_directory.get(u.id,[]) %}<div class="small"><a href="/admin/organization?unit={{item.id}}&amp;person={{u.id}}">{{item.name}}</a>{{' · Hauptzuordnung' if item.primary else ' · zusätzlich'}}</div>{% endfor %}</td>
+    <td>{{ u.email }}{% for role in org_user_roles.get(u.id,[]) if role.role in ('Leitung','Stellvertretende Leitung') %}<span class="badge {{'text-bg-primary' if role.role=='Leitung' else 'text-bg-info'}} ms-1" title="{{role.org}} · {{'einschließlich Untereinheiten' if role.children else 'nur diese Einheit'}}">{{role.role}}</span>{% endfor %}{% for item in org_directory.get(u.id,[]) %}<div class="small"><a href="/admin/organization?unit={{item.id}}&amp;person={{u.id}}">{{item.name}}</a>{{' · Hauptzuordnung' if item.primary else ' · zusätzlich'}}</div>{% endfor %}</td>
     <td>{% if u.is_admin %}<span class="badge text-bg-primary"><i class="fa-solid fa-user-shield me-1"></i>Admin</span>
         {% else %}{% for key, p in permissions.items() if key in u.perms %}<span class="badge text-bg-light border me-1" title="{{ p[2] }}"><i class="fa-solid {{ p[1] }} me-1"></i>{{ p[0] }}</span>{% else %}<span class="text-secondary small">keine</span>{% endfor %}{% endif %}{% if org_user_roles.get(u.id) %}<details class="small mt-2"><summary>Bereichsrollen ({{org_user_roles[u.id]|length}})</summary><ul class="mt-1 mb-0">{% for item in org_user_roles[u.id] %}<li><a href="/admin/organization?unit={{item.org_id}}&amp;person={{u.id}}#org-roles">{{item.role}} · {{item.org}}</a> · {{item.source}}{{' · mit Untereinheiten' if item.children}}</li>{% endfor %}</ul></details>{% endif %}</td>
     <td>{% for g in u.groups %}<span class="badge text-bg-secondary me-1">{{ g.name }}</span>{% endfor %}</td>
@@ -151,7 +151,7 @@
         <select class="form-select js-select" id="eg-{{ u.id }}" name="groups" multiple data-search="1">
           {% for g in groups %}<option value="{{ g.id }}" {% if g in u.groups %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
         </select></div>
-      <div class="col-12"><a href="/admin/organization?person={{u.id}}">Organisationszuordnungen und Bereichsrollen verwalten</a><p class="form-text">Bereichsrollen gelten ausschließlich für zugewiesene Einheiten und sind von den globalen Rechten unten getrennt.</p></div>
+      <div class="col-12"><button type="button" class="btn btn-outline-primary" data-org-person-editor data-person="{{u.id}}" data-origin="users"><i class="fa-solid fa-sitemap me-2" aria-hidden="true"></i>Organisationszuordnungen & Mehrfachrollen bearbeiten</button><p class="form-text">Der gemeinsame Personen-Editor wird auch in der Organisationsverwaltung verwendet. Bereichsrollen sind von den globalen Rechten unten getrennt.</p></div>
       <div class="col-12"><div class="form-label">Globale Portalrechte</div>
         {% if u.is_admin %}<div class="alert alert-info py-2 mb-2 small">Administrator:innen dürfen immer alles. Die Schalter gelten erst, wenn das Admin-Recht entzogen wird.</div>{% endif %}
         {{ m.perm_switches('e' ~ u.id, u.perms) }}</div>
@@ -215,3 +215,4 @@
 {{ group_modal('group-new', '/admin/groups') }}
 {% for g in groups %}{{ group_modal('group-' ~ g.id, '/admin/groups/' ~ g.id, g) }}{% endfor %}
 {% endblock %}
+{% block scripts %}<script src="/static/organization-person.js" defer></script>{% endblock %}
