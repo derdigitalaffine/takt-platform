@@ -35,6 +35,7 @@ Es ist nach Aufgaben gegliedert und zeigt nur, was Sie nutzen dürfen: **Mein Ar
 12d. [Aushänge, Umläufe und Sammelmappen](#12d-aushänge-umläufe-und-sammelmappen)
 12c. [Krank melden und Krankmeldungen bearbeiten](#12c-krank-melden-und-krankmeldungen-bearbeiten)
 12a. [Abwesenheiten und Vertretungen](#12a-abwesenheiten-und-vertretungen)
+12e. [Kalender & Urlaubsplanung](#12e-kalender--urlaubsplanung)
 13. [Profil und Sicherheit (Zwei-Faktor)](#13-profil-und-sicherheit-zwei-faktor)
 14. [Datenschutz in der Praxis](#14-datenschutz-in-der-praxis)
 15. [Hilfe bei Problemen](#15-hilfe-bei-problemen)
@@ -871,6 +872,30 @@ Mit dem Recht „Krankmeldungen“ und als Zuständige:r eines Arbeitgebers: Men
 Unter **Abwesenheiten** (Menü „Mein Arbeitsplatz“) tragen Sie Urlaub oder andere planbare Abwesenheiten ein: Zeitraum, **Vertretung**, eine Notiz zur Übergabe, die nur Sie und die Vertretung sehen, und auf Wunsch eine **Abwesenheitsnotiz für Bürger:innen** – sie steht während Ihrer Abwesenheit oben in Mails zu Ihren Anträgen und Terminbuchungen, Antworten gehen an Ihre Vertretung. Die Vertretung kann Ihre Buchungsseiten und Ressourcen wie Sie bearbeiten und Ihre Ablage lesen. Kolleg:innen sehen nur „abwesend bis …, Vertretung: …“ – nie einen Grund. Während Ihrer Abwesenheit sieht die Vertretung Ihre Aufgaben unter „Meine Aufgaben › Als Vertretung“ und Ihre Anträge im Antragseingang und bekommt Benachrichtigungen in Kopie.
 
 Werden Sie selbst als Vertretung eingetragen, bekommen Sie eine Mail. Möchten Sie jeder Vertretung vorher zustimmen, schalten Sie das im **Profil** unter „Vertretungen“ ein – Anfragen erscheinen dann unter Abwesenheiten und auf der Übersicht zum **Zustimmen** oder **Ablehnen**. Bei Krankheit tragen Gruppenleitungen bzw. die Personalstelle die Abwesenheit für Sie ein. Sind Sie früher zurück, beendet „Zurück“ die Abwesenheit.
+
+## 12e. Kalender & Urlaubsplanung
+
+Wenn die Verwaltung das Modul **Kalender & Urlaub** freigeschaltet hat, finden Sie unter **Termine & Veranstaltungen** die Einträge **Kalender & Urlaub** (`/kalender`) und **Urlaubsplanung** (`/urlaub`). Sichtbare Kalender und Urlaubsbereiche hängen von Ihren Organisationszuordnungen und den jeweiligen Freigaben ab.
+
+### Kalender ansehen und teilen
+
+Unter **Kalender & Urlaub** können Sie die Ihnen freigegebenen persönlichen, gemeinsamen und Organisationskalender auswählen. Fachtermine (beispielsweise Besprechungen, Seminare, Aufgaben oder Buchungen) werden nur mit den jeweils geltenden Fachrechten angezeigt; ihre Bearbeitung bleibt im zuständigen Modul. Berechtigte Personen können eigene Kalender anlegen, Freigaben vergeben und Termine erfassen. **Öffentliches Veröffentlichen** ist ein eigenes Recht und wird nicht durch eine normale Kalenderfreigabe erteilt.
+
+### Urlaub eintragen und im Bereich planen
+
+1. **Urlaubsplanung** öffnen und die gewünschte, für Sie sichtbare **Organisationseinheit** auswählen. Dort sehen Sie die Personenzeitachse mit geplanten, beantragten und verbindlichen Zeiträumen und – je nach Freigabe – Besetzung und Schließzeiten.
+2. Mit **Monat**, **Quartal** oder **Jahr** den Überblick wählen. Zeitraum und Zoom merkt sich die Seite **für jede Einheit in der aktuellen Browser-Sitzung** – auch nach dem Speichern und Neuladen. Mehrere Urlaube im gerade sichtbaren Ausschnitt können Sie nacheinander eintragen, ohne ständig zurücknavigieren zu müssen. Liegt ein neuer Eintrag **außerhalb** des sichtbaren Zeitraums, zeigt der Kalender danach automatisch dessen Zeitraum an und **behält die Zoomstufe**.
+3. Über die Zeitachse oder das Formular **Zeitraum eintragen** Person, Beginn/Ende und bei Bedarf **Vormittag/Nachmittag** festlegen. Die Konfliktvorschau prüft die Besetzung; eine Planung ist noch keine verbindliche Genehmigung. Die gleiche Eingabe ist über Formular und Tastatur möglich, auch wenn das Zeichnen mit der Maus nicht passt.
+4. Abhängig von der Einstellung Ihres Bereichs wird Urlaub gemeinsam geplant, intern eingereicht/genehmigt oder nach externer Genehmigung von Ihnen **als Selbstauskunft** bestätigt. Ein eigener Eintrag in Takt ist **keine automatische Meldung an Novatime**. Im reinen Planungsmodus kann ein Zeitraum ausdrücklich verbindlich markiert werden.
+5. Eine Änderung eines bereits verbindlichen Urlaubs wird zunächst als neue Planung gespeichert. Bis zur nötigen Bestätigung bleibt der bisherige Zeitraum wirksam. Schließzeiten und Notbesetzung beachten die gesonderten Bereichsregeln. Nur berechtigte Planende oder Genehmigende können fremde Einträge bzw. Regeln ändern.
+
+**Wichtig – Unterschied zu Abwesenheiten:** Die zuvor beschriebene Seite **Abwesenheiten** verwaltet unter anderem Übergaben und Vertretungen. Eine optionale Übernahme eines verbindlichen Urlaubs in die Abwesenheitsübersicht verleiht **keine Vertretungsrechte**. Die in Takt angezeigten internen Urlaubskonten sind optional; für extern verwaltete Konten wird kein Resturlaub vorgetäuscht.
+
+### Kalender auf Mobilgerät oder im Mailprogramm nutzen
+
+Öffnen Sie im Kalenderbereich **Kalender verbinden** (`/kalender/hilfe`). Sie können für jedes Gerät einen eigenen Zugang mit gezielt ausgewählten Kalendern erstellen und später widerrufen. Auf dem iPhone/iPad wird über HTTPS ein **einmalig herunterladbares Profil** mit eigenem Gerätepasswort angeboten; für andere Geräte werden CalDAV-Angaben angezeigt. Freie Kalender erlauben je nach Freigabe Änderungen per CalDAV; Fachkalender bleiben über die Schnittstelle lesend. Für Outlook ohne passende CalDAV-Anbindung steht ein **widerrufbares ICS-Leseabo** bereit. Dessen Aktualisierung hängt vom Kalenderprogramm ab. Behandeln Sie Profile und geheime Abolinks wie Zugangsdaten; bei Verlust widerrufen.
+
+Weiterführend: [Organisationsrollen](organisationsverwaltung.md) und [Implementierung, Prüfungen und Geräte-Grenzen](kalender-urlaub-umsetzungsstand.md).
 
 ## 12d. Aushänge, Umläufe und Sammelmappen
 
