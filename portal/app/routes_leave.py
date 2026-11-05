@@ -324,7 +324,7 @@ def page(
 def data(unit: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     people = visible_people(db, user, unit)
     ids = [p.id for p in people]
-    from .db import Absence, KrankReport
+    from .db import Absence
     from .leave_models import LeaveAbsencePeriod
 
     # Absence and leave remain the source of truth: no new mirrored rows.
@@ -381,45 +381,34 @@ def data(unit: int, user: User = Depends(current_user), db: Session = Depends(ge
             except ValueError:
                 pass
 
-    # Reuse only user-linked Krankmelder reports. Unlinked reports cannot be
-    # safely matched by names or e-mail and must not be guessed into the plan.
-    # No report content, diagnosis or proof ever enters this feed.
-    from . import krank
-    for report in db.scalars(
-        select(KrankReport).where(KrankReport.user_id.in_(ids))
-    ):
-        values = krank.data(report)
-        start = values.get("date") if report.kind == "simple" else values.get("from")
-        finish = values.get("date") if report.kind == "simple" else values.get("to")
-        try:
-            first = date.fromisoformat(start)
-            last = date.fromisoformat(finish)
-            if first > last:
-                continue
-        except (TypeError, ValueError):
-            continue
-        # A linked absence/leave covering the same time already occupies the
-        # timeline; do not create a second event for that person and period.
+    # Canonical, read-only Fachmodul projections. An absence already covering
+    # the session has priority, so no person has a duplicate visual event.
+    from .leave_sources import staffing_periods
+    for index, source in enumerate(staffing_periods(db, ids)):
+        start = source["starts_on"]
+        finish = source["ends_on"]
+        person_id = source["person_id"]
         overlap = any(
-            a.user_id == report.user_id
-            and a.starts_on <= last.isoformat()
-            and a.ends_on >= first.isoformat()
+            a.user_id == person_id and a.starts_on <= finish and a.ends_on >= start
             for a in absence_rows
         ) or any(
-            uid == report.user_id and
-            times.get("starts_on", "9999") <= last.isoformat() and
-            times.get("ends_on", "0000") >= first.isoformat()
+            uid == person_id
+            and times.get("starts_on", "9999") <= finish
+            and times.get("ends_on", "0000") >= start
             for uid, times in bindings
         )
         if overlap:
             continue
+        reason_allowed = (
+            can_see_illness(db, user, person_id)
+            if source["kind"] == "illness"
+            else can_see_leave_details(db, user, person_id)
+        )
         absences.append(dict(
-            id="presence:" + str(report.id),
-            person_id=report.user_id,
-            starts_on=first.isoformat(), ends_on=last.isoformat(),
-            start_half="am", end_half="pm",
-            title="Krank" if can_see_illness(db, user, report.user_id)
-                  else "Abwesend",
+            id="presence:" + str(index), person_id=person_id,
+            starts_on=start, ends_on=finish,
+            start_half=source["start_half"], end_half=source["end_half"],
+            title=source["title"] if reason_allowed else "Abwesend",
         ))
 
     def leadership(person):
