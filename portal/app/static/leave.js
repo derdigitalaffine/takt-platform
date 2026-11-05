@@ -389,6 +389,36 @@
     });
     view.attach(calendar);
     calendar.render();
+    // Direct links from "Mein Urlaub" and closure coverage open the
+    // exact editable request without creating a second planning form.
+    const direct = new URL(location.href);
+    const requestedEdit = direct.searchParams.get("edit");
+    const target = requestedEdit
+      ? requests.find((r) => String(r.id) === requestedEdit)
+      : null;
+    if (target && form) {
+      calendar.gotoDate(target.starts_on);
+      edit(target);
+      direct.searchParams.delete("edit");
+      history.replaceState(null, "", direct.pathname + direct.search);
+    } else if (
+      form && validDate(direct.searchParams.get("start")) &&
+      validDate(direct.searchParams.get("end")) &&
+      people.some((p) => String(p.id) === direct.searchParams.get("person") && p.canSelect)
+    ) {
+      const proposal = {
+        personId: direct.searchParams.get("person"),
+        start: direct.searchParams.get("start"),
+        end: direct.searchParams.get("end"),
+        startHalf: direct.searchParams.get("start_half") === "pm" ? "pm" : "am",
+        endHalf: direct.searchParams.get("end_half") === "am" ? "am" : "pm",
+      };
+      calendar.gotoDate(proposal.start);
+      edit(null, proposal);
+      for (const key of ["person", "start", "end", "start_half", "end_half"])
+        direct.searchParams.delete(key);
+      history.replaceState(null, "", direct.pathname + direct.search);
+    }
   } catch (error) {
     report(error);
   }
