@@ -81,6 +81,36 @@ def can_read_request(db, actor, row):
     )
 
 
+def can_see_leave_details(db, actor, person_id):
+    """Only the person and explicitly responsible planners/approvers see leave details.
+
+    An ordinary colleague's organizational membership is not permission to see
+    absence reasons. This rule also applies to the timeline JSON feed.
+    """
+    if actor.id == person_id or actor.is_admin:
+        return True
+    try:
+        unit = leave.primary(db, person_id)
+    except HTTPException:
+        return False
+    return any(org.allows(db, actor, unit, cap) for cap in ("plan", "approve", "absence_manage"))
+
+
+def can_see_illness(db, actor, person_id):
+    """Only the person and leadership may see the non-medical 'Krank' label."""
+    if actor.id == person_id or actor.is_admin or actor.can("krank_admin"):
+        return True
+    try:
+        path = org.active_path(db, leave.primary(db, person_id))
+    except HTTPException:
+        return False
+    return any(
+        grant.role in ("lead", "deputy") and grant.org_id in path
+        and (grant.org_id == path[0] or grant.include_children)
+        for grant in org.grants(db, actor)
+    )
+
+
 def can_read_history(db, actor, row):
     return (
         actor.id == row.person_id
@@ -181,7 +211,11 @@ def page(
             .order_by(LeaveRequest.starts_on, LeaveRequest.id)
         )
     )
-    rows = [r for r in rows if can_read_request(db, user, r)]
+    rows = [
+        r for r in rows
+        if can_read_request(db, user, r)
+        and can_see_leave_details(db, user, r.person_id)
+    ]
     return render(
         request,
         "leave.html",
