@@ -621,14 +621,25 @@ async def settings_save(
             if workflow not in {"planning", "internal", "external"}:
                 raise HTTPException(422, "Urlaubsverfahren prüfen.")
             url = str(data.get("external_url", "")).strip()
-            parsed = urlparse(url)
-            if url and (
-                len(url) > 1000
-                or parsed.scheme not in {"https", "http"}
-                or not parsed.hostname
-                or parsed.username is not None
-                or parsed.password is not None
-            ):
+            # Reject malformed IPv6 hosts, credentials and control characters
+            # before URL values are rendered back into anchor href attributes.
+            try:
+                parsed = urlparse(url)
+                host = parsed.hostname
+                invalid_url = (
+                    bool(url)
+                    and (
+                        len(url) > 1000
+                        or any(char.isspace() or ord(char) < 32 for char in url)
+                        or parsed.scheme not in {"https", "http"}
+                        or not host
+                        or parsed.username is not None
+                        or parsed.password is not None
+                    )
+                )
+            except ValueError:
+                invalid_url = True
+            if invalid_url:
                 raise HTTPException(422, "Gültige Adresse der externen ZE-Software angeben.")
             raw_units = data.getlist("approval_units")
             if any(not str(value).isdigit() for value in raw_units):
