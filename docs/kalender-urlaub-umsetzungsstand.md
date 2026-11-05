@@ -19,9 +19,13 @@ Tracking: [Issue #183](https://github.com/derdigitalaffine/takt-platform/issues/
 - Eigene Gerätezugänge mit fest ausgewählten, später änderbaren Kalendern, sofortiger serverseitiger Rechteprüfung, Widerruf und optionaler administrativer Laufzeit. Apple-Profil mit dediziertem eingebettetem Passwort, einmaliger HTTPS-Ausgabe und ausschließlich gespeichertem Prüfwert. Kein Jamf/MDM.
 - Widerrufbare ICS-Lesetokens und Einrichtungshilfe für iOS, Android, Thunderbird, klassisches/neues Outlook. Fachkalender werden über DAV/ICS lesend projiziert; fachliche Änderungen erfolgen in Takt. Freie Kalender unterstützen DAV-Schreibzugriff.
 
+- Einheitliche Organisationsverwaltung für Hierarchie, Körperschaften, Wappen, Anschrift, Kontakt, Benutzerzuordnungen und Bereichsrollen. Bestehende Organisationen und Fachverknüpfungen werden weiterverwendet, bisherige Verwaltungsadressen führen zur gemeinsamen Oberfläche. Bildwechsel löschen bisherige Dateien erst nach erfolgreichem Datenbankschreiben.
+- Gemeinsame Personenauswahl mit Namen-/E-Mail-Suche, Personen-/Gruppenfilter, sichtbarer Auswahl und entfernbaren Auswahlchips. „Alle Treffer“ ergänzt die Auswahl; Suchen verwirft sie nicht. Sammelzuordnungen, Sammelentzug, Bereichsrollen, Kalenderfreigaben, Arbeitsmodelle und einzelne abweichende Arbeitstage prüfen jedes Ziel in derselben Transaktion. Native Kontrollkästchen bleiben ohne JavaScript nutzbar.
+- Gesetzliche Feiertage werden unabhängig von Ressourcenpreisen für die Besetzung, Schließzeitpflicht und interne Konten berücksichtigt. Portalvorgabe, vererbte Bereichsvorgabe und deaktivierbarer Feiertagskalender; ein datierter Sonderdienst kann ausdrücklich davon abweichen. Bereits bestätigte Urlaubskontobelastungen bleiben festgehalten.
+
 ## Testnachweise
 
-Die vollständige Python-Suite hat im Zwischenstand 642 Tests bestanden. Anschließende Ergänzungen werden gezielt und in der PR-CI geprüft. Eigene Browserprüfungen umfassen reale Formulare, verbindlichen Urlaub samt Änderung, Kalenderanlage, mobile Breite sowie die FullCalendar-Zeitachse. Der gemessene Aufbau der Jahresansicht mit 150 Personen lag lokal bei etwa 70 ms; die CI prüft ein großzügigeres Laufzeitlimit gegen erhebliche Regressionen.
+Die vollständige lokale Python-Suite hat 660 Tests bestanden. Ergänzende Prüfungen nach den letzten Bedienverbesserungen laufen gezielt und in der vollständigen PR-CI. Eigene Browserprüfungen umfassen reale Formulare, verbindlichen Urlaub samt Änderung, Kalenderanlage, mobile Breite sowie die FullCalendar-Zeitachse. Der gemessene Aufbau der Jahresansicht mit 150 Personen lag lokal bei etwa 70 ms; die CI prüft ein großzügigeres Laufzeitlimit gegen erhebliche Regressionen.
 
 Die GitHub-Actions-Pipeline ergänzt eine eigene Kalender-/Urlaubs-Browserprüfung zu den bestehenden Aufgaben-, Umfragen-, Seminar- und Boardprüfungen. Erst nach erfolgreicher vollständiger CI ist die Änderung technisch mergebereit.
 

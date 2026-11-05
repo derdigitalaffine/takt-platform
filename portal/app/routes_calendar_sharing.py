@@ -16,6 +16,7 @@ from .calendar_models import (
 )
 from . import calendars, leave, organization as org
 from .config import settings
+from . import people_choices
 
 
 class _RedactFeed(logging.Filter):
@@ -57,6 +58,8 @@ def sharing(
     db: Session = Depends(get_db),
 ):
     cal = owned(db, user, cid)
+    people = {u.id: u for u in db.scalars(select(User).order_by(User.name))}
+    groups = {g.id: g for g in db.scalars(select(Group).order_by(Group.name))}
     return render(
         request,
         "calendar_sharing.html",
@@ -78,8 +81,10 @@ def sharing(
         grants=list(
             db.scalars(select(CalendarGrant).where(CalendarGrant.calendar_id == cid))
         ),
-        people={u.id: u for u in db.scalars(select(User).order_by(User.name))},
-        groups={g.id: g for g in db.scalars(select(Group).order_by(Group.name))},
+        people=people,
+        groups=groups,
+        sharing_choices=people_choices.users(people.values(), targets=True)
+        + people_choices.groups(groups.values()),
     )
 
 
@@ -139,28 +144,46 @@ async def grant(
             raise HTTPException(404)
         db.delete(row)
     else:
-        kind, _, raw = str(data.get("target", "")).partition(":")
-        try:
-            target = int(raw)
-        except ValueError:
-            raise HTTPException(422)
-        if kind not in ("user", "group"):
-            raise HTTPException(422)
-        obj = db.get(User if kind == "user" else Group, target)
-        if not obj or kind == "user" and not obj.active:
-            raise HTTPException(422)
-        field = CalendarGrant.user_id if kind == "user" else CalendarGrant.group_id
-        row = db.scalar(
-            select(CalendarGrant).where(
-                CalendarGrant.calendar_id == cid, field == target
-            )
-        ) or CalendarGrant(
-            calendar_id=cid,
-            user_id=target if kind == "user" else None,
-            group_id=target if kind == "group" else None,
+        selected = list(
+            dict.fromkeys(data.getlist("targets") or [data.get("target", "")])
         )
-        row.can_write = data.get("write") == "1"
-        db.add(row)
+        if not 1 <= len(selected) <= 500:
+            raise HTTPException(
+                422, "Zwischen einer und 500 Personen oder Gruppen auswählen."
+            )
+        # Validate every target before changing any grant (also for direct/no-JS submissions).
+        for value in selected:
+            kind, _, raw = value.partition(":")
+            if kind not in ("user", "group") or not raw.isdigit():
+                raise HTTPException(422, "Ungültige Auswahl.")
+            obj = db.get(User if kind == "user" else Group, int(raw))
+            if not obj or kind == "user" and not obj.active:
+                raise HTTPException(
+                    422, "Die Auswahl enthält ein nicht verfügbares Konto."
+                )
+        for value in selected:
+            kind, _, raw = value.partition(":")
+            try:
+                target = int(raw)
+            except ValueError:
+                raise HTTPException(422)
+            if kind not in ("user", "group"):
+                raise HTTPException(422)
+            obj = db.get(User if kind == "user" else Group, target)
+            if not obj or kind == "user" and not obj.active:
+                raise HTTPException(422)
+            field = CalendarGrant.user_id if kind == "user" else CalendarGrant.group_id
+            row = db.scalar(
+                select(CalendarGrant).where(
+                    CalendarGrant.calendar_id == cid, field == target
+                )
+            ) or CalendarGrant(
+                calendar_id=cid,
+                user_id=target if kind == "user" else None,
+                group_id=target if kind == "group" else None,
+            )
+            row.can_write = data.get("write") == "1"
+            db.add(row)
     cal.version += 1
     calendars.audit(
         db, user, cal, "metadata" if data.get("action") == "metadata" else "share"

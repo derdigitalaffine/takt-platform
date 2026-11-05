@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from .db import Organization, User, Group
 from .org_models import OrgMembership, OrgRoleGrant, OrgAudit, OrgKind, OrgState
-from . import organization as os, orgs
+from . import organization as os, orgs, people_choices
 from .main import app, current_user, get_db, check_csrf, render, redirect, flash
 
 
@@ -82,6 +82,45 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
                 .limit(20)
             )
         )
+    primary = {m.user_id: m.org_id for m in memberships if m.is_primary}
+    primary_hints = {
+        uid: (nodes[oid].name if oid in visible else "Hauptzuordnung vorhanden")
+        for uid, oid in primary.items()
+        if oid in nodes
+    }
+    member_remove = [
+        dict(
+            value=str(m.id),
+            label=people[m.user_id].name,
+            detail=("Hauptzuordnung" if m.is_primary else "Zusätzliche Zuordnung"),
+            kind="person",
+            disabled=m.is_primary
+            and any(
+                other.user_id == m.user_id and other.id != m.id for other in memberships
+            ),
+        )
+        for m in shown
+        if m.user_id in people
+    ]
+    role_remove = [
+        dict(
+            value=str(g.id),
+            label=(
+                people[g.user_id].name
+                if g.user_id in people
+                else (
+                    groups[g.group_id].name
+                    if g.group_id in groups
+                    else "Ehemaliger Eintrag"
+                )
+            ),
+            detail=os.ROLES.get(g.role, (g.role,))[0],
+            kind="person" if g.user_id else "group",
+            disabled=False,
+        )
+        for g in role_rows
+        if g.org_id == unit
+    ]
     return render(
         request,
         "organization.html",
@@ -91,6 +130,19 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         org_access=access,
         selected=selected,
         caps=caps,
+        primary_hints=primary_hints,
+        selected_member_ids={m.user_id for m in memberships if m.org_id == unit},
+        member_choices=people_choices.users(people.values(), hints=primary_hints),
+        role_choices=people_choices.users(people.values(), targets=True)
+        + people_choices.groups(groups.values()),
+        member_remove_choices=member_remove,
+        role_remove_choices=role_remove,
+        member_selection=(form or {}).get("user_ids", [str(person)] if person else []),
+        role_selection=(form or {}).get(
+            "targets", ["group:" + str(group)] if group else []
+        ),
+        org_logo_url=orgs.logo_url,
+        org_usage=orgs.usage(db, selected) if selected and caps.get("settings") else {},
         memberships=shown,
         own_memberships=own,
         people=people,
@@ -118,21 +170,86 @@ def organization_page(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    return view(request, user, db, unit, person, group)
+    return view(
+        request,
+        user,
+        db,
+        unit,
+        person,
+        group,
+        form=(
+            {"action": "unit_create"}
+            if request.query_params.get("new") == "1"
+            else None
+        ),
+    )
 
 
 @app.post("/admin/organization", dependencies=[Depends(check_csrf)])
 async def organization_action(
     request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)
 ):
-    data = await request.form()
+    return await handle_action(request, user, db, await request.form())
+
+
+async def handle_action(request, user, db, data):
+    new_logo = None
+    old_logo = None
+    count = None
     action = str(data.get("action", ""))
     oid = os.number(data["org_id"]) if data.get("org_id") else None
     try:
         if not os.has_access(db, user):
             raise HTTPException(403)
         os.lock(db, data.get("version"))
-        if action == "membership":
+        if action in {
+            "membership_many",
+            "role_many",
+            "membership_remove_many",
+            "role_remove_many",
+        }:
+            field = {
+                "membership_many": "user_ids",
+                "role_many": "targets",
+                "membership_remove_many": "memberships",
+                "role_remove_many": "grants",
+            }[action]
+            selected = list(dict.fromkeys(str(v) for v in data.getlist(field)))
+            if not 1 <= len(selected) <= 500:
+                raise HTTPException(
+                    422, "Zwischen einer und 500 Personen bzw. Einträgen auswählen."
+                )
+            os.require(
+                db, user, oid, "roles" if action.startswith("role") else "members"
+            )
+            for value in selected:
+                values = dict(data)
+                if action == "membership_many":
+                    values["user_id"] = value
+                    os.set_membership(db, user, values)
+                elif action == "role_many":
+                    values["target"] = value
+                    os.set_role(db, user, values)
+                else:
+                    model = (
+                        OrgMembership
+                        if action == "membership_remove_many"
+                        else OrgRoleGrant
+                    )
+                    item = db.get(model, os.number(value))
+                    if not item or item.org_id != oid:
+                        raise HTTPException(
+                            422,
+                            "Die Auswahl gehört nicht vollständig zu dieser Einheit.",
+                        )
+                    values["membership" if model is OrgMembership else "grant"] = value
+                    (
+                        os.delete_membership
+                        if model is OrgMembership
+                        else os.delete_role
+                    )(db, user, values)
+            count = len(selected)
+        elif action == "membership":
             os.set_membership(db, user, data)
         elif action == "membership_remove":
             os.delete_membership(db, user, data)
@@ -165,7 +282,20 @@ async def organization_action(
                         403,
                         "Hierarchie, Ebenentyp und Aktivierung sind nur mit globalen Strukturrechten änderbar.",
                     )
-                keys = ("name", "short_name", "contact", "phone", "email", "website")
+                keys = (
+                    "name",
+                    "short_name",
+                    "contact",
+                    "phone",
+                    "email",
+                    "website",
+                    "street",
+                    "zip",
+                    "city",
+                    "color",
+                    "ags",
+                    "note",
+                )
             else:
                 if existing and parent and orgs.would_cycle(existing, parent):
                     raise HTTPException(
@@ -183,11 +313,45 @@ async def organization_action(
             if user.can("orgs"):
                 row.parent = parent
                 row.active = data.get("active") == "1"
+            if user.can("orgs") and "position" in data:
+                row.position = os.number(data.get("position"))
+                if not -1000000 <= row.position <= 1000000:
+                    raise HTTPException(422, "Reihenfolge prüfen.")
+            upload = data.get("logo")
+            if getattr(upload, "filename", ""):
+                new_logo, error = orgs.prepare_logo(
+                    await upload.read(orgs.MAX_LOGO + 1)
+                )
+                if error:
+                    raise HTTPException(422, error)
+                old_logo = row.logo
+                row.logo = new_logo
+            elif data.get("logo_remove") == "1":
+                old_logo = row.logo
+                row.logo = ""
             if existing is None:
                 db.add(row)
             db.flush()
             oid = row.id
             os.audit(db, user, oid, "unit_save", name=row.name, parent=row.parent_id)
+        elif action == "unit_delete":
+            if not user.can("orgs"):
+                raise HTTPException(403)
+            row = db.get(Organization, oid)
+            if not row:
+                raise HTTPException(404)
+            used = {k: v for k, v in orgs.usage(db, row).items() if v}
+            if used:
+                raise HTTPException(
+                    422,
+                    "Die Einheit wird noch verwendet: "
+                    + ", ".join(f"{k}: {v}" for k, v in used.items())
+                    + ". Alternativ auf inaktiv setzen.",
+                )
+            old_logo = row.logo
+            os.audit(db, user, oid, "unit_delete", name=row.name)
+            db.delete(row)
+            oid = None
         elif action in {"kind", "kind_remove"}:
             if not user.can("orgs"):
                 raise HTTPException(403)
@@ -196,6 +360,24 @@ async def organization_action(
                 from .orgs import KINDS
 
                 label = " ".join(str(data.get("label", "")).split())
+                if not key and label:
+                    import unicodedata
+
+                    key = re.sub(
+                        "[^a-z0-9]+",
+                        "_",
+                        unicodedata.normalize("NFKD", label)
+                        .encode("ascii", "ignore")
+                        .decode()
+                        .lower(),
+                    ).strip("_")[:20]
+                    if not key or not key[0].isalpha():
+                        key = "ebene_" + key[:14]
+                    if key in os.kinds(db):
+                        raise HTTPException(
+                            422,
+                            "Dieser Ebenentyp ist bereits vorhanden. Bestehenden Typ verwenden oder umbenennen.",
+                        )
                 if (
                     not re.fullmatch("[a-z][a-z0-9_]{0,19}", key)
                     or key in KINDS
@@ -225,6 +407,7 @@ async def organization_action(
         db.commit()
     except HTTPException as exc:
         db.rollback()
+        orgs.discard_logo(new_logo)
         if exc.status_code not in {409, 422}:
             raise
         page = view(
@@ -237,9 +420,27 @@ async def organization_action(
                 else None
             ),
             error=str(exc.detail),
-            form=dict(data),
+            form={
+                **dict(data),
+                **{
+                    key: data.getlist(key)
+                    for key in ("user_ids", "targets", "memberships", "grants")
+                },
+            },
         )
         page.status_code = exc.status_code
         return page
-    flash(request, "Organisation gespeichert.")
+    except Exception:
+        db.rollback()
+        orgs.discard_logo(new_logo)
+        raise
+    orgs.discard_logo(old_logo)
+    flash(
+        request,
+        (
+            f"Organisation gespeichert · {count} ausgewählte Einträge verarbeitet."
+            if count
+            else "Organisation gespeichert."
+        ),
+    )
     return redirect("/admin/organization" + (f"?unit={oid}" if oid else ""))

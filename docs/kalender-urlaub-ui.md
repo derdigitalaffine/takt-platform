@@ -1,6 +1,6 @@
 # Kalender und Urlaubsverwaltung: UI-Konzept und FullCalendar-Entscheidung
 
-Stand: 04.11.2026. Ergänzt das [fachliche Konzept](kalender-urlaub-konzept.md). Die bestätigten Regeln bleiben verbindlich. Die folgende Oberfläche ist der überarbeitete Umsetzungsplan; eine wiederverwendbare Personenzeitachse wird als erster UI-Baustein umgesetzt. Kalenderkern, Urlaubsworkflow und CalDAV folgen separat.
+Stand: 04.11.2026. Ergänzt das [fachliche Konzept](kalender-urlaub-konzept.md). Die bestätigten Regeln bleiben verbindlich. Dieses Dokument beschreibt die vereinbarte UI-Richtung. Personenzeitachse, Kalenderkern, Urlaubsworkflow und CalDAV sind in PR #184 integriert; den konkreten Prüfstand und Betriebsgrenzen nennt [die Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md).
 
 ## 1. Verbindliche Technologieentscheidung
 

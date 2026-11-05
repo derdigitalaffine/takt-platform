@@ -228,7 +228,7 @@ def set_membership(db, actor, data):
             OrgMembership.user_id == uid, OrgMembership.is_primary.is_(True)
         )
     )
-    main = data.get("is_primary") == "1" or primary is None
+    main = data.get("is_primary") == "1" or primary is None or primary.org_id == oid
     if main and primary and primary.org_id != oid:
         require(db, actor, primary.org_id, "members")
         primary.is_primary = False

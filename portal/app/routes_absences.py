@@ -15,7 +15,15 @@ def absences_page(request: Request, user: User = Depends(current_user), db: Sess
     people = ab.manageable(db, user) if ab.can_manage_others(db, user) else []
     colleagues = [u for u in db.query(User).filter(User.active.is_(True), User.id != user.id).order_by(User.name)]
     away = ab.current_map(db)
-    return render(request, "absences.html", user, **lists, people=people, colleagues=colleagues, away=away,
+    from sqlalchemy import select
+    from .db import get_settings
+    from .leave_models import LeaveRequest
+    from .routes_leave import can_read_request
+    visible_ids={a.id for values in lists.values() for a in values}
+    sources=list(db.scalars(select(LeaveRequest).where(LeaveRequest.absence_id.in_(visible_ids))))
+    leave_owned={row.absence_id:row.id for row in sources}
+    leave_links={row.absence_id:f"/urlaub/vorgang/{row.id}" for row in sources if get_settings(db).get("module_calendars")=="1" and can_read_request(db,user,row)}
+    return render(request, "absences.html", user, **lists, leave_owned=leave_owned, leave_links=leave_links, people=people, colleagues=colleagues, away=away,
                   status=ab.STATUS, span=ab.span, label=ab.label, fmt=ab.fmt, today=ab.today(),
                   manage_all=ab.manages_all(user), led=ab.led_groups(db, user))
 

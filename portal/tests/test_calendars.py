@@ -201,6 +201,9 @@ def test_event_audience_never_leaks_through_public_json_ics_or_dav(
         assert "Nur Bereich A" not in calendars.export(db, None, cal)
         assert "Nur Bereich A" not in calendars.export(db, outsider, cal)
         assert "Nur Bereich A" in calendars.export(db, member, cal)
+        unit.active = False
+        db.commit()
+        assert "Nur Bereich A" not in calendars.export(db, member, cal)
     finally:
         db.delete(cal)
         db.commit()
@@ -243,5 +246,40 @@ def test_web_edit_retains_client_alarm_and_custom_properties(db, task_people):
             and "DTSTART;VALUE=DATE:20261203" in content
         )
     finally:
+        db.delete(cal)
+        db.commit()
+
+
+def test_bulk_calendar_grants_validate_whole_selection(db, task_people):
+    from app.calendar_models import CalendarGrant
+
+    owner, one, two = task_people[:3]
+    cal = Calendar(owner_id=owner.id, title="Sammelfreigabe", visibility="private")
+    db.add(cal)
+    db.commit()
+    c = login(owner.email, "task-passwort-123")
+    token = csrf_of(c.get(f"/kalender/{cal.id}/teilen").text)
+    try:
+        data = dict(
+            csrf=token,
+            version=cal.version,
+            targets=[f"user:{one.id}", "user:99999999"],
+            write="1",
+        )
+        assert c.post(f"/kalender/{cal.id}/teilen", data=data).status_code == 422
+        assert not db.scalar(
+            select(CalendarGrant.id).where(CalendarGrant.calendar_id == cal.id)
+        )
+        data["targets"] = [f"user:{one.id}", f"user:{two.id}"]
+        assert c.post(f"/kalender/{cal.id}/teilen", data=data).status_code == 303
+        rows = list(
+            db.scalars(select(CalendarGrant).where(CalendarGrant.calendar_id == cal.id))
+        )
+        assert {r.user_id for r in rows} == {one.id, two.id}
+        assert all(r.can_write for r in rows)
+        outsider = login(one.email, "task-passwort-123")
+        assert outsider.get(f"/kalender/{cal.id}/teilen").status_code == 403
+    finally:
+        db.query(CalendarGrant).filter_by(calendar_id=cal.id).delete()
         db.delete(cal)
         db.commit()

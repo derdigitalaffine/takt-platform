@@ -757,7 +757,8 @@
         people = value;
         refresh();
       },
-      setSummaries(value) {
+      setSummaries(value, holidays) {
+        if (holidays) config.holidays = holidays;
         summaries = value;
         refresh();
       },

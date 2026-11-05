@@ -1,4 +1,6 @@
 {% extends "base.html" %}{% import '_macros.html' as m with context %}
+{% import '_selection_picker.html' as sp %}
+{% block head %}<link rel="stylesheet" href="/static/selection-picker.css">{% endblock %}
 {% block content %}
     {% call m.page_head('Kalender teilen',calendar.title) %}
         <a class="btn btn-outline-secondary" href="/kalender">Kalender</a>
@@ -62,21 +64,13 @@
         <form method="post">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <input type="hidden" name="version" value="{{ calendar.version }}">
-            <label>
-                Person oder Gruppe<select name="target" class="form-select">
-                {% for p in people.values() if p.active %}
-                    <option value="user:{{ p.id }}">{{ p.name }}</option>
-                {% endfor %}
-                {% for g in groups.values() %}
-                    <option value="group:{{ g.id }}">Gruppe: {{ g.name }}</option>
-                {% endfor %}
-                </select>
-            </label>
+            <h2 class="h5">Personen und Gruppen freigeben</h2>
+            {{sp.picker('calendar-sharing','targets',sharing_choices)}}
             <label class="form-check">
                 <input class="form-check-input" type="checkbox" name="write" value="1">
                 <span class="form-check-label">Termine bearbeiten</span>
             </label>
-            <button class="btn btn-primary mt-3">Freigabe speichern</button>
+            <button class="btn btn-primary mt-3" data-selection-submit>Freigabe für Auswahl speichern</button>
         </form>
     </section>
     {% for grant in grants %}
@@ -92,3 +86,5 @@
     {% endfor %}
 <details class="card card-body mt-4"><summary>Letzte Änderungen</summary><p class="small mt-3">Nur für Kalenderverantwortliche. Terminänderungen und Freigaben werden mit Person und Zeitpunkt protokolliert. Zugangsdaten und Beschreibungen werden nicht in dieses Protokoll kopiert.</p><ol class="list-group list-group-numbered">{% for entry in history %}<li class="list-group-item"><strong>{{{'create':'Termin angelegt','update':'Termin geändert','delete':'Termin gelöscht','metadata':'Kalender geändert','share':'Freigabe geändert'}.get(entry.action,entry.action)}}</strong>{% if entry.event_title %} · {{entry.event_title}}{% endif %}<div class="small text-secondary">{{entry.created_at|local}} · {{people[entry.actor_id].name if entry.actor_id in people else 'Ehemaliges Benutzerkonto'}}{% if entry.device_id %} · über Kalendergerät{% endif %}</div></li>{% else %}<li class="list-group-item">Noch keine Änderungen protokolliert.</li>{% endfor %}</ol></details>
 {% endblock %}
+
+{% block scripts %}{{super()}}<script src="/static/selection-picker.js" defer></script>{% endblock %}

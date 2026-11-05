@@ -129,12 +129,16 @@ def conflicts(db, p, keep=None):
             effective.append(
                 period(a.user_id, dict(starts_on=a.starts_on, ends_on=a.ends_on))
             )
+    from .leave_rules import work_snapshot, capacity
+
+    patterns = work_snapshot(db, p.start, p.end)
     working = {uid: set() for uid, _, _ in memberships}
     for offset in range((p.end - p.start).days + 1):
         day = p.start + timedelta(days=offset)
-        if day.weekday() < 5:
-            for slots in working.values():
-                slots.update(((day, "am"), (day, "pm")))
+        for uid, slots in working.items():
+            for half in ("am", "pm"):
+                if capacity(patterns, uid, day, half, simple=True) > 0:
+                    slots.add((day, half))
     result = staffing.check_headcount(
         candidate=p,
         memberships=memberships,
@@ -147,7 +151,6 @@ def conflicts(db, p, keep=None):
     from .leave_rules import extra_conflicts, capacity
     from .leave_extensions import WorkPattern
 
-    patterns = list(db.scalars(select(WorkPattern)))
     advanced = {r.org_id for r in db.scalars(select(LeavePolicy)) if r.advanced}
     if advanced:
         result = [c for c in result if c.org_id not in advanced]
@@ -427,11 +430,11 @@ def command(db, actor, request_id, action, version, reason=""):
         row.status = "binding"
         effective = interval(row)
         if cfg.internal_account:
-            from .leave_rules import days_used
+            from .leave_rules import days_used, work_snapshot
             from .leave_extensions import WorkPattern
 
             effective["account_charge"] = days_used(
-                p, list(db.scalars(select(WorkPattern)))
+                p, work_snapshot(db, p.start, p.end, [row.person_id])
             )
         row.effective_json = json.dumps(effective)
         if action == "attest":

@@ -303,7 +303,11 @@ async def dav(request: Request, path: str = "", db: Session = Depends(get_db)):
         return Response(
             content if method == "GET" else "",
             media_type="text/calendar",
-            headers={"Cache-Control": "no-store", **({"ETag": tag} if tag else {})},
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Length": str(len(content.encode())),
+                **({"ETag": tag} if tag else {}),
+            },
         )
     tree = parse_xml(await xml_body(request))
     if method == "REPORT":

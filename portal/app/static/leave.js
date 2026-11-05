@@ -58,8 +58,12 @@
         "start_half",
         "end_half",
       ])
-        form.elements[key].value = values[key];
-    form.elements.person_id.disabled = !!row;
+        if (form.elements[key].tomselect)
+          form.elements[key].tomselect.setValue(String(values[key]), true);
+        else form.elements[key].value = values[key];
+    const person = form.elements.person_id;
+    person.disabled = !!row;
+    if (person.tomselect) person.tomselect[row ? "disable" : "enable"]();
     document.getElementById("leave-editor-title").textContent = row
       ? "Urlaubszeit ändern"
       : "Zeitraum eintragen";
@@ -110,8 +114,8 @@
         personId: button.dataset.person,
         start: button.dataset.start,
         end: button.dataset.end,
-        startHalf: "am",
-        endHalf: "pm",
+        startHalf: button.dataset.startHalf || "am",
+        endHalf: button.dataset.endHalf || "pm",
       }),
     );
   if (form) {
@@ -328,7 +332,7 @@
             "&end=" +
             encodeURIComponent(info.endStr),
         )
-          .then((value) => view.setSummaries(value))
+          .then((value) => view.setSummaries(value.summaries, value.holidays))
           .catch(report);
       },
     });

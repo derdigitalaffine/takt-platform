@@ -148,7 +148,7 @@ ITEMS: list[Item] = [
          _pre("/maps")),
     # Verwaltung
     Item("users", "admin", "/admin/users", "fa-users", "Benutzer & Gruppen", lambda c: c.can("users"), _is("/admin/users")),
-    Item("orgs", "admin", "/admin/organization", "fa-sitemap", "Organisation & Rollen", lambda c: c.org_nav or c.can("orgs"), _pre("/admin/organization", "/admin/orgs")),
+    Item("orgs", "admin", "/admin/organization", "fa-sitemap", "Organisation", lambda c: c.org_nav or c.can("orgs"), _pre("/admin/organization", "/admin/orgs")),
     Item("payments", "admin", "/payments", "fa-euro-sign", "Zahlungen", lambda c: c.can("payments"), _pre("/payments")),
     Item("expense_rules", "admin", "/settings/expense-rules", "fa-calculator", "Reisekostensätze", lambda c: c.admin, _pre("/settings/expense-rules")),
     Item("locations", "know", "/settings/locations", "fa-location-dot", "Orte und Fahrtstrecken", lambda c: "forms" in c.modules, _pre("/settings/locations")),

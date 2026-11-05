@@ -40,7 +40,11 @@ def test_device_scope_etags_and_revocation(db, task_people):
         result = c.put(url, content=ICAL, headers={**auth, "If-None-Match": "*"})
         assert result.status_code == 201, result.text
         tag = result.headers["etag"]
-        assert c.get(url, headers=auth).status_code == 200
+        fetched = c.get(url, headers=auth)
+        assert fetched.status_code == 200
+        assert int(c.head(url, headers=auth).headers["content-length"]) == len(
+            fetched.content
+        )
         assert (
             c.put(url, content=ICAL, headers={**auth, "If-Match": '"old"'}).status_code
             == 412

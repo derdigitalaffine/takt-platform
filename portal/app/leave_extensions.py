@@ -44,6 +44,23 @@ class Closure(Base):
     )
 
 
+class WorkDay(Base):
+    """Explicit one-day schedule, including a day off or holiday duty."""
+
+    __tablename__ = "leave_work_days"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    day: Mapped[str] = mapped_column(String(10))
+    am: Mapped[float] = mapped_column(Float)
+    pm: Mapped[float] = mapped_column(Float)
+    __table_args__ = (
+        UniqueConstraint("person_id", "day"),
+        CheckConstraint("am >= 0 AND am <= 1 AND pm >= 0 AND pm <= 1"),
+    )
+
+
 class EmergencyAssignment(Base):
     __tablename__ = "leave_emergency_assignments"
     closure_id: Mapped[int] = mapped_column(

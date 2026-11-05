@@ -6,9 +6,11 @@ from dataclasses import asdict
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from . import people_choices
 from .main import app, current_user, get_db, check_csrf, render, redirect, flash
-from .db import User, Organization
+from .db import User, Organization, get_settings
 from .org_models import OrgMembership
+from .holidays import STATES
 from .leave_models import LeaveRequest, LeavePolicy
 from . import leave, leave_rules, organization as org
 from .leave_extensions import (
@@ -17,6 +19,7 @@ from .leave_extensions import (
     LeaveInbox,
     LeaveAccount,
     WorkPattern,
+    WorkDay,
     LeavePreference,
 )
 
@@ -74,6 +77,17 @@ def can_read_request(db, actor, row):
         and bool(path)
         and org.allows(
             db, actor, path[min(row.approval_step or 0, len(path) - 1)], "approve"
+        )
+    )
+
+
+def can_read_history(db, actor, row):
+    return (
+        actor.id == row.person_id
+        or org.allows(db, actor, leave.decision_unit(row), "approve")
+        or (
+            row.cancel_requested
+            and org.allows(db, actor, leave.cancellation_unit(db, row), "approve")
         )
     )
 
@@ -151,7 +165,16 @@ def page(
         ),
         unit=unit,
         current_year=date.today().year,
+        holiday_states=STATES,
+        portal_holiday_state=get_settings(db).get("leave_holiday_state", "RP"),
         people=people,
+        work_choices=people_choices.users(
+            [
+                p
+                for p in people
+                if org.allows(db, user, leave.primary(db, p.id), "leave_settings")
+            ]
+        ),
         can_create=any(leave.can_plan(db, user, p.id) for p in people),
         rows=rows,
         row_policies={r.id: leave.policy(db, r.org_id) for r in rows},
@@ -170,14 +193,13 @@ def page(
             if unit and c.org_id in org.active_path(db, unit)
         },
         emergency={
-            c.closure_id: set(
-                db.scalars(
-                    select(EmergencyAssignment.person_id).where(
-                        EmergencyAssignment.closure_id == c.closure_id
-                    )
-                )
-            )
-            for c in db.scalars(select(EmergencyAssignment))
+            c.id: leave_rules.eligible_emergency_ids(db, c)
+            for c in db.scalars(select(Closure))
+        },
+        closure_statuses={
+            c.id: leave_rules.closure_status(db, c)
+            for c in db.scalars(select(Closure))
+            if unit and c.org_id in org.active_path(db, unit)
         },
         email_mode=(
             db.get(LeavePreference, user.id).email_mode
@@ -203,21 +225,24 @@ def page(
             else []
         ),
         local_policy=db.get(LeavePolicy, unit) if unit else None,
+        work_days=(
+            list(
+                db.scalars(
+                    select(WorkDay)
+                    .where(WorkDay.person_id.in_(ids))
+                    .order_by(WorkDay.day)
+                )
+            )
+            if unit and org.allows(db, user, unit, "leave_settings")
+            else []
+        ),
         policy=leave.policy(db, unit) if unit else None,
         can_settings=bool(unit and org.allows(db, user, unit, "leave_settings")),
         planners={p.id: leave.can_plan(db, user, p.id) for p in people},
         approvers={
             r.id: org.allows(db, user, leave.decision_unit(r), "approve") for r in rows
         },
-        history_rights={
-            r.id: user.id == r.person_id
-            or org.allows(db, user, leave.decision_unit(r), "approve")
-            for r in rows
-        },
-        cancel_approvers={
-            r.id: org.allows(db, user, leave.cancellation_unit(db, r), "approve")
-            for r in rows
-        },
+        history_rights={r.id: can_read_history(db, user, r) for r in rows},
     )
 
 
@@ -372,6 +397,12 @@ async def settings_save(
             raise HTTPException(422, "Gültige Adresse des externen Systems angeben.")
         row = db.get(LeavePolicy, unit) or LeavePolicy(org_id=unit)
         row.version = (row.version or 0) + 1
+        from .holidays import STATES
+
+        state = data.get("holiday_state", "inherit")
+        if state not in {"inherit", "none", *STATES}:
+            raise HTTPException(422, "Feiertagskalender prüfen.")
+        row.holiday_state = state
         row.workflow = workflow
         row.minimum = minimum
         row.conflict_mode = mode
@@ -419,10 +450,7 @@ def history(
     from .leave_models import LeaveAudit
 
     row = db.get(LeaveRequest, rid)
-    if not row or not (
-        user.id == row.person_id
-        or org.allows(db, user, leave.decision_unit(row), "approve")
-    ):
+    if not row or not can_read_history(db, user, row):
         raise HTTPException(403)
     rows = list(
         db.scalars(
@@ -455,7 +483,11 @@ def summary(
     from .calendar_recurrence import window
 
     a, b = window(start, end)
-    return leave_rules.planning_summary(db, unit, a.date(), b.date())
+    days = leave_rules.holiday_days(db, unit, a.date(), b.date())
+    return dict(
+        summaries=leave_rules.planning_summary(db, unit, a.date(), b.date()),
+        holidays=[dict(date=d.isoformat(), label=label) for d, label in days.items()],
+    )
 
 
 @app.get("/urlaub/vorgang/{rid:int}")

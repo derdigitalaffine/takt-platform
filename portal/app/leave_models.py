@@ -30,6 +30,7 @@ class LeavePolicy(Base):
     internal_account: Mapped[bool] = mapped_column(Boolean, default=False)
     approval_units: Mapped[str] = mapped_column(Text, default="[]")
     notify_only_warnings: Mapped[bool] = mapped_column(Boolean, default=False)
+    holiday_state: Mapped[str] = mapped_column(String(8), default="inherit")
     __table_args__ = (
         CheckConstraint("workflow IN ('planning','internal','external')"),
         CheckConstraint("minimum >= 0"),

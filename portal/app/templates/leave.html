@@ -1,7 +1,9 @@
 {% extends "base.html" %}{% import '_macros.html' as m with context %}
+{% import '_selection_picker.html' as sp %}
 {% block title %}Urlaubsplanung{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="/static/person-timeline.css">
+    <link rel="stylesheet" href="/static/selection-picker.css">
 {% endblock %}
 {% block content %}
     {{ m.page_head('Urlaubsplanung', 'Gemeinsam planen und verbindliche Zeiten nachvollziehen.') }}
@@ -37,9 +39,9 @@
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 <div class="col-md-4">
                     <label class="form-label" for="leave-person">Person</label>
-                    <select id="leave-person" class="form-select" name="person_id">
+                    <select id="leave-person" class="form-select js-select" data-search="1" name="person_id">
                         {% for p in people if planners[p.id] %}
-                            <option value="{{ p.id }}">{{ p.name }}</option>
+                            <option value="{{ p.id }}">{{ p.name }} · {{p.email}}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -173,7 +175,8 @@
                         {% endfor %}
                         </select>
                     </label>
-                    <label class="form-label">
+                    <label class="form-label" for="leave-holidays">Arbeitsfreier Feiertagskalender</label><select id="leave-holidays" class="form-select mb-2" name="holiday_state"><option value="inherit" {{'selected' if not local_policy or local_policy.holiday_state=='inherit'}}>Vorgabe der übergeordneten Einheit / des Portals</option><option value="none" {{'selected' if local_policy and local_policy.holiday_state=='none'}}>Keine automatischen Feiertage</option>{% for code,label in holiday_states.items() %}<option value="{{code}}" {{'selected' if local_policy and local_policy.holiday_state==code}}>{{label}}</option>{% endfor %}</select><p class="small">Gesetzliche Feiertage gelten als arbeitsfrei. Ausdrücklich erfasste abweichende Arbeitstage haben Vorrang. Sonderpreistage der Ressourcen verändern keine Arbeitszeit.</p>
+<label class="form-label">
                         Mindestbesetzung (Personen)<input type="number"
                                                           name="minimum"
                                                           min="0"
@@ -264,5 +267,6 @@
     <script src="/static/vendor/fullcalendar/index.global.min.js"></script>
     <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
     <script src="/static/person-timeline.js"></script>
+    <script src="/static/selection-picker.js"></script>
     <script src="/static/leave.js"></script>
 {% endblock %}

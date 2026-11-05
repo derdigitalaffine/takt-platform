@@ -28,18 +28,20 @@
 {% for closed in closures %}
     <section class="card card-body mb-3" id="closure-{{ closed.id }}">
         <h2 class="h6">Schließzeit: {{ closed.title }}</h2>
+        <p>{{closure_statuses[closed.id].assigned}} {{'Person' if closure_statuses[closed.id].assigned==1 else 'Personen'}} zur Notbesetzung eingeteilt.</p>
+        {% if closure_statuses[closed.id].shortages %}<details class="alert alert-warning"><summary>Notbesetzung in {{closure_statuses[closed.id].shortages|length}} Tageshälften nicht gedeckt</summary><ul class="mt-2">{% for gap in closure_statuses[closed.id].shortages %}<li>{{gap.day}} · {{'Vormittag' if gap.half=='am' else 'Nachmittag'}}: {{gap.available}} verfügbar, {{closed.emergency_minimum}} erforderlich</li>{% endfor %}</ul></details>{% endif %}
         <p>{{ closed.starts_on }} bis {{ closed.ends_on }} · Mindest-Notbesetzung: {{ closed.emergency_minimum }}</p>
         <p class="small">Außerhalb der Notbesetzung muss der erforderliche Urlaub im vereinbarten Ablauf eingetragen werden. Vorhandene verbindliche Zeiten werden nicht überschrieben.</p>
         <details class="mb-3">
             <summary>Planungsstand der betroffenen Personen</summary>
             <ul class="mt-2">
                 {% for item in closure_obligations.get(closed.id,[]) %}
-                    <li>{{ item.name }}: {% if item.emergency %}Notbesetzung{% elif item.missing %}{{ item.missing|length }} Arbeitstageshälften noch nicht verbindlich abgedeckt{% if item.planned %}, davon {{ item.planned }} Arbeitstageshälften geplant oder beantragt{% endif %}{% if planners[item.person_id] %} <button type="button"
+                    <li>{{ item.name }}: {% if item.emergency %}Notbesetzung{% elif item.missing %}{{ item.missing|length }} Arbeitstageshälften noch nicht verbindlich abgedeckt{% if item.planned %}, davon {{ item.planned }} Arbeitstageshälften geplant oder beantragt{% endif %}{% if planners[item.person_id] and item.proposal %} <button type="button"
                                                                                                                                                                                                                                                                                                                                 class="btn btn-sm btn-outline-primary"
                                                                                                                                                                                                                                                                                                                                 data-closure-plan="{{ closed.id }}"
                                                                                                                                                                                                                                                                                                                                 data-person="{{ item.person_id }}"
-                                                                                                                                                                                                                                                                                                                                data-start="{{ closed.starts_on }}"
-                                                                                                                                                                                                                                                                                                                                data-end="{{ closed.ends_on }}">Planen</button>
+                                                                                                                                                                                                                                                                                                                                data-start="{{ item.proposal.starts_on }}"
+                                                                                                                                                                                                                                                                                                                                data-end="{{ item.proposal.ends_on }}" data-start-half="{{item.proposal.start_half}}" data-end-half="{{item.proposal.end_half}}" title="Nächsten zusammenhängenden offenen Zeitraum planen">Planen</button>
                 {% endif %}{% else %}Urlaubspflicht abgedeckt{% endif %}
             </li>
 {% endfor %}
@@ -55,7 +57,7 @@
         {{ meta("emergency") }}<input type="hidden" name="closure_id" value="{{ closed.id }}">
         {% if closure_managers[closed.id] %}
             <label>
-                Person<select class="form-select" name="person_id">
+                Person<select class="form-select js-select" data-search="1" name="person_id">
                 {% for person in people %}
                     <option value="{{ person.id }}">{{ person.name }}</option>
                 {% endfor %}

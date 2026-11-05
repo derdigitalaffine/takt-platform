@@ -35,13 +35,12 @@
             <summary>Fachkalender einblenden</summary>
             <form method="post" action="/kalender/quellen">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
-                <label class="form-label">
-                    Kalenderquelle<select class="form-select" name="source">
+                <label class="form-label" for="calendar-select-1">Kalenderquelle</label>
+<select id="calendar-select-1" class="form-select" name="source">
                     {% for key,title in sources.items() %}
                         <option value="{{ key }}">{{ title }}</option>
                     {% endfor %}
                     </select>
-                </label>
                 <p class="small">Die Daten bleiben im Fachmodul. Berechtigungen werden bei jedem Abruf erneut geprüft; Änderungen erfolgen im Original.</p>
                 <button class="btn btn-outline-primary">Quelle einblenden</button>
             </form>
@@ -54,8 +53,8 @@
                     <label class="form-label">
                         Name<input class="form-control" name="title" maxlength="200" required>
                     </label>
-                    <label class="form-label">
-                        Sichtbarkeit<select name="visibility" class="form-select">
+                    <label class="form-label" for="calendar-select-2">Sichtbarkeit</label>
+<select id="calendar-select-2" name="visibility" class="form-select">
                         <option value="private">Privat / ausdrücklich geteilt</option>
                         <option value="organization">Organisationseinheit</option>
                         {% if user.can("calendar_publish") %}
@@ -63,15 +62,13 @@
                             <option value="public">Öffentlich</option>
                         {% endif %}
                         </select>
-                    </label>
-                    <label class="form-label">
-                        Organisationseinheit<select class="form-select" name="org_id">
+                    <label class="form-label" for="calendar-select-3">Organisationseinheit</label>
+<select id="calendar-select-3" class="form-select" name="org_id">
                         <option value="">Keine</option>
                         {% for unit in units %}
                             <option value="{{ unit.id }}">{{ unit.name }}</option>
                         {% endfor %}
                         </select>
-                    </label>
                     <label class="form-check">
                         <input name="include_children"
                                value="1"
@@ -104,24 +101,22 @@
                     </label>
                 </div>
                 <div class="col-12">
-                    <label class="form-label">
-                        Art<select class="form-select" name="kind">
+                    <label class="form-label" for="calendar-select-4">Art</label>
+<select id="calendar-select-4" class="form-select" name="kind">
                         <option value="event">Kalendertermin</option>
                         {% if closure_units %}
                             <option value="closure">Schließzeit mit Urlaubspflicht</option>
                         {% endif %}
                         </select>
-                    </label>
                 </div>
                 <div class="col-12" id="closure-fields" hidden>
                     <p class="small">Diese Schließzeit erscheint zugleich in der Urlaubsplanung. Bestehender Urlaub bleibt erhalten; die Notbesetzung wird dort eingeteilt.</p>
-                    <label class="form-label">
-                        Betroffener Bereich einschließlich Untereinheiten<select class="form-select" name="org_id">
+                    <label class="form-label" for="calendar-select-5">Betroffener Bereich einschließlich Untereinheiten</label>
+<select id="calendar-select-5" class="form-select" name="org_id">
                         {% for unit in closure_units %}
                             <option value="{{ unit.id }}">{{ unit.name }}</option>
                         {% endfor %}
                         </select>
-                    </label>
                     <label class="form-label">
                         Mindest-Notbesetzung<input class="form-control"
                                                    type="number"
@@ -130,31 +125,28 @@
                                                    min="0"
                                                    max="10000">
                     </label>
-                    <label class="form-label">
-                        Einteilung<select class="form-select" name="enrollment">
+                    <label class="form-label" for="calendar-select-6">Einteilung</label>
+<select id="calendar-select-6" class="form-select" name="enrollment">
                         <option value="lead">Durch Bereichsverantwortliche</option>
                         <option value="self">Selbsteintragung</option>
                         </select>
-                    </label>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">
-                        Kalender<select class="form-select" name="calendar_id">
+                    <label class="form-label" for="calendar-select-7">Kalender</label>
+<select id="calendar-select-7" class="form-select" name="calendar_id">
                         {% for cal in calendars if cal.id in writable_calendars %}
                             <option value="{{ cal.id }}">{{ cal.title }}</option>
                         {% endfor %}
                         </select>
-                    </label>
                 </div>
                 <div class="col-12" id="event-audience">
-                    <label class="form-label">
-                        Zielgruppe zusätzlich einschränken<select class="form-select" name="org_id_event">
+                    <label class="form-label" for="calendar-select-8">Zielgruppe zusätzlich einschränken</label>
+<select id="calendar-select-8" class="form-select" name="org_id_event">
                         <option value="">Wie Kalenderfreigabe</option>
                         {% for unit in units %}
                             <option value="{{ unit.id }}">{{ unit.name }}</option>
                         {% endfor %}
                         </select>
-                    </label>
                     <label class="form-check">
                         <input type="checkbox"
                                class="form-check-input"
@@ -220,15 +212,14 @@
                     <p class="small">Uhrzeiten in der Zeitzone dieses Geräts. Ende und Dauer aktualisieren sich gegenseitig.</p>
                 </div>
                 <div class="col-md-6 calendar-series">
-                    <label class="form-label">
-                        Wiederholung<select class="form-select" name="repeat">
+                    <label class="form-label" for="calendar-select-9">Wiederholung</label>
+<select id="calendar-select-9" class="form-select" name="repeat">
                         <option value="none">Keine</option>
                         <option value="daily">Täglich</option>
                         <option value="weekly">Wöchentlich</option>
                         <option value="monthly">Monatlich</option>
                         <option value="yearly">Jährlich</option>
                         </select>
-                    </label>
                 </div>
                 <div class="col-md-6 calendar-series">
                     <label class="form-label">

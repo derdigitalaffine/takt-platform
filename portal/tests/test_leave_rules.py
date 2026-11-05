@@ -1,6 +1,7 @@
 import json
 from datetime import date
 import pytest
+from sqlalchemy import select
 from fastapi import HTTPException
 from app import leave, leave_rules
 from app.db import Absence
@@ -180,6 +181,23 @@ def test_closure_markers_and_capacity_exception(db, task_people, units):
         leave.command(db, person, row.id, "bind", row.version)
         db.commit()
         assert not leave_rules.closure_obligations(db, closed, [person])[0]["missing"]
+        closed.ends_on = "2026-12-02"
+        db.commit()
+        leave.save(
+            db,
+            person,
+            dict(
+                starts_on="2026-12-02",
+                ends_on="2026-12-02",
+                start_half="am",
+                end_half="am",
+            ),
+        )
+        db.commit()
+        proposal = leave_rules.closure_obligations(db, closed, [person])[0]["proposal"]
+        assert proposal == dict(
+            starts_on="2026-12-02", ends_on="2026-12-02", start_half="pm", end_half="pm"
+        )
     finally:
         clean(db, person.id, [unit.id])
 
@@ -271,3 +289,145 @@ def test_full_workday_with_only_one_scheduled_half_uses_one_day():
     )
     assert leave_rules.days_used(p, [pattern]) == {2026: 1}
     assert leave_rules.days_used(p, []) == {2026: 0.5}
+
+
+def test_inactive_emergency_assignment_no_longer_counts(db, task_people, units):
+    _, unit, _, _ = units
+    person, duty = task_people[:2]
+    assigned(db, person, unit)
+    assigned(db, duty, unit)
+    closed = Closure(
+        org_id=unit.id,
+        title="Schließzeit",
+        starts_on="2026-12-01",
+        ends_on="2026-12-01",
+        emergency_minimum=1,
+    )
+    db.add(closed)
+    db.flush()
+    db.add(EmergencyAssignment(closure_id=closed.id, person_id=duty.id))
+    db.commit()
+    try:
+        assert leave_rules.closure_status(db, closed)["assigned"] == 1
+        duty.active = False
+        db.commit()
+        state = leave_rules.closure_status(db, closed)
+        assert state["assigned"] == 0 and len(state["shortages"]) == 2
+        p = leave.period(
+            person.id, dict(starts_on=closed.starts_on, ends_on=closed.ends_on)
+        )
+        assert all(
+            c.available == 0 and c.mode == "block"
+            for c in leave_rules.extra_conflicts(db, p)
+        )
+        assert len(leave_rules.extra_conflicts(db, p)) == 2
+    finally:
+        duty.active = True
+        clean(db, person.id, [unit.id])
+
+
+def test_holidays_do_not_charge_leave_and_explicit_day_overrides_them(
+    db, task_people, units
+):
+    from app.db import CustomHoliday
+    from app.leave_extensions import WorkDay
+
+    _, unit, _, _ = units
+    person = task_people[0]
+    assigned(db, person, unit)
+    db.add(
+        LeavePolicy(
+            org_id=unit.id,
+            workflow="planning",
+            internal_account=True,
+            holiday_state="RP",
+        )
+    )
+    db.add(LeaveAccount(person_id=person.id, year=2026, entitlement=30, carry=0))
+    price_day = CustomHoliday(day=date(2026, 12, 24), name="Nur Preisaufschlag")
+    db.add(price_day)
+    db.commit()
+    try:
+        p = leave.period(person.id, dict(starts_on="2026-12-24", ends_on="2026-12-25"))
+        snapshot = leave_rules.work_snapshot(db, p.start, p.end, [person.id])
+        assert leave_rules.days_used(p, snapshot) == {2026: 1}
+        row = leave.save(db, person, dict(starts_on="2026-12-24", ends_on="2026-12-25"))
+        db.commit()
+        leave.command(db, person, row.id, "bind", row.version)
+        db.commit()
+        db.add(WorkDay(person_id=person.id, day="2026-12-25", am=1, pm=0))
+        db.commit()
+        holiday = leave.period(
+            person.id, dict(starts_on="2026-12-25", ends_on="2026-12-25")
+        )
+        override = leave_rules.work_snapshot(
+            db, holiday.start, holiday.end, [person.id]
+        )
+        assert leave_rules.days_used(holiday, override) == {2026: 1}
+        assert leave_rules.account_balances(db, person.id)[0]["used"] == 1
+    finally:
+        db.delete(price_day)
+        db.commit()
+        clean(db, person.id, [unit.id])
+
+
+def test_holiday_policy_inherits_through_local_workflow_override(
+    db, task_people, units
+):
+    root, _, team, _ = units
+    person = task_people[0]
+    assigned(db, person, team)
+    parent = LeavePolicy(org_id=root.id, holiday_state="BE")
+    child = LeavePolicy(org_id=team.id, workflow="planning")
+    db.add_all([parent, child])
+    db.commit()
+    try:
+        day = date(2027, 3, 8)
+        snapshot = leave_rules.work_snapshot(db, day, day, [person.id])
+        assert leave_rules.capacity(snapshot, person.id, day, "am") == 0
+        parent.holiday_state = "none"
+        db.commit()
+        assert (
+            leave_rules.capacity(
+                leave_rules.work_snapshot(db, day, day, [person.id]),
+                person.id,
+                day,
+                "am",
+            )
+            == 1
+        )
+    finally:
+        clean(db, person.id, [root.id, team.id])
+
+
+def test_bulk_work_days_preserve_scope_and_roll_back(db, task_people, units):
+    from app.leave_extensions import WorkDay
+    from conftest import login, csrf_of, settings
+
+    settings(module_calendars="1")
+    _, a, _, b = units
+    manager, one, two = task_people[:3]
+    assigned(db, one, a)
+    assigned(db, two, b)
+    grant(db, a, manager, "leave_settings")
+    c = login(manager.email, "task-passwort-123")
+    data = dict(
+        csrf=csrf_of(c.get("/").text),
+        unit=a.id,
+        action="work_day",
+        person_ids=[str(one.id), str(two.id)],
+        day="2026-12-02",
+        am="0",
+        pm="0",
+    )
+    try:
+        assert c.post("/urlaub/konfiguration", data=data).status_code == 403
+        assert not db.scalar(select(WorkDay.id).where(WorkDay.person_id == one.id))
+        grant(db, b, manager, "leave_settings")
+        assert c.post("/urlaub/konfiguration", data=data).status_code == 303
+        assert db.scalar(select(WorkDay.id).where(WorkDay.person_id == one.id))
+        assert db.scalar(select(WorkDay.id).where(WorkDay.person_id == two.id))
+        assert c.post("/urlaub/konfiguration", data=data).status_code == 409
+    finally:
+        db.query(WorkDay).filter(WorkDay.person_id.in_([one.id, two.id])).delete()
+        db.commit()

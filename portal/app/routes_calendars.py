@@ -314,3 +314,27 @@ async def attach_source(
         )
     db.commit()
     return redirect("/kalender")
+
+
+@app.get("/kalender/besprechungen/{mid:int}/oeffnen")
+def open_meeting(
+    mid: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    from .db import Meeting, Invitee
+    from . import seminar_hybrid
+
+    row = db.get(Meeting, mid)
+    if not row or row.cancelled_at or seminar_hybrid.is_seminar_room(db, row):
+        raise HTTPException(404)
+    if row.owner_id == user.id and user.can("video"):
+        return redirect("/meetings/" + str(row.id))
+    invited = db.scalar(
+        select(Invitee).where(
+            Invitee.meeting_id == mid,
+            Invitee.email == user.email,
+            Invitee.join_token.is_not(None),
+        )
+    )
+    if not invited:
+        raise HTTPException(403)
+    return redirect("/join/" + invited.join_token)

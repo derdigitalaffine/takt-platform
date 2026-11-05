@@ -9,6 +9,7 @@ from .main import app, current_user, get_db, check_csrf, redirect, flash
 from .db import User
 from .leave_extensions import (
     WorkPattern,
+    WorkDay,
     Closure,
     EmergencyAssignment,
     LeaveAccount,
@@ -34,7 +35,18 @@ async def configure(
     unit = number(data.get("unit"))
     action = data.get("action")
     leave.lock(db)
-    if action == "notifications":
+    if action == "global_holidays":
+        from .db import set_setting
+        from .holidays import STATES
+
+        if not user.is_admin:
+            raise HTTPException(403)
+        state = data.get("holiday_state")
+        if state not in {*STATES, "none"}:
+            raise HTTPException(422)
+        set_setting(db, "leave_holiday_state", state)
+        org.audit(db, user, None, "leave_holidays", state=state)
+    elif action == "notifications":
         mode = data.get("email_mode")
         if mode not in ("none", "immediate", "daily"):
             raise HTTPException(422)
@@ -56,6 +68,11 @@ async def configure(
             raise HTTPException(403)
         if closed.org_id not in org.active_path(db, leave.primary(db, uid)):
             raise HTTPException(403)
+        person = db.get(User, uid)
+        if not person or not person.active:
+            raise HTTPException(
+                422, "Eine aktive Person für die Notbesetzung auswählen."
+            )
         key = (closed.id, uid)
         row = db.get(EmergencyAssignment, key)
         if data.get("remove") == "1":
@@ -189,68 +206,115 @@ async def configure(
                     enrollment=enrollment,
                 )
             )
-        elif action in ("work", "account"):
-            uid = number(data.get("person_id"))
-            if not org.allows(db, user, leave.primary(db, uid), "leave_settings"):
+        elif action == "work_day_remove":
+            row = db.get(WorkDay, number(data.get("work_day_id")))
+            if not row:
+                raise HTTPException(404)
+            if not org.allows(
+                db, user, leave.primary(db, row.person_id), "leave_settings"
+            ):
                 raise HTTPException(403)
-            if action == "work":
-                p = leave.period(uid, data, max_days=36500)
-                weekly = leave_rules.validate_pattern(
-                    [data.get("slot_" + str(i), "0") for i in range(14)]
-                )
-                if db.scalar(
-                    select(WorkPattern.id).where(
-                        WorkPattern.person_id == uid,
-                        WorkPattern.starts_on <= p.end.isoformat(),
-                        WorkPattern.ends_on >= p.start.isoformat(),
+            db.delete(row)
+        elif action in ("work", "account", "work_day"):
+            selected = list(
+                dict.fromkeys(data.getlist("person_ids") or [data.get("person_id", "")])
+            )
+            if not 1 <= len(selected) <= 500:
+                raise HTTPException(422, "Zwischen einer und 500 Personen auswählen.")
+            for raw in selected:
+                uid = number(raw)
+                person = db.get(User, uid)
+                if not person or not person.active:
+                    raise HTTPException(422, "Eine aktive Person auswählen.")
+                if not org.allows(db, user, leave.primary(db, uid), "leave_settings"):
+                    raise HTTPException(403)
+                if action == "work_day":
+                    try:
+                        day = date.fromisoformat(data.get("day", ""))
+                    except (ValueError, TypeError):
+                        raise HTTPException(422, "Gültigen Arbeitstag auswählen.")
+                    if not 1970 <= day.year <= 2200:
+                        raise HTTPException(422)
+                    values = leave_rules.validate_pattern(
+                        [data.get("am", "0"), data.get("pm", "0")] + [0] * 12
                     )
-                ):
-                    raise HTTPException(
-                        409,
-                        "Für diesen Zeitraum ist bereits ein Arbeitsmodell vorhanden.",
+                    if db.scalar(
+                        select(WorkDay.id).where(
+                            WorkDay.person_id == uid, WorkDay.day == day.isoformat()
+                        )
+                    ):
+                        raise HTTPException(
+                            409,
+                            "Für diesen Tag ist bereits eine Abweichung erfasst. Diese vor einer Änderung entfernen.",
+                        )
+                    db.add(
+                        WorkDay(
+                            person_id=uid,
+                            day=day.isoformat(),
+                            am=values[0],
+                            pm=values[1],
+                        )
                     )
-                db.add(
-                    WorkPattern(
-                        person_id=uid,
-                        starts_on=p.start.isoformat(),
-                        ends_on=p.end.isoformat(),
-                        weekly_json=json.dumps(weekly),
+                elif action == "work":
+                    p = leave.period(uid, data, max_days=36500)
+                    weekly = leave_rules.validate_pattern(
+                        [data.get("slot_" + str(i), "0") for i in range(14)]
                     )
-                )
-            else:
-                try:
-                    year = int(data.get("year"))
-                    entitlement = float(data.get("entitlement", "0"))
-                    carry = float(data.get("carry", "0"))
-                except (TypeError, ValueError):
-                    raise HTTPException(422)
-                if not 2000 <= year <= 2200 or any(
-                    not math.isfinite(v) or not 0 <= v <= 10000 or v * 2 != int(v * 2)
-                    for v in (entitlement, carry)
-                ):
-                    raise HTTPException(
-                        422,
-                        "Anspruch und Übertrag in ganzen oder halben Tagen angeben.",
+                    if db.scalar(
+                        select(WorkPattern.id).where(
+                            WorkPattern.person_id == uid,
+                            WorkPattern.starts_on <= p.end.isoformat(),
+                            WorkPattern.ends_on >= p.start.isoformat(),
+                        )
+                    ):
+                        raise HTTPException(
+                            409,
+                            "Für diesen Zeitraum ist bereits ein Arbeitsmodell vorhanden.",
+                        )
+                    db.add(
+                        WorkPattern(
+                            person_id=uid,
+                            starts_on=p.start.isoformat(),
+                            ends_on=p.end.isoformat(),
+                            weekly_json=json.dumps(weekly),
+                        )
                     )
-                row = db.get(LeaveAccount, (uid, year)) or LeaveAccount(
-                    person_id=uid, year=year
-                )
-                used = next(
-                    (
-                        a["used"]
-                        for a in leave_rules.account_balances(db, uid)
-                        if a["year"] == year
-                    ),
-                    0,
-                )
-                if entitlement + carry < used:
-                    raise HTTPException(
-                        409,
-                        "Anspruch und Übertrag dürfen bereits verbrauchten Urlaub nicht unterschreiten.",
+                else:
+                    try:
+                        year = int(data.get("year"))
+                        entitlement = float(data.get("entitlement", "0"))
+                        carry = float(data.get("carry", "0"))
+                    except (TypeError, ValueError):
+                        raise HTTPException(422)
+                    if not 2000 <= year <= 2200 or any(
+                        not math.isfinite(v)
+                        or not 0 <= v <= 10000
+                        or v * 2 != int(v * 2)
+                        for v in (entitlement, carry)
+                    ):
+                        raise HTTPException(
+                            422,
+                            "Anspruch und Übertrag in ganzen oder halben Tagen angeben.",
+                        )
+                    row = db.get(LeaveAccount, (uid, year)) or LeaveAccount(
+                        person_id=uid, year=year
                     )
-                row.entitlement = entitlement
-                row.carry = carry
-                db.add(row)
+                    used = next(
+                        (
+                            a["used"]
+                            for a in leave_rules.account_balances(db, uid)
+                            if a["year"] == year
+                        ),
+                        0,
+                    )
+                    if entitlement + carry < used:
+                        raise HTTPException(
+                            409,
+                            "Anspruch und Übertrag dürfen bereits verbrauchten Urlaub nicht unterschreiten.",
+                        )
+                    row.entitlement = entitlement
+                    row.carry = carry
+                    db.add(row)
         else:
             raise HTTPException(422)
         org.audit(db, user, unit, "leave_" + action)

@@ -1,6 +1,6 @@
 # Kalender, Organisation und Urlaubsplanung – Interviewstand 04.11.2026
 
-Dieses Dokument hält die Anforderungen aus dem Workshop-Interview fest. Die Organisationsverwaltung wird als erster technischer Baustein umgesetzt; Kalender, CalDAV und Urlaubsplanung sind hier spezifiziert, noch nicht implementiert.
+Dieses Dokument hält die Anforderungen aus dem Workshop-Interview fest. Die Umsetzung liegt in PR #182 und PR #184. Dieses Dokument hält die fachlichen Entscheidungen fest; den aktuellen Implementierungs- und Prüfstand dokumentiert [die Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md).
 
 ## Verbindlich vereinbarte Anforderungen
 

@@ -70,14 +70,42 @@ with tempfile.TemporaryDirectory(prefix="takt-org-") as root:
                 tree.get_by_role("link", name="Finanzen", exact=True).click()
                 finance_url = p.url
                 p.locator("summary").filter(
-                    has_text="Person zuordnen oder Zuordnung ändern"
+                    has_text="Personen zuordnen oder Zuordnungen ändern"
                 ).click()
-                p.locator("#org-person").select_option(
-                    label="Alex Teilnahme · member@example.org"
+                picker = p.locator("#org-members [data-selection-picker]").first
+                search = picker.locator("[data-selection-search]")
+                search.fill("member@example.org")
+                picker.get_by_role(
+                    "button", name="Alle Treffer auswählen", exact=True
+                ).click()
+                expect(picker.locator("[data-selection-count]")).to_contain_text(
+                    "1 ausgewählt"
                 )
-                p.get_by_role("button", name="Zuordnung speichern", exact=True).click()
-                expect(p.locator("#org-members")).to_contain_text("Alex Teilnahme")
-                expect(p.locator("#org-members")).to_contain_text("Hauptzuordnung")
+                search.fill("scope@example.org")
+                expect(picker.locator("[data-selection-count]")).to_contain_text(
+                    "1 ausgewählt"
+                )
+                picker.get_by_role(
+                    "button", name="Alle Treffer auswählen", exact=True
+                ).click()
+                expect(picker.locator("[data-selection-count]")).to_contain_text(
+                    "2 ausgewählt"
+                )
+                with p.expect_navigation(wait_until="domcontentloaded"):
+                    p.get_by_role("button", name="Auswahl zuordnen", exact=True).click()
+                expect(p.locator("#org-members .list-group")).to_contain_text(
+                    "Alex Teilnahme"
+                )
+                expect(p.locator("#org-members .list-group")).to_contain_text(
+                    "Hauptzuordnung"
+                )
+                expect(p.locator('.alert-danger[role="alert"]')).to_have_count(0)
+                p.locator("#org-assignment > summary").click()
+                p.screenshot(
+                    path=str(OUTPUT / "organization-selection-desktop.png"),
+                    full_page=True,
+                )
+                p.locator("#org-assignment > summary").click()
                 p.locator("summary").filter(
                     has_text="Organisationseinheit anlegen"
                 ).click()
@@ -96,6 +124,7 @@ with tempfile.TemporaryDirectory(prefix="takt-org-") as root:
                 for width in (360, 768):
                     p.set_viewport_size({"width": width, "height": 900})
                     p.emulate_media(color_scheme="dark")
+                    p.locator("#org-assignment").evaluate("(el)=>el.open=true")
                     p.wait_for_timeout(350)
                     p.screenshot(
                         path=str(OUTPUT / f"organization-{width}-debug.png"),

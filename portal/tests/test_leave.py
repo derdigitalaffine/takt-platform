@@ -38,6 +38,9 @@ def test_binding_sync_and_proposed_change_keep_effective_absence(
         db.commit()
         aid = row.absence_id
         assert db.get(Absence, aid).substitute_id is None
+        page = login(person.email, "task-passwort-123").get("/abwesenheiten")
+        assert page.status_code == 200 and f"/urlaub/vorgang/{row.id}" in page.text
+        assert f"/abwesenheiten/{aid}/loeschen" not in page.text
         leave.save(
             db,
             person,
@@ -240,4 +243,60 @@ def test_parent_view_uses_each_persons_actual_workflow(db, task_people, units):
     finally:
         db.query(LeaveRequest).filter_by(person_id=person.id).delete()
         db.query(LeavePolicy).filter_by(org_id=team.id).delete()
+        db.commit()
+
+
+def test_cancellation_of_edited_binding_leave_reaches_final_approver(
+    db, task_people, units
+):
+    root, unit, _, _ = units
+    person, local, central = task_people[:3]
+    assigned(db, person, unit)
+    grant(db, unit, local, "approver", False)
+    grant(db, root, central, "approver", False)
+    db.add(
+        LeavePolicy(
+            org_id=unit.id,
+            workflow="internal",
+            approval_units=json.dumps([unit.id, root.id]),
+        )
+    )
+    db.commit()
+    try:
+        row = leave.save(db, person, dict(starts_on="2026-12-01", ends_on="2026-12-01"))
+        db.commit()
+        for actor, action in (
+            (person, "request"),
+            (local, "approve"),
+            (central, "approve"),
+        ):
+            leave.command(db, actor, row.id, action, row.version)
+            db.commit()
+        leave.save(
+            db,
+            person,
+            dict(starts_on="2026-12-02", ends_on="2026-12-02", version=row.version),
+            row.id,
+        )
+        db.commit()
+        leave.command(db, person, row.id, "request_cancel", row.version)
+        db.commit()
+        assert json.loads(row.effective_json)["starts_on"] == "2026-12-01"
+        c = login(central.email, "task-passwort-123")
+        response = c.get(f"/urlaub/vorgang/{row.id}", follow_redirects=False)
+        assert (
+            response.status_code == 303
+            and f"unit={root.id}" in response.headers["location"]
+        )
+        assert c.get(f"/urlaub/{row.id}/verlauf").status_code == 200
+        with pytest.raises(HTTPException) as exc:
+            leave.command(db, local, row.id, "cancel", row.version)
+        assert exc.value.status_code == 403
+        db.rollback()
+        leave.command(db, central, row.id, "cancel", row.version)
+        db.commit()
+        assert not row.effective_json
+    finally:
+        db.query(LeaveRequest).filter_by(person_id=person.id).delete()
+        db.query(LeavePolicy).filter_by(org_id=unit.id).delete()
         db.commit()

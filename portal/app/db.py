@@ -131,7 +131,7 @@ PERMISSIONS = {
     "krank_admin": ("Krankmelder verwalten", "fa-user-nurse", "Alle Krankmeldungen sehen; Arbeitgeber, Empfänger, Zuständige, Zugang, Texte, Löschfrist und Import verwalten"),
     "org_members": ("Organisationszuordnungen verwalten", "fa-users-gear", "Haupt- und zusätzliche Organisationseinheiten aller Personen zuordnen; keine Konten oder Rollen ändern"),
     "org_roles": ("Organisationsrollen vergeben", "fa-user-shield", "Bereichsrollen für Personen und Gruppen vergeben; keine globalen Portalrechte"),
-    "orgs": ("Körperschaften (Stammdaten)", "fa-landmark-flag", "Gebietskörperschaften, Zweckverbände und ihre Einrichtungen (Abteilungen, Kitas …) mit Wappen und Kontakt pflegen – genutzt von Ressourcen, Krankmelder, Rechtstexten und Anträgen"),
+    "orgs": ("Organisation", "fa-landmark-flag", "Organisationsstruktur, Körperschaften, Stammdaten und Wappen verwalten; bereichsbezogene Zuordnungen und Rollen pflegen"),
     "absences": ("Vertretungen verwalten", "fa-user-clock", "Abwesenheiten (z. B. Krankheit) mit Vertretung für andere eintragen – ohne Angabe eines Grundes"),
     "users": ("Benutzerverwaltung", "fa-users-gear", "Benutzer und Gruppen anlegen, bearbeiten und löschen"),
 }
@@ -2766,6 +2766,7 @@ DEFAULT_SETTINGS = {
     "module_calendars": "0",
     "calendar_device_days": "0",
     "leave_email": "0",
+    "leave_holiday_state": "RP",
     "sm_api_url": "https://api-v2.speechmind.com/external/v2/graphql",
     "sm_api_key_enc": "",
     "sm_project_slug": "",
@@ -2925,6 +2926,7 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "leave_policies": {"holiday_state": "VARCHAR(8) NOT NULL DEFAULT 'inherit'"},
     "task_board_cards": {"shareable": "BOOLEAN NOT NULL DEFAULT 0"},
     "seminar_subscriptions": {"standing": "BOOLEAN NOT NULL DEFAULT 0"},
     "seminar_attendance": {"source": "VARCHAR(20) NOT NULL DEFAULT 'staff'"},

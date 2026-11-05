@@ -76,6 +76,8 @@ def event_access(db, actor, calendar, event):
         or org.allows(db, actor, event.org_id, "plan")
     ):
         return True
+    if not org.active_path(db, event.org_id):
+        return False
     return any(
         oid == event.org_id
         or event.include_children

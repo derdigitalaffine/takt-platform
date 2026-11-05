@@ -12,6 +12,7 @@ from .db import User, Organization
 from .org_models import OrgMembership
 from .leave_extensions import (
     WorkPattern,
+    WorkDay,
     Closure,
     EmergencyAssignment,
     LeaveAccount,
@@ -37,7 +38,12 @@ def validate_pattern(raw):
     return values
 
 
-def capacity(patterns, uid, day, half):
+def capacity(patterns, uid, day, half, simple=False):
+    special = getattr(patterns, "exceptions", {}).get((uid, day.isoformat()))
+    if special is not None:
+        return special[half == "pm"]
+    if day in getattr(patterns, "days_off", {}).get(uid, {}):
+        return 0
     matched = [
         p
         for p in patterns
@@ -48,7 +54,9 @@ def capacity(patterns, uid, day, half):
             409, "Überlappende Arbeitsmodelle müssen zuerst korrigiert werden."
         )
     values = (
-        validate_pattern(matched[0].weekly_json) if matched else [1.0] * 10 + [0.0] * 4
+        validate_pattern(matched[0].weekly_json)
+        if matched and not simple
+        else [1.0] * 10 + [0.0] * 4
     )
     return values[day.weekday() * 2 + (half == "pm")]
 
@@ -77,7 +85,7 @@ def account_check(db, person_id, candidate, keep):
     from .leave import period
 
     used = {}
-    patterns = list(db.scalars(select(WorkPattern)))
+    patterns = work_snapshot(db, candidate.start, candidate.end, [person_id])
     for row in db.scalars(
         select(LeaveRequest).where(
             LeaveRequest.person_id == person_id, LeaveRequest.id != keep
@@ -87,7 +95,11 @@ def account_check(db, person_id, candidate, keep):
             data = json.loads(row.effective_json)
             charges = data.get("account_charge")
             if charges is None:
-                charges = days_used(period(person_id, data), patterns)
+                previous = period(person_id, data)
+                charges = days_used(
+                    previous,
+                    work_snapshot(db, previous.start, previous.end, [person_id]),
+                )
             for year, days in charges.items():
                 year = int(year)
                 used[year] = used.get(year, 0) + days
@@ -135,9 +147,9 @@ def extra_conflicts(db, candidate, keep=None):
             )
         )
     )
-    assignments = {}
-    for a in db.scalars(select(EmergencyAssignment)):
-        assignments.setdefault(a.closure_id, set()).add(a.person_id)
+    assignments = {
+        closed.id: eligible_emergency_ids(db, closed, nodes) for closed in closures
+    }
     absences = []
     for row in db.scalars(select(LeaveRequest).where(LeaveRequest.id != keep)):
         if row.effective_json:
@@ -155,7 +167,7 @@ def extra_conflicts(db, candidate, keep=None):
             absences.append(
                 period(row.user_id, dict(starts_on=row.starts_on, ends_on=row.ends_on))
             )
-    patterns = list(db.scalars(select(WorkPattern)))
+    patterns = work_snapshot(db, candidate.start, candidate.end)
     tentative_periods = [
         period(
             row.person_id,
@@ -244,10 +256,7 @@ def extra_conflicts(db, candidate, keep=None):
                         )
                     )
             for closed in closures:
-                if (
-                    closed.org_id not in affected
-                    or not closed.starts_on <= day.isoformat() <= closed.ends_on
-                ):
+                if not closed.starts_on <= day.isoformat() <= closed.ends_on:
                     continue
                 assigned = assignments.get(closed.id, set())
                 if candidate.person_id in assigned:
@@ -255,6 +264,8 @@ def extra_conflicts(db, candidate, keep=None):
                         409,
                         "Die Person ist für die Notbesetzung einer Schließzeit eingeteilt.",
                     )
+                if closed.org_id not in affected:
+                    continue
                 available = len(
                     [
                         uid
@@ -317,7 +328,6 @@ def notify_request(db, row, actor, title, units):
 def account_balances(db, person_id):
     from .leave import period
 
-    patterns = list(db.scalars(select(WorkPattern)))
     used = {}
     for row in db.scalars(
         select(LeaveRequest).where(LeaveRequest.person_id == person_id)
@@ -327,7 +337,10 @@ def account_balances(db, person_id):
         data = json.loads(row.effective_json)
         charges = data.get("account_charge")
         if charges is None:
-            charges = days_used(period(person_id, data), patterns)
+            previous = period(person_id, data)
+            charges = days_used(
+                previous, work_snapshot(db, previous.start, previous.end, [person_id])
+            )
         for year, amount in charges.items():
             used[int(year)] = used.get(int(year), 0) + amount
     return [
@@ -350,14 +363,10 @@ def closure_obligations(db, closed, people):
     """Required leave is a planning marker, never an invented application or approval."""
     from .leave import period
 
-    patterns = list(db.scalars(select(WorkPattern)))
-    assigned = set(
-        db.scalars(
-            select(EmergencyAssignment.person_id).where(
-                EmergencyAssignment.closure_id == closed.id
-            )
-        )
+    patterns = work_snapshot(
+        db, date.fromisoformat(closed.starts_on), date.fromisoformat(closed.ends_on)
     )
+    assigned = eligible_emergency_ids(db, closed)
     rows = list(
         db.scalars(
             select(LeaveRequest).where(
@@ -397,6 +406,7 @@ def closure_obligations(db, closed, people):
         if person.id not in relevant:
             continue
         missing = []
+        unplanned = []
         planned = 0
         if person.id not in assigned:
             for offset in range(
@@ -421,6 +431,27 @@ def closure_obligations(db, closed, people):
                         for uid, p in tentative
                     ):
                         planned += 1
+                    else:
+                        unplanned.append(dict(day=day.isoformat(), half=half))
+        proposal = None
+        if unplanned:
+            run = [unplanned[0]]
+
+            def slot(item):
+                return date.fromisoformat(item["day"]).toordinal() * 2 + (
+                    item["half"] == "pm"
+                )
+
+            for item in unplanned[1:]:
+                if slot(item) != slot(run[-1]) + 1:
+                    break
+                run.append(item)
+            proposal = dict(
+                starts_on=run[0]["day"],
+                start_half=run[0]["half"],
+                ends_on=run[-1]["day"],
+                end_half=run[-1]["half"],
+            )
         result.append(
             dict(
                 person_id=person.id,
@@ -428,6 +459,7 @@ def closure_obligations(db, closed, people):
                 emergency=person.id in assigned,
                 missing=missing,
                 planned=planned,
+                proposal=proposal,
             )
         )
     return result
@@ -501,7 +533,7 @@ def planning_summary(db, unit, start, end):
     from .leave import policy
 
     effective_cfg = policy(db, unit)
-    patterns = list(db.scalars(select(WorkPattern))) if effective_cfg.advanced else []
+    patterns = work_snapshot(db, start, end)
     unavailable = []
     mirrors = set()
     for row in db.scalars(select(LeaveRequest)):
@@ -521,7 +553,12 @@ def planning_summary(db, unit, start, end):
         day = start + timedelta(days=offset)
         counts = []
         for half in ("am", "pm"):
-            available = {uid for uid in ids if capacity(patterns, uid, day, half) > 0}
+            available = {
+                uid
+                for uid in ids
+                if capacity(patterns, uid, day, half, simple=not effective_cfg.advanced)
+                > 0
+            }
             if not available:
                 continue
             absent = {p.person_id for p in unavailable if p.contains(day, half)}
@@ -534,3 +571,154 @@ def planning_summary(db, unit, start, end):
             )
         )
     return [dict(label="Verfügbare Personen · niedrigster Halbtag", days=days)]
+
+
+def eligible_emergency_ids(db, closed, nodes=None):
+    if nodes is None:
+        nodes = {n.id: n for n in db.scalars(select(Organization))}
+    eligible = {
+        m.user_id
+        for m in db.scalars(
+            select(OrgMembership)
+            .join(User, User.id == OrgMembership.user_id)
+            .where(OrgMembership.is_primary.is_(True), User.active.is_(True))
+        )
+        if closed.org_id in org.active_path(db, m.org_id, nodes)
+    }
+    return eligible.intersection(
+        db.scalars(
+            select(EmergencyAssignment.person_id).where(
+                EmergencyAssignment.closure_id == closed.id
+            )
+        )
+    )
+
+
+def closure_status(db, closed):
+    from .leave import period
+    from .db import Absence
+
+    assigned = eligible_emergency_ids(db, closed)
+    patterns = work_snapshot(
+        db,
+        date.fromisoformat(closed.starts_on),
+        date.fromisoformat(closed.ends_on),
+        assigned,
+    )
+    unavailable = []
+    mirrors = set()
+    for row in db.scalars(
+        select(LeaveRequest).where(LeaveRequest.person_id.in_(assigned))
+    ):
+        if row.absence_id:
+            mirrors.add(row.absence_id)
+        if row.effective_json:
+            unavailable.append(period(row.person_id, json.loads(row.effective_json)))
+    for row in db.scalars(
+        select(Absence).where(
+            Absence.user_id.in_(assigned), Absence.status == "confirmed"
+        )
+    ):
+        if row.id not in mirrors:
+            unavailable.append(
+                period(row.user_id, dict(starts_on=row.starts_on, ends_on=row.ends_on))
+            )
+    shortages = []
+    start = date.fromisoformat(closed.starts_on)
+    end = date.fromisoformat(closed.ends_on)
+    for offset in range((end - start).days + 1):
+        day = start + timedelta(days=offset)
+        for half in ("am", "pm"):
+            working = {
+                uid for uid in assigned if capacity(patterns, uid, day, half) > 0
+            }
+            if not working and (
+                day.weekday() >= 5 or day in holiday_days(db, closed.org_id, day, day)
+            ):
+                continue
+            available = working - {
+                p.person_id for p in unavailable if p.contains(day, half)
+            }
+            if len(available) < closed.emergency_minimum:
+                shortages.append(
+                    dict(day=day.isoformat(), half=half, available=len(available))
+                )
+    return dict(assigned=len(assigned), shortages=shortages)
+
+
+class WorkSnapshot(list):
+    def __init__(self, patterns, days_off, exceptions):
+        super().__init__(patterns)
+        self.days_off = days_off
+        self.exceptions = exceptions
+
+
+def holiday_days(
+    db, unit, start, end, *, policies=None, nodes=None, default_state=None
+):
+    """Reuse the legal-date calculation, never resource-price-only custom holidays."""
+    from . import holidays
+    from .db import get_settings
+
+    if policies is None:
+        policies = {p.org_id: p for p in db.scalars(select(LeavePolicy))}
+    if nodes is None:
+        nodes = {n.id: n for n in db.scalars(select(Organization))}
+    default_state = default_state or get_settings(db).get("leave_holiday_state", "RP")
+    state = next(
+        (
+            policies[oid].holiday_state
+            for oid in org.active_path(db, unit, nodes)
+            if oid in policies and policies[oid].holiday_state not in (None, "inherit")
+        ),
+        default_state,
+    )
+    if state == "none":
+        return {}
+    if state not in holidays.STATES:
+        state = "RP"
+    return {
+        day: label
+        for year in range(start.year, end.year + 1)
+        for day, label in holidays.legal(year, state).items()
+        if start <= day <= end
+    }
+
+
+def work_snapshot(db, start, end, person_ids=None):
+    from .db import get_settings
+
+    patterns = list(db.scalars(select(WorkPattern)))
+    primary = {
+        m.user_id: m.org_id
+        for m in db.scalars(
+            select(OrgMembership).where(OrgMembership.is_primary.is_(True))
+        )
+    }
+    ids = set(person_ids) if person_ids is not None else set(primary)
+    policies = {p.org_id: p for p in db.scalars(select(LeavePolicy))}
+    nodes = {n.id: n for n in db.scalars(select(Organization))}
+    default = get_settings(db).get("leave_holiday_state", "RP")
+    off = {
+        uid: holiday_days(
+            db,
+            primary.get(uid),
+            start,
+            end,
+            policies=policies,
+            nodes=nodes,
+            default_state=default,
+        )
+        for uid in ids
+    }
+    exceptions = {
+        (d.person_id, d.day): (d.am, d.pm)
+        for d in db.scalars(
+            select(WorkDay).where(
+                WorkDay.person_id.in_(ids),
+                WorkDay.day >= start.isoformat(),
+                WorkDay.day <= end.isoformat(),
+            )
+        )
+    }
+    return WorkSnapshot(patterns, off, exceptions)

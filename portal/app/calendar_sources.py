@@ -1,7 +1,7 @@
 """Read-only projections of canonical business objects, with their live access rules."""
 
 from datetime import date, datetime, timedelta, timezone
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from .db import (
     get_settings,
     to_local,
@@ -25,6 +25,7 @@ SOURCES = {
     "leave": ("Mein Urlaub", "module_calendars"),
     "absences": ("Meine weiteren Abwesenheiten", "module_calendars"),
     "closures": ("Schließzeiten meines Bereichs", "module_calendars"),
+    "holidays": ("Gesetzliche Feiertage", "module_calendars"),
 }
 
 
@@ -66,20 +67,26 @@ def project(db, user, kind, start, end):
             )
         )
 
-    if kind == "meetings" and user.can("video"):
+    if kind == "meetings":
         for row in db.scalars(
             select(Meeting).where(
                 or_(
-                    Meeting.owner_id == user.id,
+                    and_(Meeting.owner_id == user.id, user.can("video")),
                     Meeting.id.in_(
-                        select(Invitee.meeting_id).where(Invitee.email == user.email)
+                        select(Invitee.meeting_id).where(
+                            Invitee.email == user.email, Invitee.join_token.is_not(None)
+                        )
                     ),
                 ),
-                Meeting.ends_at > a,
+                Meeting.starts_at.is_not(None),
                 Meeting.starts_at < b,
                 Meeting.cancelled_at.is_(None),
             )
         ):
+            from . import seminar_hybrid
+
+            if seminar_hybrid.is_seminar_room(db, row):
+                continue
             add(
                 row.id,
                 row.title,
@@ -88,7 +95,7 @@ def project(db, user, kind, start, end):
                 (
                     "/meetings/" + str(row.id)
                     if row.owner_id == user.id
-                    else "/join/" + row.room
+                    else "/kalender/besprechungen/" + str(row.id) + "/oeffnen"
                 ),
             )
     elif kind == "seminars":
@@ -183,6 +190,7 @@ def project(db, user, kind, start, end):
                     staff_links=level >= 3,
                 )
             ):
+                event["title"] = resource.name + ": " + event["title"]
                 event["id"] = kind + ":" + str(resource.id) + ":" + event["id"]
                 event.setdefault("extendedProps", {}).update(
                     source=kind, url=event.pop("url", "/resources/" + str(resource.id))
@@ -276,6 +284,17 @@ def project(db, user, kind, start, end):
                 "/abwesenheiten",
                 True,
             )
+    elif kind == "holidays":
+        from .leave_rules import holiday_days
+        from .org_models import OrgMembership
+
+        unit = db.scalar(
+            select(OrgMembership.org_id).where(
+                OrgMembership.user_id == user.id, OrgMembership.is_primary.is_(True)
+            )
+        )
+        for day, label in holiday_days(db, unit, start.date(), end.date()).items():
+            add(day.isoformat(), label, day, day + timedelta(days=1), "", True)
     elif kind == "closures":
         from .leave_extensions import Closure
         from .routes_calendars import closure_visible, closure_link

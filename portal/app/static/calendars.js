@@ -101,6 +101,7 @@
         : "none";
       fields.repeat_count.value = series ? event.extendedProps.repeatCount : 10;
       fields.id.value = series ? event.extendedProps.seriesId : event.id;
+      fields.kind.disabled = true;
       fields.version.value = event.extendedProps.version;
       fields.calendar_id.value = event.extendedProps.calendarId;
       fields.org_id_event.value = event.extendedProps.orgId || "";
@@ -151,7 +152,14 @@
     document.getElementById("event-audience").hidden = closed;
     for (const row of form.querySelectorAll(".calendar-series"))
       row.hidden = closed;
-    fields.calendar_id.disabled = closed;
+    for (const field of [
+      fields.calendar_id,
+      fields.location,
+      fields.description,
+    ]) {
+      field.closest(".col-md-6").hidden = closed;
+      field.disabled = closed;
+    }
     if (closed) fields.all_day.checked = true;
     fields.all_day.disabled = closed;
     toggleTimes();
