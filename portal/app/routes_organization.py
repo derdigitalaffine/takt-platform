@@ -151,11 +151,19 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         for g in role_rows
         if g.org_id == unit
     ]
+    org_people_count = {}
+    for membership in memberships:
+        org_people_count[membership.org_id] = org_people_count.get(membership.org_id, 0) + 1
+    org_role_count = {}
+    for grant in all_grants:
+        org_role_count[grant.org_id] = org_role_count.get(grant.org_id, 0) + 1
     return render(
         request,
         "organization.html",
         user,
         org_rows=rows,
+        org_people_count=org_people_count,
+        org_role_count=org_role_count,
         org_nodes=nodes,
         org_access=access,
         selected=selected,
