@@ -69,7 +69,7 @@ def test_external_attestation_cannot_be_delegated_and_stale_version(
     person, planner = task_people[:2]
     assigned(db, person, a)
     grant(db, a, planner, "planner")
-    db.add(LeavePolicy(org_id=a.id, workflow="external"))
+    db.add(LeavePolicy(org_id=a.id, workflow="external", external_attestation=True))
     db.commit()
     try:
         row = leave.save(
