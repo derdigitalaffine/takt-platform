@@ -217,6 +217,11 @@ def page(
             c.id: org.allows(db, user, c.org_id, "leave_settings")
             for c in db.scalars(select(Closure))
         },
+        closure_enrollers={
+            c.id: org.allows(db, user, c.org_id, "plan") or
+                  org.allows(db, user, c.org_id, "leave_settings")
+            for c in db.scalars(select(Closure))
+        },
         closure_obligations={
             c.id: leave_rules.closure_obligations(db, c, people)
             for c in db.scalars(select(Closure))
