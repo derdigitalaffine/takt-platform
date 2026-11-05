@@ -56,6 +56,8 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 p.get_by_label("Passwort", exact=True).fill("browser-test-password")
                 p.get_by_role("button", name="Anmelden", exact=True).click()
                 p.goto(base + "/urlaub")
+                expect(p.get_by_role("navigation", name="Urlaubsbereiche")).to_be_visible()
+                expect(p.get_by_role("link", name="Mein Urlaub", exact=True)).to_be_visible()
                 p.get_by_label("Organisationseinheit", exact=True).select_option(
                     label="Finanzen"
                 )
@@ -213,11 +215,12 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 expect(form.get_by_label("Ort", exact=True)).to_be_hidden()
                 form.get_by_role("button", name="Termin speichern", exact=True).click()
                 expect(form.get_by_label("Titel", exact=True)).to_have_value("")
-                p.goto(base + "/urlaub")
+                p.goto(base + "/urlaub/schliesszeiten")
                 p.get_by_label("Organisationseinheit", exact=True).select_option(
                     label="Finanzen"
                 )
                 p.get_by_role("button", name="Anzeigen", exact=True).click()
+                expect(p.get_by_role("navigation", name="Urlaubsbereiche")).to_be_visible()
                 closed = p.get_by_role(
                     "heading", name="Schließzeit: Betriebsruhe", exact=True
                 ).locator("..")
