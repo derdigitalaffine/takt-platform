@@ -154,6 +154,7 @@ def page(
         people=people,
         can_create=any(leave.can_plan(db, user, p.id) for p in people),
         rows=rows,
+        row_policies={r.id: leave.policy(db, r.org_id) for r in rows},
         closures=[
             c
             for c in db.scalars(select(Closure))
@@ -455,3 +456,17 @@ def summary(
 
     a, b = window(start, end)
     return leave_rules.planning_summary(db, unit, a.date(), b.date())
+
+
+@app.get("/urlaub/vorgang/{rid:int}")
+def open_request(
+    rid: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    row = db.get(LeaveRequest, rid)
+    if not row or not can_read_request(db, user, row):
+        raise HTTPException(403)
+    unit = leave.primary(db, row.person_id)
+    for oid in org.active_path(db, unit):
+        if readable(db, user, oid):
+            return redirect(f"/urlaub?unit={oid}#leave-row-{rid}")
+    raise HTTPException(403)

@@ -42,7 +42,7 @@
             </select>
         </label>
         <p class="small">Das Apple-Profil enthält das eigene Gerätepasswort. Bewahren Sie es wie ein Passwort auf und geben Sie es nicht weiter. Nach dem Download öffnen und die Installation in den Geräteeinstellungen bestätigen.</p>
-        <button class="btn btn-primary">Gerätezugang erzeugen</button>
+        <button class="btn btn-primary" {{'disabled' if not calendars}}>Gerätezugang erzeugen</button>
     </form>
 </section>
 {% if user.is_admin %}

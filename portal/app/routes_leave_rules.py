@@ -225,7 +225,7 @@ async def configure(
                 except (TypeError, ValueError):
                     raise HTTPException(422)
                 if not 2000 <= year <= 2200 or any(
-                    not math.isfinite(v) or v < 0 or v * 2 != int(v * 2)
+                    not math.isfinite(v) or not 0 <= v <= 10000 or v * 2 != int(v * 2)
                     for v in (entitlement, carry)
                 ):
                     raise HTTPException(

@@ -251,3 +251,15 @@ def test_readonly_source_sync_rechecks_membership_and_reports_removal(
 
 
 from test_organization import units
+
+
+def test_calendar_query_rejects_unbounded_historical_scan():
+    import pytest
+    from xml.etree import ElementTree as ET
+    from fastapi import HTTPException
+    from app.dav_protocol import query_filter
+
+    xml = '<c:calendar-query xmlns:c="urn:ietf:params:xml:ns:caldav"><c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT"><c:time-range start="00010101T000000Z" end="99991231T000000Z"/></c:comp-filter></c:comp-filter></c:filter></c:calendar-query>'
+    with pytest.raises(HTTPException) as exc:
+        query_filter(ET.fromstring(xml))
+    assert exc.value.status_code == 400

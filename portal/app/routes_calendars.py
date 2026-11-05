@@ -38,6 +38,7 @@ def calendar_page(
         "calendars.html",
         user,
         calendars=rows,
+        has_closure_source=any(c.source == "closures" for c in rows),
         sources={
             key: val[0]
             for key, val in calendar_sources.SOURCES.items()

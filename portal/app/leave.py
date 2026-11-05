@@ -300,6 +300,8 @@ def command(db, actor, request_id, action, version, reason=""):
         row.approval_path = json.dumps(path)
         row.approval_step = 0
     elif action == "request_cancel":
+        if row.cancel_requested:
+            raise HTTPException(409, "Die Stornierung ist bereits angefragt.")
         if not row.effective_json or cfg.workflow != "internal":
             raise HTTPException(
                 422, "Für diesen Urlaub ist keine Stornoanfrage erforderlich."

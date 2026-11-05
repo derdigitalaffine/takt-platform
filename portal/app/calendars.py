@@ -193,7 +193,27 @@ def save_event(db, actor, calendar, data, row=None, *, raw_ical=None):
         row.uid = str(master["UID"])
         row.ical_data = parsed.to_ical().decode()
     else:
-        row.ical_data = build_web_series(row, data)
+        replacement = build_web_series(row, data)
+        if (
+            not replacement
+            and row.ical_data
+            and not event_data(row)["extendedProps"].get("series")
+        ):
+            parsed, master, _ = validate(row.ical_data)
+            # A web edit of a client-created single event retains alarms and extra properties.
+            for key, value in {
+                "SUMMARY": row.title,
+                "DESCRIPTION": row.description,
+                "LOCATION": row.location,
+                "DTSTART": start,
+                "DTEND": end,
+                "DTSTAMP": row.updated_at.replace(tzinfo=timezone.utc),
+                "SEQUENCE": (row.version or 0) + 1,
+            }.items():
+                master.pop(key, None)
+                master.add(key, value)
+            replacement = parsed.to_ical().decode()
+        row.ical_data = replacement
     row.version = (row.version or 0) + 1
     db.add(row)
     db.flush()

@@ -204,3 +204,44 @@ def test_event_audience_never_leaks_through_public_json_ics_or_dav(
     finally:
         db.delete(cal)
         db.commit()
+
+
+def test_web_edit_retains_client_alarm_and_custom_properties(db, task_people):
+    owner = task_people[0]
+    cal = Calendar(owner_id=owner.id, title="Client roundtrip")
+    db.add(cal)
+    db.commit()
+    raw = b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Roundtrip//EN\r\nBEGIN:VEVENT\r\nUID:roundtrip@example.org\r\nDTSTART;VALUE=DATE:20261201\r\nDTEND;VALUE=DATE:20261202\r\nSUMMARY:Original\r\nX-CLIENT-NOTE:keep-me\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15M\r\nDESCRIPTION:Remember\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    try:
+        row = calendars.save_event(
+            db,
+            owner,
+            cal,
+            dict(title="Original", start="2026-12-01", end="2026-12-01", all_day=True),
+            raw_ical=raw,
+        )
+        db.commit()
+        calendars.save_event(
+            db,
+            owner,
+            cal,
+            dict(
+                title="Web edit",
+                start="2026-12-03",
+                end="2026-12-03",
+                all_day=True,
+                version=row.version,
+            ),
+            row,
+        )
+        db.commit()
+        content = calendars.export(db, owner, cal)
+        assert (
+            "X-CLIENT-NOTE:keep-me" in content
+            and "BEGIN:VALARM" in content
+            and "SUMMARY:Web edit" in content
+            and "DTSTART;VALUE=DATE:20261203" in content
+        )
+    finally:
+        db.delete(cal)
+        db.commit()

@@ -7,6 +7,7 @@ from .db import (
     to_local,
     Meeting,
     Invitee,
+    Poll,
     Seminar,
     SeminarEnrollment,
     BookingPage,
@@ -17,11 +18,12 @@ from .db import (
 SOURCES = {
     "meetings": ("Besprechungen", "module_video"),
     "seminars": ("Seminare und Teilnahmen", "module_seminars"),
+    "polls": ("Festgelegte Terminumfragen", "module_polls"),
     "resources": ("Ressourcenbelegung", "module_resources"),
     "bookings": ("Terminbuchungen", "module_bookings"),
     "tasks": ("Aufgabentermine", "module_tasks"),
     "leave": ("Mein Urlaub", "module_calendars"),
-    "absences": ("Meine Abwesenheiten", "module_calendars"),
+    "absences": ("Meine weiteren Abwesenheiten", "module_calendars"),
     "closures": ("Schließzeiten meines Bereichs", "module_calendars"),
 }
 
@@ -90,7 +92,7 @@ def project(db, user, kind, start, end):
                 ),
             )
     elif kind == "seminars":
-        from . import seminars
+        from . import seminars, seminar_series
 
         owned = set(
             db.scalars(
@@ -102,7 +104,8 @@ def project(db, user, kind, start, end):
         )
         for row in db.scalars(select(Seminar)):
             planning = seminars.may_plan(db, user, row)
-            if row.id not in owned and not planning:
+            teaching = {term.id for term in seminar_series.staff_terms(db, user, row)}
+            if row.id not in owned and not planning and not teaching:
                 continue
             enrolled = list(
                 db.scalars(
@@ -120,8 +123,10 @@ def project(db, user, kind, start, end):
             }
             if row.status == "cancelled":
                 continue
-            for term in seminars.sessions(db, row):
-                if not planning and term.id not in allowed:
+            for term in seminars.sessions(db, row, False):
+                if term.cancelled or (
+                    not planning and term.id not in allowed | teaching
+                ):
                     continue
                 add(
                     term.id,
@@ -129,6 +134,40 @@ def project(db, user, kind, start, end):
                     term.starts_at,
                     term.ends_at,
                     "/seminare/" + str(row.id),
+                )
+    elif kind == "polls":
+        from . import shares
+
+        for row in db.scalars(
+            select(Poll).where(
+                Poll.final_option_id.is_not(None),
+                Poll.published_at.is_not(None),
+                Poll.archived_at.is_(None),
+            )
+        ):
+            if shares.access_level(db, "poll", row, user) < shares.VIEW:
+                continue
+            opt = row.final_option
+            if not opt:
+                continue
+            if opt.all_day:
+                day = opt.starts_at.date()
+                add(
+                    row.id,
+                    row.title,
+                    day,
+                    day + timedelta(days=1),
+                    "/polls/" + str(row.id),
+                    True,
+                )
+            else:
+                add(
+                    row.id,
+                    row.title,
+                    opt.starts_at,
+                    opt.ends_at
+                    or opt.starts_at + timedelta(minutes=row.duration_minutes or 60),
+                    "/polls/" + str(row.id),
                 )
     elif kind == "resources":
         from . import resources
@@ -220,10 +259,13 @@ def project(db, user, kind, start, end):
             )
     elif kind == "absences":
         from . import absence
+        from .leave_models import LeaveAbsencePeriod
 
         for row in db.scalars(
             select(Absence).where(
-                Absence.user_id == user.id, Absence.status == "confirmed"
+                Absence.user_id == user.id,
+                Absence.status == "confirmed",
+                Absence.id.not_in(select(LeaveAbsencePeriod.absence_id)),
             )
         ):
             add(

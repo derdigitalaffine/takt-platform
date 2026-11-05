@@ -74,6 +74,7 @@
         </section>
         {% endif %}
 {% for row in rows %}
+            {% set row_policy = row_policies[row.id] %}
             <article id="leave-row-{{ row.id }}" class="card card-body mb-3">
                 <h2 class="h6">{{ (people|selectattr('id','equalto',row.person_id)|first).name}} · {{ row.starts_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.start_half=='am' else 'Nachmittag'}}) bis {{ row.ends_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.end_half=='am' else 'Nachmittag'}})</h2>
                 <p>{{{'planned':'Geplant','requested':'Beantragt','binding':'Verbindlich','rejected':'Abgelehnt','cancelled':'Storniert'}[row.status]}}{% if row.attested_at %} · Extern genehmigt (Selbstauskunft){% endif %}{% if row.effective_json and row.status!="binding" %} · Bisheriger verbindlicher Zeitraum gilt bis zur Entscheidung weiter.{% endif %}
@@ -86,12 +87,12 @@
                             class="btn btn-outline-secondary align-self-start mb-2"
                             data-leave-edit="{{ row.id }}">Zeitraum bearbeiten</button>
                 {% endif %}
-                {% if policy.workflow=="external" and row.person_id==user.id and row.status=="planned" %}
+                {% if row_policy.workflow=="external" and row.person_id==user.id and row.status=="planned" %}
                     <div class="alert alert-info">
                         <p>Urlaub auch im externen System beantragen. Nach dessen Genehmigung bestätigen Sie hier Ihre Selbstauskunft.</p>
-                        {% if policy.external_url %}
+                        {% if row_policy.external_url %}
                             <a class="btn btn-outline-primary"
-                               href="{{ policy.external_url }}"
+                               href="{{ row_policy.external_url }}"
                                target="_blank"
                                rel="noopener noreferrer">Externes System öffnen</a>
                         {% endif %}
@@ -100,19 +101,19 @@
                                 data-leave-copy="{{ row.id }}">Zeitraum kopieren</button>
                     </div>
                 {% endif %}
-                {% if planners[row.person_id] or approvers[row.id] or (row.cancel_requested and cancel_approvers[row.id]) %}
+                {% if planners[row.person_id] or (row.status=="requested" and approvers[row.id]) or (row.effective_json and cancel_approvers[row.id]) %}
                     <form data-leave-command
                           method="post"
                           action="/urlaub/{{ row.id }}"
                           class="d-flex flex-wrap gap-2">
                         <input type="hidden" name="csrf" value="{{ csrf }}">
                         <input type="hidden" name="version" value="{{ row.version }}">
-                        {% if row.status=="planned" %}
-                            {% if policy.workflow=="planning" %}
+                        {% if row.status=="planned" and planners[row.person_id] %}
+                            {% if row_policy.workflow=="planning" %}
                                 <button class="btn btn-primary"
                                         name="action"
                                         value="bind">Verbindlich markieren</button>
-                            {% elif policy.workflow=="internal" %}
+                            {% elif row_policy.workflow=="internal" %}
                                 <button class="btn btn-primary" name="action" value="request">Antrag einreichen</button>
                             {% elif row.person_id==user.id %}
                                 <button class="btn btn-primary"
@@ -132,16 +133,18 @@
                                         value="reject_cancel">Stornoanfrage ablehnen</button>
                             {% endif %}
                         {% endif %}
-                        {% if row.status=="planned" and policy.workflow!="internal" and not policy.notify_only_warnings %}
+                        {% if row.status=="planned" and planners[row.person_id] and row_policy.workflow!="internal" and not row_policy.notify_only_warnings %}
                             <button class="btn btn-outline-secondary"
                                     name="action"
                                     value="request_exception">Ausnahmeentscheidung anfragen</button>
                         {% endif %}
-                        {% if row.effective_json and policy.workflow=="internal" and not cancel_approvers[row.id] %}
-                            <button class="btn btn-outline-danger"
-                                    name="action"
-                                    value="request_cancel">Stornierung anfragen</button>
-                        {% elif row.status!="cancelled" %}
+                        {% if row.effective_json and row_policy.workflow=="internal" %}
+                            {% if cancel_approvers[row.id] %}
+                                <button class="btn btn-outline-danger" name="action" value="cancel">Stornieren</button>
+                            {% elif planners[row.person_id] and not row.cancel_requested %}
+                                <button class="btn btn-outline-danger" name="action" value="request_cancel">Stornierung anfragen</button>
+                            {% endif %}
+                        {% elif row.status!="cancelled" and (planners[row.person_id] or cancel_approvers[row.id]) %}
                             <button class="btn btn-outline-danger" name="action" value="cancel">Stornieren</button>
                         {% endif %}
                         <label class="small">

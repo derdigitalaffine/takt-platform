@@ -207,7 +207,11 @@ def query_filter(tree):
         finish = datetime.strptime(
             bounds.get("end", "22001231T000000Z"), "%Y%m%dT%H%M%SZ"
         ).replace(tzinfo=timezone.utc)
-        if finish <= begin:
+        if (
+            finish <= begin
+            or begin.year < 1970
+            or finish > datetime(2201, 1, 1, tzinfo=timezone.utc)
+        ):
             raise ValueError()
     except ValueError:
         raise HTTPException(400, "Invalid time range")

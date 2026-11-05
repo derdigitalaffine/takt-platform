@@ -218,3 +218,26 @@ def test_area_viewer_can_read_but_never_plan_or_see_private_history(
     finally:
         db.query(LeaveRequest).filter_by(person_id=person.id).delete()
         db.commit()
+
+
+def test_parent_view_uses_each_persons_actual_workflow(db, task_people, units):
+    _, unit, team, _ = units
+    person = task_people[0]
+    assigned(db, person, team)
+    grant(db, unit, person, "viewer")
+    db.add(LeavePolicy(org_id=team.id, workflow="external"))
+    db.commit()
+    row = leave.save(db, person, dict(starts_on="2026-12-01", ends_on="2026-12-01"))
+    db.commit()
+    try:
+        c = login(person.email, "task-passwort-123")
+        page = c.get(f"/urlaub?unit={unit.id}")
+        assert page.status_code == 200
+        assert (
+            "Externe Genehmigung selbst bestätigen" in page.text
+            and 'value="bind"' not in page.text
+        )
+    finally:
+        db.query(LeaveRequest).filter_by(person_id=person.id).delete()
+        db.query(LeavePolicy).filter_by(org_id=team.id).delete()
+        db.commit()
