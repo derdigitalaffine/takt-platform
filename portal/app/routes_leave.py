@@ -248,7 +248,7 @@ def page(
             and (can_see_leave_details(db, user, r.person_id) or can_decide_request(db, user, r))
         ]
     visible_closures = (
-        [c for c in visible_closures if c.org_id in org.active_path(db, unit)]
+        [c for c in db.scalars(select(Closure)) if c.org_id in org.active_path(db, unit)]
         if unit and section == "schliesszeiten" else []
     )
     preference = db.get(LeavePreference, user.id) if section == "mein-urlaub" else None
