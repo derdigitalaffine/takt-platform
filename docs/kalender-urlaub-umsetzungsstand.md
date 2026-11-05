@@ -10,6 +10,14 @@ Der [PR #185](https://github.com/derdigitalaffine/takt-platform/pull/185) trennt
 
 Interne Genehmigung bleibt optional; für Leitung und Stellvertretung geht eigener Urlaub standardmäßig zur übergeordneten Einheit, ausdrückliche Genehmigungswege bleiben vorrangig und eine Selbstgenehmigung ist nicht erlaubt. Im externen Modus ist die **persönliche Selbstauskunft pro Einheit abschaltbar**. Schließzeiten können Leitungseinteilung, Selbsteintragung oder beides zulassen. Bestehende Fachrechte bleiben wirksam.
 
+### Zweite Qualitätsrunde (PR #185)
+
+Die [separate Security-/Datenschutz-Review- und Abnahmecheckliste](SECURITY-REVIEW-PR185.md) benennt die geprüften Berechtigungsgrenzen, die kanonischen Abwesenheitsquellen und verbleibende Betriebsprüfungen. Die Einstellung für die freiwillige Selbstauskunft der externen ZE-Software ist für neue Policys **standardmäßig ausgeschaltet**. Die vier Reiter für Urlaubsverfahren, Besetzung, Feiertage und Konten speichern nur ihre eigenen Werte; Eingabefelder anderer Reiter werden **serverseitig ignoriert**. Eine bestehende vollständige Policy kann nur im Verfahren-Reiter mit ausdrücklich benannter Wirkung zurückgesetzt werden.
+
+Für einen Elternbereich mit eingeschränkter Untereinheitenvererbung bleibt eine *ausdrücklich zugewiesene* Genehmigungsentscheidung sichtbar, ohne pauschalen Einblick in sämtliche Untereinheiten. Die eigene Urlaubsansicht ist auch beim Wechsel des gemeinsamen Arbeitskontexts erhalten. Reine Schließzeiten- und Verwaltungsansichten laden keine unnötigen Urlaubsdetail- und Besetzungslisten mehr.
+
+**Wichtige Bestandsgrenze:** Die vorhandene `LeavePolicy` vererbt vollständige Richtliniensätze, nicht einzelne Felder. Der erste lokale Reiter-Edit übernimmt die übrigen zum Speichern wirksamen Elternwerte als einmaligen Snapshot. Spätere Änderungen im Elternbereich werden für diese Felder **nicht** automatisch übernommen. Die Dokumentation grenzt dieses Verhalten ausdrücklich von einer noch nicht existierenden feldweisen Vererbung ab.
+
 **Abnahmegrenze:** Dieser Abschnitt beschreibt die Änderung **im PR-Review**, nicht bereits den freigegebenen Stand in `main`. Vor dem Merge sind vollständige Python-, Chromium- und Sicherheitsprüfungen des endgültigen Head-Commits erforderlich. Die früher dokumentierten grünen 660 Tests beziehen sich weiterhin auf PR #184, nicht automatisch auf #185.
 
 ## Implementiert
