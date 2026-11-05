@@ -4,7 +4,7 @@ import json
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
-from app import leave
+from app import leave, organization as org
 from app.db import Absence
 from app.leave_models import LeavePolicy, LeaveRequest
 from test_organization import units, grant
@@ -565,7 +565,7 @@ def test_parent_only_approver_sees_assigned_request_not_unrelated_leave(
         leave.command(db, employee, request.id, "request", request.version)
         db.commit()
         assert request.status == "requested"
-        assert not __import__("app").organization.allows(
+        assert not org.allows(
             db, reviewer, area.id, "approve"
         )
         approver = login(reviewer.email, "task-passwort-123")
