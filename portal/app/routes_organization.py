@@ -195,6 +195,149 @@ def organization_page(
     )
 
 
+
+def _person_editor_entries(db, actor, person, focus=None):
+    """One shared, rights-filtered editor in user and organization administration."""
+    assigned = {
+        row.org_id: row
+        for row in db.scalars(
+            select(OrgMembership).where(OrgMembership.user_id == person.id)
+        )
+    }
+    direct = {}
+    for grant in db.scalars(
+        select(OrgRoleGrant).where(OrgRoleGrant.user_id == person.id)
+    ):
+        direct.setdefault(grant.org_id, {})[grant.role] = grant
+    entries = []
+    for node in db.scalars(select(Organization).order_by(Organization.name)):
+        if not os.allows(db, actor, node.id, "view"):
+            continue
+        members = os.allows(db, actor, node.id, "members")
+        roles = os.allows(db, actor, node.id, "roles")
+        if not (members or roles or node.id in assigned or node.id in direct):
+            continue
+        entries.append(dict(
+            node=node, membership=assigned.get(node.id),
+            grants=direct.get(node.id, {}),
+            can_members=members, can_roles=roles,
+            focused=node.id == focus or (focus is None and node.id in assigned),
+        ))
+    return entries
+
+
+@app.get("/admin/organization/person/{person_id:int}")
+def organization_person_panel(
+    request: Request,
+    person_id: int,
+    unit: int | None = None,
+    origin: str = "organization",
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    if not os.has_access(db, user):
+        raise HTTPException(403)
+    person = db.get(User, person_id)
+    if not person:
+        raise HTTPException(404)
+    entries = _person_editor_entries(db, user, person, unit)
+    if not entries:
+        raise HTTPException(403)
+    return render(
+        request, "organization_person_panel.html", user,
+        person=person, entries=entries, org_roles=os.ROLES,
+        org_version=db.get(OrgState, 1).version,
+        origin="users" if origin == "users" else "organization",
+    )
+
+
+@app.post("/admin/organization/person/{person_id:int}", dependencies=[Depends(check_csrf)])
+async def organization_person_save(
+    request: Request,
+    person_id: int,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    if not os.has_access(db, user):
+        raise HTTPException(403)
+    person = db.get(User, person_id)
+    if not person or not person.active:
+        raise HTTPException(404, "Aktive Person auswählen.")
+    form = await request.form()
+    entries = _person_editor_entries(db, user, person)
+    editable = [e for e in entries if e["can_members"] or e["can_roles"]]
+    if not editable:
+        raise HTTPException(403)
+    # One optimistic version check and one transaction for all changed units.
+    os.lock(db, form.get("version"))
+    primary_raw = form.get("primary_unit")
+    primary_unit = os.number(primary_raw) if primary_raw else None
+    if primary_unit and not any(
+        e["node"].id == primary_unit and e["can_members"]
+        and form.get(f"member_{primary_unit}") == "1" for e in entries
+    ):
+        raise HTTPException(422, "Hauptzuordnung muss aktiv und bearbeitbar sein.")
+    # Move the primary association first, then update other associations,
+    # and only then process removals. Existing scopes outside this editor survive.
+    member_entries = sorted(
+        (e for e in editable if e["can_members"] and
+         form.get(f'member_{e["node"].id}') == "1"),
+        key=lambda e: 0 if e["node"].id == primary_unit else 1,
+    )
+    for entry in member_entries:
+        oid = entry["node"].id
+        member = entry["membership"]
+        want_primary = oid == primary_unit if primary_unit else bool(
+            member and member.is_primary
+        )
+        staff = form.get(f"staff_{oid}")
+        capacity = str(form.get(f"capacity_{oid}", "100"))
+        if staff not in ("yes", "no"):
+            raise HTTPException(422, "Besetzungswirkung prüfen.")
+        if (
+            member and member.is_primary == want_primary
+            and member.counts_staff == (staff == "yes")
+            and str(member.capacity_percent) == capacity
+        ):
+            continue
+        os.set_membership(db, user, dict(
+            org_id=oid, user_id=person_id,
+            is_primary="1" if want_primary else "0",
+            staff_mode=staff, capacity_percent=capacity,
+        ))
+    for entry in editable:
+        oid = entry["node"].id
+        if entry["can_roles"]:
+            selected = form.getlist(f"role_{oid}")
+            if len(selected) != len(set(selected)) or any(
+                role not in os.ROLES for role in selected
+            ):
+                raise HTTPException(422, "Bereichsrollen prüfen.")
+            current = entry["grants"]
+            for role in selected:
+                children = form.get(f"child_{oid}_{role}") == "1"
+                grant = current.get(role)
+                if not grant or grant.include_children != children:
+                    os.set_role(db, user, dict(
+                        org_id=oid, target=f"user:{person_id}", role=role,
+                        include_children="1" if children else "0",
+                    ))
+            for role, grant in current.items():
+                if role not in selected:
+                    os.delete_role(db, user, dict(grant=grant.id))
+    for entry in editable:
+        if not entry["can_members"]:
+            continue
+        old = entry["membership"]
+        if old and form.get(f'member_{entry["node"].id}') != "1":
+            os.delete_membership(db, user, dict(membership=old.id))
+    db.commit()
+    flash(request, "Organisationszuordnungen und Bereichsrollen gemeinsam gespeichert.")
+    if form.get("origin") == "users":
+        return redirect("/admin/users")
+    return redirect("/admin/organization?person=" + str(person_id))
+
+
 @app.post("/admin/organization", dependencies=[Depends(check_csrf)])
 async def organization_action(
     request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)
