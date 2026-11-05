@@ -10,6 +10,7 @@
   const navigationKey = "takt-leave-navigation:" + el.dataset.unit;
   const views = ["taktPeople", "taktPeopleQuarter", "taktPeopleYear"];
   let navigation = { view: "taktPeople" };
+  let visibleRange = null;
   function validDate(value) {
     return (
       typeof value === "string" &&
@@ -166,7 +167,14 @@
           headers: { Accept: "application/json" },
           body: new URLSearchParams(values),
         });
-        remember(values.starts_on);
+        // Keep the current period if the saved leave overlaps it. Only move to
+        // another period when the new dates would otherwise be out of sight.
+        if (
+          !visibleRange ||
+          values.ends_on < visibleRange.start ||
+          values.starts_on >= visibleRange.end
+        )
+          remember(values.starts_on);
         location.reload();
       } catch (error) {
         report(error);
@@ -352,6 +360,11 @@
       },
       events,
       datesSet(info) {
+        // FullCalendar uses an exclusive end date for the visible interval.
+        visibleRange = {
+          start: info.startStr.slice(0, 10),
+          end: info.endStr.slice(0, 10),
+        };
         const anchor = info.view.calendar.getDate();
         const date = [
           anchor.getFullYear(),
