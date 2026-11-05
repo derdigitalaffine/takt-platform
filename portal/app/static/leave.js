@@ -7,6 +7,34 @@
   const feedback = document.getElementById("leave-feedback");
   let requests = [],
     people = [];
+  const navigationKey = "takt-leave-navigation:" + el.dataset.unit;
+  const views = ["taktPeople", "taktPeopleQuarter", "taktPeopleYear"];
+  let navigation = { view: "taktPeople" };
+  function validDate(value) {
+    return (
+      typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+      Number(value.slice(0, 4)) >= 1970 &&
+      Number(value.slice(0, 4)) <= 2200 &&
+      !Number.isNaN(Date.parse(value))
+    );
+  }
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(navigationKey));
+    if (saved && views.includes(saved.view) && validDate(saved.date))
+      navigation = saved;
+  } catch (_) {
+    /* Browser storage is optional. */
+  }
+  function remember(date, view = navigation.view) {
+    if (!validDate(date) || !views.includes(view)) return;
+    navigation = { date, view };
+    try {
+      sessionStorage.setItem(navigationKey, JSON.stringify(navigation));
+    } catch (_) {
+      /* Planning remains usable without browser storage. */
+    }
+  }
   function report(error) {
     feedback.textContent = error.message;
     feedback.hidden = false;
@@ -132,11 +160,13 @@
       button.disabled = true;
       feedback.hidden = true;
       try {
+        const values = payload();
         await send(form.getAttribute("action"), {
           method: "POST",
           headers: { Accept: "application/json" },
-          body: new URLSearchParams(payload()),
+          body: new URLSearchParams(values),
         });
+        remember(values.starts_on);
         location.reload();
       } catch (error) {
         report(error);
@@ -311,7 +341,8 @@
     let summaryKey = "";
     const calendar = new FullCalendar.Calendar(el, {
       plugins: [view.plugin],
-      initialView: "taktPeople",
+      initialView: navigation.view,
+      initialDate: navigation.date,
       locale: "de",
       height: "auto",
       headerToolbar: {
@@ -321,6 +352,13 @@
       },
       events,
       datesSet(info) {
+        const anchor = info.view.calendar.getDate();
+        const date = [
+          anchor.getFullYear(),
+          String(anchor.getMonth() + 1).padStart(2, "0"),
+          String(anchor.getDate()).padStart(2, "0"),
+        ].join("-");
+        remember(date, info.view.type);
         const key = info.startStr + info.endStr;
         if (key === summaryKey) return;
         summaryKey = key;

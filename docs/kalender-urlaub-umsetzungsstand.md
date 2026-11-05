@@ -5,7 +5,7 @@ Tracking: [Issue #183](https://github.com/derdigitalaffine/takt-platform/issues/
 ## Implementiert
 
 - Kalenderkern mit persönlichen/geteilten, internen, öffentlichen und Organisationskalendern; zusätzliche Zielgruppe je Termin. Freigaben für Personen/Gruppen, getrenntes Publikationsrecht, identische Live-Prüfungen in Web, Export und CalDAV.
-- FullCalendar Standard 6.1.21 und eigene Personenzeitachse für Monat/Quartal/Jahr, halbe Tage, Überlappungen, Filter, Tastatur-/Formulareingabe, Mausauswahl und Änderungsentwürfe. Gemeinsame responsive Kalendersteuerung und Designvariablen auch in bestehenden Kalenderoberflächen.
+- FullCalendar Standard 6.1.21 und eigene Personenzeitachse für Monat/Quartal/Jahr, halbe Tage, Überlappungen, Filter, Tastatur-/Formulareingabe, Mausauswahl und Änderungsentwürfe. Zeitraum und Zoom werden je Bereich für die Browser-Sitzung erhalten; gespeicherte neue Zeiträume werden direkt angezeigt. Gemeinsame responsive Kalendersteuerung und Designvariablen auch in bestehenden Kalenderoberflächen.
 - Urlaub: einfache Personenzahl oder erweiterte Kapazität, datierte Wochenmodelle, zusätzliche Zuordnungen, deduplizierte Vorfahrenprüfung, getrennte Konfliktvorschau für Entwürfe, Warnungen/Sperren, optionale begründete Ausnahmeentscheidung oder bloße Benachrichtigung.
 - Interne mehrstufige Genehmigung, reine Planung und externe eigene Selbstauskunft. Bereichsplanung, Genehmigung, Urlaubsregeln und Rollenverwaltung sind getrennte Rechte. Stornoanfragen und geschützter Entscheidungsverlauf.
 - Änderungen lassen bisherige verbindliche Zeiträume bestehen. Atomare Besetzungs-/Kontenprüfung und Abwesenheitsübernahme unter gemeinsamem Organisationsschutz; Versionsprüfung und konkurrierende Genehmigungen getestet.

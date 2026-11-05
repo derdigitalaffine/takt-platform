@@ -66,6 +66,18 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                     "button", name="Als geplant speichern", exact=True
                 ).click()
                 expect(p.locator("article")).to_contain_text("Geplant")
+                expect(p.locator("#leave-calendar .fc-toolbar-title")).to_contain_text(
+                    "Dezember 2026"
+                )
+                p.get_by_role("button", name="Quartal", exact=True).click()
+                p.reload()
+                expect(
+                    p.locator(".fc-taktPeopleQuarter-button.fc-button-active")
+                ).to_have_count(1)
+                p.get_by_role("button", name="Monat", exact=True).click()
+                expect(p.locator("#leave-calendar .fc-toolbar-title")).to_contain_text(
+                    "Dezember 2026"
+                )
                 p.get_by_role(
                     "button", name="Verbindlich markieren", exact=True
                 ).click()
