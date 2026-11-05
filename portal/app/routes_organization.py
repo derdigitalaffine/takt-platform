@@ -69,6 +69,15 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         if (g.org_id == unit or g.include_children and g.org_id in path)
         and (group is None or g.group_id == group)
     ]
+    # One entry per person or group, with all effective roles collected in it.
+    grouped_roles = {}
+    for grant in role_rows:
+        key = ("user", grant.user_id) if grant.user_id else ("group", grant.group_id)
+        grouped_roles.setdefault(key, []).append(grant)
+    role_groups = [
+        dict(kind=kind, target_id=tid, grants=items)
+        for (kind, tid), items in grouped_roles.items()
+    ]
     people = {p.id: p for p in db.scalars(select(User).order_by(User.name))}
     groups = {g.id: g for g in db.scalars(select(Group).order_by(Group.name))}
     own = [m for m in memberships if m.user_id == user.id]
@@ -148,6 +157,7 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         people=people,
         org_groups=groups,
         role_rows=role_rows,
+        role_groups=role_groups,
         org_roles=os.ROLES,
         org_kinds=os.kinds(db),
         org_custom_kinds=list(db.scalars(select(OrgKind).order_by(OrgKind.label))),
@@ -228,8 +238,22 @@ async def handle_action(request, user, db, data):
                     values["user_id"] = value
                     os.set_membership(db, user, values)
                 elif action == "role_many":
-                    values["target"] = value
-                    os.set_role(db, user, values)
+                    roles = list(dict.fromkeys(str(v) for v in data.getlist("roles")))
+                    if not roles:
+                        roles = [str(data.get("role", ""))]
+                    if not 1 <= len(roles) <= len(os.ROLES) or any(
+                        role not in os.ROLES for role in roles
+                    ):
+                        raise HTTPException(422, "Mindestens eine gültige Bereichsrolle wählen.")
+                    for role in roles:
+                        values["target"] = value
+                        values["role"] = role
+                        # Every role retains its own subtree scope.
+                        if data.getlist("roles"):
+                            values["include_children"] = (
+                                "1" if data.get(f"children_{role}") == "1" else "0"
+                            )
+                        os.set_role(db, user, values)
                 else:
                     model = (
                         OrgMembership
