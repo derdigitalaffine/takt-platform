@@ -99,6 +99,59 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                     ).click()
                 expect(p.locator("article > p").first).to_contain_text("Verbindlich")
                 expect(p.locator("#leave-calendar .pt-table")).to_be_visible()
+                # Multiple saves within the visible quarter must not reset the
+                # chosen zoom or calendar anchor.
+                p.get_by_role("button", name="Quartal", exact=True).click()
+                get_navigation = (
+                    "() => JSON.parse(sessionStorage.getItem("
+                    "'takt-leave-navigation:' + "
+                    "document.querySelector('#leave-calendar').dataset.unit))"
+                )
+                quarter_navigation = p.evaluate(get_navigation)
+                assert quarter_navigation["view"] == "taktPeopleQuarter"
+                for start, end in [
+                    ("18.12.2026", "19.12.2026"),
+                    ("21.12.2026", "22.12.2026"),
+                ]:
+                    p.locator("#leave-starts_on-display").fill(start)
+                    p.locator("#leave-ends_on-display").fill(end)
+                    with p.expect_navigation(wait_until="domcontentloaded"):
+                        p.get_by_role(
+                            "button", name="Als geplant speichern", exact=True
+                        ).click()
+                    expect(
+                        p.locator(".fc-taktPeopleQuarter-button.fc-button-active")
+                    ).to_have_count(1)
+                    assert p.evaluate(get_navigation) == quarter_navigation
+                expect(
+                    p.locator("#leave-calendar .pt-event").filter(
+                        has_text="Urlaubsplanung"
+                    )
+                ).to_have_count(2)
+
+                # Saving outside the visible quarter moves to the new leave
+                # period, but retains the quarter zoom across another reload.
+                p.locator("#leave-starts_on-display").fill("12.04.2027")
+                p.locator("#leave-ends_on-display").fill("13.04.2027")
+                with p.expect_navigation(wait_until="domcontentloaded"):
+                    p.get_by_role(
+                        "button", name="Als geplant speichern", exact=True
+                    ).click()
+                expect(
+                    p.locator(".fc-taktPeopleQuarter-button.fc-button-active")
+                ).to_have_count(1)
+                assert p.evaluate(get_navigation)["date"] == "2027-04-12"
+                expect(
+                    p.locator("#leave-calendar .pt-event").filter(
+                        has_text="Urlaubsplanung"
+                    )
+                ).to_have_count(1)
+                p.reload()
+                expect(
+                    p.locator(".fc-taktPeopleQuarter-button.fc-button-active")
+                ).to_have_count(1)
+                assert p.evaluate(get_navigation)["date"] == "2027-04-12"
+
                 p.set_viewport_size({"width": 390, "height": 844})
                 p.wait_for_function(
                     "document.documentElement.scrollWidth<=innerWidth+1"
