@@ -320,4 +320,5 @@ async def configure(
         org.audit(db, user, unit, "leave_" + action)
     db.commit()
     flash(request, "Planungseinstellungen gespeichert.")
-    return redirect("/urlaub?unit=" + str(unit))
+    from .routes_leave import _return_to
+    return redirect(_return_to(request, "/urlaub/verwaltung", unit))
