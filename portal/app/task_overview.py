@@ -3,14 +3,14 @@ from datetime import datetime
 from .db import utcnow, to_local
 
 SCOPES = {'all': 'Alle', 'personal': 'Persönlich', 'proxy': 'Vertretung', 'group': 'Gruppenaufgaben'}
-SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben'}
+SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben', 'leave': 'Urlaubsplanung'}
 
 
 def collect(db, user, modules, *, now=None):
     from . import workflow, circulations, resources
     now = now or utcnow()
     ready, pool, waiting, delegated, history, managed, archive = [], [], [], [], [], [], []
-    source_modules = {'application': 'applications', 'circulation': 'circulations', 'resource': 'resources', 'native': 'tasks'}
+    source_modules = {'application': 'applications', 'circulation': 'circulations', 'resource': 'resources', 'native': 'tasks', 'leave': 'calendars'}
     sources = {key: label for key, label in SOURCES.items() if key == 'all' or source_modules.get(key) in modules}
 
     resource_scopes = {}
@@ -39,6 +39,11 @@ def collect(db, user, modules, *, now=None):
         return dict(source=source, source_label=SOURCES[source], title=title, href=href, action=action,
                     due=due, scope=scope, detail=detail, icon=icon, late=bool(due and due < now), **extra)
 
+    if 'calendars' in modules:
+        from sqlalchemy import select
+        from .leave_extensions import LeaveInbox
+        for notice in db.scalars(select(LeaveInbox).where(LeaveInbox.user_id == user.id, LeaveInbox.read.is_(False)).order_by(LeaveInbox.id.desc()).limit(200)):
+            ready.append(entry('leave', notice.title, '/urlaub', 'Ansehen', icon='fa-calendar-check', detail='Urlaubsplanung · neuer Hinweis'))
     if 'tasks' in modules:
         from . import tasks as native
         from .task_models import Task, TaskCheck

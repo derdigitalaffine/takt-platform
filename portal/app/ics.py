@@ -12,8 +12,8 @@ PRODID = "-//Videokonferenzserver//Portal//DE"
 
 
 def _esc(text: str) -> str:
-    return (text or "").replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,") \
-        .replace("\r\n", "\n").replace("\n", "\\n")
+    return (text or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,") \
+        .replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\\n")
 
 
 def _param(text: str) -> str:
@@ -76,3 +76,24 @@ def build(*, method: str, uid: str, sequence: int, start: datetime, minutes: int
                   f"TRIGGER:-PT{alarm_minutes}M", "END:VALARM"]
     lines += ["END:VEVENT", "END:VCALENDAR"]
     return "\r\n".join(_fold(line) for line in lines) + "\r\n"
+
+
+def feed(events, name, *, prodid=PRODID, refresh=None, method=None):
+    """Shared feed serializer for free calendars and canonical business projections.
+
+    Input dates are date objects (exclusive end) or timezone-aware datetimes.
+    Business adapters supply stable UIDs and their already-authorized public fields.
+    """
+    from datetime import timezone
+    from icalendar import Calendar, Event
+    cal=Calendar()
+    cal.add('prodid',prodid);cal.add('version','2.0');cal.add('calscale','GREGORIAN');cal.add('x-wr-calname',name)
+    if refresh:cal.add('refresh-interval;value=duration',refresh)
+    if method:cal.add('method',method)
+    for item in events:
+        event=Event()
+        for key,value in item.items():
+            if value is not None: event.add(key,value)
+        if 'dtstamp' not in event:event.add('dtstamp',utcnow().replace(tzinfo=timezone.utc))
+        cal.add_component(event)
+    return cal.to_ical()

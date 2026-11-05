@@ -101,6 +101,8 @@ class User(Base):
 
 # Bereiche, die einzeln pro Benutzer freigeschaltet werden
 PERMISSIONS = {
+    "calendars": ("Kalender anlegen und teilen", "fa-calendar-days", "Eigene und berechtigte Organisationskalender anlegen und teilen; keine fremden Kalender verwalten"),
+    "calendar_publish": ("Kalender veröffentlichen", "fa-globe", "Eigene Kalender intern oder öffentlich veröffentlichen"),
     "tasks": ("Aufgaben erstellen", "fa-list-check", "Eigene Aufgaben erfassen, zuweisen und bearbeiten"),
     "tasks_manage": ("Aufgaben verwalten", "fa-user-gear", "Alle nativen Aufgaben sehen und verwalten"),
     "seminars": ("Seminare planen", "fa-chalkboard-user", "Seminare und Lehrgänge mit Terminen, Einladungen und Unterlagen planen"),
@@ -2761,6 +2763,9 @@ def seed_orgs(db) -> None:
 
 DEFAULT_SETTINGS = {
     "module_tasks": "0",
+    "module_calendars": "0",
+    "calendar_device_days": "0",
+    "leave_email": "0",
     "sm_api_url": "https://api-v2.speechmind.com/external/v2/graphql",
     "sm_api_key_enc": "",
     "sm_project_slug": "",
@@ -3062,7 +3067,7 @@ def _migrate() -> None:
 
 
 def init_db() -> None:
-    from . import org_models  # noqa: F401
+    from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import task_models  # noqa: F401 – register additive native-task tables
     Base.metadata.create_all(engine)
     _migrate()

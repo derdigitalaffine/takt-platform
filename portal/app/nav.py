@@ -178,9 +178,12 @@ ITEMS: list[Item] = [
 ITEMS.append(Item("oidc", "admin", "/admin/oidc", "fa-key", "Nextcloud / OIDC-Anmeldung", lambda c: c.admin, _pre("/admin/oidc")))
 ITEMS.append(Item("seminars", "schedule", "/seminare", "fa-chalkboard-user", "Seminare & Lehrgänge", lambda c: "seminars" in c.modules, _pre("/seminare")))
 ITEMS.append(Item("circulation_reports", "work", "/umlaeufe/auswertung", "fa-chart-column", "Meine Umläufe & Rückmeldungen", lambda c: "circulations" in c.modules, _pre("/umlaeufe/auswertung")))
+ITEMS.append(Item("calendars", "schedule", "/kalender", "fa-calendar-days", "Kalender & Urlaub", lambda c: "calendars" in c.modules, _pre("/kalender")))
+ITEMS.append(Item("leave", "schedule", "/urlaub", "fa-umbrella-beach", "Urlaubsplanung", lambda c: "calendars" in c.modules, _pre("/urlaub")))
 BY_ID = {it.id: it for it in ITEMS}
 # Stable entry IDs preserve bookmarks and personal favorites.
 FAMILIES = [
+    ("calendars", "leave"),
     ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
     ("surveys", "polls", "votes"), ("shortlinks",),
     ("meetings", "meeting_plan"), ("seminars",),
@@ -204,6 +207,7 @@ DESCRIPTIONS = {
     "circulations": ("Teilen Sie Informationen und verfolgen Sie Rückmeldungen und Kenntnisnahmen.", "Aushänge lesen · Rückmeldungen geben", "Umlauf Sammelmappe Kenntnisnahme"),
     "surveys": ("Sammeln Sie Feedback, stimmen Sie gemeinsam ab oder finden Sie einen passenden Termin.", "Umfragen öffnen · Gemeinsam entscheiden", "Poll Vote Live Feedback Terminumfrage"),
     "shortlinks": ("Machen Sie lange Links leichter teilbar und erstellen Sie passende QR-Codes.", "Links verwalten · QR-Codes erstellen", "Link verkürzen QR"),
+    "calendars": ("Sehen Sie freigegebene Kalender und planen Sie Urlaub im eigenen Bereich. Verbinden Sie Kalendergeräte über eigene widerrufbare Zugänge.", "Kalender öffnen · Urlaub planen · Gerät verbinden", "Jahreskalender CalDAV Urlaub Besetzung"),
     "meetings": ("Planen und nutzen Sie Online-Besprechungen. Verfügbare Aufnahmen und Transkripte finden Sie beim jeweiligen Meeting.", "Besprechungen öffnen · Meetings planen", "Video Konferenz Transkript Aufnahme"),
     "seminars": ("Finden Sie Veranstaltungen und verwalten Sie Ihre Teilnahmen. Zugewiesene Planer und Dozenten finden hier ihre Planung und Durchführung.", "Angebot ansehen · Teilnahmen öffnen", "Seminar Lehrgang Reihe Veranstaltung Dozent"),
     "resources": ("Finden Sie Räume, Plätze und Geräte. Prüfen Sie die Belegung und bearbeiten Sie freigegebene Buchungen.", "Ressourcen ansehen · Belegung prüfen", "Raumbuchung Ressourcen Belegungsplan Geräte"),
@@ -220,7 +224,7 @@ DESCRIPTIONS = {
 for family in FAMILIES:
     head = BY_ID[family[0]]
     group = ("personal" if head.id in {"absences", "krank_me"} else
-             "schedule" if head.id in {"meetings", "seminars", "resources", "bookings"} else
+             "schedule" if head.id in {"meetings", "seminars", "resources", "bookings", "calendars"} else
              "work" if head.id in {"tasks", "kanban", "circulations", "surveys", "shortlinks"} else head.group)
     for key in family:
         BY_ID[key].group = group

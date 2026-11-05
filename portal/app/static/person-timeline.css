@@ -1,0 +1,320 @@
+/* Own Takt view; never change FullCalendar's vendored distribution. */
+.takt-person-timeline {
+  --pt-slot: 24px;
+  --pt-name: 200px;
+  --pt-line: var(--bs-border-color, #dee2e6);
+  --pt-bg: var(--bs-body-bg, #fff);
+  --pt-fg: var(--bs-body-color, #212529);
+  color: var(--pt-fg);
+  font-size: 1rem;
+  min-width: 0;
+}
+.takt-person-timeline .pt-tools {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.pt-filter {
+  font-size: 0.875rem;
+  max-width: 20rem;
+}
+.pt-filter input {
+  display: block;
+  margin-top: 0.25rem;
+}
+.takt-person-timeline .pt-scroll {
+  max-height: 65vh;
+  overflow: auto;
+  border: 1px solid var(--pt-line);
+  border-radius: 0.5rem;
+  position: relative;
+  isolation: isolate;
+  overscroll-behavior: contain;
+}
+.takt-person-timeline .pt-table {
+  width: calc(var(--pt-name) + var(--pt-slots) * var(--pt-slot));
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+.takt-person-timeline .pt-name-col {
+  width: var(--pt-name);
+}
+.takt-person-timeline .pt-day-col {
+  width: calc(var(--pt-slot) * 2);
+}
+.takt-person-timeline th,
+.takt-person-timeline td {
+  border: 0;
+  border-bottom: 1px solid var(--pt-line);
+  padding: 0;
+  font-weight: 400;
+  vertical-align: middle;
+}
+.takt-person-timeline thead {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--pt-bg);
+}
+.takt-person-timeline thead th {
+  text-align: center;
+  border-inline-end: 1px solid var(--pt-line);
+  font-size: 0.7rem;
+  height: 62px;
+}
+.takt-person-timeline thead span,
+.takt-person-timeline thead strong {
+  display: block;
+}
+.takt-person-timeline .pt-holiday {
+  max-height: 1.1rem;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.takt-person-timeline .pt-name {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 2;
+  width: var(--pt-name);
+  background: var(--pt-bg);
+  border-inline-end: 1px solid var(--pt-line);
+  padding: 0.5rem 0.75rem;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.takt-person-timeline .pt-name strong,
+.takt-person-timeline .pt-name small {
+  display: block;
+}
+.takt-person-timeline .pt-name small {
+  font-size: 0.75rem;
+}
+.takt-person-timeline .pt-name button {
+  margin-top: 0.35rem;
+}
+.takt-person-timeline thead .pt-name {
+  z-index: 5;
+}
+.takt-person-timeline .pt-group th {
+  height: 38px;
+  background: var(--bs-tertiary-bg, #f8f9fa);
+  text-align: start;
+}
+.takt-person-timeline .pt-group button {
+  position: sticky;
+  inset-inline-start: 0.5rem;
+  max-width: calc(100vw - 4rem);
+  white-space: normal;
+  text-align: start;
+}
+.takt-person-timeline .pt-lane {
+  position: relative;
+  min-height: 64px;
+  font-size: var(--pt-slot);
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(var(--pt-slot) - 1px),
+    var(--pt-line) calc(var(--pt-slot) - 1px),
+    var(--pt-line) var(--pt-slot)
+  );
+  touch-action: pan-x pan-y;
+}
+.takt-person-timeline .pt-shading {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.takt-person-timeline .pt-nonwork {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2em;
+  background: var(--bs-secondary-bg, #e9ecef);
+  opacity: 0.55;
+}
+.takt-person-timeline .pt-selection {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  z-index: 2;
+  background: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.18);
+  outline: 2px solid var(--bs-primary, #0d6efd);
+  outline-offset: -2px;
+  pointer-events: none;
+}
+.takt-person-timeline .pt-event {
+  position: absolute;
+  height: 28px;
+  min-width: 0;
+  padding: 3px 7px;
+  border: 1px solid var(--bs-primary, #0d6efd);
+  border-radius: 5px;
+  background: var(--bs-primary-bg-subtle, #cfe2ff);
+  color: var(--bs-primary-text-emphasis, #052c65);
+  font: inherit;
+  font-size: 1em;
+  line-height: 1;
+  text-align: start;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.takt-person-timeline .pt-event-text,
+.takt-person-timeline .pt-conflict {
+  font-size: 12px;
+  line-height: 20px;
+  vertical-align: top;
+}
+.takt-person-timeline .pt-event-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.takt-person-timeline .pt-conflict {
+  position: absolute;
+  inset-inline-end: 3px;
+  background: var(--bs-warning-bg-subtle, #fff3cd);
+  color: var(--bs-warning-text-emphasis, #664d03);
+  padding: 0 3px;
+}
+.takt-person-timeline .pt-status-planned {
+  background: var(--pt-bg);
+}
+.takt-person-timeline .pt-status-requested {
+  border-style: dashed;
+  border-width: 2px;
+  padding-top: 2px;
+}
+.takt-person-timeline .pt-status-binding,
+.takt-person-timeline .pt-status-external {
+  background: var(--bs-primary, #0d6efd);
+  color: var(--app-primary-text, #fff);
+}
+.takt-person-timeline .pt-status-absence {
+  background: var(--bs-secondary-bg, #e9ecef);
+  color: var(--pt-fg);
+  border-color: var(--bs-secondary-color, #6c757d);
+}
+.takt-person-timeline .pt-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  opacity: 0;
+  background: currentColor;
+}
+.takt-person-timeline .pt-handle-start {
+  inset-inline-start: 0;
+}
+.takt-person-timeline .pt-handle-end {
+  inset-inline-end: 0;
+}
+.takt-person-timeline .pt-event:hover .pt-handle,
+.takt-person-timeline .pt-event:focus-visible .pt-handle {
+  opacity: 0.35;
+}
+.takt-person-timeline
+  :is(button, input, select, .pt-lane, .pt-scroll):focus-visible {
+  outline: 3px solid var(--bs-primary, #0d6efd);
+  outline-offset: -3px;
+}
+.takt-person-timeline .pt-today {
+  box-shadow: inset 0 -3px var(--bs-primary, #0d6efd);
+}
+.takt-person-timeline .pt-weekend {
+  background: var(--bs-secondary-bg, #e9ecef);
+}
+.takt-person-timeline tfoot {
+  background: var(--pt-bg);
+}
+.takt-person-timeline .pt-summary {
+  text-align: center;
+  font-size: 0.75rem;
+  height: 44px;
+}
+.takt-person-timeline .pt-shortage {
+  background: var(--bs-danger-bg-subtle, #f8d7da);
+  color: var(--bs-danger-text-emphasis, #58151c);
+  font-weight: 700;
+}
+.takt-person-timeline .pt-empty {
+  padding: 2rem;
+  max-width: 100vw;
+}
+.takt-person-timeline .pt-dialog {
+  border: 1px solid var(--pt-line);
+  border-radius: 0.75rem;
+  background: var(--pt-bg);
+  color: var(--pt-fg);
+  padding: 1.5rem;
+  width: min(520px, calc(100vw - 2rem));
+  max-height: 90vh;
+  overflow: auto;
+}
+.takt-person-timeline .pt-dialog::backdrop {
+  background: #0008;
+}
+.takt-person-timeline .pt-date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.takt-person-timeline .pt-date-row label {
+  display: block;
+  font-size: 0.875rem;
+  min-width: 0;
+}
+.takt-person-timeline .pt-dialog-actions {
+  display: flex;
+  justify-content: end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+@media (max-width: 575px) {
+  .takt-person-timeline {
+    --pt-name: 128px;
+  }
+  .takt-person-timeline .pt-name {
+    padding: 0.5rem;
+  }
+  .takt-person-timeline .pt-name button {
+    min-height: 44px;
+  }
+  .takt-person-timeline .pt-date-row {
+    grid-template-columns: 1fr;
+  }
+  .takt-person-timeline .pt-tools {
+    align-items: stretch;
+  }
+  .takt-person-timeline .pt-dialog-actions button {
+    min-height: 44px;
+  }
+  .takt-person-timeline .pt-event {
+    height: 30px;
+  }
+}
+@media print {
+  .takt-person-timeline .pt-tools,
+  .takt-person-timeline .pt-name button {
+    display: none;
+  }
+  .takt-person-timeline .pt-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+  .takt-person-timeline .pt-event {
+    print-color-adjust: exact;
+  }
+  .takt-person-timeline thead {
+    position: static;
+  }
+}

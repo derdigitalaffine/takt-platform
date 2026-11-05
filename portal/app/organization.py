@@ -7,6 +7,11 @@ from .db import Organization, User, Group, GroupMember, Setting
 from .org_models import OrgKind, OrgState, OrgMembership, OrgRoleGrant, OrgAudit
 
 ROLES = {
+    "leave_settings": (
+        "Urlaubsregeln verwalten",
+        {"view", "leave_settings"},
+        "Urlaubsablauf und Besetzungsregeln im freigegebenen Bereich einstellen; keine Rollen vergeben.",
+    ),
     "lead": (
         "Leitung",
         {"view", "plan", "approve"},

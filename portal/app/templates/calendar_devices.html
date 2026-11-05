@@ -1,0 +1,104 @@
+{% extends "base.html" %}{% import '_macros.html' as m with context %}{% block title %}Kalendergeräte{% endblock %}{% block content %}
+{% call m.page_head('Kalendergeräte','Eigene Geräte verbinden und Zugänge einzeln verwalten.') %}
+    <a class="btn btn-outline-secondary" href="/kalender">Kalender</a>
+{% endcall %}
+<p>
+    <a href="/kalender/hilfe">Einrichtung für iPhone, Android, Thunderbird und Outlook</a>
+</p>
+<section class="card card-body mb-4">
+    <h2 class="h5">Gerät verbinden</h2>
+    <form method="post" action="/kalender/geraete">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="form-label">
+            Gerätename<input class="form-control"
+                             name="name"
+                             required
+                             maxlength="100"
+                             placeholder="Mein iPhone">
+        </label>
+        <fieldset class="mb-3">
+            <legend class="h6">Kalender und Zugriff</legend>
+            {% for cal in calendars %}
+                <div class="d-flex flex-wrap gap-3 mb-2">
+                    <label>
+                        <input type="checkbox" name="calendars" value="{{ cal.id }}">
+                        {{ cal.title }}
+                    </label>
+                    {% if writable[cal.id] %}
+                        <label>
+                            <input type="checkbox" name="write" value="{{ cal.id }}">
+                            Auch bearbeiten
+                        </label>
+                    {% endif %}
+                </div>
+            {% else %}
+                <p>Zuerst einen Kalender anlegen oder freigeben lassen.</p>
+            {% endfor %}
+        </fieldset>
+        <label class="form-label">
+            Gerät<select name="platform" class="form-select">
+            <option value="ios">iPhone / iPad – Profil herunterladen</option>
+            <option value="manual">Anderes Gerät – Zugangsdaten anzeigen</option>
+            </select>
+        </label>
+        <p class="small">Das Apple-Profil enthält das eigene Gerätepasswort. Bewahren Sie es wie ein Passwort auf und geben Sie es nicht weiter. Nach dem Download öffnen und die Installation in den Geräteeinstellungen bestätigen.</p>
+        <button class="btn btn-primary">Gerätezugang erzeugen</button>
+    </form>
+</section>
+{% if user.is_admin %}
+    <details class="card card-body mb-4">
+        <summary>Administrative Laufzeitvorgabe</summary>
+        <form method="post" action="/kalender/geraete/laufzeit">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label class="form-label">
+                Tage für neu erzeugte Zugänge (0 = bis Widerruf)<input type="number"
+                                                                       class="form-control"
+                                                                       name="days"
+                                                                       min="0"
+                                                                       max="3650"
+                                                                       value="{{ device_days }}"
+                                                                       required>
+            </label>
+            <button class="btn btn-primary">Vorgabe speichern</button>
+        </form>
+    </details>
+{% endif %}
+{% for device in devices %}
+    <section class="card card-body mb-3">
+        <h2 class="h6">{{ device.name }}</h2>
+        <p>{{'Widerrufen' if device.revoked else 'Aktiv'}} · Letzter Zugriff: {{ device.last_used|local if device.last_used else 'noch keiner' }} · {{'Gültig bis ' ~ device.expires_at if device.expires_at else 'bis zum Widerruf'}}</p>
+        {% if not device.revoked %}
+            <form method="post" action="/kalender/geraete/{{ device.id }}/widerrufen">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="btn btn-outline-danger">Zugang widerrufen</button>
+            </form>
+            <details class="mt-3">
+                <summary>Kalenderauswahl ändern</summary>
+                <form method="post" action="/kalender/geraete/{{ device.id }}/auswahl">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <p class="small">Die hier markierte Auswahl ersetzt die bisherige vollständig.</p>
+                    {% for cal in calendars %}
+                        <div>
+                            <label>
+                                <input type="checkbox"
+                                       name="calendars"
+                                       value="{{ cal.id }}"
+                                       {{'checked' if (device.id,cal.id) in scopes}}> {{ cal.title }}
+                            </label>
+                            {% if writable[cal.id] %}
+                                <label>
+                                    <input type="checkbox"
+                                           name="write"
+                                           value="{{ cal.id }}"
+                                           {{ 'checked' if scopes.get((device.id,cal.id),false) }}> Bearbeiten
+                                </label>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <button class="btn btn-primary mt-3">Auswahl ersetzen</button>
+                </form>
+            </details>
+        {% endif %}
+    </section>
+{% endfor %}
+{% endblock %}

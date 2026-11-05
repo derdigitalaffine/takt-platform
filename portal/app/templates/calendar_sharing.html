@@ -1,0 +1,93 @@
+{% extends "base.html" %}{% import '_macros.html' as m with context %}
+{% block content %}
+    {% call m.page_head('Kalender teilen',calendar.title) %}
+        <a class="btn btn-outline-secondary" href="/kalender">Kalender</a>
+    {% endcall %}
+    <p>Sichtbarkeit: {{ calendar.visibility }}. Gruppenfreigaben gelten auch für zukünftige Mitglieder. Eine Freigabe erlaubt keine weitere Rechtevergabe.</p>
+    <details class="card card-body mb-3">
+        <summary>Kalender bearbeiten</summary>
+        <form method="post" class="mt-3">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="version" value="{{ calendar.version }}">
+            <input type="hidden" name="action" value="metadata">
+            <label class="form-label">
+                Name<input class="form-control"
+                           name="title"
+                           value="{{ calendar.title }}"
+                           maxlength="200"
+                           required>
+            </label>
+            <label class="form-label">
+                Sichtbarkeit<select class="form-select" name="visibility">
+                {% for key,title in [('private','Privat / ausdrücklich geteilt'),('organization','Organisationseinheit'),('internal','Alle Portalnutzer'),('public','Öffentlich')] %}
+                    {% if key in ["private","organization"] or user.can("calendar_publish") or calendar.visibility==key %}
+                        <option value="{{ key }}" {{'selected' if calendar.visibility==key}}>{{ title }}</option>
+                    {% endif %}
+                {% endfor %}
+                </select>
+            </label>
+            <label class="form-label">
+                Organisationseinheit<select class="form-select" name="org_id">
+                <option value="">Keine</option>
+                {% for unit in units %}
+                    <option value="{{ unit.id }}" {{'selected' if calendar.org_id==unit.id}}>{{ unit.name }}</option>
+                {% endfor %}
+                </select>
+            </label>
+            <label class="form-check">
+                <input type="checkbox"
+                       class="form-check-input"
+                       name="include_children"
+                       value="1"
+                       {{'checked' if calendar.include_children}}>
+                <span class="form-check-label">Untereinheiten einbeziehen</span>
+            </label>
+            <button class="btn btn-primary mt-3">Kalender speichern</button>
+        </form>
+    </details>
+    <details class="card card-body mb-3">
+        <summary>Kalender löschen</summary>
+        <p class="small mt-3">Alle Termine dieses Kalenders werden gelöscht und Gerätezugänge verlieren diesen Kalender. Fachtermine anderer Module bleiben erhalten.</p>
+        <form method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="version" value="{{ calendar.version }}">
+            <input type="hidden" name="action" value="delete">
+            <label class="form-label">
+                Kalendername zur Bestätigung<input class="form-control" name="confirm_title" required>
+            </label>
+            <button class="btn btn-outline-danger">Kalender endgültig löschen</button>
+        </form>
+    </details>
+    <section class="card card-body">
+        <form method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="version" value="{{ calendar.version }}">
+            <label>
+                Person oder Gruppe<select name="target" class="form-select">
+                {% for p in people.values() if p.active %}
+                    <option value="user:{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+                {% for g in groups.values() %}
+                    <option value="group:{{ g.id }}">Gruppe: {{ g.name }}</option>
+                {% endfor %}
+                </select>
+            </label>
+            <label class="form-check">
+                <input class="form-check-input" type="checkbox" name="write" value="1">
+                <span class="form-check-label">Termine bearbeiten</span>
+            </label>
+            <button class="btn btn-primary mt-3">Freigabe speichern</button>
+        </form>
+    </section>
+    {% for grant in grants %}
+        <section class="card card-body mt-3">
+            <p>{{ people[grant.user_id].name if grant.user_id else 'Gruppe: '~groups[grant.group_id].name }} · {{'Bearbeiten' if grant.can_write else 'Lesen'}}</p>
+            <form method="post">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="version" value="{{ calendar.version }}">
+                <input type="hidden" name="grant" value="{{ grant.id }}">
+                <button class="btn btn-outline-danger" name="action" value="revoke">Freigabe entziehen</button>
+            </form>
+        </section>
+    {% endfor %}
+{% endblock %}

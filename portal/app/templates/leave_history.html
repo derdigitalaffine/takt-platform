@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% import '_macros.html' as m with context %}
+{% block title %}Urlaubsverlauf{% endblock %}{% block content %}
+{% call m.page_head('Änderungen und Entscheidungen',person.name) %}
+    <a class="btn btn-outline-secondary"
+       href="/urlaub?unit={{ row.org_id }}">Urlaubsplanung</a>
+{% endcall %}
+<p>Dieser Verlauf ist für die betroffene Person und berechtigte Genehmigende sichtbar.</p>
+<ol class="list-group list-group-numbered">
+    {% for item in history %}
+        <li class="list-group-item">
+            <strong>{{ {'plan':'Entwurf gespeichert','bind':'Verbindlich eingeplant','request':'Antrag eingereicht','approve':'Genehmigung bearbeitet','reject':'Antrag abgelehnt','attest':'Externe Genehmigung selbst bestätigt','request_exception':'Ausnahmeentscheidung angefragt','request_cancel':'Stornierung angefragt','reject_cancel':'Stornierung abgelehnt','cancel':'Urlaub storniert'}.get(item.action,item.action) }}</strong>
+            <p class="small mb-1">{{ item.created_at|local }} · {{ actors[item.actor_id].name if actors.get(item.actor_id) else 'Ehemaliges Benutzerkonto' }}</p>
+            {% if item.detail and item.action!="plan" %}
+                <p class="mb-0 text-break">{{ item.detail }}</p>
+            {% endif %}
+        </li>
+    {% endfor %}
+</ol>
+{% endblock %}

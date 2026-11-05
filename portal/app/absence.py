@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, or_, select
 
+from .leave_models import LeaveAbsencePeriod
 from .db import Absence, Group, GroupMember, User, to_local, utcnow
 
 STATUS = {"pending": ("angefragt", "warning"), "confirmed": ("bestätigt", "success"), "declined": ("abgelehnt", "danger")}
@@ -40,7 +41,17 @@ def fmt(day: str) -> str:
         return day or ""
 
 
+def _leave_scope(a):
+    from sqlalchemy.orm import object_session
+    session = object_session(a)
+    return session.get(LeaveAbsencePeriod, a.id) if session else None
+
+
 def span(a: Absence) -> str:
+    scope = _leave_scope(a)
+    if scope and (scope.start_half != 'am' or scope.end_half != 'pm'):
+        halves = {'am': 'Vormittag', 'pm': 'Nachmittag'}
+        return f"{fmt(a.starts_on)} ({halves[scope.start_half]}) – {fmt(a.ends_on)} ({halves[scope.end_half]})"
     if a.starts_on == a.ends_on:
         return fmt(a.starts_on)
     start = fmt(a.starts_on)
@@ -51,7 +62,10 @@ def span(a: Absence) -> str:
 
 def label(a: Absence) -> str:
     """Öffentliche Kurzform – ohne Grund."""
+    scope = _leave_scope(a)
     text = f"abwesend bis {fmt(a.ends_on)}"
+    if scope and (scope.start_half != "am" or scope.end_half != "pm"):
+        text = "abwesend: " + span(a)
     if a.substitute and a.status == "confirmed":
         text += f", Vertretung: {a.substitute.name}"
     return text
@@ -78,7 +92,7 @@ def represented(db, user: User, day: str | None = None) -> list[int]:
     """IDs der Personen, die `user` heute vertritt (bestätigt)."""
     day = day or today()
     return list(db.scalars(select(Absence.user_id).where(
-        Absence.substitute_id == user.id, Absence.status == "confirmed", Absence.starts_on <= day,
+        Absence.substitute_id == user.id, Absence.id.not_in(select(LeaveAbsencePeriod.absence_id)), Absence.status == "confirmed", Absence.starts_on <= day,
         Absence.ends_on >= day)).all())
 
 
@@ -100,7 +114,7 @@ def substitutes_for_addresses(db, addresses: list[str]) -> dict[str, tuple[str, 
     day = today()
     rows = db.execute(select(User.email, User.name, Absence.substitute_id).join(Absence, Absence.user_id == User.id).where(
         User.email.in_(addrs), Absence.status == "confirmed", Absence.starts_on <= day, Absence.ends_on >= day,
-        Absence.substitute_id.is_not(None))).all()
+        Absence.substitute_id.is_not(None), Absence.id.not_in(select(LeaveAbsencePeriod.absence_id)))).all()
     out = {}
     for email, name, sub_id in rows:
         sub = db.get(User, sub_id)

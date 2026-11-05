@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% import '_macros.html' as m with context %}
+{% block content %}
+    {% call m.page_head('Kalender lesend abonnieren','Ein eigener Link pro Abo, jederzeit widerrufbar.') %}
+        <a class="btn btn-outline-secondary" href="/kalender">Kalender</a>
+    {% endcall %}
+    <form method="post" class="card card-body">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>
+            Name des Abos<input class="form-control" name="name" required maxlength="100">
+        </label>
+        <label>
+            Kalender<select name="calendar_id" class="form-select">
+            {% for c in calendars %}
+                <option value="{{ c.id }}">{{ c.title }}</option>
+            {% endfor %}
+            </select>
+        </label>
+        <button class="btn btn-primary mt-3">Abonnement erzeugen</button>
+    </form>
+    {% for feed in feeds %}
+        <section class="card card-body mt-3">
+            <h2 class="h6">{{ feed.name }}</h2>
+            <p>{{'Widerrufen' if feed.revoked else 'Aktiv'}}</p>
+            {% if not feed.revoked %}
+                <form method="post" action="/kalender/abos/{{ feed.id }}/widerrufen">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <button class="btn btn-outline-danger">Abonnement widerrufen</button>
+                </form>
+            {% endif %}
+        </section>
+    {% endfor %}
+{% endblock %}

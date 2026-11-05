@@ -52,6 +52,10 @@ def _absence(db: Session, absence_id: int) -> Absence:
     a = db.get(Absence, absence_id)
     if a is None:
         raise HTTPException(404, "Diese Abwesenheit gibt es nicht.")
+    from .leave_models import LeaveRequest
+    from sqlalchemy import select
+    if db.scalar(select(LeaveRequest.id).where(LeaveRequest.absence_id == a.id)):
+        raise HTTPException(409, "Diese Abwesenheit wird über die Urlaubsplanung verwaltet.")
     return a
 
 

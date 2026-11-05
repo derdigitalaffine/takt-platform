@@ -34,6 +34,8 @@ Dieses Dokument hält die Anforderungen aus dem Workshop-Interview fest. Die Org
 
 ## Bedienkonzept
 
+Das ausführliche [UI- und Umsetzungskonzept](kalender-urlaub-ui.md) konkretisiert die folgenden Leitlinien. Technologiewahl: FullCalendar Standard bleibt die Basis; eine eigene Takt-Custom-View bildet die Personenzeitachse ab. Keine Premium- oder zweite Kalenderbibliothek.
+
 Ein Kalenderbereich mit auswählbaren überlagerten Kalendern, Suche, Tages-/Wochen-/Monats-/Jahresansichten und verständlichen Freigaben. Urlaubsplanung als Bereichsansicht mit fixierter Namensspalte, gruppierbaren Organisationseinheiten, Monats-/Quartals-/Jahreszoom, Arbeits-/Feiertagen und halben Tagen. Zeitraum zeichnen, Vorschau mit Konflikten, bewusste Übernahme. Gleichwertige Datums-/Tastatureingabe ohne Ziehen. Mobil fokussierte Zeiträume und Personen statt unbedienbarer verkleinerter Jahrestabelle. Status nie ausschließlich über Farben darstellen.
 
 Konfiguration über einfache Voreinstellungen und bei Bedarf Detailregeln; geerbte Einstellungen und tatsächliche Auswirkungen ausdrücklich anzeigen. Kein unübersichtlicher Schalterwald. Rollen und Personenverwaltung verwenden die gemeinsamen Takt-Komponenten.

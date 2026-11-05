@@ -285,6 +285,10 @@ def overview(db, user: User, modules: set) -> tuple[dict, dict]:
         act(a["overdue"], "Anträge mit Frist über", "/forms/applications?status=overdue", "fa-hourglass-end", "danger")
         act(a["new"], "neue Anträge", "/forms/applications?status=received", "fa-file-signature")
         act(a["query"], "Rückfragen offen", "/forms/applications?status=query", "fa-comments", "secondary")
+    if "calendars" in modules:
+        from .leave_extensions import LeaveInbox
+        count = len(list(db.scalars(select(LeaveInbox.id).where(LeaveInbox.user_id == user.id, LeaveInbox.read.is_(False)))))
+        act(count, "Hinweise zur Urlaubsplanung", "/urlaub", "fa-calendar-check")
     if "seminars" in modules:
         from . import seminars
         se=cache["seminars"]=seminars.overview(db,user)
