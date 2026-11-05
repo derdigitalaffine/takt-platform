@@ -1,6 +1,6 @@
 # Organisationsverwaltung
 
-Unter **Administration → Organisation** wird die vorhandene Körperschaftsstruktur um frei kombinierbare Organisationsebenen ergänzt. Bestehende IDs und Verknüpfungen in Rechtstexten, Ressourcen, Krankmeldungen und Anträgen bleiben erhalten. Anschriften, Kontakt, Farben und Wappen werden direkt bei derselben Organisationseinheit gepflegt. Die früheren Körperschaftsadressen leiten hierher weiter.
+Seit [PR #182](https://github.com/derdigitalaffine/takt-platform/pull/182) und [PR #184](https://github.com/derdigitalaffine/takt-platform/pull/184) ist die gemeinsame Organisationsverwaltung in `main` integriert. Unter **Administration → Organisation** wird die vorhandene Körperschaftsstruktur um frei kombinierbare Organisationsebenen ergänzt. Bestehende IDs und Verknüpfungen in Rechtstexten, Ressourcen, Krankmeldungen und Anträgen bleiben erhalten. Anschriften, Kontakt, Farben und Wappen werden direkt bei derselben Organisationseinheit gepflegt. Die früheren Körperschaftsadressen leiten hierher weiter.
 
 ## Personen und Gruppen
 
@@ -45,4 +45,4 @@ Der Start legt additive Tabellen für Ebenentypen, Zuordnungen, Rollenzuweisunge
 
 Alle Organisationsaktionen einschließlich der bisherigen kompatiblen Schreibadressen prüfen einen gemeinsamen Versionsstand. Veraltete Änderungen werden mit HTTP 409 abgelehnt. Neue Organisationsaktionen werden mit handelnder Person, Zeitpunkt und sachlichen Änderungsdaten protokolliert. Die Oberfläche zeigt die letzten Änderungen der ausgewählten Einheit.
 
-Das fachliche Konzept für Kalender, Urlaubsplanung, Schließtage und Novatime-Parallelbetrieb steht in [kalender-urlaub-konzept.md](kalender-urlaub-konzept.md).
+Die Organisationsstruktur und ihre Bereichsrollen bilden die Freigabegrundlage für **Kalender & Urlaub**. Das Modul bleibt nach dem Update zunächst ausgeschaltet; Admins aktivieren es unter **Module** und konfigurieren je Organisationseinheit Planung, Genehmigung, Feiertage und Besetzung in der Urlaubsansicht. Im Planungsbereich bleiben Zeitraum und Zoom bei mehreren Speichervorgängen erhalten; außerhalb liegende neue Urlaubszeiten werden direkt im passenden Zeitraum gezeigt. Das [fachliche Konzept](kalender-urlaub-konzept.md), die [Umsetzung und Abnahme](kalender-urlaub-umsetzungsstand.md) sowie das [Admin-Handbuch](ADMIN-HANDBUCH.md#kalender--urlaubsplanung-konfigurieren) erläutern Details und Grenzen.
