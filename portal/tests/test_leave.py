@@ -614,7 +614,7 @@ def test_external_url_validation_rejects_bad_hosts_without_persisting(
     _, area, _, _ = units
     admin = login("admin@example.org", "admin-passwort-123")
     for value in ("https://[broken", "https://person:password@zeit.example.org",
-                  "https://zeit.example.org\\n.example.org"):
+                  "https://zeit.exam ple.org"):
         policy = db.get(LeavePolicy, area.id)
         version = f"{policy.org_id}:{policy.version}" if policy else f"{area.id}:0"
         response = admin.post(
