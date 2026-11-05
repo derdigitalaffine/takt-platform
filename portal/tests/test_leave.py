@@ -365,9 +365,9 @@ def test_existing_krankmeldung_is_private_read_only_projection(
     db.add(report)
     db.commit()
     try:
-        def read_as(actor):
+        def read_as(actor, unit_id=area.id):
             c = login(actor.email, "task-passwort-123")
-            result = c.get(f"/urlaub/data?unit={area.id}")
+            result = c.get(f"/urlaub/data?unit={unit_id}")
             assert result.status_code == 200
             return result.json()
         coworker = read_as(viewer)
@@ -378,7 +378,7 @@ def test_existing_krankmeldung_is_private_read_only_projection(
         displayed = [row for row in supervisor["absences"] if str(row["id"]).startswith("presence:")]
         assert len(displayed) == 1 and displayed[0]["title"] == "Krank"
         assert "first_name" not in str(supervisor)
-        own = read_as(person)
+        own = read_as(person, team.id)
         assert any(row["title"] == "Krank" for row in own["absences"])
     finally:
         db.delete(report)
