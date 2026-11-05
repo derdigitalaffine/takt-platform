@@ -45,9 +45,14 @@
       {% include "leave_config.html" %}
       {% if active_section == 'planer' %}
         <div class="leave-planner-layout"><div class="leave-planner-primary">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <span class="small text-secondary">Personenzeitachse · Datum und Zoom bleiben beim Speichern erhalten</span>
+          {% if can_create %}<button type="button" id="leave-open-editor" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Zeitraum eintragen</button>{% endif %}
+        </div>
         <div id="leave-calendar" class="mb-4" data-unit="{{ unit }}"></div>
         <p class="small text-secondary">Eintrag anklicken zum Prüfen oder Ändern. Alternativ können Sie alle Zeiträume über das Formular bearbeiten.</p>
-        </div><aside class="leave-planner-side" aria-label="Urlaubszeit erfassen und prüfen">
+        </div><aside class="leave-planner-side" aria-label="Urlaubszeit erfassen und prüfen" id="leave-side-panel">
+        <div class="d-flex justify-content-end mb-2 leave-close-panel"><button type="button" id="leave-close-editor" class="btn btn-outline-secondary btn-sm" aria-label="Bearbeitung schließen"><i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Schließen</button></div>
         <div id="leave-feedback" class="alert alert-danger" role="alert" hidden></div>
         <section id="leave-preview"
                  class="card card-body mb-3"
