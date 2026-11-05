@@ -136,3 +136,7 @@
   .org-editor-units { max-height: none; }
   .org-person-drawer .offcanvas-body { padding: .9rem; }
 }
+
+/* Keep large, individually inspectable bulk previews within the workspace. */
+[data-org-batch-preview] ul { max-height: 17rem; overflow-y: auto; padding-right: .65rem; }
+[data-org-person-preview] ul { max-height: 17rem; overflow-y: auto; padding-right: .65rem; }
