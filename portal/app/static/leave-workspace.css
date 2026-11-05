@@ -65,6 +65,8 @@
   padding: .75rem; overflow-x: auto;
 }
 .leave-planner-side { min-width: 0; position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+.leave-close-panel { display: none !important; }
+#leave-open-editor { display: none; }
 .leave-planner-side #leave-editor { border-color: var(--bs-border-color); box-shadow: 0 3px 16px rgba(0,0,0,.04); }
 .leave-planner-side .row > [class*="col-"] { width: 100%; }
 .leave-planner-side #leave-feedback { overflow-wrap: anywhere; }
@@ -85,6 +87,21 @@
   .leave-planner-side .row > [class*="col-"] { width: auto; flex: 1 1 15rem; }
 }
 @media (max-width: 580px) {
+  #leave-open-editor { display: inline-flex; align-items: center; }
+  .leave-close-panel { display: flex !important; }
+  .leave-planner-side {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1060;
+    background: var(--bs-body-bg);
+    padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+    max-height: 100dvh;
+    overflow-y: auto;
+    box-shadow: 0 0 0 100vmax rgba(0,0,0,.4);
+  }
+  .leave-planner-side.is-open { display: block; }
+  body:has(.leave-planner-side.is-open) { overflow: hidden; }
   .leave-section-nav { gap: .35rem; }
   .leave-section-link { padding: .6rem .7rem; font-size: .87rem; }
   .leave-planner-primary #leave-calendar { padding: .25rem; }
