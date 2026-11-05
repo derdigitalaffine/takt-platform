@@ -4,7 +4,7 @@ import re
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
-from .db import Organization, User, Group
+from .db import Organization, User, Group, GroupMember
 from .org_models import OrgMembership, OrgRoleGrant, OrgAudit, OrgKind, OrgState
 from . import organization as os, orgs, people_choices
 from .main import app, current_user, get_db, check_csrf, render, redirect, flash
@@ -78,6 +78,19 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         dict(kind=kind, target_id=tid, grants=items)
         for (kind, tid), items in grouped_roles.items()
     ]
+    # Group-derived leadership is displayed as a tag without creating a
+    # duplicate person or a second, implicit direct role grant.
+    members_by_group = {}
+    for gid, uid in db.execute(select(GroupMember.group_id, GroupMember.user_id)):
+        members_by_group.setdefault(gid, set()).add(uid)
+    leadership_tags = {}
+    for grant in role_rows:
+        if grant.role not in ("lead", "deputy"):
+            continue
+        affected = ({grant.user_id} if grant.user_id is not None
+                    else members_by_group.get(grant.group_id, set()))
+        for uid in affected:
+            leadership_tags.setdefault(uid, set()).add(grant.role)
     people = {p.id: p for p in db.scalars(select(User).order_by(User.name))}
     groups = {g.id: g for g in db.scalars(select(Group).order_by(Group.name))}
     own = [m for m in memberships if m.user_id == user.id]
@@ -158,6 +171,7 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         org_groups=groups,
         role_rows=role_rows,
         role_groups=role_groups,
+        leadership_tags=leadership_tags,
         org_roles=os.ROLES,
         org_kinds=os.kinds(db),
         org_custom_kinds=list(db.scalars(select(OrgKind).order_by(OrgKind.label))),
