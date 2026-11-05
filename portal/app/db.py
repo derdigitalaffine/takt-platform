@@ -2927,7 +2927,7 @@ DEFAULT_SETTINGS = {
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
     "leave_policies": {"holiday_state": "VARCHAR(8) NOT NULL DEFAULT 'inherit'",
-                       "external_attestation": "BOOLEAN NOT NULL DEFAULT 1"},
+                       "external_attestation": "BOOLEAN NOT NULL DEFAULT 0"},
     "task_board_cards": {"shareable": "BOOLEAN NOT NULL DEFAULT 0"},
     "seminar_subscriptions": {"standing": "BOOLEAN NOT NULL DEFAULT 0"},
     "seminar_attendance": {"source": "VARCHAR(20) NOT NULL DEFAULT 'staff'"},
