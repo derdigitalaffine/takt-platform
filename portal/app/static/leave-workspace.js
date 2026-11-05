@@ -4,46 +4,17 @@
   const calendarPresent = !!document.getElementById("leave-calendar");
   const policy = document.querySelector("[data-leave-policy-topic]");
   if (policy) {
-    const topic = policy.dataset.leavePolicyTopic;
-    const groups = {
-      verfahren: ["workflow", "external_url", "external_attestation", "approval_units", "sync_absence"],
-      besetzung: ["minimum", "conflict_mode", "notify_only_warnings", "advanced", "minimum_capacity"],
-      feiertage: ["holiday_state"],
-      urlaubskonten: ["internal_account"],
-    };
-    const names = new Set(groups[topic] || groups.verfahren);
-    const namesUsed = new Set(Object.values(groups).flat());
-    const form = policy.querySelector("form");
-    if (form) {
-      for (const field of form.querySelectorAll("input[name],select[name]")) {
-        if (!namesUsed.has(field.name)) continue;
-        const owner = field.closest("label") || field;
-        owner.hidden = !names.has(field.name);
-        if (field.name === "holiday_state") {
-          const title = form.querySelector('label[for="leave-holidays"]');
-          if (title) title.hidden = !names.has(field.name);
-        }
-      }
-      const hints = [
-        ["Genehmigungsweg:", "verfahren"],
-        ["Gesetzliche Feiertage", "feiertage"],
-        ["Verbindliche Sperren", "besetzung"],
-        ["Die Übernahme erteilt", "verfahren"],
-      ];
-      for (const paragraph of form.querySelectorAll("p")) {
-        for (const [needle, owner] of hints)
-          if (paragraph.textContent.includes(needle)) paragraph.hidden = topic !== owner;
-      }
-    }
+    // The server already renders only this tab's editable fields. JS merely
+    // adds context and must never decide which sensitive setting is saved.
     const descriptions = {
       verfahren: "Interne Genehmigungen sind optional. Bei externer ZE-Software gibt es keine automatische Schnittstelle und keine doppelte interne Entscheidung.",
-      besetzung: "Mindestbesetzung und Konfliktregeln gelten für verbindliche Zeiten; Vorschauen reservieren keine Kapazität.",
-      feiertage: "Arbeitsfreie Feiertage und Sonderdienste sind unabhängig von den Preisregeln der Ressourcenbuchung.",
+      besetzung: "Mindestbesetzung und Konfliktregeln werden vor jedem verbindlichen Eintrag serverseitig geprüft.",
+      feiertage: "Arbeitsfreie Feiertage sind unabhängig von den Preisregeln der Ressourcenbuchung.",
       urlaubskonten: "Interne Urlaubskonten sind optional. Bei externer ZE-Software zeigt Takt keine erfundenen Resturlaubswerte.",
     };
     const intro = document.createElement("p");
     intro.className = "leave-setting-intro small";
-    intro.textContent = descriptions[topic] || "";
+    intro.textContent = descriptions[policy.dataset.leavePolicyTopic] || "";
     policy.prepend(intro);
   }
   document.addEventListener("click", async (event) => {
