@@ -1,0 +1,86 @@
+{# Shared fragment fetched by the organization and user administration. One atomic save. #}
+<div class="org-person-editor">
+  <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+    <div><h2 class="h4 mb-1" id="org-panel-title">{{ person.name }}</h2>
+      <p class="text-secondary small mb-0">{{ person.email }} · Organisationszuordnungen und Bereichsrollen</p></div>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Schließen"></button>
+  </div>
+  <p class="small text-secondary">Haupt- und Zusatzzuordnungen sowie mehrere Rollen können hier gemeinsam gespeichert werden. Jede Rolle besitzt ihren eigenen Geltungsbereich. Nicht bearbeitbare Bereiche bleiben unverändert.</p>
+  <form method="post" action="/admin/organization/person/{{person.id}}" data-org-person-form>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="version" value="{{ org_version }}">
+    <input type="hidden" name="origin" value="{{ origin }}">
+    <div class="org-editor-units">
+      {% for entry in entries %}
+        {% set node=entry.node %}{% set member=entry.membership %}
+        <details class="card mb-3 org-editor-unit" {{'open' if entry.focused}}>
+          <summary class="card-header d-flex align-items-center justify-content-between gap-2">
+            <span class="fw-semibold">{{node.name}}</span>
+            <span class="d-flex gap-1 flex-wrap">
+              {% if member %}<span class="badge text-bg-{{'primary' if member.is_primary else 'light'}}">{{'Hauptzuordnung' if member.is_primary else 'Zusätzlich'}}</span>{% endif %}
+              {% if 'lead' in entry.grants %}<span class="badge text-bg-primary">Leitung</span>{% endif %}
+              {% if 'deputy' in entry.grants %}<span class="badge text-bg-info">Stellvertretung</span>{% endif %}
+            </span>
+          </summary>
+          <div class="card-body">
+            {% if entry.can_members %}
+              <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="member_{{node.id}}" value="1" {{'checked' if member}}>
+                <span class="form-check-label">Organisationszuordnung aktiv</span>
+              </label>
+              <label class="form-check mb-3">
+                <input class="form-check-input" type="radio" name="primary_unit" value="{{node.id}}" {{'checked' if member and member.is_primary}}>
+                <span class="form-check-label">Als Hauptzuordnung festlegen</span>
+              </label>
+              <div class="row g-2 mb-3">
+                <div class="col-md-7">
+                  <label class="form-label" for="staff-{{node.id}}">Besetzungswirkung</label>
+                  <select class="form-select" id="staff-{{node.id}}" name="staff_{{node.id}}">
+                    <option value="yes" {{'selected' if member and member.counts_staff}}>Für die Besetzung mitzählen</option>
+                    <option value="no" {{'selected' if not member or not member.counts_staff}}>Nicht mitzählen</option>
+                  </select>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label" for="capacity-{{node.id}}">Einsatzanteil (%)</label>
+                  <input class="form-control" id="capacity-{{node.id}}" type="number" name="capacity_{{node.id}}" min="0" max="100" value="{{member.capacity_percent if member else 100}}">
+                </div>
+              </div>
+            {% elif member %}
+              <p class="small text-secondary mb-2">Zuordnung kann hier nicht bearbeitet werden.</p>
+            {% endif %}
+            {% if entry.can_roles %}
+              <p class="fw-semibold small mb-2">Bereichsrollen (Mehrfachauswahl)</p>
+              <div class="org-role-picker">
+                {% for key,desc in org_roles.items() %}
+                  {% set grant=entry.grants.get(key) %}
+                  <div class="org-role-choice">
+                    <label class="form-check mb-1">
+                      <input class="form-check-input" type="checkbox" name="role_{{node.id}}" value="{{key}}" {{'checked' if grant}}>
+                      <span class="form-check-label">{{desc[0]}}</span>
+                    </label>
+                    <label class="form-check ms-4 small text-secondary">
+                      <input class="form-check-input" type="checkbox" name="child_{{node.id}}_{{key}}" value="1" {{'checked' if grant and grant.include_children}}>
+                      <span class="form-check-label">Einschließlich Untereinheiten</span>
+                    </label>
+                  </div>
+                {% endfor %}
+              </div>
+            {% elif entry.grants %}
+              <p class="small text-secondary mb-0">Rollen dieses Bereichs sind nur lesbar.</p>
+            {% endif %}
+            {% if not entry.can_members and not entry.can_roles %}
+              <p class="small text-secondary mb-0">Keine Bearbeitungsberechtigung für diese Einheit.</p>
+            {% endif %}
+          </div>
+        </details>
+      {% endfor %}
+    </div>
+    <div class="org-editor-actions border-top bg-body py-3">
+      <div class="small text-secondary mb-2" data-org-person-preview aria-live="polite">Änderungen werden für alle betroffenen Einheiten gemeinsam geprüft und entweder vollständig gespeichert oder verworfen.</div>
+      <div class="d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Abbrechen</button>
+        <button class="btn btn-primary" type="submit">Zuordnungen und Rollen speichern</button>
+      </div>
+    </div>
+  </form>
+</div>
