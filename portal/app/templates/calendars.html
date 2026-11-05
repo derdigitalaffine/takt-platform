@@ -1,11 +1,14 @@
 {% extends "base.html" %}{% import '_macros.html' as m with context %}
-{% block title %}Kalender{% endblock %}{% block content %}
+{% block title %}Kalender{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/ui-density.css">{% endblock %}
+{% block content %}
 {% call m.page_head('Kalender','Persönliche und gemeinsame Termine in einer Übersicht.') %}
     <a class="btn btn-outline-primary" href="/urlaub">Urlaubsplanung</a>
     <a class="btn btn-outline-secondary" href="/kalender/geraete">Gerät verbinden</a>
     <a class="btn btn-outline-secondary" href="/kalender/abos">Lesend abonnieren</a>
 {% endcall %}
-<div class="row g-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-ui-preferences data-csrf="{{csrf}}"><p class="small text-secondary mb-0">Kalenderfreigaben, Ansichten und Gerätezugänge bleiben unabhängig von der Urlaubsplanung.</p><div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte"><button type="button" class="btn btn-outline-secondary" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button><button type="button" class="btn btn-outline-secondary" data-ui-density="compact" aria-pressed="false">Kompakt</button></div></div>
+<div class="row g-4 calendar-workspace">
     <aside class="col-12 col-lg-3">
         <section class="card card-body">
             <h2 class="h6">Meine Kalender</h2>
@@ -264,7 +267,7 @@
     </section>
 </div>
 {% endblock %}
-{% block scripts %}
+{% block scripts %}<script src="/static/ui-preferences.js" defer></script>
     <script src="/static/vendor/fullcalendar/index.global.min.js"></script>
     <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
     <script src="/static/calendars.js"></script>
