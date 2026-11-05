@@ -383,3 +383,44 @@ def test_existing_krankmeldung_is_private_read_only_projection(
     finally:
         db.delete(report)
         db.commit()
+
+def test_illness_source_reduces_staffing_without_duplicate_absence_records(
+    db, task_people, units,
+):
+    """Use canonical Krankmelder data for staffing; never mirror it into Absence."""
+    from app import krank
+    from app.db import KrankReport
+
+    _, area, _, _ = units
+    planner, sick = task_people[:2]
+    assigned(db, planner, area)
+    assigned(db, sick, area)
+    db.add(LeavePolicy(
+        org_id=area.id, workflow="planning", minimum=1,
+        conflict_mode="block",
+    ))
+    report = KrankReport(
+        ref_no="T-PRIVATE-STAFFING-001", kind="simple", status="new",
+        user_id=sick.id,
+    )
+    krank.set_data(report, {"date": "2026-12-08"})
+    db.add(report)
+    db.commit()
+    try:
+        row = leave.save(db, planner, dict(
+            starts_on="2026-12-08", ends_on="2026-12-08",
+        ))
+        db.commit()
+        with pytest.raises(HTTPException) as denied:
+            leave.command(db, planner, row.id, "bind", row.version)
+        assert denied.value.status_code == 409
+        # The Krankmelder remains the canonical source: no shadow Absence is made.
+        assert not db.scalar(select(Absence.id).where(
+            Absence.user_id == sick.id, Absence.starts_on == "2026-12-08",
+        ))
+    finally:
+        db.rollback()
+        db.query(LeaveRequest).filter_by(person_id=planner.id).delete()
+        db.query(LeavePolicy).filter_by(org_id=area.id).delete()
+        db.delete(report)
+        db.commit()
