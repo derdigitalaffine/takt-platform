@@ -248,10 +248,30 @@ def decision_unit(row):
     return path[min(row.approval_step or 0, len(path) - 1)]
 
 
+def _default_approval_unit(db, person_id, unit):
+    """Leadership's own approval decisions belong to the next parent level.
+
+    Reuse the same fallback for initial requests and later cancellations,
+    including edits that have reset the draft approval_path.
+    """
+    path = org.active_path(db, unit)
+    if len(path) <= 1:
+        return unit
+    person = db.get(User, person_id)
+    leading = any(
+        g.role in ("lead", "deputy")
+        and g.org_id in path
+        and (g.org_id == unit or g.include_children)
+        for g in org.grants(db, person)
+    )
+    return path[1] if leading else unit
+
+
 def cancellation_unit(db, row):
-    return (json.loads(policy(db, row.org_id).approval_units or "[]") or [row.org_id])[
-        -1
-    ]
+    configured = json.loads(policy(db, row.org_id).approval_units or "[]")
+    return configured[-1] if configured else _default_approval_unit(
+        db, row.person_id, row.org_id
+    )
 
 
 def command(db, actor, request_id, action, version, reason=""):
@@ -319,17 +339,7 @@ def command(db, actor, request_id, action, version, reason=""):
         row.requested_workflow = cfg.workflow
         path = json.loads(cfg.approval_units or "[]")
         if not path:
-            # Leaders and deputies normally submit their own requests upwards;
-            # others use their primary unit's configured approvers.
-            person = db.get(User, row.person_id)
-            leading = any(
-                g.role in ("lead", "deputy")
-                and g.org_id in org.active_path(db, unit)
-                and (g.org_id == unit or g.include_children)
-                for g in org.grants(db, person)
-            )
-            ancestry = org.active_path(db, unit)
-            path = [ancestry[1]] if leading and len(ancestry) > 1 else [unit]
+            path = [_default_approval_unit(db, row.person_id, unit)]
         if any(node not in org.active_path(db, unit) for node in path):
             raise HTTPException(
                 422,
