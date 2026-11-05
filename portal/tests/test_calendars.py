@@ -87,7 +87,7 @@ def test_closure_created_in_calendar_is_same_object_in_leave(db, task_people, un
         assert events[0]["end"] == "2026-12-31"
         assert (
             "Zwischen den Jahren"
-            in member_client.get("/urlaub?unit=" + str(team.id)).text
+            in member_client.get("/urlaub/schliesszeiten?unit=" + str(team.id)).text
         )
         other_client = login(outsider.email, "task-passwort-123")
         assert other_client.get("/kalender/organisationstermine").json()["events"] == []
