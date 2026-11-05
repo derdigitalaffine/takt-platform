@@ -29,7 +29,8 @@
             <h2 class="h6">Konfliktvorschau</h2>
             <div id="leave-preview-content"></div>
         </section>
-        <section id="leave-editor" class="card card-body mb-4">
+        {% if can_create %}
+<section id="leave-editor" class="card card-body mb-4">
             <h2 class="h5" id="leave-editor-title">Zeitraum eintragen</h2>
             <p id="leave-edit-note" class="small" hidden>Die Änderung wird als neuer Entwurf gespeichert. Der bisherige verbindliche Zeitraum bleibt bis zur erneuten Bestätigung bestehen.</p>
             <form id="leave-form" method="post" action="/urlaub" class="row g-3">
@@ -71,7 +72,8 @@
                 </div>
             </form>
         </section>
-        {% for row in rows %}
+        {% endif %}
+{% for row in rows %}
             <article id="leave-row-{{ row.id }}" class="card card-body mb-3">
                 <h2 class="h6">{{ (people|selectattr('id','equalto',row.person_id)|first).name}} · {{ row.starts_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.start_half=='am' else 'Nachmittag'}}) bis {{ row.ends_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.end_half=='am' else 'Nachmittag'}})</h2>
                 <p>{{{'planned':'Geplant','requested':'Beantragt','binding':'Verbindlich','rejected':'Abgelehnt','cancelled':'Storniert'}[row.status]}}{% if row.attested_at %} · Extern genehmigt (Selbstauskunft){% endif %}{% if row.effective_json and row.status!="binding" %} · Bisheriger verbindlicher Zeitraum gilt bis zur Entscheidung weiter.{% endif %}

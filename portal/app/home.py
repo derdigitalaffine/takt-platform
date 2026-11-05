@@ -289,6 +289,9 @@ def overview(db, user: User, modules: set) -> tuple[dict, dict]:
         from .leave_extensions import LeaveInbox
         count = len(list(db.scalars(select(LeaveInbox.id).where(LeaveInbox.user_id == user.id, LeaveInbox.read.is_(False)))))
         act(count, "Hinweise zur Urlaubsplanung", "/urlaub", "fa-calendar-check")
+        from .calendar_models import CalendarDevice
+        expiring = len(list(db.scalars(select(CalendarDevice.id).where(CalendarDevice.user_id==user.id,CalendarDevice.revoked.is_(False),CalendarDevice.expires_at <= now+timedelta(days=7)))))
+        act(expiring, "Kalendergerätezugänge erneuern", "/kalender/geraete", "fa-mobile-screen", "warning")
     if "seminars" in modules:
         from . import seminars
         se=cache["seminars"]=seminars.overview(db,user)

@@ -185,3 +185,36 @@ def test_simultaneous_binding_serializes_staffing_decision(db, task_people, unit
         ).delete()
         db.query(LeavePolicy).filter_by(org_id=unit.id).delete()
         db.commit()
+
+
+def test_area_viewer_can_read_but_never_plan_or_see_private_history(
+    db, task_people, units
+):
+    _, unit, team, _ = units
+    person, viewer = task_people[:2]
+    assigned(db, person, team)
+    grant(db, unit, viewer, "viewer")
+    row = leave.save(db, person, dict(starts_on="2026-12-01", ends_on="2026-12-01"))
+    db.commit()
+    try:
+        c = login(viewer.email, "task-passwort-123")
+        page = c.get(f"/urlaub?unit={unit.id}")
+        assert page.status_code == 200
+        data = c.get(f"/urlaub/data?unit={unit.id}").json()
+        assert data["requests"][0]["person_id"] == person.id
+        assert data["people"][0]["canSelect"] is False
+        token = csrf_of(page.text)
+        assert (
+            c.post(
+                "/urlaub/preview",
+                json=dict(
+                    person_id=person.id, starts_on="2026-12-01", ends_on="2026-12-01"
+                ),
+                headers={"X-CSRF-Token": token},
+            ).status_code
+            == 403
+        )
+        assert c.get(f"/urlaub/{row.id}/verlauf").status_code == 403
+    finally:
+        db.query(LeaveRequest).filter_by(person_id=person.id).delete()
+        db.commit()

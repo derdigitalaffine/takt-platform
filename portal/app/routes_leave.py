@@ -152,6 +152,7 @@ def page(
         unit=unit,
         current_year=date.today().year,
         people=people,
+        can_create=any(leave.can_plan(db, user, p.id) for p in people),
         rows=rows,
         closures=[
             c

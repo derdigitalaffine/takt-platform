@@ -7,6 +7,11 @@ from .db import Organization, User, Group, GroupMember, Setting
 from .org_models import OrgKind, OrgState, OrgMembership, OrgRoleGrant, OrgAudit
 
 ROLES = {
+    "viewer": (
+        "Bereich ansehen",
+        {"view"},
+        "Freigegebene Bereichsinformationen und Urlaubsplanungen sehen; keine Planung, Genehmigung oder Verwaltung.",
+    ),
     "leave_settings": (
         "Urlaubsregeln verwalten",
         {"view", "leave_settings"},

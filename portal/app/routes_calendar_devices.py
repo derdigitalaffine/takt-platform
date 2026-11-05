@@ -5,7 +5,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .main import app, current_user, get_db, check_csrf, render, redirect, flash
-from .db import User, get_settings, set_setting
+from .db import User, get_settings, set_setting, utcnow
 from .calendar_models import Calendar, CalendarDevice, CalendarDeviceScope
 from . import calendar_devices as devices, calendars
 from .calendar_profiles import ios_profile
@@ -33,6 +33,7 @@ def page(
         "calendar_devices.html",
         user,
         devices=rows,
+        now=utcnow(),
         calendars=available,
         writable={c.id: calendars.access(db, user, c, True) for c in available},
         scopes={

@@ -348,7 +348,7 @@ def account_balances(db, person_id):
 
 def closure_obligations(db, closed, people):
     """Required leave is a planning marker, never an invented application or approval."""
-    from .leave import period, primary
+    from .leave import period
 
     patterns = list(db.scalars(select(WorkPattern)))
     assigned = set(
@@ -386,9 +386,15 @@ def closure_obligations(db, closed, people):
         for row in rows
         if row.status in ("planned", "requested")
     ]
+    relevant = {
+        m.user_id
+        for m in db.scalars(select(OrgMembership))
+        if (m.is_primary or m.counts_staff)
+        and closed.org_id in org.active_path(db, m.org_id)
+    }
     result = []
     for person in people:
-        if closed.org_id not in org.active_path(db, primary(db, person.id)):
+        if person.id not in relevant:
             continue
         missing = []
         planned = 0
@@ -428,11 +434,17 @@ def closure_obligations(db, closed, people):
 
 
 def send_digests():
-    from .db import SessionLocal, utcnow, to_local
+    from .db import SessionLocal, utcnow, to_local, get_settings
     from . import notify, leave
     from .config import settings
 
     with SessionLocal() as db:
+        if get_settings(db).get("module_calendars", "0") != "1" or not db.scalar(
+            select(LeavePreference.user_id)
+            .where(LeavePreference.email_mode == "daily")
+            .limit(1)
+        ):
+            return 0
         leave.lock(db)
         today = to_local(utcnow()).date()
         count = 0
@@ -486,7 +498,10 @@ def planning_summary(db, unit, start, end):
         if unit in org.active_path(db, m.org_id, nodes)
     }
     cfg = db.get(LeavePolicy, unit)
-    patterns = list(db.scalars(select(WorkPattern))) if cfg and cfg.advanced else []
+    from .leave import policy
+
+    effective_cfg = policy(db, unit)
+    patterns = list(db.scalars(select(WorkPattern))) if effective_cfg.advanced else []
     unavailable = []
     mirrors = set()
     for row in db.scalars(select(LeaveRequest)):
