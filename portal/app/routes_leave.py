@@ -324,45 +324,125 @@ def page(
 def data(unit: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     people = visible_people(db, user, unit)
     ids = [p.id for p in people]
-    from .db import Absence
+    from .db import Absence, KrankReport
+    from .leave_models import LeaveAbsencePeriod
 
+    # Absence and leave remain the source of truth: no new mirrored rows.
     mirrors = set(
+        db.scalars(
+            select(LeaveAbsencePeriod.absence_id)
+            .where(LeaveAbsencePeriod.absence_id.is_not(None))
+        )
+    )
+    # The direct LeaveRequest.absence_id link is used by older and current records.
+    mirrors.update(
         db.scalars(
             select(LeaveRequest.absence_id).where(LeaveRequest.absence_id.is_not(None))
         )
     )
     absence_rows = [
-        a
-        for a in db.scalars(
+        a for a in db.scalars(
             select(Absence).where(
                 Absence.user_id.in_(ids), Absence.status == "confirmed"
             )
         )
         if a.id not in mirrors
     ]
-    return dict(
-        absences=[
-            dict(
-                id=a.id,
-                person_id=a.user_id,
-                starts_on=a.starts_on,
-                ends_on=a.ends_on,
-                start_half="am",
-                end_half="pm",
-            )
+    absences = [
+        dict(id=a.id, person_id=a.user_id,
+             starts_on=a.starts_on, ends_on=a.ends_on,
+             start_half="am", end_half="pm", title="Abwesend")
+        for a in absence_rows
+    ]
+    requests = []
+    bindings = []
+    for req in db.scalars(
+        select(LeaveRequest).where(LeaveRequest.person_id.in_(ids))
+    ):
+        if not can_read_request(db, user, req):
+            continue
+        if can_see_leave_details(db, user, req.person_id):
+            requests.append(leave.serialize(req))
+        elif req.effective_json:
+            # Colleagues only see availability, not an individual status or reason.
+            try:
+                interval = json.loads(req.effective_json)
+            except ValueError:
+                continue
+            absences.append(dict(
+                id="leave:" + str(req.id), person_id=req.person_id,
+                starts_on=interval["starts_on"], ends_on=interval["ends_on"],
+                start_half=interval.get("start_half", "am"),
+                end_half=interval.get("end_half", "pm"), title="Abwesend",
+            ))
+        if req.effective_json:
+            try:
+                bindings.append((req.person_id, json.loads(req.effective_json)))
+            except ValueError:
+                pass
+
+    # Reuse only user-linked Krankmelder reports. Unlinked reports cannot be
+    # safely matched by names or e-mail and must not be guessed into the plan.
+    # No report content, diagnosis or proof ever enters this feed.
+    from . import krank
+    for report in db.scalars(
+        select(KrankReport).where(KrankReport.user_id.in_(ids))
+    ):
+        values = krank.data(report)
+        start = values.get("date") if report.kind == "simple" else values.get("from")
+        finish = values.get("date") if report.kind == "simple" else values.get("to")
+        try:
+            first = date.fromisoformat(start)
+            last = date.fromisoformat(finish)
+            if first > last:
+                continue
+        except (TypeError, ValueError):
+            continue
+        # A linked absence/leave covering the same time already occupies the
+        # timeline; do not create a second event for that person and period.
+        overlap = any(
+            a.user_id == report.user_id
+            and a.starts_on <= last.isoformat()
+            and a.ends_on >= first.isoformat()
             for a in absence_rows
-        ],
+        ) or any(
+            uid == report.user_id and
+            times.get("starts_on", "9999") <= last.isoformat() and
+            times.get("ends_on", "0000") >= first.isoformat()
+            for uid, times in bindings
+        )
+        if overlap:
+            continue
+        absences.append(dict(
+            id="presence:" + str(report.id),
+            person_id=report.user_id,
+            starts_on=first.isoformat(), ends_on=last.isoformat(),
+            start_half="am", end_half="pm",
+            title="Krank" if can_see_illness(db, user, report.user_id)
+                  else "Abwesend",
+        ))
+
+    def leadership(person):
+        path = org.active_path(db, unit)
+        roles = {
+            g.role for g in org.grants(db, person)
+            if g.org_id in path and (g.org_id == unit or g.include_children)
+        }
+        return "Leitung" if "lead" in roles else (
+            "Stellvertretung" if "deputy" in roles else ""
+        )
+
+    return dict(
+        absences=absences,
         people=[
-            dict(id=p.id, name=p.name, canSelect=leave.can_plan(db, user, p.id))
+            dict(
+                id=p.id, name=p.name,
+                canSelect=leave.can_plan(db, user, p.id),
+                roleTag=leadership(p),
+            )
             for p in people
         ],
-        requests=[
-            leave.serialize(r)
-            for r in db.scalars(
-                select(LeaveRequest).where(LeaveRequest.person_id.in_(ids))
-            )
-            if can_read_request(db, user, r)
-        ],
+        requests=requests,
     )
 
 
