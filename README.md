@@ -1,6 +1,6 @@
 # Videokonferenzserver der Verbandsgemeinde Otterbach-Otterberg
 
-**Selbst gehostetes Portal für Verwaltungen:** Videokonferenzen mit [Jitsi Meet](https://jitsi.org/), Aufnahme und Transkription über [SpeechMind](https://www.speechmind.com/), Besprechungsplanung mit Outlook-Einladungen, Terminumfragen wie Doodle, Abstimmungen und Wahlen, Terminbuchung wie Calendly, Buchung von Bürgerhäusern, Räumen, Grillplätzen und Geräten, Kurzlinks mit QR-Codes, ein Formularserver mit Online-Anträgen, Bezahlung per PayPal oder Überweisung, eine Ablage (DMS), ein Kartenbrowser, öffentliche und interne Rechtstexte sowie Aushänge und Dokumentenumläufe mit wiederverwendbaren Sammelmappen – alles auf dem eigenen Server, ohne Daten an große Plattformen.
+**Selbst gehostetes Portal für Verwaltungen:** Videokonferenzen mit [Jitsi Meet](https://jitsi.org/), Aufnahme und Transkription über [SpeechMind](https://www.speechmind.com/), Besprechungsplanung mit Outlook-Einladungen, gemeinsamen Kalendern und Urlaubsplanung, Terminumfragen wie Doodle, Abstimmungen und Wahlen, Terminbuchung wie Calendly, Buchung von Bürgerhäusern, Räumen, Grillplätzen und Geräten, Kurzlinks mit QR-Codes, ein Formularserver mit Online-Anträgen, Bezahlung per PayPal oder Überweisung, eine Ablage (DMS), ein Kartenbrowser, öffentliche und interne Rechtstexte sowie Aushänge und Dokumentenumläufe mit wiederverwendbaren Sammelmappen – alles auf dem eigenen Server, ohne Daten an große Plattformen.
 
 Herausgegeben von der Verbandsgemeinde Otterbach-Otterberg und als **freie Software (MIT-Lizenz)** ausdrücklich für alle anderen Verwaltungen gedacht: Verbandsgemeinden, Städte, Kreise, Zweckverbände. Nutzen Sie es, passen Sie es an Ihr Haus an, und teilen Sie Verbesserungen, damit alle davon profitieren. Name, Farben und Logo stellen Sie in der Oberfläche um (Design & Branding), voreingestellt über `BRAND_NAME` und `BRAND_PRODUCT` in `.env`.
 
@@ -32,6 +32,16 @@ Herausgegeben von der Verbandsgemeinde Otterbach-Otterberg und als **freie Softw
 - Termin, Dauer, Tagesordnung, Teilnehmende (Kolleg:innen werden vorgeschlagen, Gäste per Adresse).
 - Jede Person bekommt eine eigene **Outlook-Besprechungsanfrage** mit ICS und persönlichem Einwahllink. Änderungen, Ausladungen und Absagen aktualisieren die Kalender; beim Löschen eines Meetings werden Absagen vorgeschlagen.
 - **Zu- und Absagen** per Kalender (IMAP-Auswertung inkl. Outlook/Exchange-Sonderformaten, mit Postfach-Diagnose) oder per Link in jedem Mailprogramm.
+
+### Kalender & Urlaubsplanung (abschaltbares Modul, zunächst deaktiviert)
+
+- **Kalender & Urlaub** unter „Termine & Veranstaltungen“: persönliche und geteilte Kalender, Organisations- und Jahrestermine sowie lesende Ansichten berechtigt sichtbarer Fachtermine. Freigaben für Personen, Gruppen und organisatorische Zielgruppen werden serverseitig geprüft; ein Termin allein verändert keine Mindestbesetzung.
+- **Gemeinsame Urlaubsplanung** in der Personenzeitachse mit Monats-, Quartals- und Jahresansicht, halben Tagen, Arbeitsmodellen und datumsgenauer Besetzungsprüfung. **Zeitraum und Zoom** bleiben je Organisationseinheit während der Browser-Sitzung auch nach dem Speichern und Neuladen erhalten. Mehrere Einträge im sichtbaren Zeitraum verschieben die Ansicht nicht; ein neu gespeicherter Eintrag außerhalb des Ausschnitts führt gezielt zu seinem Zeitraum, ohne den Zoom zu ändern. Formulare und Tastatur sind Alternativen zur Mausbedienung.
+- **Konfigurierbare Verfahren:** gemeinsame Planung, interne mehrstufige Genehmigung oder externe Genehmigung mit ausdrücklich gekennzeichneter eigener Selbstauskunft (beispielsweise parallel zu Novatime **ohne** automatische Novatime-Schnittstelle). Optionale interne Urlaubskonten, Feiertagskalender unabhängig von Ressourcenpreisen, Schließzeiten und Notbesetzung. Verbindliche Änderungen erhalten den bisherigen wirksamen Zeitraum bis zur Bestätigung; eine Abwesenheitsübernahme vergibt **keine** Vertretungsrechte.
+- **Kalender auf Geräten:** einzeln widerrufbare Zugänge mit expliziter Kalender- und Schreibrechteauswahl. Freie Kalender sind über CalDAV bei entsprechender Freigabe beschreibbar; Fachkalender werden lesend projiziert und in Takt bearbeitet. Einmalig abrufbares iOS-Konfigurationsprofil nur über HTTPS und eigene widerrufbare ICS-Leseabos. Outlook-Varianten ohne passende CalDAV-Anbindung nutzen ein ICS-Abo; dessen Aktualisierung hängt vom Client ab.
+- **Einrichtung:** Admins aktivieren „Kalender & Urlaub“ unter **Module**, pflegen Organisation und Bereichsrollen unter **Administration → Organisation** und konfigurieren Urlaubsregeln im jeweiligen Bereich. Bestehende Organisationseinheiten und Fachverknüpfungen bleiben erhalten; Tabellen werden additiv angelegt. Geräte-Zugangswege und Token-URLs müssen über HTTPS geschützt sein; persönliche ICS-Pfade sind auch in Proxy-Zugriffslogs auszunehmen.
+
+Mehr dazu: [Bedienung im Benutzerhandbuch](docs/BENUTZERHANDBUCH.md#12e-kalender--urlaubsplanung), [Administration](docs/ADMIN-HANDBUCH.md#kalender--urlaubsplanung-konfigurieren), [Organisationsrollen](docs/organisationsverwaltung.md), [fachliches Konzept](docs/kalender-urlaub-konzept.md), [UI-Konzept](docs/kalender-urlaub-ui.md), [Implementierung und Grenzen](docs/kalender-urlaub-umsetzungsstand.md). **Auf realen iOS-/Android-/Outlook-Geräten ist noch keine Abnahme dokumentiert.**
 
 ### Einheitliche Umfragen & Abstimmungen
 
@@ -190,11 +200,12 @@ Herausgegeben von der Verbandsgemeinde Otterbach-Otterberg und als **freie Softw
 
 ### Verwaltung und Sicherheit
 
+- **Gemeinsame Organisationsverwaltung** für Hierarchie, Körperschaften und Einrichtungen, Wappen und Stammdaten, Haupt-/Zusatzzuordnungen sowie Bereichsrollen. Planung, Genehmigung, Urlaubsregeln und Abwesenheitsverwaltung sind getrennte Rechte. [Details](docs/organisationsverwaltung.md).
 - **Benutzerverwaltung** mit Einladung per E-Mail, **Rechten je Bereich** (Videokonferenzen, Kurzlinks, Formulare, Formularbausteine, Online-Anträge einrichten, Prozesse, Aktenplan verwalten, Terminumfragen, Abstimmungen, Terminbuchung, Ressourcen, Zahlungen, Karten, Kartenlayer & Geocoding, Rechtstexte, Krankmeldungen, Krankmelder verwalten, Benutzerverwaltung) und **Gruppen**. **CSV-Import** mit Vorlage und Vorschau: Konten mit oder ohne Startpasswort, Gruppen werden angelegt bzw. ergänzt, Konten ohne Passwort auf Wunsch per Mail eingeladen.
 - **Gehärtet:** Content-Security-Policy und weitere Sicherheits-Header, CSRF-Schutz für alle Formulare, Bremse gegen Passwort-Raten je IP und je Konto, keine Kontenermittlung über Antwortzeiten, Uploads nur als Download, aktuelle Bibliotheken ohne bekannte Sicherheitslücken.
 - **Nextcloud / OIDC-Anmeldung:** Einrichtung im Administrationsbereich, ausdrückliche Kontoverknüpfung, Gruppenzuordnung und optionale zentrale Abmeldung. Lokale Anmeldung bleibt verfügbar. [Einrichtung und Grenzen](docs/NEXTCLOUD-OIDC.md).
 - **Zwei-Faktor-Anmeldung** per **Authenticator-App (TOTP)** oder **Code per E-Mail**, mit Notfallcodes; freiwillig oder Pflicht für Admins/alle. „Passwort vergessen“ per Mail-Link.
-- **Module** Kurzlinks, Formulare, Online-Anträge, Ablage (DMS), Umfragen & Abstimmungen, Terminbuchung, Ressourcenbuchung, Kartenbrowser, Rechtstexte und Krankmelder komplett abschaltbar; auf Wunsch je Modul mit **eigener Domain**.
+- **Module** Kalender & Urlaub, Kurzlinks, Formulare, Online-Anträge, Ablage (DMS), Umfragen & Abstimmungen, Terminbuchung, Ressourcenbuchung, Kartenbrowser, Rechtstexte und Krankmelder komplett abschaltbar; auf Wunsch je Modul mit **eigener Domain**.
 - **Sitzungen & Cookies:** technische Übersicht, wer angemeldet ist (Gerät, IP, letzte Aktivität), Inhalt und Eigenschaften der Session-Cookies; Sitzungen einzeln, je Person oder alle anderen beenden. Jede:r sieht unter Profil › Sicherheit die eigenen angemeldeten Geräte; ein neues Passwort meldet alle anderen Geräte ab.
 - **E-Mail** über SMTP mit Warteschlange, Wiederholungen und Protokoll; optional Ablage in „Gesendet“ per IMAP. **Alle Mails als Vorlagen bearbeitbar**, mit Platzhaltern und Live-Vorschau.
 - **HTTPS** mit Caddy: Start mit selbst signiertem Zertifikat, **Let's Encrypt** per Klick in der Oberfläche.
@@ -206,7 +217,7 @@ Herausgegeben von der Verbandsgemeinde Otterbach-Otterberg und als **freie Softw
 
 Oberflächen und Entwicklung: [Gemeinsames Designsystem](docs/DESIGN-SYSTEM.md), [Komponentenreferenz](docs/design-system-reference.html), [Branding und Kontrastprüfung](docs/BRANDING-ACCESSIBILITY.md), [UX-Grundsätze](docs/UX-GRUNDSAETZE.md), [UX-Review-Vorlage](docs/UX-REVIEW-VORLAGE.md).
 
-Zusätzliche Modul-Anleitungen: [Benutzerprofile](docs/BENUTZERPROFILE.md), [Dienstreisen und Satzpflege](docs/DIENSTREISEN.md), [Aushänge und Sammelmappen](docs/UMLAEUFE-UND-SAMMELMAPPEN.md), [interne Rechtstexte](portal/docs/internal-laws.md), [DMS-Dateibrowser und PDF-Vorschau](portal/docs/dms-browser.md).
+Zusätzliche Modul-Anleitungen: [Kalender und Urlaubsplanung](docs/kalender-urlaub-umsetzungsstand.md), [Organisationsverwaltung](docs/organisationsverwaltung.md), [Benutzerprofile](docs/BENUTZERPROFILE.md), [Dienstreisen und Satzpflege](docs/DIENSTREISEN.md), [Aushänge und Sammelmappen](docs/UMLAEUFE-UND-SAMMELMAPPEN.md), [interne Rechtstexte](portal/docs/internal-laws.md), [DMS-Dateibrowser und PDF-Vorschau](portal/docs/dms-browser.md).
 
 | Für wen | Datei |
 |---|---|
@@ -427,6 +438,8 @@ Tests (ohne Jitsi, eigene Testdatenbank):
 ```bash
 cd portal && pip install pytest && python -m pytest -q tests
 ```
+
+Die GitHub-Pipeline führt außerdem Chromium-Tests für die Kalender-/Urlaubsansicht (einschließlich mehrfachen Speicherns mit beibehaltenem Zeitraum und Zoom), Seminare/Organisation, Aufgaben, Umfragen und Boards aus. Die erfolgreiche Abnahme für [PR #184](https://github.com/derdigitalaffine/takt-platform/pull/184) mit **660 Python-Tests** und sämtlichen sechs grünen Portal-CI-Jobs ist [dokumentiert](docs/kalender-urlaub-umsetzungsstand.md).
 
 Eine Jibri-Aufnahme lässt sich simulieren, indem man in `dev-recordings/<name>/` eine MP4-Datei, eine `metadata.json` mit `{"meeting_url": "https://meet.example.com/<raum>"}` und eine leere Datei `.finalized` ablegt.
 
