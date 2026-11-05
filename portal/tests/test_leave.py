@@ -204,7 +204,8 @@ def test_area_viewer_can_read_but_never_plan_or_see_private_history(
         page = c.get(f"/urlaub?unit={unit.id}")
         assert page.status_code == 200
         data = c.get(f"/urlaub/data?unit={unit.id}").json()
-        assert data["requests"][0]["person_id"] == person.id
+        # Area viewers may see availability, not colleagues' leave reasons.
+        assert data["requests"] == []
         assert data["people"][0]["canSelect"] is False
         token = csrf_of(page.text)
         assert (
@@ -299,4 +300,86 @@ def test_cancellation_of_edited_binding_leave_reaches_final_approver(
     finally:
         db.query(LeaveRequest).filter_by(person_id=person.id).delete()
         db.query(LeavePolicy).filter_by(org_id=unit.id).delete()
+        db.commit()
+
+
+def test_leave_sections_and_settings_are_separate_routes(db, task_people, units):
+    _, area, _, _ = units
+    person, leader = task_people[:2]
+    assigned(db, person, area)
+    grant(db, area, leader, "lead", False)
+    person_client = login(person.email, "task-passwort-123")
+    leader_client = login(leader.email, "task-passwort-123")
+    assert person_client.get(f"/urlaub/mein-urlaub?unit={area.id}").status_code == 200
+    assert person_client.get(f"/urlaub/verwaltung/feiertage?unit={area.id}").status_code == 403
+    assert person_client.get(f"/urlaub/genehmigungen?unit={area.id}").status_code == 403
+    assert leader_client.get(f"/urlaub/genehmigungen?unit={area.id}").status_code == 200
+    assert leader_client.get(f"/urlaub/verwaltung/besetzung?unit={area.id}").status_code == 403
+    admin = login("admin@example.org", "admin-passwort-123")
+    for topic in ("verfahren", "besetzung", "arbeitsmodelle", "feiertage", "urlaubskonten"):
+        page = admin.get(f"/urlaub/verwaltung/{topic}?unit={area.id}")
+        assert page.status_code == 200, (topic, page.text[:300])
+    assert admin.get(f"/urlaub/verwaltung/unknown?unit={area.id}").status_code == 404
+
+
+def test_leader_cannot_approve_own_leave_and_defaults_to_parent(
+    db, task_people, units,
+):
+    root, area, _, _ = units
+    person = task_people[0]
+    assigned(db, person, area)
+    grant(db, area, person, "deputy", False)
+    db.add(LeavePolicy(org_id=area.id, workflow="internal"))
+    db.commit()
+    try:
+        row = leave.save(db, person, dict(starts_on="2026-12-09", ends_on="2026-12-10"))
+        db.commit()
+        leave.command(db, person, row.id, "request", row.version)
+        db.commit()
+        assert json.loads(row.approval_path) == [root.id]
+        with pytest.raises(HTTPException) as exc:
+            leave.command(db, person, row.id, "approve", row.version)
+        assert exc.value.status_code == 403
+        assert row.status == "requested"
+    finally:
+        db.query(LeaveRequest).filter_by(person_id=person.id).delete()
+        db.query(LeavePolicy).filter_by(org_id=area.id).delete()
+        db.commit()
+
+
+def test_existing_krankmeldung_is_private_read_only_projection(
+    db, task_people, units,
+):
+    from app import krank
+    from app.db import KrankReport
+    _, area, team, _ = units
+    person, viewer, leader = task_people[:3]
+    assigned(db, person, team)
+    grant(db, area, viewer, "viewer")
+    grant(db, area, leader, "lead")
+    report = KrankReport(
+        ref_no="T-PRIVATE-ILLNESS-001", kind="simple", status="new",
+        user_id=person.id,
+    )
+    krank.set_data(report, {"date": "2026-12-07", "first_name": person.name})
+    db.add(report)
+    db.commit()
+    try:
+        def read_as(actor):
+            c = login(actor.email, "task-passwort-123")
+            result = c.get(f"/urlaub/data?unit={area.id}")
+            assert result.status_code == 200
+            return result.json()
+        coworker = read_as(viewer)
+        displayed = [row for row in coworker["absences"] if str(row["id"]).startswith("presence:")]
+        assert len(displayed) == 1 and displayed[0]["title"] == "Abwesend"
+        assert "first_name" not in str(coworker)
+        supervisor = read_as(leader)
+        displayed = [row for row in supervisor["absences"] if str(row["id"]).startswith("presence:")]
+        assert len(displayed) == 1 and displayed[0]["title"] == "Krank"
+        assert "first_name" not in str(supervisor)
+        own = read_as(person)
+        assert any(row["title"] == "Krank" for row in own["absences"])
+    finally:
+        db.delete(report)
         db.commit()
