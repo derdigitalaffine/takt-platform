@@ -374,7 +374,9 @@ def command(db, actor, request_id, action, version, reason=""):
                 422, "Genehmigung oder externe Selbstauskunft erforderlich."
             )
         if action == "attest" and (
-            cfg.workflow != "external" or actor.id != row.person_id
+            cfg.workflow != "external"
+            or not cfg.external_attestation
+            or actor.id != row.person_id
         ):
             raise HTTPException(
                 403,
