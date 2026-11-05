@@ -1,0 +1,24 @@
+/* Consistent, user-selectable information density; no impact on data or rights. */
+[data-density="compact"] .js-table > :not(caption) > * > * {
+  padding-top: .32rem;
+  padding-bottom: .32rem;
+}
+[data-density="compact"] .js-table .btn-sm {
+  padding-top: .18rem;
+  padding-bottom: .18rem;
+}
+[data-density="compact"] .card-body {
+  --takt-density-inset: .8rem;
+}
+[data-density="compact"] .card-body > .table-responsive {
+  margin-inline: -.25rem;
+}
+[data-density="compact"] .form-text {
+  margin-top: .2rem;
+}
+[data-density="compact"] .avatar {
+  transform: scale(.91);
+}
+@media (max-width: 767px) {
+  [data-density="compact"] .btn:not(.btn-sm) { min-height: 40px; }
+}
