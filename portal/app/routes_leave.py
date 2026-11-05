@@ -230,18 +230,28 @@ def page(
     if section == "mein-urlaub" and personal_unit and all(p.id != user.id for p in people):
         people.append(user)
     ids = [p.id for p in people]
-    rows = list(
-        db.scalars(
-            select(LeaveRequest)
-            .where(LeaveRequest.person_id.in_(ids))
-            .order_by(LeaveRequest.starts_on, LeaveRequest.id)
-        )
+    rows = []
+    if section in {"planer", "mein-urlaub", "genehmigungen"}:
+        query = select(LeaveRequest).where(LeaveRequest.person_id.in_(ids))
+        if section == "mein-urlaub":
+            query = query.where(LeaveRequest.person_id == user.id)
+        elif section == "genehmigungen":
+            query = query.where(
+                (LeaveRequest.status == "requested")
+                | LeaveRequest.cancel_requested.is_(True)
+            )
+        rows = [
+            r for r in db.scalars(
+                query.order_by(LeaveRequest.starts_on, LeaveRequest.id)
+            )
+            if can_read_request(db, user, r)
+            and (can_see_leave_details(db, user, r.person_id) or can_decide_request(db, user, r))
+        ]
+    visible_closures = (
+        [c for c in visible_closures if c.org_id in org.active_path(db, unit)]
+        if unit and section == "schliesszeiten" else []
     )
-    rows = [
-        r for r in rows
-        if can_read_request(db, user, r)
-        and (can_see_leave_details(db, user, r.person_id) or can_decide_request(db, user, r))
-    ]
+    preference = db.get(LeavePreference, user.id) if section == "mein-urlaub" else None
     return render(
         request,
         "leave.html",
@@ -274,55 +284,47 @@ def page(
         can_create=any(leave.can_plan(db, user, p.id) for p in people),
         rows=rows,
         row_policies={r.id: leave.policy(db, r.org_id) for r in rows},
-        closures=[
-            c
-            for c in db.scalars(select(Closure))
-            if unit and c.org_id in org.active_path(db, unit)
-        ],
+        closures=visible_closures,
         closure_managers={
             c.id: org.allows(db, user, c.org_id, "leave_settings")
-            for c in db.scalars(select(Closure))
+            for c in visible_closures
         },
         closure_enrollers={
             c.id: org.allows(db, user, c.org_id, "plan") or
                   org.allows(db, user, c.org_id, "leave_settings")
-            for c in db.scalars(select(Closure))
+            for c in visible_closures
         },
         closure_obligations={
             c.id: leave_rules.closure_obligations(db, c, people)
-            for c in db.scalars(select(Closure))
-            if unit and c.org_id in org.active_path(db, unit)
+            for c in visible_closures
         },
         emergency={
             c.id: leave_rules.eligible_emergency_ids(db, c)
-            for c in db.scalars(select(Closure))
+            for c in visible_closures
         },
         closure_statuses={
             c.id: leave_rules.closure_status(db, c)
-            for c in db.scalars(select(Closure))
-            if unit and c.org_id in org.active_path(db, unit)
+            for c in visible_closures
         },
-        email_mode=(
-            db.get(LeavePreference, user.id).email_mode
-            if db.get(LeavePreference, user.id)
-            else "none"
-        ),
-        notices=list(
-            db.scalars(
+        email_mode=preference.email_mode if preference else "none",
+        notices=(
+            list(db.scalars(
                 select(LeaveInbox)
                 .where(LeaveInbox.user_id == user.id, LeaveInbox.read.is_(False))
                 .order_by(LeaveInbox.id.desc())
                 .limit(50)
-            )
+            )) if section == "mein-urlaub" else []
         ),
         accounts=(
             leave_rules.account_balances(db, user.id)
-            if unit and leave.policy(db, unit).internal_account
+            if section == "mein-urlaub" and personal_unit
+            and leave.policy(db, personal_unit).internal_account
             else []
         ),
         work_patterns=(
             list(db.scalars(select(WorkPattern).where(WorkPattern.person_id.in_(ids))))
-            if unit and org.allows(db, user, unit, "leave_settings")
+            if unit and section == "verwaltung" and config_topic == "arbeitsmodelle"
+            and org.allows(db, user, unit, "leave_settings")
             else []
         ),
         local_policy=db.get(LeavePolicy, unit) if unit else None,
@@ -334,7 +336,8 @@ def page(
                     .order_by(WorkDay.day)
                 )
             )
-            if unit and org.allows(db, user, unit, "leave_settings")
+            if unit and section == "verwaltung" and config_topic == "arbeitsmodelle"
+            and org.allows(db, user, unit, "leave_settings")
             else []
         ),
         policy=leave.policy(db, unit) if unit else None,
