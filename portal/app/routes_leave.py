@@ -679,7 +679,7 @@ async def settings_save(
             )
         row.version = (row.version or 0) + 1
         db.add(row)
-    org.audit(db, user, unit, "leave_policy", topic=topic or "gesamt", action=action)
+    org.audit(db, user, unit, "leave_policy", topic=topic or "gesamt", operation=action)
     db.commit()
     flash(request, "Urlaubsregeln gespeichert.")
     fallback = "/urlaub/verwaltung/" + (topic if topic else "verfahren")
