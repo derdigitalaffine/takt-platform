@@ -282,6 +282,15 @@ def command(db, actor, request_id, action, version, reason=""):
     decision_unit = path[min(row.approval_step or 0, len(path) - 1)]
     if action in ("cancel", "request_cancel", "reject_cancel"):
         decision_unit = cancellation_unit(db, row)
+    # Cancelling or dismissing an effective internal approval is a decision,
+    # not an ordinary edit. Leaders and deputies may not decide their own case.
+    if (
+        cfg.workflow == "internal"
+        and row.effective_json
+        and actor.id == row.person_id
+        and action in ("cancel", "reject_cancel")
+    ):
+        raise HTTPException(403, "Eigene verbindliche Urlaubszeiten erfordern eine fremde Stornoentscheidung.")
     if action == "reject_cancel":
         if not row.cancel_requested or not org.allows(
             db, actor, decision_unit, "approve"
