@@ -150,7 +150,12 @@ def page(
                 OrgMembership.user_id == user.id, OrgMembership.is_primary.is_(True)
             )
         )
-        unit = own or (units[0].id if units else None)
+        try:
+            remembered = json.loads(user.nav_json or "{}").get("last_org_unit")
+        except (ValueError, AttributeError):
+            remembered = None
+        allowed = {n.id for n in units}
+        unit = remembered if remembered in allowed else own or (units[0].id if units else None)
     path = request.url.path
     if topic is not None and topic not in LEAVE_TOPICS:
         raise HTTPException(404)
