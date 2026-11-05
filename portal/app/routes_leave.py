@@ -519,83 +519,134 @@ async def settings_save(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
+    """Persist exactly the settings tab being edited, never hidden sibling tabs.
+
+    Without 'topic' the existing full-policy form remains supported for older
+    clients. The policy row remains the one canonical record per unit.
+    """
+    import math
     from urllib.parse import urlparse
 
     if not org.allows(db, user, unit, "leave_settings"):
         raise HTTPException(403)
     data = await request.form()
+    topic = str(data.get("topic", ""))
+    valid_topics = {"verfahren", "besetzung", "feiertage", "urlaubskonten"}
+    if topic and topic not in valid_topics:
+        raise HTTPException(422, "Unbekannter Einstellungsbereich.")
+    action = data.get("action", "save")
+    if action not in {"save", "inherit"}:
+        raise HTTPException(422, "Aktion nicht verfügbar.")
+
     leave.lock(db)
-    current = leave.policy(db, unit)
-    if data.get("policy_version") != f"{current.org_id}:{current.version or 0}":
+    inherited = leave.policy(db, unit)
+    if data.get("policy_version") != f"{inherited.org_id}:{inherited.version or 0}":
         raise HTTPException(
             409, "Die Urlaubsregeln wurden inzwischen geändert. Bitte neu laden."
         )
-    if data.get("action") == "inherit":
+    if action == "inherit":
+        # The existing schema inherits an entire policy, never individual
+        # fields: only offer an explicit, complete reset in the procedure tab.
+        if topic not in {"", "verfahren"}:
+            raise HTTPException(
+                422, "Alle Bereichsregeln können nur im Verfahren zurückgesetzt werden."
+            )
         row = db.get(LeavePolicy, unit)
         if row:
             db.delete(row)
     else:
-        workflow = data.get("workflow")
-        mode = data.get("conflict_mode")
-        url = str(data.get("external_url", "")).strip()
-        try:
-            minimum = int(data.get("minimum", "0"))
-        except (TypeError, ValueError):
-            raise HTTPException(422, "Mindestbesetzung prüfen.")
-        if (
-            workflow not in ("planning", "internal", "external")
-            or mode not in ("warning", "block")
-            or not 0 <= minimum <= 10000
-        ):
-            raise HTTPException(422, "Regeln prüfen.")
-        if url and (
-            urlparse(url).scheme not in ("http", "https") or not urlparse(url).netloc
-        ):
-            raise HTTPException(422, "Gültige Adresse des externen Systems angeben.")
-        row = db.get(LeavePolicy, unit) or LeavePolicy(org_id=unit)
-        row.version = (row.version or 0) + 1
-        from .holidays import STATES
+        row = db.get(LeavePolicy, unit)
+        if row is None:
+            # A scoped first edit must not reset unrelated inherited settings.
+            # Copy the *effective* configuration into the canonical local row.
+            row = LeavePolicy(org_id=unit)
+            defaults = {
+                "workflow": "planning",
+                "sync_absence": False,
+                "minimum": 0,
+                "conflict_mode": "warning",
+                "external_url": "",
+                "external_attestation": False,
+                "advanced": False,
+                "minimum_capacity": 0,
+                "internal_account": False,
+                "approval_units": "[]",
+                "notify_only_warnings": False,
+                "holiday_state": "inherit",
+            }
+            for key, default in defaults.items():
+                value = getattr(inherited, key, None)
+                setattr(row, key, default if value is None else value)
 
-        state = data.get("holiday_state", "inherit")
-        if state not in {"inherit", "none", *STATES}:
-            raise HTTPException(422, "Feiertagskalender prüfen.")
-        row.holiday_state = state
-        row.workflow = workflow
-        row.minimum = minimum
-        row.conflict_mode = mode
-        row.external_url = url[:1000]
-        row.external_attestation = data.get("external_attestation") == "1"
-        row.sync_absence = data.get("sync_absence") == "1"
-        row.notify_only_warnings = data.get("notify_only_warnings") == "1"
-        import json, math
+        if topic in {"", "verfahren"}:
+            workflow = data.get("workflow")
+            if workflow not in {"planning", "internal", "external"}:
+                raise HTTPException(422, "Urlaubsverfahren prüfen.")
+            url = str(data.get("external_url", "")).strip()
+            parsed = urlparse(url)
+            if url and (
+                len(url) > 1000
+                or parsed.scheme not in {"https", "http"}
+                or not parsed.hostname
+                or parsed.username is not None
+                or parsed.password is not None
+            ):
+                raise HTTPException(422, "Gültige Adresse der externen ZE-Software angeben.")
+            raw_units = data.getlist("approval_units")
+            if any(not str(value).isdigit() for value in raw_units):
+                raise HTTPException(422, "Genehmigungsweg prüfen.")
+            approval = [int(value) for value in raw_units]
+            allowed = set(org.active_path(db, unit))
+            if len(approval) != len(set(approval)) or any(
+                oid not in allowed for oid in approval
+            ):
+                raise HTTPException(422, "Genehmigungsweg prüfen.")
+            row.workflow = workflow
+            row.external_url = url
+            row.external_attestation = data.get("external_attestation") == "1"
+            row.sync_absence = data.get("sync_absence") == "1"
+            row.approval_units = json.dumps(approval)
 
-        try:
-            minimum_capacity = float(data.get("minimum_capacity", "0"))
-        except ValueError:
-            raise HTTPException(422)
-        if not math.isfinite(minimum_capacity) or not 0 <= minimum_capacity <= 10000:
-            raise HTTPException(422)
-        path = [
-            int(raw) for raw in data.getlist("approval_units") if str(raw).isdigit()
-        ]
-        if any(oid not in org.active_path(db, unit) for oid in path) or len(
-            path
-        ) != len(set(path)):
-            raise HTTPException(422, "Genehmigungsweg prüfen.")
-        row.advanced = data.get("advanced") == "1"
-        row.minimum_capacity = round(minimum_capacity * 100)
-        row.internal_account = data.get("internal_account") == "1"
-        row.approval_units = json.dumps(path)
+        if topic in {"", "besetzung"}:
+            try:
+                minimum = int(data.get("minimum", "0"))
+                minimum_capacity = float(data.get("minimum_capacity", "0"))
+            except (TypeError, ValueError):
+                raise HTTPException(422, "Mindestbesetzung und Kapazität prüfen.")
+            mode = data.get("conflict_mode")
+            if (
+                mode not in {"warning", "block"}
+                or not 0 <= minimum <= 10000
+                or not math.isfinite(minimum_capacity)
+                or not 0 <= minimum_capacity <= 10000
+            ):
+                raise HTTPException(422, "Besetzungsregeln prüfen.")
+            row.minimum = minimum
+            row.conflict_mode = mode
+            row.advanced = data.get("advanced") == "1"
+            row.minimum_capacity = round(minimum_capacity * 100)
+            row.notify_only_warnings = data.get("notify_only_warnings") == "1"
+
+        if topic in {"", "feiertage"}:
+            state = data.get("holiday_state", "inherit")
+            if state not in {"inherit", "none", *STATES}:
+                raise HTTPException(422, "Feiertagskalender prüfen.")
+            row.holiday_state = state
+
+        if topic in {"", "urlaubskonten"}:
+            row.internal_account = data.get("internal_account") == "1"
+
         if row.workflow == "external" and row.internal_account:
             raise HTTPException(
-                422,
-                "Bei externer Kontenverwaltung darf kein internes Urlaubskonto aktiviert werden.",
+                422, "Bei externer Kontenverwaltung darf kein internes Urlaubskonto aktiviert werden."
             )
+        row.version = (row.version or 0) + 1
         db.add(row)
-    org.audit(db, user, unit, "leave_policy")
+    org.audit(db, user, unit, "leave_policy", topic=topic or "gesamt", action=action)
     db.commit()
     flash(request, "Urlaubsregeln gespeichert.")
-    return redirect(_return_to(request, "/urlaub/verwaltung/verfahren", unit))
+    fallback = "/urlaub/verwaltung/" + (topic if topic else "verfahren")
+    return redirect(_return_to(request, fallback, unit))
 
 
 @app.get("/urlaub/{rid:int}/verlauf")
