@@ -1,0 +1,126 @@
+{% macro meta(action) %}
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="unit" value="{{ unit }}">
+    <input type="hidden" name="action" value="{{ action }}">
+{% endmacro %}
+{% if notices %}
+    <details class="card card-body mb-4">
+        <summary>Mein Eingang · {{ notices|length }} neue Hinweise</summary>
+        {% for notice in notices %}
+            <div class="d-flex gap-3 justify-content-between border-bottom py-2">
+                <span>{% if notice.request_id %}<a href="/urlaub/vorgang/{{ notice.request_id }}">{{ notice.title }}</a>{% else %}{{ notice.title }}{% endif %}</span>
+                <form method="post" action="/urlaub/konfiguration">
+                    {{ meta("notice_read") }}<input type="hidden" name="notice_id" value="{{ notice.id }}">
+                    <button class="btn btn-sm btn-outline-secondary">Gelesen</button>
+                </form>
+            </div>
+        {% endfor %}
+    </details>
+{% endif %}
+{% if accounts %}
+    <section class="card card-body mb-4">
+        <h2 class="h5">Mein Urlaubskonto</h2>
+        {% for account in accounts %}
+            <p>{{ account.year }} · Anspruch {{ account.entitlement }} Tage · Übertrag {{ account.carry }} Tage · Verbindlich verplant {{ account.used }} Tage · Rest {{ account.remaining }} Tage</p>
+        {% endfor %}
+    </section>
+{% endif %}
+{% for closed in closures %}
+    <section class="card card-body mb-3" id="closure-{{ closed.id }}">
+        <h2 class="h6">Schließzeit: {{ closed.title }}</h2>
+        <p>{{closure_statuses[closed.id].assigned}} {{'Person' if closure_statuses[closed.id].assigned==1 else 'Personen'}} zur Notbesetzung eingeteilt.</p>
+        {% if closure_statuses[closed.id].shortages %}<details class="alert alert-warning"><summary>Notbesetzung in {{closure_statuses[closed.id].shortages|length}} Tageshälften nicht gedeckt</summary><ul class="mt-2">{% for gap in closure_statuses[closed.id].shortages %}<li>{{gap.day}} · {{'Vormittag' if gap.half=='am' else 'Nachmittag'}}: {{gap.available}} verfügbar, {{closed.emergency_minimum}} erforderlich</li>{% endfor %}</ul></details>{% endif %}
+        <p>{{ closed.starts_on }} bis {{ closed.ends_on }} · Mindest-Notbesetzung: {{ closed.emergency_minimum }}</p>
+        <p class="small">Außerhalb der Notbesetzung muss der erforderliche Urlaub im vereinbarten Ablauf eingetragen werden. Vorhandene verbindliche Zeiten werden nicht überschrieben.</p>
+        <details class="mb-3">
+            <summary>Planungsstand der betroffenen Personen</summary>
+            <ul class="mt-2">
+                {% for item in closure_obligations.get(closed.id,[]) %}
+                    <li>{{ item.name }}: {% if item.emergency %}Notbesetzung{% elif item.missing %}{{ item.missing|length }} Arbeitstageshälften noch nicht verbindlich abgedeckt{% if item.planned %}, davon {{ item.planned }} Arbeitstageshälften geplant oder beantragt{% endif %}{% if planners[item.person_id] and item.proposal %} <button type="button"
+                                                                                                                                                                                                                                                                                                                                class="btn btn-sm btn-outline-primary"
+                                                                                                                                                                                                                                                                                                                                data-closure-plan="{{ closed.id }}"
+                                                                                                                                                                                                                                                                                                                                data-person="{{ item.person_id }}"
+                                                                                                                                                                                                                                                                                                                                data-start="{{ item.proposal.starts_on }}"
+                                                                                                                                                                                                                                                                                                                                data-end="{{ item.proposal.ends_on }}" data-start-half="{{item.proposal.start_half}}" data-end-half="{{item.proposal.end_half}}" title="Nächsten zusammenhängenden offenen Zeitraum planen">Planen</button>
+                {% endif %}{% else %}Urlaubspflicht abgedeckt{% endif %}
+            </li>
+{% endfor %}
+</ul>
+</details>
+{% if user.id in emergency.get(closed.id,[]) %}
+    <p class="fw-semibold">Sie sind zur Notbesetzung eingeteilt.</p>
+{% endif %}
+{% if closed.enrollment=="self" or closure_managers[closed.id] %}
+    <form method="post"
+          action="/urlaub/konfiguration"
+          class="d-flex flex-wrap gap-2">
+        {{ meta("emergency") }}<input type="hidden" name="closure_id" value="{{ closed.id }}">
+        {% if closure_managers[closed.id] %}
+            <label>
+                Person<select class="form-select js-select" data-search="1" name="person_id">
+                {% for person in people %}
+                    <option value="{{ person.id }}">{{ person.name }}</option>
+                {% endfor %}
+                </select>
+            </label>
+        {% endif %}
+        <button class="btn btn-outline-primary">Zur Notbesetzung eintragen</button>
+        <button class="btn btn-outline-danger" name="remove" value="1">Aus Notbesetzung entfernen</button>
+    </form>
+{% endif %}
+{% if closure_managers[closed.id] %}
+    <details class="mt-3">
+        <summary>Schließzeit ändern oder aufheben</summary>
+        <form method="post" action="/urlaub/konfiguration" class="row g-3 mt-1">
+            {{ meta("closure_update") }}<input type="hidden" name="closure_id" value="{{ closed.id }}">
+            <input type="hidden"
+                   name="closure_version"
+                   value="{{ closed.starts_on }}:{{ closed.ends_on }}:{{ closed.title }}:{{ closed.emergency_minimum }}:{{ closed.enrollment }}">
+            <div class="col-12">
+                <label>
+                    Titel<input class="form-control"
+                                name="title"
+                                value="{{ closed.title }}"
+                                required
+                                maxlength="200">
+                </label>
+            </div>
+            {% for key,title in [('starts_on','Beginn'),('ends_on','Ende einschließlich')] %}
+                <div class="col-md-6">
+                    <label>
+                        {{ title }}<input class="form-control"
+                                          type="date"
+                                          name="{{ key }}"
+                                          value="{{ closed[key] }}"
+                                          required>
+                    </label>
+                </div>
+            {% endfor %}
+            <div class="col-md-6">
+                <label>
+                    Mindest-Notbesetzung<input class="form-control"
+                                               type="number"
+                                               name="minimum"
+                                               min="0"
+                                               max="10000"
+                                               value="{{ closed.emergency_minimum }}">
+                </label>
+            </div>
+            <div class="col-md-6">
+                <label>
+                    Einteilung<select class="form-select" name="enrollment">
+                    <option value="lead" {{'selected' if closed.enrollment=='lead'}}>Durch Leitung</option>
+                    <option value="self" {{'selected' if closed.enrollment=='self'}}>Selbsteintragung</option>
+                    </select>
+                </label>
+            </div>
+            <p class="small">Änderungen überschreiben keinen Urlaub. Bei geänderten Daten wird die Notbesetzung neu geprüft.</p>
+            <div>
+                <button class="btn btn-primary">Schließzeit speichern</button>
+                <button class="btn btn-outline-danger" name="remove" value="1">Schließzeit aufheben</button>
+            </div>
+        </form>
+    </details>
+{% endif %}
+</section>
+{% endfor %}

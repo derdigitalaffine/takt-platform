@@ -1,6 +1,6 @@
 # Kalender, Organisation und Urlaubsplanung – Interviewstand 04.11.2026
 
-Dieses Dokument hält die Anforderungen aus dem Workshop-Interview fest. Die Organisationsverwaltung wird als erster technischer Baustein umgesetzt; Kalender, CalDAV und Urlaubsplanung sind hier spezifiziert, noch nicht implementiert.
+Dieses Dokument hält die Anforderungen aus dem Workshop-Interview fest. Die Umsetzung liegt in PR #182 und PR #184. Dieses Dokument hält die fachlichen Entscheidungen fest; den aktuellen Implementierungs- und Prüfstand dokumentiert [die Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md).
 
 ## Verbindlich vereinbarte Anforderungen
 
@@ -33,6 +33,8 @@ Dieses Dokument hält die Anforderungen aus dem Workshop-Interview fest. Die Org
 27. Größenordnung: etwa 150 Personen insgesamt, 20–30 je Fachbereich.
 
 ## Bedienkonzept
+
+Das ausführliche [UI- und Umsetzungskonzept](kalender-urlaub-ui.md) konkretisiert die folgenden Leitlinien. Technologiewahl: FullCalendar Standard bleibt die Basis; eine eigene Takt-Custom-View bildet die Personenzeitachse ab. Keine Premium- oder zweite Kalenderbibliothek.
 
 Ein Kalenderbereich mit auswählbaren überlagerten Kalendern, Suche, Tages-/Wochen-/Monats-/Jahresansichten und verständlichen Freigaben. Urlaubsplanung als Bereichsansicht mit fixierter Namensspalte, gruppierbaren Organisationseinheiten, Monats-/Quartals-/Jahreszoom, Arbeits-/Feiertagen und halben Tagen. Zeitraum zeichnen, Vorschau mit Konflikten, bewusste Übernahme. Gleichwertige Datums-/Tastatureingabe ohne Ziehen. Mobil fokussierte Zeiträume und Personen statt unbedienbarer verkleinerter Jahrestabelle. Status nie ausschließlich über Farben darstellen.
 

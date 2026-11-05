@@ -1,0 +1,53 @@
+/* Shared calendar controls, including the existing booking/resource calendars. */
+.fc {
+  --fc-border-color: var(--bs-border-color);
+  --fc-page-bg-color: var(--bs-body-bg);
+  --fc-neutral-bg-color: var(--bs-tertiary-bg);
+  --fc-neutral-text-color: var(--bs-secondary-color);
+  --fc-list-event-hover-bg-color: var(--bs-secondary-bg);
+  --fc-today-bg-color: rgba(var(--bs-primary-rgb), 0.08);
+  --fc-button-bg-color: var(--bs-primary);
+  --fc-button-border-color: var(--bs-primary);
+  --fc-button-text-color: var(--app-primary-text, #fff);
+  min-width: 0;
+}
+.fc .fc-header-toolbar {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.fc .fc-toolbar-title {
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+.fc .fc-button {
+  min-height: 2.5rem;
+}
+.fc .fc-view-harness {
+  min-width: 0;
+}
+.fc a {
+  color: inherit;
+}
+.fc .fc-button:focus-visible {
+  outline: 3px solid var(--bs-primary);
+  outline-offset: 3px;
+}
+@media (max-width: 575px) {
+  .fc .fc-header-toolbar {
+    justify-content: center;
+  }
+  .fc .fc-toolbar-chunk {
+    max-width: 100%;
+  }
+  .fc .fc-toolbar-chunk:has(.fc-toolbar-title) {
+    flex-basis: 100%;
+    order: -1;
+    text-align: center;
+  }
+  .fc .fc-button {
+    min-height: 44px;
+  }
+  .fc .fc-multimonth {
+    --fc-multimonth-min-width: 240px;
+  }
+}

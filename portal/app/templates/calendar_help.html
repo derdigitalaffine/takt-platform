@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% import '_macros.html' as m with context %}
+{% block title %}Kalender verbinden{% endblock %}{% block content %}
+{% call m.page_head('Kalender verbinden','Ein eigener Zugang für jedes Gerät. Kalender und Rechte bleiben in Takt steuerbar.') %}
+    <a class="btn btn-primary" href="/kalender/geraete">Gerät verbinden</a>
+    <a class="btn btn-outline-secondary" href="/kalender/abos">Lesend abonnieren</a>
+{% endcall %}
+<section class="card card-body mb-4">
+    <h2 class="h5">iPhone und iPad</h2>
+    <ol>
+        <li>„Gerät verbinden“ öffnen, einen Gerätenamen vergeben und die gewünschten Kalender auswählen.</li>
+        <li>„iPhone / iPad“ wählen und das Profil herunterladen.</li>
+        <li>Das heruntergeladene Profil öffnen und in den Geräteeinstellungen installieren. Die Zugangsdaten sind bereits enthalten.</li>
+        <li>Die ausgewählten Kalender in der Kalender-App aktivieren.</li>
+    </ol>
+    <p class="small">Das Profil enthält ein eigenes Gerätepasswort. Bei Verlust den Zugang in Takt widerrufen und einen neuen erzeugen. Das Portalpasswort wird dafür nicht verwendet.</p>
+</section>
+<section class="card card-body mb-4">
+    <h2 class="h5">Thunderbird und Apple Kalender am Mac</h2>
+    <p>Einen Gerätezugang mit „Anderes Gerät“ erzeugen. Im Kalenderprogramm einen Netzwerkkalender bzw. CalDAV-Account hinzufügen. Server, Benutzerkennung und Gerätepasswort aus Takt übernehmen und die gefundenen Kalender auswählen.</p>
+    <a href="https://support.mozilla.org/en-US/kb/creating-new-calendars"
+       target="_blank"
+       rel="noopener noreferrer">Thunderbird-Anleitung</a>
+</section>
+<section class="card card-body mb-4">
+    <h2 class="h5">Android</h2>
+    <p>Eine CalDAV-Synchronisationsapp wie DAVx⁵ verwenden. Einen Gerätezugang mit „Anderes Gerät“ erzeugen und in der Synchronisationsapp „Mit URL und Benutzername“ auswählen. Die drei Angaben aus Takt übernehmen; danach die gewünschten Kalender synchronisieren und in der Kalender-App einblenden.</p>
+    <a href="https://manual.davx5.com/accounts_collections.html"
+       target="_blank"
+       rel="noopener noreferrer">DAVx⁵-Anleitung</a>
+</section>
+<section class="card card-body mb-4">
+    <h2 class="h5">Outlook</h2>
+    <p>Im klassischen Outlook für Windows kann ein CalDAV-Zusatzprogramm eingesetzt werden. Dafür einen Gerätezugang mit „Anderes Gerät“ erzeugen und die Angaben aus Takt in das Zusatzprogramm übernehmen.</p>
+    <p>Für das neue Outlook, Outlook im Web und Varianten ohne passende CalDAV-Anbindung: In Takt „Lesend abonnieren“ wählen und einen eigenen Abolink erzeugen. In Outlook „Kalender hinzufügen“ → „Aus dem Internet abonnieren“ wählen. Änderungen erfolgen dann in Takt. Aktualisierungen können je nach Outlook-Variante mehrere Stunden benötigen.</p>
+    <a href="https://caldavsynchronizer.org/help/documentation/"
+       target="_blank"
+       rel="noopener noreferrer">Outlook CalDAV Synchronizer</a> · <a href="https://support.microsoft.com/en-us/outlook/import-or-subscribe-to-a-calendar-in-outlook-com-or-outlook-on-the-web"
+                                                                      target="_blank"
+                                                                      rel="noopener noreferrer">Outlook-Abonnements</a>
+</section>
+<section class="card card-body">
+    <h2 class="h5">Welche Änderungen sind möglich?</h2>
+    <p>Freie Kalender können mit ausdrücklich ausgewähltem Schreibzugriff bearbeitet werden. Fachkalender zeigen die Daten aus den jeweiligen Takt-Modulen; die Bearbeitung erfolgt dort mit den zugehörigen Prüfungen und Abläufen. Ein ICS-Abonnement liest ausschließlich.</p>
+    <p>Später neu freigegebene Kalender werden nicht automatisch an Geräte weitergegeben. Die Auswahl lässt sich bei jedem Gerätezugang ändern. Entzogene Rechte gelten beim nächsten Serverzugriff; bereits heruntergeladene lokale Kopien verwaltet das Kalenderprogramm.</p>
+</section>
+{% endblock %}

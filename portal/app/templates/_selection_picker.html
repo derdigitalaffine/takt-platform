@@ -1,0 +1,26 @@
+{% macro picker(id, name, options, selected=[]) %}
+<fieldset class="selection-picker" data-selection-picker data-max="500">
+    <legend class="h6">Personen{% if options|selectattr('kind','equalto','group')|list %} oder Gruppen{% endif %} auswählen</legend>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+        <label class="visually-hidden" for="{{id}}-search">Personen{% if options|selectattr('kind','equalto','group')|list %} und Gruppen{% endif %} suchen</label>
+        <input id="{{id}}-search" type="search" class="form-control flex-grow-1 w-auto" placeholder="Namen oder E-Mail suchen …" data-selection-search autocomplete="off">
+        {% if options|selectattr('kind','equalto','group')|list %}<label class="visually-hidden" for="{{id}}-kind">Auswahltyp</label><select id="{{id}}-kind" class="form-select w-auto" data-selection-kind><option value="">Alle</option><option value="person">Personen</option><option value="group">Gruppen</option></select>{% endif %}
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <button class="btn btn-sm btn-outline-primary" type="button" data-selection-all>Alle Treffer auswählen</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-selection-clear>Auswahl leeren</button>
+        <output class="small ms-auto" data-selection-count aria-live="polite">{{selected|length}} ausgewählt</output>
+    </div>
+    <p class="small text-secondary mb-2">Die Suche verändert Ihre Auswahl nicht. „Alle Treffer“ ergänzt nur die aktuell sichtbaren Einträge.</p>
+    <noscript><p class="small">Die Einträge können direkt über die Kontrollkästchen ausgewählt werden. Suche und Sammelschaltflächen benötigen JavaScript.</p></noscript>
+    <div class="selection-chips" data-selection-chips></div>
+    <div class="selection-options">
+        {% for option in options %}<label class="selection-option" data-selection-option data-kind="{{option.kind}}" data-search="{{option.label}} {{option.detail}}">
+            <input class="form-check-input" type="checkbox" id="{{id}}-{{loop.index}}" name="{{name}}" value="{{option.value}}" data-selection-check {{'checked' if option.value in selected}} {{'disabled' if option.disabled}}>
+            <span><strong data-selection-title>{{option.label}}</strong>{% if option.kind=='group' %}<span class="badge text-bg-secondary ms-2">Gruppe</span>{% endif %}<small class="d-block text-secondary">{{option.detail}}</small></span>
+        </label>{% endfor %}
+        <p class="small text-secondary p-3 mb-0" data-selection-empty {{'hidden' if options}}>Keine passenden Einträge.</p>
+    </div>
+    <p class="small text-danger mt-2 mb-0" role="alert" data-selection-error></p>
+</fieldset>
+{% endmacro %}

@@ -1,0 +1,183 @@
+{% macro meta(action) %}
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="unit" value="{{ unit }}">
+    <input type="hidden" name="action" value="{{ action }}">
+{% endmacro %}
+{% if can_settings %}
+    <details class="card card-body mb-3">
+        <summary>Schließzeit anlegen</summary>
+        <form method="post" action="/urlaub/konfiguration" class="row g-3 mt-1">
+            {{ meta("closure") }}
+            <div class="col-12">
+                <label>
+                    Titel<input class="form-control" name="title" required maxlength="200">
+                </label>
+            </div>
+            {% for key,title in [('starts_on','Beginn'),('ends_on','Ende einschließlich')] %}
+                <div class="col-md-6">
+                    <label for="closure-{{ key }}">{{ title }}</label>
+                    <input class="form-control"
+                           type="date"
+                           name="{{ key }}"
+                           id="closure-{{ key }}"
+                           required>
+                </div>
+            {% endfor %}
+            <div class="col-md-6">
+                <label>
+                    Mindest-Notbesetzung<input class="form-control"
+                                               type="number"
+                                               min="0"
+                                               max="10000"
+                                               name="minimum"
+                                               value="0">
+                </label>
+            </div>
+            <div class="col-md-6">
+                <label>
+                    Einteilung<select class="form-select" name="enrollment">
+                    <option value="lead">Durch Bereichsverantwortliche</option>
+                    <option value="self">Selbsteintragung</option>
+                    </select>
+                </label>
+            </div>
+            <div>
+                <button class="btn btn-primary">Schließzeit anlegen</button>
+            </div>
+        </form>
+    </details>
+    {% for pattern in work_patterns %}
+        <div class="card card-body mb-3">
+            <p>Arbeitsmodell: {{ (people|selectattr('id','equalto',pattern.person_id)|first).name}} · {{ pattern.starts_on }} bis {{ pattern.ends_on }}</p>
+            <form method="post" action="/urlaub/konfiguration">
+                {{ meta("work_remove") }}<input type="hidden" name="work_id" value="{{ pattern.id }}">
+                <button class="btn btn-outline-danger">Arbeitsmodell entfernen</button>
+            </form>
+        </div>
+    {% endfor %}
+    <details class="card card-body mb-3">
+        <summary>Arbeitsmodell zuordnen</summary>
+        <p class="small mt-3">Kapazität pro Tageshälfte: 1 = vollständig verfügbar, 0 = arbeitsfrei, Zwischenwerte entsprechend anteilig. Es wird kein zusätzlicher Vollzeitfaktor multipliziert. Im einfachen Besetzungsmodus werden diese Gewichte nicht verwendet.</p>
+        <form method="post" action="/urlaub/konfiguration">
+            {{ meta("work") }}{{sp.picker('work-people','person_ids',work_choices)}}
+            <div class="row g-3 my-2">
+                {% for key,title in [('starts_on','Gültig ab'),('ends_on','Gültig bis')] %}
+                    <div class="col-md-6">
+                        <label for="work-{{ key }}">{{ title }}</label>
+                        <input type="date"
+                               class="form-control"
+                               id="work-{{ key }}"
+                               name="{{ key }}"
+                               required>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Wochentag</th>
+                            <th>Vormittag</th>
+                            <th>Nachmittag</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'] %}
+                            {% set d = loop.index0 %}
+                            <tr>
+                                <th>{{ day }}</th>
+                                {% for half in [0,1] %}
+                                    <td>
+                                        <input type="number"
+                                               class="form-control"
+                                               name="slot_{{ d*2+half }}"
+                                               min="0"
+                                               max="1"
+                                               step="0.01"
+                                               value="{{ 1 if d<5 else 0 }}"
+                                               required
+                                               aria-label="{{ day }} {{'Vormittag' if half==0 else 'Nachmittag'}}">
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-primary" data-selection-submit>Arbeitsmodell für Auswahl speichern</button>
+        </form>
+    </details>
+    <details class="card card-body mb-3">
+        <summary>Internen Urlaubsanspruch pflegen</summary>
+        <p class="small mt-3">Nur für Bereiche mit aktivierter interner Kontenverwaltung. Bei externer Verwaltung bleiben Kontenanzeigen ausgeblendet.</p>
+        <form method="post" action="/urlaub/konfiguration" class="row g-3">
+            {{ meta("account") }}
+            <div class="col-md-6">
+                <label>
+                    Person<select class="form-select js-select" data-search="1" name="person_id">
+                    {% for person in people %}
+                        <option value="{{ person.id }}">{{ person.name }}</option>
+                    {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="col-md-6">
+                <label>
+                    Jahr<input class="form-control"
+                               type="number"
+                               name="year"
+                               min="2000"
+                               max="2200"
+                               value="{{ current_year }}"
+                               required>
+                </label>
+            </div>
+            <div class="col-md-6">
+                <label>
+                    Anspruch (Tage)<input class="form-control"
+                                          type="number"
+                                          min="0"
+                                          step="0.5"
+                                          name="entitlement"
+                                          required>
+                </label>
+            </div>
+            <div class="col-md-6">
+                <label>
+                    Übertrag (Tage)<input class="form-control"
+                                          type="number"
+                                          min="0"
+                                          step="0.5"
+                                          name="carry"
+                                          value="0"
+                                          required>
+                </label>
+            </div>
+            <div>
+                <button class="btn btn-primary">Anspruch speichern</button>
+            </div>
+        </form>
+    </details>
+{% endif %}
+<details class="card card-body mb-3">
+    <summary>Meine Benachrichtigungen</summary>
+    <form method="post" action="/urlaub/konfiguration" class="mt-3">
+        {{ meta("notifications") }}
+        <p>Vorgänge bleiben in Takt sichtbar. E-Mails sind eine zusätzliche Erinnerung.</p>
+        <label class="form-label">
+            E-Mail-Zustellung<select class="form-select" name="email_mode">
+            {% for key,title in [('none','Keine zusätzlichen E-Mails'),('immediate','Sofort'),('daily','Tägliche Zusammenfassung')] %}
+                <option value="{{ key }}" {{'selected' if email_mode==key}}>{{ title }}</option>
+            {% endfor %}
+            </select>
+        </label>
+        <button class="btn btn-outline-primary">Benachrichtigungen speichern</button>
+    </form>
+</details>
+
+{% if can_settings %}
+<details class="card card-body mb-3"><summary>Abweichende Arbeitstage</summary><p class="small mt-3">Für einen einmalig arbeitsfreien Tag oder einen ausdrücklich geplanten Sonderdienst, auch an einem Feiertag. Die Werte ersetzen an diesem Datum das reguläre Arbeitsmodell. Urlaub und Abwesenheiten werden weiterhin in ihren jeweiligen Funktionen erfasst.</p>
+{% for item in work_days %}<div class="border-bottom py-2"><span>{{people|selectattr('id','equalto',item.person_id)|map(attribute='name')|first}} · {{item.day}} · Vormittag {{item.am}}, Nachmittag {{item.pm}}</span><form method="post" action="/urlaub/konfiguration">{{meta('work_day_remove')}}<input type="hidden" name="work_day_id" value="{{item.id}}"><button class="btn btn-sm btn-outline-danger">Abweichenden Arbeitstag entfernen</button></form></div>{% endfor %}
+<form method="post" action="/urlaub/konfiguration" class="row g-3 mt-1">{{meta('work_day')}}<div class="col-12">{{sp.picker('work-day-people','person_ids',work_choices)}}</div><div class="col-md-6"><label for="work-day-date" class="form-label">Datum</label><input id="work-day-date" name="day" type="date" class="form-control" required></div>{% for key,title in [('am','Vormittag'),('pm','Nachmittag')] %}<div class="col-md-6"><label class="form-label" for="work-day-{{key}}">{{title}} (0 = arbeitsfrei, 1 = verfügbar)</label><input id="work-day-{{key}}" name="{{key}}" type="number" min="0" max="1" step="0.01" value="0" class="form-control" required></div>{% endfor %}<div><button class="btn btn-primary" data-selection-submit>Arbeitstag für Auswahl speichern</button></div></form></details>
+{% endif %}
+{% if user.is_admin %}<details class="card card-body mb-3"><summary>Portalweite Feiertagsvorgabe für Urlaub</summary><p class="small mt-3">Gilt für Bereiche ohne eigene Vorgabe. Die Einstellung für Ressourcenpreise bleibt davon unabhängig.</p><form method="post" action="/urlaub/konfiguration">{{meta('global_holidays')}}<label for="leave-global-holidays" class="form-label">Feiertagskalender</label><select id="leave-global-holidays" name="holiday_state" class="form-select mb-3"><option value="none" {{'selected' if portal_holiday_state=='none'}}>Keine automatischen Feiertage</option>{% for code,title in holiday_states.items() %}<option value="{{code}}" {{'selected' if portal_holiday_state==code}}>{{title}}</option>{% endfor %}</select><button class="btn btn-outline-primary">Portalvorgabe speichern</button></form></details>{% endif %}

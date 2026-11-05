@@ -11,6 +11,9 @@
   {% if a.starts_on <= today <= a.ends_on and a.status == 'confirmed' %}<span class="badge text-bg-primary">läuft</span>{% elif a.ends_on < today %}<span class="badge text-bg-light border">vorbei</span>{% endif %}
   {% if a.note and (a.substitute_id == user.id or a.user_id == user.id or a.created_by == user.id) %}<span class="small text-secondary w-100"><i class="fa-regular fa-note-sticky me-1"></i>{{ a.note }}</span>{% endif %}
   <span class="ms-auto d-flex gap-1">
+    {% if a.id in leave_owned %}
+    {% if a.id in leave_links %}<a class="btn btn-sm btn-outline-secondary" href="{{leave_links[a.id]}}">Urlaubsplanung öffnen</a>{% else %}<span class="small text-secondary">Über Urlaubsplanung verwaltet</span>{% endif %}
+    {% else %}
     {% if answer and a.status == 'pending' %}
     <form method="post" action="/abwesenheiten/{{ a.id }}/antwort"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-success" name="accept" value="1" type="submit"><i class="fa-solid fa-check me-1"></i>Zustimmen</button></form>
     <form method="post" action="/abwesenheiten/{{ a.id }}/antwort"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger" name="accept" value="0" type="submit">Ablehnen</button></form>
@@ -18,6 +21,7 @@
     {% if can_delete %}
     {% if a.starts_on <= today <= a.ends_on and a.status == 'confirmed' %}<form method="post" action="/abwesenheiten/ende/{{ a.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-secondary" type="submit" title="Früher zurück: endet mit gestern">Zurück</button></form>{% endif %}
     <form method="post" action="/abwesenheiten/{{ a.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-link text-danger" type="submit" aria-label="Abwesenheit {{ span(a) }} löschen" data-confirm="Abwesenheit {{ span(a) }} löschen?" data-confirm-button="Löschen"><i class="fa-regular fa-trash-can"></i></button></form>
+    {% endif %}
     {% endif %}
   </span>
 </li>

@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block title %}{{ calendar.title }}{% endblock %}{% block content %}
+<h1 class="h3">{{ calendar.title }}</h1>
+<p class="text-secondary">Öffentlich freigegebene Termine. Weitere berechtigte Kalender stehen nach der Anmeldung in Takt zur Verfügung.</p>
+<div id="public-calendar"
+     data-url="/kalender/oeffentlich/{{ calendar.id }}/data"></div>
+<p id="public-calendar-error" role="alert" class="text-danger"></p>
+{% endblock %}
+{% block scripts %}
+    <script src="/static/vendor/fullcalendar/index.global.min.js"></script>
+    <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
+    <script src="/static/calendar-public.js"></script>
+{% endblock %}

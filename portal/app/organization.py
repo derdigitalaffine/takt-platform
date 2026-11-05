@@ -7,6 +7,16 @@ from .db import Organization, User, Group, GroupMember, Setting
 from .org_models import OrgKind, OrgState, OrgMembership, OrgRoleGrant, OrgAudit
 
 ROLES = {
+    "viewer": (
+        "Bereich ansehen",
+        {"view"},
+        "Freigegebene Bereichsinformationen und Urlaubsplanungen sehen; keine Planung, Genehmigung oder Verwaltung.",
+    ),
+    "leave_settings": (
+        "Urlaubsregeln verwalten",
+        {"view", "leave_settings"},
+        "Urlaubsablauf und Besetzungsregeln im freigegebenen Bereich einstellen; keine Rollen vergeben.",
+    ),
     "lead": (
         "Leitung",
         {"view", "plan", "approve"},
@@ -218,7 +228,7 @@ def set_membership(db, actor, data):
             OrgMembership.user_id == uid, OrgMembership.is_primary.is_(True)
         )
     )
-    main = data.get("is_primary") == "1" or primary is None
+    main = data.get("is_primary") == "1" or primary is None or primary.org_id == oid
     if main and primary and primary.org_id != oid:
         require(db, actor, primary.org_id, "members")
         primary.is_primary = False

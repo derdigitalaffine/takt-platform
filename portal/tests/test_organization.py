@@ -154,7 +154,7 @@ def test_group_scope_revocation_and_no_global_permissions(db, task_people, units
         assert not person.can("orgs") and not person.can("users")
         c = client(person)
         page = c.get(f"/admin/organization?unit={team.id}")
-        assert page.status_code == 200 and "Organisation &amp; Rollen" in page.text
+        assert page.status_code == 200 and "Organisation" in page.text
         assert c.get(f"/admin/organization?unit={b.id}").status_code == 403
         assert (
             post(
@@ -426,7 +426,7 @@ def test_legacy_editor_serializes_and_cannot_expand_inherited_roles(
     v = db.get(OrgState, 1)
     db.refresh(v)
     old = v.version
-    page = c.get(f"/admin/orgs/{b.id}")
+    page = c.get(f"/admin/orgs/{b.id}", follow_redirects=True)
     response = c.post(
         f"/admin/orgs/{b.id}",
         data={
@@ -531,3 +531,147 @@ def test_custom_types_and_plain_member_cannot_manage(db, task_people, units):
         if kind:
             db.delete(kind)
             db.commit()
+
+
+def test_bulk_memberships_are_atomic_and_scoped(db, task_people, units):
+    _, a, team, b = units
+    person, manager, other = task_people[:3]
+    grant(db, a, manager, "members")
+    c = client(manager)
+    # A bad entry must roll back the preceding valid entry too.
+    response = post(
+        c, db, "membership_many", org_id=team.id, user_ids=[str(person.id), "999999999"]
+    )
+    assert response.status_code == 422
+    assert not db.scalar(
+        select(OrgMembership.id).where(OrgMembership.org_id == team.id)
+    )
+    response = post(
+        c,
+        db,
+        "membership_many",
+        org_id=team.id,
+        user_ids=[str(person.id), str(other.id), str(person.id)],
+    )
+    assert response.status_code == 303
+    rows = list(
+        db.scalars(select(OrgMembership).where(OrgMembership.org_id == team.id))
+    )
+    assert {r.user_id for r in rows} == {person.id, other.id}
+    # Reapplying a batch preserves existing primary memberships without a forced move.
+    assert (
+        post(
+            c,
+            db,
+            "membership_many",
+            org_id=team.id,
+            user_ids=[str(person.id), str(other.id)],
+        ).status_code
+        == 303
+    )
+    assert (
+        post(
+            c, db, "membership_many", org_id=b.id, user_ids=[str(person.id)]
+        ).status_code
+        == 403
+    )
+    foreign = OrgMembership(org_id=b.id, user_id=manager.id, is_primary=True)
+    db.add(foreign)
+    db.commit()
+    assert (
+        post(
+            c,
+            db,
+            "membership_remove_many",
+            org_id=team.id,
+            memberships=[str(rows[0].id), str(foreign.id)],
+        ).status_code
+        == 422
+    )
+    assert db.get(OrgMembership, rows[0].id)
+    assert (
+        post(
+            c,
+            db,
+            "role_many",
+            org_id=team.id,
+            targets=[f"user:{person.id}"],
+            role="planner",
+        ).status_code
+        == 403
+    )
+
+
+def test_bulk_roles_and_unified_legacy_entry(db, task_people, units):
+    _, a, team, _ = units
+    admin = login(*ADMIN)
+    person, other = task_people[:2]
+    response = admin.get(f"/admin/orgs/{team.id}", follow_redirects=False)
+    assert response.status_code == 303
+    assert (
+        response.headers["location"]
+        == f"/admin/organization?unit={team.id}#org-settings"
+    )
+    response = post(
+        admin,
+        db,
+        "role_many",
+        org_id=a.id,
+        targets=[f"user:{person.id}", f"user:{other.id}"],
+        role="planner",
+        include_children="1",
+    )
+    assert response.status_code == 303
+    assert all(os.allows(db, u, team.id, "plan") for u in (person, other))
+    rows = list(db.scalars(select(OrgRoleGrant).where(OrgRoleGrant.org_id == a.id)))
+    assert (
+        post(
+            admin, db, "role_remove_many", org_id=a.id, grants=[str(r.id) for r in rows]
+        ).status_code
+        == 303
+    )
+    assert not os.allows(db, person, team.id, "plan")
+
+
+def test_unified_logo_update_keeps_old_file_on_failure(
+    db, task_people, units, monkeypatch
+):
+    from test_orgs import PNG
+
+    _, a, _, _ = units
+    old, error = orgs.prepare_logo(PNG)
+    assert not error
+    a.logo = old
+    db.commit()
+    c = login(*ADMIN)
+    before = set(orgs.logo_dir().iterdir())
+
+    def broken_audit(*args, **kwargs):
+        raise RuntimeError("simulated write failure")
+
+    monkeypatch.setattr(os, "audit", broken_audit)
+    version = db.get(OrgState, 1)
+    db.refresh(version)
+    try:
+        with pytest.raises(RuntimeError, match="simulated write failure"):
+            c.post(
+                "/admin/organization",
+                data=dict(
+                    csrf=csrf_of(c.get("/").text),
+                    version=version.version,
+                    action="unit_save",
+                    org_id=a.id,
+                    name=a.name,
+                    kind=a.kind,
+                    parent_id=a.parent_id,
+                    active="1",
+                ),
+                files={"logo": ("new.png", PNG, "image/png")},
+            )
+        db.refresh(a)
+        assert a.logo == old and (orgs.logo_dir() / old).is_file()
+        assert set(orgs.logo_dir().iterdir()) == before
+    finally:
+        a.logo = ""
+        db.commit()
+        orgs.discard_logo(old)

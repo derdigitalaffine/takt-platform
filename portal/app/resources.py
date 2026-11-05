@@ -1553,32 +1553,16 @@ def fc_events(events: list[dict]) -> list[dict]:
 
 
 def ics(events: list[dict], name: str) -> bytes:
-    from icalendar import Calendar, Event
-    cal = Calendar()
-    cal.add("prodid", "-//jitsii-speechmind//Ressourcen//DE")
-    cal.add("version", "2.0")
-    cal.add("x-wr-calname", name)
-    cal.add("refresh-interval;value=duration", "PT1H")
-    host = settings.portal_base_url.split("//", 1)[-1].split("/")[0]
+    from . import ics as calendar_ics
+    host = settings.portal_base_url.split("//",1)[-1].split("/")[0]
+    items=[]
     for e in events:
-        ev = Event()
-        ev.add("uid", f"res-{e['id']}@{host}")
-        ev.add("summary", e["title"])
-        if e["allDay"]:
-            ev.add("dtstart", to_local(e["start"]).date())
-            ev.add("dtend", to_local(e["end"]).date())
-        else:
-            ev.add("dtstart", e["start"].replace(tzinfo=timezone.utc))
-            ev.add("dtend", e["end"].replace(tzinfo=timezone.utc))
-        ev.add("dtstamp", utcnow().replace(tzinfo=timezone.utc))
-        ev.add("status", "TENTATIVE" if e.get("tentative") else "CONFIRMED")
-        ev.add("transp", "OPAQUE")
-        loc = e["resource"] + (f" – {e['units']}" if e.get("units") else "")
-        ev.add("location", loc)
-        if e.get("description"):
-            ev.add("description", e["description"])
-        cal.add_component(ev)
-    return cal.to_ical()
+        item={"uid":f"res-{e['id']}@{host}","summary":e["title"],"status":"TENTATIVE" if e.get("tentative") else "CONFIRMED","transp":"OPAQUE","location":e["resource"]+(f" – {e['units']}" if e.get("units") else "")}
+        for key,prop in [("start","dtstart"),("end","dtend")]:
+            item[prop]=to_local(e[key]).date() if e["allDay"] else e[key].replace(tzinfo=timezone.utc)
+        if e.get("description"):item["description"]=e["description"]
+        items.append(item)
+    return calendar_ics.feed(items,name,prodid="-//jitsii-speechmind//Ressourcen//DE",refresh="PT1H")
 
 
 def money_input(cents: int | None) -> str:

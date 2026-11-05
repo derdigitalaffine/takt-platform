@@ -175,6 +175,7 @@ templates.env.filters["local"] = lambda dt, fmt="%d.%m.%Y, %H:%M": to_local(dt).
 
 # Modul: (Einstellung, Rechte-Schlüssel, Pfad-Präfixe)
 MODULES = {
+    "calendars": ("Kalender & Urlaub", "module_calendars", ("/kalender", "/urlaub", "/caldav", "/.well-known/caldav")),
     "tasks": ("Aufgaben & Zusammenarbeit", "module_tasks", ("/aufgaben",)),
     "seminars": ("Seminare & Lehrgänge", "module_seminars", ("/seminare",)),
     "shortlinks": ("Kurzlinks & QR-Codes", "module_shortlinks", ("/shortlinks", "/s/", "/s")),
@@ -486,7 +487,7 @@ def stash_get(request: Request, name: str, pop: bool = False):
 
 async def check_csrf(request: Request) -> None:
     form = await request.form()
-    if not csrf_valid(request.session, form.get("csrf")):
+    if not csrf_valid(request.session, form.get("csrf") or request.headers.get("X-CSRF-Token")):
         raise HTTPException(400, "Sitzung abgelaufen. Bitte Seite neu laden und erneut versuchen.")
 
 
@@ -2904,3 +2905,15 @@ from . import routes_seminar_transfer  # noqa: E402,F401
 from . import routes_task_boards  # noqa: E402,F401
 
 from . import routes_organization  # noqa: E402,F401
+
+from . import routes_leave  # noqa: E402,F401
+
+from . import routes_calendars  # noqa: E402,F401
+
+from . import routes_calendar_devices  # noqa: E402,F401
+
+from . import routes_caldav  # noqa: E402,F401
+
+from . import routes_leave_rules  # noqa: E402,F401
+
+from . import routes_calendar_sharing  # noqa: E402,F401
