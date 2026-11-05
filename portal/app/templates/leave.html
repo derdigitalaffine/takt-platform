@@ -34,6 +34,12 @@
         {% endif %}
       {% endfor %}
     </nav>
+    {% if active_section=='mein-urlaub' and personal_unit %}
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="btn btn-primary" href="/urlaub/planer?unit={{personal_unit}}"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Eigenen Urlaub eintragen</a>
+        {% if personal_unit != unit %}<span class="small text-secondary align-self-center">Die eigene Hauptzuordnung wird für die Planung automatisch ausgewählt.</span>{% endif %}
+      </div>
+    {% endif %}
     {% if active_section=='verwaltung' %}
       <nav class="leave-config-nav" aria-label="Urlaubsverwaltung">
         {% for key,label in [('verfahren','Urlaubsverfahren & Genehmigung'),('besetzung','Besetzungsregeln'),('arbeitsmodelle','Arbeitsmodelle'),('feiertage','Feiertage'),('urlaubskonten','Urlaubskonten')] %}
@@ -124,7 +130,7 @@
                 {% if planners[row.person_id] %}
                     <button type="button"
                             class="btn btn-outline-secondary align-self-start mb-2"
-                            data-leave-edit="{{ row.id }}" data-leave-edit-link="/urlaub/planer?unit={{unit}}&amp;edit={{row.id}}">Zeitraum bearbeiten</button>
+                            data-leave-edit="{{ row.id }}" data-leave-edit-link="/urlaub/planer?unit={{row.org_id}}&amp;edit={{row.id}}">Zeitraum bearbeiten</button>
                 {% endif %}
                 {% if row_policy.workflow=="external" and row.person_id==user.id and row.status=="planned" %}
                     <div class="alert alert-info">
