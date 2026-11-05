@@ -270,10 +270,21 @@ def prefs(user) -> dict:
     return {"fav": list(dict.fromkeys(fav)), "hidden": hidden, "closed": [g for g in data.get("closed", [g for g in GROUPS if g != "work"]) if g in GROUPS]}
 
 
-def dump(fav: list[str], hidden: list[str], closed=None) -> str:
+def dump(fav: list[str], hidden: list[str], closed=None, user=None) -> str:
     fav = list(dict.fromkeys(i for i in fav if i in BY_ID))[:MAX_FAVORITES]
     data = {"fav": fav, "hidden": [g for g in dict.fromkeys(hidden) if g in GROUPS]}
     if closed is not None: data["closed"] = list(dict.fromkeys(g for g in closed if g in GROUPS))
+    # Preserve independent display/context preferences when the existing
+    # favorites or menu-settings endpoint updates nav_json.
+    if user is not None:
+        try:
+            current = json.loads(user.nav_json or "{}")
+        except ValueError:
+            current = {}
+        if isinstance(current, dict):
+            for key in ("ui_density", "org_view", "last_org_unit"):
+                if key in current:
+                    data[key] = current[key]
     return json.dumps(data)
 
 
