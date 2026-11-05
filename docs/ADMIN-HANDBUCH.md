@@ -6,7 +6,8 @@ Für alle, die das Portal der Verbandsgemeinde Otterbach-Otterberg betreuen: Vid
 
 1. [Die Oberfläche im Überblick](#die-oberfläche-im-überblick)
 2. [Benutzer, Rechte und Gruppen](#benutzer-rechte-und-gruppen)
-2a. [Körperschaften und Einrichtungen](#körperschaften-und-einrichtungen)
+2a. [Körperschaften und Einrichtungen](#körperschaften-und-einrichtungen) (gemeinsame Organisationsverwaltung)
+2c. [Kalender & Urlaubsplanung konfigurieren](#kalender--urlaubsplanung-konfigurieren)
 2b. [Freiwillige Benutzerprofile](#freiwillige-benutzerprofile)
 3. [Anmeldung und Zwei-Faktor](#anmeldung-und-zwei-faktor)
 4. [Module ein- und ausschalten](#module-ein--und-ausschalten)
@@ -49,6 +50,8 @@ Das Menü links ist nach Bereichen gegliedert. Jede Person sieht nur, wofür sie
 | Mein Arbeitsplatz | **Meine Aufgaben** | Gemeinsame Aufgabenübersicht; eigene Aufgaben über Schnellfeld oder **Mit Formular anlegen** erfassen, sofern das Modul und das Erstellrecht freigeschaltet sind. [Einrichtung und Rechte](AUFGABEN.md) |
 | Videokonferenzen | **Meetings** | Eigene Räume anlegen und betreten, anstehende Besprechungen |
 | | **Besprechung planen** | Termin anlegen und Teilnehmende per Kalendereinladung einladen |
+| Termine & Veranstaltungen | **Kalender & Urlaub** / **Urlaubsplanung** | Gemeinsame Kalender, Personenzeitachse und Urlaubsverfahren (Modul standardmäßig aus) |
+| Administration | **Organisation** | Hierarchie, Körperschaften, Zuordnungen, Bereichsrollen und Stammdaten |
 | Kurzlinks | **Kurzlinks** | Kurze Adressen mit Statistik, QR-Generator; für Admins die Einstellungen (Kurz-Domain) |
 | Formulare | **Formulare** | Eigene und geteilte Formulare bauen, verteilen, auswerten |
 | | **Zum Ausfüllen** | Formulare, zu denen man eingeladen ist |
@@ -192,18 +195,14 @@ Die Bestandsmigration ergänzt `users.profile_data_enc`. Datenbank und `PORTAL_S
 
 ## Körperschaften und Einrichtungen
 
-Menü **Verwaltung › Körperschaften** (Admins und Recht „Körperschaften (Stammdaten)“). Hier werden die Gebietskörperschaften und Zweckverbände, die das Portal betreut, **einmal zentral** gepflegt – mit Art (Verbandsgemeinde, Ortsgemeinde, Stadt, Landkreis, Zweckverband), Kurzname, Gemeindeschlüssel, Farbe, **Wappen** (PNG/JPEG/WebP), Anschrift und Kontakt. Darunter hängen beliebig viele **Einrichtungen** (Abteilungen, Kitas, Schulen, Eigenbetriebe …); Ortsgemeinden und Städte stehen unter der Verbandsgemeinde.
+Die bisherige Verwaltungsseite für Körperschaften und Einrichtungen ist jetzt in **Administration → Organisation** integriert. Die gemeinsame Organisationsverwaltung aus [PR #182](https://github.com/derdigitalaffine/takt-platform/pull/182) und [PR #184](https://github.com/derdigitalaffine/takt-platform/pull/184) verwaltet einen frei gliederbaren Baum (Körperschaften, Verwaltungen, Einrichtungen, Abteilungen, Teams usw.), Anschriften, Kontakt, Wappen und Bereichsrollen. Frühere Verwaltungsadressen führen zur gemeinsamen Oberfläche; vorhandene IDs und Fachbezüge in Ressourcen, Krankmelder, Rechtstexten und Anträgen bleiben erhalten.
 
-Genutzt wird die Liste in allen Modulen:
+- **Zuordnungen:** Personen haben eine Haupt- und gegebenenfalls zusätzliche Organisationszuordnungen. Die Hauptzuordnung zählt standardmäßig für die Besetzung, Zusatzzuordnungen nur nach ausdrücklicher Festlegung. Ein Austausch der Hauptzuordnung benötigt die entsprechenden Rechte.
+- **Bereichsrollen:** Leitung, Bereichsplanung, Genehmigung, Zuordnungen, Bereichseinstellungen und Abwesenheitsverwaltung sind getrennt. Rollen können auf eine Einheit oder einschließlich Untereinheiten wirken. Zusätzlich gibt es eine gesonderte Berechtigung zur **Verwaltung von Urlaubsregeln**. Globale Rollen-/Zuordnungsverwaltung bleibt getrennt.
+- **Gemeinsame Personenauswahl:** Suche nach Namen/E-Mail, Filter, Auswahlchips und „Alle Treffer auswählen“. Bereits ausgewählte Personen bleiben bei weiterer Suche erhalten. Sammelaktionen prüfen jedes Ziel serverseitig und werden bei Fehlern als Ganzes abgelehnt; ohne JavaScript stehen native Formulare zur Verfügung.
+- **Bestand und Sicherheit:** Neue Tabellen werden additiv angelegt. Gleichzeitige Änderungen verwenden einen gemeinsamen Versionsstand; Gruppen dürfen keine indirekte Rechteausweitung ermöglichen. Vor Updates weiterhin Datenbank und Dateien sichern.
 
-| Modul | Verwendung |
-|---|---|
-| Ressourcen | **Anbieter** einer Ressource (Reiter Allgemein) – Wappen und Kontakt auf der öffentlichen Seite, Filter im Katalog |
-| Krankmelder | Jeder **Arbeitgeber** ist einer Körperschaft oder Einrichtung zugeordnet; das Meldeformular gruppiert die Auswahl nach Körperschaft, Kitas und Abteilungen sind einzeln wählbar |
-| Rechtstexte | Jede **Ebene** im Rechtsbaum kann auf ihre Körperschaft zeigen – das Wappen erscheint im Ortsrecht |
-| Anträge | **Zuständige Stelle** je Online-Antrag – mit Wappen im Antragskatalog, dort auch als Filter |
-
-Beim ersten Start nach dem Update legt das Portal die Verbandsgemeinde und die Ortsgemeinden aus dem Rechtsbaum an und übernimmt die bisherigen Arbeitgeber des Krankmelders als Einrichtungen (gleichnamige werden verknüpft). Danach bitte unter Verwaltung › Körperschaften die Einrichtungen ihrer Körperschaft zuordnen. Einträge, die noch verwendet werden, lassen sich nicht löschen – stattdessen auf **inaktiv** setzen.
+Ausführliche Rechte, Schutzregeln und Zuordnungsabläufe: [Organisationsverwaltung](organisationsverwaltung.md).
 
 ## Anmeldung und Zwei-Faktor
 
@@ -238,7 +237,7 @@ Weitere Schutzmechanismen, die immer aktiv sind:
 
 **Gemeinsamer Einstieg für Befragungen:** Unter **Kommunikation → Umfragen & Abstimmungen** erscheinen Live-Umfragen, Abstimmungen und Terminumfragen in einer Übersicht. Die Rechte **Abstimmungen** (einschließlich Live) und **Terminumfragen** sowie die bisherigen Freigabestufen gelten weiter. Administration sieht fremde Einträge erst mit **Anzeigen → Alle im Portal**. Formulare und Online-Anträge bleiben eigenständig. **Neu erstellen** bietet sichtbare Auswahlkarten; Live öffnet unmittelbar die Fragenvorbereitung ohne vorgeschaltete Titelabfrage. [Bedienung und Erhalt der Funktionen](UMFRAGEN.md).
 
-Menü **Module** (nur Admins). **Kurzlinks & QR-Codes**, **Formulare**, **Online-Anträge** (nur zusammen mit Formularen), **Ablage (DMS)**, **Umfragen & Abstimmungen**, **Terminbuchung**, **Ressourcenbuchung**, **Kartenbrowser** und **Rechtstexte** lassen sich komplett abschalten. Videokonferenzen sind die Kernfunktion und immer aktiv.
+Menü **Module** (nur Admins). **Kurzlinks & QR-Codes**, **Formulare**, **Online-Anträge** (nur zusammen mit Formularen), **Ablage (DMS)**, **Umfragen & Abstimmungen**, **Kalender & Urlaub**, **Terminbuchung**, **Ressourcenbuchung**, **Kartenbrowser** und **Rechtstexte** lassen sich komplett abschalten. Videokonferenzen sind die Kernfunktion und immer aktiv.
 
 Ein abgeschaltetes Modul
 
@@ -247,6 +246,21 @@ Ein abgeschaltetes Modul
 - behält alle Daten. Nach dem Wiedereinschalten ist alles wieder da.
 
 Die Umschaltung wirkt nach wenigen Sekunden, ohne Neustart.
+
+## Kalender & Urlaubsplanung konfigurieren
+
+Das mit [PR #184](https://github.com/derdigitalaffine/takt-platform/pull/184) integrierte Modul **Kalender & Urlaub** ist bei bestehenden wie neuen Installationen zunächst **deaktiviert**. Die Datenbankinitialisierung ergänzt die benötigten Tabellen, ohne bestehende Fachobjekt-IDs und Kalenderlinks zu ersetzen.
+
+1. Unter **Administration → Module** das Modul **Kalender & Urlaub** aktivieren. Danach stehen unter **Termine & Veranstaltungen** die Einträge **Kalender & Urlaub** (`/kalender`) und **Urlaubsplanung** (`/urlaub`) zur Verfügung.
+2. Unter **Administration → Organisation** die Einheiten, Haupt-/Zusatzzuordnungen und Bereichsrollen prüfen. Planen, Genehmigen, Organisations- und Urlaubsregeln verwalten sowie fremde Abwesenheiten bearbeiten sind **verschiedene Rechte**. Organisationszuordnung allein erzeugt keine globale Administratorberechtigung.
+3. In der **Urlaubsplanung** die betreffende Organisationseinheit wählen und die **Urlaubsregeln dieses Bereichs** mit einem entsprechend berechtigten Konto öffnen: *gemeinsam planen*, *intern genehmigen* (auch mehrstufig) oder *externes System* mit eigener Selbstauskunft. Bei externen Konten (beispielsweise Novatime) **keine automatische Schnittstelle oder verifizierte Freigabe** annehmen; ein internes Resturlaubskonto nur aktivieren, wenn es tatsächlich hier geführt werden soll.
+4. **Besetzung und Feiertage** je Einheit konfigurieren: einfache Personenzahl oder Arbeitskapazität, Arbeitsmodelle und Ausnahmen, Warnungen/Sperren, optionaler Urlaubspflichtzeitraum und Notbesetzung. Der arbeitsfreie **gesetzliche Feiertagskalender** ist von den Feiertags- und Preisregeln der Ressourcenbuchung getrennt. Verbindlichmachen prüft Besetzung und gegebenenfalls Urlaubskonto atomar; eine offene Planung ist keine Reservierung.
+5. Optional die **Übernahme verbindlicher Urlaubszeiten in Abwesenheiten** einschalten. Ein geänderter wirksamer Zeitraum bleibt bis zur nötigen Bestätigung gültig. Die Übernahme erzeugt **keine automatischen Vertretungsbefugnisse**.
+6. Die Urlaubsansicht unterstützt Monat, Quartal und Jahr. Der gewählte Zeitraum und Zoom bleiben **je Einheit innerhalb einer Browser-Sitzung** beim Speichern/Neuladen erhalten. Mehrere neue Einträge im sichtbaren Zeitraum verändern den Ausschnitt nicht; für außerhalb liegende neue Einträge wechselt die Ansicht zum passenden Zeitraum und behält den Zoom. Es handelt sich nicht um eine serverweite Synchronisierung der Browseransichten.
+
+**Kalenderfreigaben und Geräte:** Freie Kalender dürfen bei ausdrücklicher Berechtigung über CalDAV geschrieben werden; Fachkalender stellen gesicherte Leseansichten bereit, deren Inhalte im jeweiligen Fachmodul bearbeitet werden. Über **Kalender verbinden** (`/kalender/hilfe`) lassen sich Gerätezugänge (`/kalender/geraete`) für explizit ausgewählte Kalender und Schreibrechte erstellen oder widerrufen. Neue Kalenderfreigaben erweitern vorhandene Gerätezugänge **nicht automatisch**. Für iPhone/iPad wird ein einmalig abrufbares `.mobileconfig`-Profil mit einem eigenen Gerätepasswort angeboten. **HTTPS** ist dafür zwingend; das Profil sicher behandeln und bei Verlust den Gerätezugang widerrufen. Separat widerrufbare ICS-Leseabos eignen sich für Clients ohne CalDAV-Schreibunterstützung (unter anderem verschiedene Outlook-Versionen).
+
+**Betrieb:** Persönliche ICS-Tokenpfade sind auch in Reverse-Proxy-Zugriffslogs zu unterdrücken. Bei Entzug eines Gerätezugangs sind bereits vom Client gespeicherte Daten nicht rückholbar. Die implementierten Protokoll-/Browserprüfungen ersetzen **keine reale Geräteabnahme** auf iOS, Android oder Outlook. Einrichtungshilfe, Grenzen und CI-Nachweise stehen in [Kalender und Urlaub: Implementierung/Abnahme](kalender-urlaub-umsetzungsstand.md); die fachlichen Hintergründe in [Konzept](kalender-urlaub-konzept.md) und [UI-Konzept](kalender-urlaub-ui.md).
 
 ## Aufnahmen und Transkription
 
