@@ -468,7 +468,7 @@ a.dash-num:hover > span { text-decoration: underline; }
 .nav-group-toggle i { font-size: .65rem; transition: transform .18s ease; }
 .nav-group:not(.is-open) .nav-group-toggle i { transform: rotate(-90deg); }
 .nav-group.has-active .nav-group-toggle { color: var(--bs-body-color); }
-.nav-group-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .18s ease; }
+.nav-group-body { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr; transition: grid-template-rows .18s ease; }
 .nav-group-body > ul { overflow: hidden; min-height: 0; gap: .1rem; }
 .nav-group:not(.is-open) .nav-group-body { grid-template-rows: 0fr; }
 .app-nav.is-searching .nav-group-body { grid-template-rows: 1fr; }
@@ -577,3 +577,6 @@ a.dash-num:hover > span { text-decoration: underline; }
 .module-catalog .card { min-width:0; }
 .module-catalog .card-body { display:flex; flex-direction:column; gap:.75rem; }
 .module-catalog .module-description { flex:1; }
+
+/* Collapsed groups keep one column instead of wrapping links into invisible horizontal overflow. */
+.app-sidebar .nav.flex-column { flex-wrap: nowrap; min-width: 0; }

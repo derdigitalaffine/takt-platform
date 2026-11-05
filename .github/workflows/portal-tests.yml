@@ -119,6 +119,8 @@ jobs:
         run: python tests/browser/navigation_ui_smoke.py
       - name: Check consistent navigation controls across modules
         run: python tests/browser/navigation_controls_smoke.py
+      - name: Check organization memberships and scoped roles
+        run: python tests/browser/organization_ui_smoke.py
       - name: Check theme selection in Chromium
         run: python tests/browser/theme_ui_smoke.py
       - name: Exercise seminar workflows on desktop and mobile

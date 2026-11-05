@@ -124,7 +124,9 @@ def manageable(db, user: User) -> list[User]:
     if manages_all(user):
         return list(db.scalars(select(User).where(User.active.is_(True), User.id != user.id).order_by(User.name)))
     ids = select(GroupMember.user_id).join(Group, Group.id == GroupMember.group_id).where(Group.lead_id == user.id)
-    return list(db.scalars(select(User).where(User.id.in_(ids), User.active.is_(True), User.id != user.id)
+    from .organization import scoped_people
+    organizational_ids = scoped_people(db,user,'absence_manage',primary_only=True)
+    return list(db.scalars(select(User).where(or_(User.id.in_(ids), User.id.in_(organizational_ids)), User.active.is_(True), User.id != user.id)
                            .order_by(User.name)))
 
 
@@ -135,7 +137,8 @@ def may_manage(db, actor: User, target_id: int) -> bool:
 
 
 def can_manage_others(db, user: User) -> bool:
-    return manages_all(user) or bool(led_groups(db, user))
+    from .organization import scoped_people
+    return manages_all(user) or bool(led_groups(db,user)) or bool(scoped_people(db,user,'absence_manage',primary_only=True))
 
 
 # --- Anlegen, Antworten, Löschen -----------------------------------------------------------------

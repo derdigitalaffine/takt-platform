@@ -5,7 +5,7 @@
 <nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/admin/orgs">Körperschaften</a> › {{ 'Neu' if new else org.name }}</nav>
 {{ m.page_head('Neuer Eintrag' if new else org.name, 'Körperschaft, Zweckverband oder Einrichtung') }}
 <form method="post" action="{{ '/admin/orgs/new' if new else '/admin/orgs/' ~ org.id }}" enctype="multipart/form-data">
-<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="version" value="{{ org_version }}">
 <div class="row g-4">
   <div class="col-12 col-xl-8">
     <div class="card mb-4"><div class="card-header fw-semibold"><i class="fa-solid fa-landmark-flag me-2"></i>Grunddaten</div><div class="card-body row g-3">
@@ -50,7 +50,7 @@
 </div>
 </form>
 {% if not new %}
-<form method="post" action="/admin/orgs/{{ org.id }}/delete" class="mt-3"><input type="hidden" name="csrf" value="{{ csrf }}">
+<form method="post" action="/admin/orgs/{{ org.id }}/delete" class="mt-3"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="version" value="{{ org_version }}">
   <button class="btn btn-sm btn-link text-danger p-0" type="submit" data-confirm-title="{{ org.name }} löschen?" data-confirm="Nur möglich, wenn der Eintrag nirgends mehr verwendet wird." data-confirm-button="Löschen"><i class="fa-regular fa-trash-can me-1"></i>Eintrag löschen</button></form>
 {% endif %}
 {% endblock %}

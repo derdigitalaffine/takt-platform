@@ -7,6 +7,12 @@ from sqlalchemy import select
 from app import krank, orgs
 from app.db import Form, KrankEmployer, LawLevel, Organization, Resource, SessionLocal, Setting, User, seed_orgs
 from app.security import hash_password
+from app.org_models import OrgState
+
+def version():
+    with SessionLocal() as db:
+        return db.get(OrgState, 1).version
+
 from conftest import client, csrf_of, login, settings
 
 ADMIN = ("admin@example.org", "admin-passwort-123")
@@ -51,7 +57,7 @@ def test_admin_crud_logo_and_permission():
     page = c.get("/admin/orgs/new")
     with SessionLocal() as db:
         vg_id = db.scalar(select(Organization.id).where(Organization.kind == "vg"))
-    r = c.post("/admin/orgs/new", data={"csrf": csrf_of(page.text), "name": "Ortsgemeinde Heiligenmoschel", "kind": "og",
+    r = c.post("/admin/orgs/new", data={"version": version(), "csrf": csrf_of(page.text), "name": "Ortsgemeinde Heiligenmoschel", "kind": "og",
                                          "parent_id": str(vg_id), "active": "1", "email": "og@heiligenmoschel.de",
                                          "website": "heiligenmoschel.de", "color": "#aa3300"},
                files={"logo": ("wappen.png", PNG, "image/png")})
@@ -64,25 +70,25 @@ def test_admin_crud_logo_and_permission():
     assert logo.status_code == 200 and logo.headers["content-type"] == "image/png"
     # Einrichtung darunter, Zyklus wird verhindert
     page = c.get(f"/admin/orgs/new?parent={oid}")
-    c.post("/admin/orgs/new", data={"csrf": csrf_of(page.text), "name": "Kita Regenbogen", "kind": "kita", "parent_id": str(oid), "active": "1"})
+    c.post("/admin/orgs/new", data={"version": version(), "csrf": csrf_of(page.text), "name": "Kita Regenbogen", "kind": "kita", "parent_id": str(oid), "active": "1"})
     with SessionLocal() as db:
         kita = db.scalar(select(Organization).where(Organization.name == "Kita Regenbogen"))
         assert orgs.body_of(kita).id == oid
         kid = kita.id
     page = c.get(f"/admin/orgs/{oid}")
-    c.post(f"/admin/orgs/{oid}", data={"csrf": csrf_of(page.text), "name": "Ortsgemeinde Heiligenmoschel", "kind": "og",
+    c.post(f"/admin/orgs/{oid}", data={"version": version(), "csrf": csrf_of(page.text), "name": "Ortsgemeinde Heiligenmoschel", "kind": "og",
                                        "parent_id": str(kid), "active": "1"})
     with SessionLocal() as db:
         assert db.get(Organization, oid).parent_id == vg_id
     # SVG als Wappen abgelehnt, Löschen bei Verwendung verhindert
     page = c.get(f"/admin/orgs/{kid}")
-    c.post(f"/admin/orgs/{kid}", data={"csrf": csrf_of(page.text), "name": "Kita Regenbogen", "kind": "kita", "parent_id": str(oid), "active": "1"},
+    c.post(f"/admin/orgs/{kid}", data={"version": version(), "csrf": csrf_of(page.text), "name": "Kita Regenbogen", "kind": "kita", "parent_id": str(oid), "active": "1"},
            files={"logo": ("x.svg", b"<svg onload='alert(1)'/>", "image/svg+xml")})
     with SessionLocal() as db:
         assert db.get(Organization, kid).logo == ""
         db.add(Resource(name="Dorfgemeinschaftshaus", slug="dgh-heiligenmoschel", provider_id=oid))
         db.commit()
-    c.post(f"/admin/orgs/{oid}/delete", data={"csrf": csrf_of(page.text)})
+    c.post(f"/admin/orgs/{oid}/delete", data={"version": version(), "csrf": csrf_of(page.text)})
     with SessionLocal() as db:
         assert db.get(Organization, oid) is not None
 
@@ -107,13 +113,13 @@ def test_application_responsible_body_in_catalog():
     settings(module_applications="1", module_forms="1")
     c = login(*ADMIN)
     page = c.get("/forms")
-    r = c.post("/forms", data={"csrf": csrf_of(page.text), "title": "Hund anmelden", "kind": "application"})
+    r = c.post("/forms", data={"version": version(), "csrf": csrf_of(page.text), "title": "Hund anmelden", "kind": "application"})
     fid = int(r.headers["location"].rsplit("/", 1)[1])
     with SessionLocal() as db:
         og = db.scalar(select(Organization).where(Organization.name == "Stadt Otterberg"))
     page = c.get(f"/forms/{fid}/application")
     assert 'name="org_id"' in page.text
-    c.post(f"/forms/{fid}/application", data={"csrf": csrf_of(page.text), "is_application": "1", "app_catalog": "1", "org_id": str(og.id)})
+    c.post(f"/forms/{fid}/application", data={"version": version(), "csrf": csrf_of(page.text), "is_application": "1", "app_catalog": "1", "org_id": str(og.id)})
     with SessionLocal() as db:
         form = db.get(Form, fid)
         assert form.org_id == og.id

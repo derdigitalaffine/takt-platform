@@ -568,13 +568,19 @@ def _update_hint(user: User | None) -> str:
         return updates.available(get_settings(db))
 
 
+def _org_nav(user: User | None) -> bool:
+    if user is None:return False
+    from .organization import has_access
+    with SessionLocal() as db:return has_access(db,user)
+
+
 def _navigation_context(request: Request, user: User | None) -> dict:
     """Reuse access adapters within one request, never across accounts or requests."""
     key = user.id if user else None
     cached = getattr(request.state, "navigation_context", None)
     if cached is None or cached[0] != key:
         values = {"shared_nav": _shared_nav(user), "task_badge": _task_badge(user),
-                  "dms_nav": _dms_nav(user), "res_nav": _res_nav(user), "krank_nav": _krank_nav(user)}
+                  "dms_nav": _dms_nav(user), "res_nav": _res_nav(user), "krank_nav": _krank_nav(user), "org_nav": _org_nav(user)}
         request.state.navigation_context = (key, values)
     return request.state.navigation_context[1]
 
@@ -583,7 +589,7 @@ def nav_ctx(request: Request, user: User, navctx: dict | None = None):
     from . import nav
     n = navctx if navctx is not None else _navigation_context(request, user)
     return nav.Ctx(user=user, path=request.url.path, modules=enabled_modules(), shared=n["shared_nav"],
-                   task_badge=n["task_badge"], dms_nav=n["dms_nav"], res_nav=n["res_nav"], krank_nav=n["krank_nav"])
+                   task_badge=n["task_badge"], dms_nav=n["dms_nav"], res_nav=n["res_nav"], krank_nav=n["krank_nav"], org_nav=n.get("org_nav",False))
 
 
 def _nav_menu(request: Request, user: User | None, navctx: dict) -> dict:
@@ -2016,14 +2022,20 @@ def _perm_value(selected: list[str], actor: User | None = None, before: set[str]
     return ",".join(p for p in PERMISSIONS if p in chosen)
 
 
-def _can_manage(actor: User, target: User) -> bool:
+def _can_manage(actor: User, target: User, protected_ids=None) -> bool:
     """Wer Benutzer verwalten darf, aber kein Admin ist, ändert keine Admin-Konten und keine Konten mit Rechten,
     die er selbst nicht hat (sonst ließe sich z. B. über einen Zurücksetzen-Link ein mächtigeres Konto übernehmen)."""
-    return actor.is_admin or (not target.is_admin and (target.id == actor.id or target.perms <= actor.perms))
+    from sqlalchemy.orm import object_session
+    from .organization import protected_user
+    db = object_session(target)
+    scoped_ok = actor.id == target.id or actor.can("org_roles") or not db or (target.id not in protected_ids if protected_ids is not None else not protected_user(db, target))
+    return actor.is_admin or (scoped_ok and not target.is_admin and (target.id == actor.id or target.perms <= actor.perms))
 
 
-def _set_groups(db: Session, target: User, group_ids: list[str]) -> None:
+def _set_groups(db: Session, target: User, group_ids: list[str], actor: User) -> None:
     ids = {int(g) for g in group_ids if str(g).isdigit()}
+    from .organization import check_group_changes
+    check_group_changes(db, actor, {g.id for g in target.groups}, ids)
     target.groups = list(db.scalars(select(Group).where(Group.id.in_(ids)))) if ids else []
     db.flush()
     from .db import GroupMember
@@ -2035,8 +2047,11 @@ def _set_groups(db: Session, target: User, group_ids: list[str]) -> None:
 def admin_users(request: Request, user: User = Depends(users_manager), db: Session = Depends(get_db)):
     users = db.scalars(select(User).options(joinedload(User.groups)).order_by(User.name)).unique().all()
     groups = db.scalars(select(Group).options(joinedload(Group.members)).order_by(Group.name)).unique().all()
-    from . import absence
-    return render(request, "admin_users.html", user, users=users, groups=groups,
+    from . import absence, organization
+    org_user_roles=organization.role_directory(db)
+    return render(request, "admin_users.html", user, users=users, groups=groups,org_directory=organization.directory(db),org_user_roles=org_user_roles,
+                  org_group_roles=set(db.scalars(select(organization.OrgRoleGrant.group_id).where(organization.OrgRoleGrant.group_id.is_not(None)))),
+                  manageable_users={u.id:_can_manage(user,u,set(org_user_roles)) for u in users},
                   away=absence.current_map(db), away_label=absence.label,
                   invite_links=stash_get(request, "invite_links", pop=True),
                   mail_ready=notify.mail_configured(get_settings(db)),
@@ -2067,7 +2082,7 @@ async def admin_users_create(request: Request, emails: str = Form(...), name: st
         target = User(email=email, name=display, is_admin=is_admin == "1" and user.is_admin, permissions=perms,
                       password_hash=hash_password(secrets.token_urlsafe(32)), password_set=False)
         db.add(target)
-        _set_groups(db, target, group_ids)
+        _set_groups(db, target, group_ids, user)
         link, queued = send_link(db, target, "invite")
         created.append(email)
         if not queued:
@@ -2122,6 +2137,13 @@ def admin_users_import_apply(request: Request, token: str = Form(...), invite: s
     if not user.is_admin:
         for row in rows:
             row["admin"] = False
+    from .organization import protected_group
+    if not user.is_admin and not user.can("org_roles"):
+        for row in rows:
+            for name in row.get("groups", []):
+                group = db.scalar(select(Group).where(func.lower(Group.name) == name.lower()))
+                if group and protected_group(db, group.id):
+                    raise HTTPException(403, "Import in Gruppen mit Bereichsrollen erfordert Organisationsrollen-Rechte.")
     without_password, created, added = user_import.apply(db, rows, force_change == "1")
     links, queued = [], 0
     if invite == "1":
@@ -2172,7 +2194,7 @@ async def admin_users_update(request: Request, uid: int, action: str = Form(...)
         if target.id == user.id and not user.is_admin and "users" not in perms:
             perms.append("users")  # sich nicht selbst aussperren
         target.permissions = _perm_value(perms, user, target.perms)
-        _set_groups(db, target, form.getlist("groups"))
+        _set_groups(db, target, form.getlist("groups"), user)
         flash(request, f"{target.email} gespeichert.")
     elif action == "reset_2fa":
         twofa.reset(target)
@@ -2243,6 +2265,9 @@ async def admin_groups_update(request: Request, gid: int, action: str = Form("sa
     group = db.get(Group, gid)
     if group is None:
         raise HTTPException(404)
+    from .organization import protected_group
+    if protected_group(db, group.id) and not (user.is_admin or user.can("org_roles")):
+        raise HTTPException(403, "Gruppen mit Bereichsrollen dürfen nur mit Organisationsrollen-Rechten geändert werden.")
     if action == "delete":
         db.delete(group)
         db.commit()
@@ -2877,3 +2902,5 @@ from . import routes_seminar_operations  # noqa: E402,F401
 from . import routes_seminar_transfer  # noqa: E402,F401
 
 from . import routes_task_boards  # noqa: E402,F401
+
+from . import routes_organization  # noqa: E402,F401
