@@ -1,10 +1,17 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Benutzer{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/ui-density.css">{% endblock %}
 {% block content %}
 {{ m.page_head('Benutzer & Gruppen', 'Neue Personen werden per E-Mail eingeladen und legen ihr Passwort selbst fest. Je Person schalten Sie frei, welche Bereiche sie nutzen darf. Gruppen erleichtern das Einladen zu Formularen. Gäste brauchen kein Konto.') }}
 
-<p><a class="btn btn-outline-secondary" href="/admin/organization"><i class="fa-solid fa-sitemap me-2" aria-hidden="true"></i>Organisation</a></p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-ui-preferences data-csrf="{{csrf}}">
+  <a class="btn btn-outline-secondary" href="/admin/organization"><i class="fa-solid fa-sitemap me-2" aria-hidden="true"></i>Organisation öffnen</a>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte">
+    <button class="btn btn-outline-secondary" type="button" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button>
+    <button class="btn btn-outline-secondary" type="button" data-ui-density="compact" aria-pressed="false">Kompakt</button>
+  </div>
+</div>
 {% if invite_links %}
 <div class="alert alert-info">
   <div class="fw-semibold mb-2"><i class="fa-solid fa-link me-2"></i>Kein E-Mail-Versand eingerichtet – bitte diese Links weitergeben:</div>
@@ -215,4 +222,4 @@
 {{ group_modal('group-new', '/admin/groups') }}
 {% for g in groups %}{{ group_modal('group-' ~ g.id, '/admin/groups/' ~ g.id, g) }}{% endfor %}
 {% endblock %}
-{% block scripts %}<script src="/static/organization-person.js" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/organization-person.js" defer></script><script src="/static/ui-preferences.js" defer></script>{% endblock %}
