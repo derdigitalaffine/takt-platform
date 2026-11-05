@@ -16,6 +16,16 @@ Personenzuordnungen und Bereichsrollen verwenden dieselbe Auswahl wie Kalenderfr
 
 Sammelaktionen umfassen maximal 500 eindeutige Einträge. Jede Person bzw. jedes Ziel wird mit den gleichen Bereichsprüfungen wie bei Einzelaktionen verarbeitet. Ein ungültiges oder unberechtigtes Ziel verwirft die gesamte Aktion. Ohne JavaScript stehen die nativen Kontrollkästchen und die serverseitigen Prüfungen zur Verfügung. Eine bestehende Hauptzuordnung in der aktuellen Einheit bleibt bei erneuter Zuordnung erhalten; ein Wechsel in eine andere Einheit benötigt weiterhin Rechte auf beiden Seiten.
 
+## Gemeinsamer Organisations- und Benutzer-Editor (PR #185)
+
+Der [Integrations-PR #185](https://github.com/derdigitalaffine/takt-platform/pull/185) verbindet **Administration → Organisation** und **Benutzer & Gruppen** über denselben mobilen Seitenpanel-Editor. Haupt-/Zusatzzuordnungen, Besetzungsrelevanz, Einsatzanteil und beliebig viele Bereichsrollen werden in einer zusammengefassten Bearbeitung verarbeitet. Alle betroffenen Daten werden mit dem vorhandenen globalen Organisationsversionsstand geprüft und in einer Transaktion gespeichert; bei fehlenden Rechten oder veraltetem Stand erfolgt keine Teilübernahme. Gruppenrollen bleiben eigenständige Zuweisungen.
+
+Die Organisation zeigt eine **Exploreransicht** mit Baum und eine alternativ auswählbare **hierarchische Tabelle** mit Such- und Kontextfunktionen. In Rollenübersichten erscheint jede Person nur einmal pro Einheit; ihre Rollen einschließlich geerbter Geltungsbereiche erscheinen als Chips. Rollen können in der Sammelbearbeitung **mehrfach ausgewählt und ergänzt oder gezielt entzogen** werden, ohne nicht ausgewählte Rollen zu ersetzen. Jede Rolle bekommt individuell die Option „einschließlich Untereinheiten“. Personenbezogene Änderungen sind sowohl aus der Benutzerliste als auch dem Organisations-Explorer erreichbar.
+
+**Leitung und stellvertretende Leitung** sind unterschiedliche sichtbare Bezeichnungen mit identischen fachlichen Rechten für Planung und Genehmigung. Es dürfen mehrere Leitungen und Stellvertretungen je Einheit tätig sein. Sie erhalten damit weder automatisch globale Administratorrechte noch das gesonderte Recht zur Urlaubsregel- oder Rollenverwaltung; eigene Urlaubsanträge können sie nicht selbst genehmigen. Beide Tags werden in den fachlich relevanten Personenansichten dargestellt.
+
+Der zuletzt verwendete, weiterhin freigegebene Organisationsbereich wird für Kalender, Urlaub und Organisationsübersicht übernommen; direkte Links bleiben maßgeblich. Benutzerinnen und Benutzer können zwischen komfortabler und kompakter Darstellung wechseln. Diese Einstellung sowie Explorer-/Tabellenwahl werden im eigenen Benutzerkonto gespeichert.
+
 ## Rechte
 
 Admins dürfen alles. Globale Rechte sind getrennt:
@@ -29,6 +39,7 @@ Bereichsrollen gelten wahlweise nur für die Einheit oder einschließlich Untere
 | Rolle | Umfang |
 | --- | --- |
 | Leitung | Bereich ansehen; Planung und Genehmigung |
+| Stellvertretende Leitung | Dieselben fachlichen Planungs- und Genehmigungsrechte wie Leitung, als Stellvertretung gekennzeichnet |
 | Bereichsplanung | Bereich ansehen; Planung |
 | Genehmigung | Bereich ansehen; Genehmigung |
 | Zuordnungen verwalten | Zuordnungen innerhalb des Bereichs pflegen |
