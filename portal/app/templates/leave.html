@@ -123,12 +123,12 @@
                 {% endif %}
                 {% if row_policy.workflow=="external" and row.person_id==user.id and row.status=="planned" %}
                     <div class="alert alert-info">
-                        <p>Urlaub auch im externen System beantragen. Nach dessen Genehmigung bestätigen Sie hier Ihre Selbstauskunft.</p>
+                        <p>Urlaub auch in der externen ZE-Software beantragen. Nach dessen Genehmigung bestätigen Sie hier Ihre Selbstauskunft.</p>
                         {% if row_policy.external_url %}
                             <a class="btn btn-outline-primary"
                                href="{{ row_policy.external_url }}"
                                target="_blank"
-                               rel="noopener noreferrer">Externes System öffnen</a>
+                               rel="noopener noreferrer">Externe ZE-Software öffnen</a>
                         {% endif %}
                         <button type="button"
                                 class="btn btn-outline-secondary"
@@ -152,7 +152,7 @@
                             {% elif row.person_id==user.id %}
                                 <button class="btn btn-primary"
                                         name="action"
-                                        value="attest">Externe Genehmigung selbst bestätigen</button>
+                                        value="attest" {{'hidden' if not row_policy.external_attestation}}>Externe Genehmigung selbst bestätigen (Selbstauskunft)</button>
                             {% endif %}
                         {% endif %}
                         {% if row.status=="requested" and approvers[row.id] %}
@@ -239,11 +239,13 @@
                     </label>
                     <p class="small">Verbindliche Sperren gelten weiterhin. Ohne diese Option benötigen Warnungen eine begründete Ausnahmeentscheidung.</p>
                     <label class="form-label">
-                        Externes System<input type="url"
+                        Externe ZE-Software<input type="url"
                                               class="form-control"
                                               name="external_url"
                                               value="{{ policy.external_url }}">
                     </label>
+                    <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="external_attestation" value="1" {{'checked' if policy.external_attestation}}><span class="form-check-label">Persönliche Selbstauskunft über externe Genehmigung anbieten (optional)</span></label>
+                    <p class="small text-secondary">Ohne diese Option bleibt Takt ein reiner Planer. Eine externe Genehmigung wird nie automatisch als verifiziert dargestellt.</p>
                     <label class="form-check">
                         <input type="checkbox"
                                class="form-check-input"
