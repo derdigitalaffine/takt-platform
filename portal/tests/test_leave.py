@@ -229,7 +229,7 @@ def test_parent_view_uses_each_persons_actual_workflow(db, task_people, units):
     person = task_people[0]
     assigned(db, person, team)
     grant(db, unit, person, "viewer")
-    db.add(LeavePolicy(org_id=team.id, workflow="external"))
+    db.add(LeavePolicy(org_id=team.id, workflow="external", external_attestation=True))
     db.commit()
     row = leave.save(db, person, dict(starts_on="2026-12-01", ends_on="2026-12-01"))
     db.commit()
