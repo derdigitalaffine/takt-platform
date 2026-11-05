@@ -6,7 +6,7 @@
   if (policy) {
     const topic = policy.dataset.leavePolicyTopic;
     const groups = {
-      verfahren: ["workflow", "external_url", "approval_units", "sync_absence"],
+      verfahren: ["workflow", "external_url", "external_attestation", "approval_units", "sync_absence"],
       besetzung: ["minimum", "conflict_mode", "notify_only_warnings", "advanced", "minimum_capacity"],
       feiertage: ["holiday_state"],
       urlaubskonten: ["internal_account"],
