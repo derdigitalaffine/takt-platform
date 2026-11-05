@@ -155,6 +155,13 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 assert p.evaluate(get_navigation)["date"] == "2027-04-12"
 
                 p.set_viewport_size({"width": 390, "height": 844})
+                # The editor is a full-height sheet on phones and can be
+                # opened/closed without losing the timeline underneath.
+                expect(p.locator("#leave-side-panel")).to_be_hidden()
+                p.locator("#leave-open-editor").click()
+                expect(p.locator("#leave-side-panel")).to_be_visible()
+                p.get_by_role("button", name="Bearbeitung schließen").click()
+                expect(p.locator("#leave-side-panel")).to_be_hidden()
                 p.wait_for_function(
                     "document.documentElement.scrollWidth<=innerWidth+1"
                 )
