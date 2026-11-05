@@ -205,101 +205,91 @@
             <details class="card card-body mt-3" open data-leave-policy-topic="{{config_topic}}">
                 <summary>Urlaubsregeln dieses Bereichs</summary>
                 <p class="small mt-3">Wirksame Vorgabe aus Einheit {{ policy.org_id }}. Bestehende verbindliche Zeiten werden nicht rückwirkend geändert. Mindestbesetzungen gelten für die jeweils gespeicherte Einheit; Regeln übergeordneter Einheiten werden zusätzlich geprüft.</p>
-                <form method="post" action="/urlaub/regeln/{{ unit }}">
-                    <input type="hidden"
-                           name="policy_version"
-                           value="{{ policy.org_id }}:{{ policy.version or 0 }}">
+                <form method="post" action="/urlaub/regeln/{{ unit }}" class="row g-3">
+                    <input type="hidden" name="policy_version" value="{{ policy.org_id }}:{{ policy.version or 0 }}">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
-                    <label class="form-label">
-                        Ablauf<select class="form-select" name="workflow">
-                        {% for key,title in [('planning','Gemeinsam planen'),('internal','Interne Genehmigung'),('external','Externe ZE-Software')] %}
-                            <option value="{{ key }}" {{'selected' if policy.workflow==key}}>{{ title }}</option>
-                        {% endfor %}
+                    <input type="hidden" name="topic" value="{{ config_topic }}">
+                    {% if config_topic=='verfahren' %}
+                      <div class="col-12">
+                        <label class="form-label" for="leave-workflow">Urlaubsverfahren</label>
+                        <select id="leave-workflow" class="form-select" name="workflow">
+                          {% for key,title in [('planning','Gemeinsame Planung'),('internal','Interne Genehmigung'),('external','Externe ZE-Software')] %}
+                            <option value="{{key}}" {{'selected' if policy.workflow==key}}>{{title}}</option>
+                          {% endfor %}
                         </select>
-                    </label>
-                    <label class="form-label" for="leave-holidays">Arbeitsfreier Feiertagskalender</label><select id="leave-holidays" class="form-select mb-2" name="holiday_state"><option value="inherit" {{'selected' if not local_policy or local_policy.holiday_state=='inherit'}}>Vorgabe der übergeordneten Einheit / des Portals</option><option value="none" {{'selected' if local_policy and local_policy.holiday_state=='none'}}>Keine automatischen Feiertage</option>{% for code,label in holiday_states.items() %}<option value="{{code}}" {{'selected' if local_policy and local_policy.holiday_state==code}}>{{label}}</option>{% endfor %}</select><p class="small">Gesetzliche Feiertage gelten als arbeitsfrei. Ausdrücklich erfasste abweichende Arbeitstage haben Vorrang. Sonderpreistage der Ressourcen verändern keine Arbeitszeit.</p>
-<label class="form-label">
-                        Mindestbesetzung (Personen)<input type="number"
-                                                          name="minimum"
-                                                          min="0"
-                                                          max="10000"
-                                                          class="form-control"
-                                                          value="{{ local_policy.minimum if local_policy else 0 }}">
-                    </label>
-                    <label class="form-label">
-                        Bei Unterschreitung<select class="form-select" name="conflict_mode">
-                        <option value="warning"
-                                {{'selected' if policy.conflict_mode=='warning'}}>Warnung mit begründeter Ausnahme</option>
-                        <option value="block"
-                                {{'selected' if policy.conflict_mode=='block'}}>Verbindliche Sperre</option>
-                        </select>
-                    </label>
-                    <label class="form-check">
-                        <input type="checkbox"
-                               class="form-check-input"
-                               name="notify_only_warnings"
-                               value="1"
-                               {{'checked' if policy.notify_only_warnings}}>
-                        <span class="form-check-label">Warnungen ohne Ausnahmegenehmigung zulassen und Leitungen informieren</span>
-                    </label>
-                    <p class="small">Verbindliche Sperren gelten weiterhin. Ohne diese Option benötigen Warnungen eine begründete Ausnahmeentscheidung.</p>
-                    <label class="form-label">
-                        Externe ZE-Software<input type="url"
-                                              class="form-control"
-                                              name="external_url"
-                                              value="{{ policy.external_url }}">
-                    </label>
-                    <label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="external_attestation" value="1" {{'checked' if policy.external_attestation}}><span class="form-check-label">Persönliche Selbstauskunft über externe Genehmigung anbieten (optional)</span></label>
-                    <p class="small text-secondary">Ohne diese Option bleibt Takt ein reiner Planer. Eine externe Genehmigung wird nie automatisch als verifiziert dargestellt.</p>
-                    <label class="form-check">
-                        <input type="checkbox"
-                               class="form-check-input"
-                               name="advanced"
-                               value="1"
-                               {{'checked' if policy.advanced}}>
-                        <span class="form-check-label">Erweiterte Kapazitätsprüfung verwenden</span>
-                    </label>
-                    <label class="form-label">
-                        Mindestkapazität je Tageshälfte (volle Kapazitätseinheiten)<input class="form-control"
-                                                                                          type="number"
-                                                                                          step="0.01"
-                                                                                          min="0"
-                                                                                          max="10000"
-                                                                                          name="minimum_capacity"
-                                                                                          value="{{(local_policy.minimum_capacity or 0)/100 if local_policy else 0}}">
-                    </label>
-                    <label class="form-check">
-                        <input type="checkbox"
-                               class="form-check-input"
-                               name="internal_account"
-                               value="1"
-                               {{'checked' if policy.internal_account}}>
-                        <span class="form-check-label">Internes Urlaubskonto führen</span>
-                    </label>
-                    <p class="small">Genehmigungsweg: Ohne Auswahl entscheidet die Hauptzuordnung; ausgewählte Ebenen werden in der angezeigten Reihenfolge durchlaufen.</p>
-                    {% for n in approval_options %}
+                        <div class="form-text">Leitungen und Stellvertretungen können eigenen Urlaub erfassen, aber nicht selbst genehmigen. Die interne Genehmigung ist vollständig abschaltbar.</div>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="leave-external-url">Adresse der externen ZE-Software (optional)</label>
+                        <input id="leave-external-url" type="url" class="form-control" name="external_url" maxlength="1000" value="{{policy.external_url}}">
+                      </div>
+                      <div class="col-12">
+                        <label class="form-check"><input class="form-check-input" type="checkbox" name="external_attestation" value="1" {{'checked' if policy.external_attestation}}><span class="form-check-label">Persönliche Selbstauskunft „Extern genehmigt“ anbieten</span></label>
+                        <div class="form-text">Keine technische Prüfung und keine doppelte interne Genehmigung; die Angabe stammt ausschließlich von der betreffenden Person.</div>
+                      </div>
+                      <div class="col-12">
+                        <div class="fw-semibold small mb-2">Interner Genehmigungsweg (nur bei aktiviertem Verfahren)</div>
+                        <p class="small text-secondary">Ohne eigene Auswahl entscheidet normalerweise die Hauptzuordnung; bei Leitungen und Stellvertretungen die übergeordnete Stelle.</p>
+                        {% for n in approval_options %}
                         <label class="form-check">
-                            <input type="checkbox"
-                                   class="form-check-input"
-                                   name="approval_units"
-                                   value="{{ n.id }}"
-                                   {{'checked' if n.id in approval_selected}}>
-                            <span class="form-check-label">{{ n.name }}</span>
+                          <input type="checkbox" class="form-check-input" name="approval_units" value="{{n.id}}" {{'checked' if n.id in approval_selected}}>
+                          <span class="form-check-label">{{n.name}}</span>
                         </label>
-                    {% endfor %}
-                    <label class="form-check">
-                        <input type="checkbox"
-                               class="form-check-input"
-                               name="sync_absence"
-                               value="1"
-                               {{'checked' if policy.sync_absence}}>
-                        <span class="form-check-label">Verbindlichen Urlaub in Abwesenheiten übernehmen</span>
-                    </label>
-                    <p class="small">Die Übernahme erteilt keine Vertretungsrechte. Tageshälften bleiben ausdrücklich gekennzeichnet.</p>
-                    <button class="btn btn-primary" name="action" value="save">Regeln speichern</button>
-                    <button class="btn btn-outline-secondary"
-                            name="action"
-                            value="inherit">Vorgabe des übergeordneten Bereichs übernehmen</button>
+                        {% endfor %}
+                      </div>
+                      <div class="col-12">
+                        <label class="form-check"><input type="checkbox" class="form-check-input" name="sync_absence" value="1" {{'checked' if policy.sync_absence}}><span class="form-check-label">Verbindlichen Urlaub zusätzlich in die bestehenden Abwesenheiten übernehmen</span></label>
+                        <div class="form-text">Verknüpfte Abwesenheiten werden nicht verdoppelt; vorhandene manuelle Abwesenheiten und Vertretungsrechte bleiben unberührt.</div>
+                      </div>
+                    {% elif config_topic=='besetzung' %}
+                      <div class="col-md-6">
+                        <label class="form-label" for="leave-minimum">Mindestbesetzung (Personen)</label>
+                        <input id="leave-minimum" type="number" min="0" max="10000" name="minimum" class="form-control" required value="{{policy.minimum or 0}}">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="leave-conflict-mode">Bei Unterschreitung</label>
+                        <select id="leave-conflict-mode" name="conflict_mode" class="form-select">
+                          <option value="warning" {{'selected' if policy.conflict_mode=='warning'}}>Warnung mit begründeter Ausnahme</option>
+                          <option value="block" {{'selected' if policy.conflict_mode=='block'}}>Verbindliche Sperre</option>
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-check"><input type="checkbox" class="form-check-input" name="notify_only_warnings" value="1" {{'checked' if policy.notify_only_warnings}}><span class="form-check-label">Warnungen ohne zusätzliche Ausnahmeentscheidung zulassen und Leitungen informieren</span></label>
+                        <div class="form-text">Verbindliche Sperren bleiben bestehen. Die endgültige Prüfung erfolgt immer serverseitig.</div>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-check"><input type="checkbox" class="form-check-input" name="advanced" value="1" {{'checked' if policy.advanced}}><span class="form-check-label">Erweiterte Kapazitätsprüfung verwenden</span></label>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="leave-capacity">Mindestkapazität je Tageshälfte</label>
+                        <input id="leave-capacity" class="form-control" type="number" step="0.01" min="0" max="10000" name="minimum_capacity" value="{{(policy.minimum_capacity or 0)/100}}">
+                      </div>
+                    {% elif config_topic=='feiertage' %}
+                      <div class="col-12">
+                        <label class="form-label" for="leave-holidays">Arbeitsfreier Feiertagskalender</label>
+                        <select id="leave-holidays" class="form-select" name="holiday_state">
+                          <option value="inherit" {{'selected' if not local_policy or local_policy.holiday_state=='inherit'}}>Vorgabe der übergeordneten Einheit / des Portals</option>
+                          <option value="none" {{'selected' if local_policy and local_policy.holiday_state=='none'}}>Keine automatischen Feiertage</option>
+                          {% for code,label in holiday_states.items() %}
+                            <option value="{{code}}" {{'selected' if local_policy and local_policy.holiday_state==code}}>{{label}}</option>
+                          {% endfor %}
+                        </select>
+                        <div class="form-text">Gesetzliche Feiertage gelten als arbeitsfrei. Sonderdienste und abweichende Arbeitstage werden in „Arbeitsmodelle“ gepflegt; Ressourcenpreise bleiben unabhängig.</div>
+                      </div>
+                    {% elif config_topic=='urlaubskonten' %}
+                      <div class="col-12">
+                        <label class="form-check"><input type="checkbox" class="form-check-input" name="internal_account" value="1" {{'checked' if policy.internal_account}}><span class="form-check-label">Internes Urlaubskonto führen</span></label>
+                        <div class="form-text">Nur einschalten, wenn Takt selbst für Anspruch und Resttage zuständig ist. Bei externer ZE-Software keine vermeintlich synchronisierten Kontostände anzeigen.</div>
+                      </div>
+                    {% endif %}
+                    <div class="col-12 d-flex flex-wrap align-items-center gap-2">
+                      <button class="btn btn-primary" type="submit" name="action" value="save">Einstellungen dieses Bereichs speichern</button>
+                      {% if config_topic=='verfahren' %}
+                        <button class="btn btn-outline-danger" type="submit" name="action" value="inherit"
+                          data-confirm="Alle lokal hinterlegten Urlaubsregeln dieser Organisationseinheit zurücksetzen? Dies betrifft auch Besetzung, Feiertage und Konten. Danach gelten wieder die übergeordneten Vorgaben."
+                          data-confirm-button="Alle lokalen Regeln zurücksetzen">Alle lokalen Bereichsregeln zurücksetzen</button>
+                      {% endif %}
+                    </div>
                 </form>
             </details>
         {% endif %}
