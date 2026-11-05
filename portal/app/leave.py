@@ -286,6 +286,9 @@ def command(db, actor, request_id, action, version, reason=""):
             raise HTTPException(403)
         row.cancel_requested = False
     elif action in ("approve", "reject"):
+        # A leader is also an employee: no one decides their own leave.
+        if actor.id == row.person_id:
+            raise HTTPException(403, "Eigener Urlaub darf nicht selbst genehmigt werden.")
         if (
             not org.allows(db, actor, decision_unit, "approve")
             or row.status != "requested"
@@ -302,7 +305,19 @@ def command(db, actor, request_id, action, version, reason=""):
             raise HTTPException(422, "Dieser Ablauf benötigt keinen internen Antrag.")
         row.status = "requested"
         row.requested_workflow = cfg.workflow
-        path = json.loads(cfg.approval_units or "[]") or [unit]
+        path = json.loads(cfg.approval_units or "[]")
+        if not path:
+            # Leaders and deputies normally submit their own requests upwards;
+            # others use their primary unit's configured approvers.
+            person = db.get(User, row.person_id)
+            leading = any(
+                g.role in ("lead", "deputy")
+                and g.org_id in org.active_path(db, unit)
+                and (g.org_id == unit or g.include_children)
+                for g in org.grants(db, person)
+            )
+            ancestry = org.active_path(db, unit)
+            path = [ancestry[1]] if leading and len(ancestry) > 1 else [unit]
         if any(node not in org.active_path(db, unit) for node in path):
             raise HTTPException(
                 422,
