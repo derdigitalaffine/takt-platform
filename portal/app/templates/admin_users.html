@@ -128,7 +128,7 @@
       {% if manageable_users[u.id] %}
       <form method="post" action="/admin/users/{{ u.id }}" class="d-inline-flex gap-1">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#edit-{{ u.id }}" title="Bearbeiten" aria-label="Bearbeiten"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#edit-{{ u.id }}" title="Bearbeiten" aria-label="Bearbeiten"><i class="fa-solid fa-pen"></i></button><button type="button" class="btn btn-sm btn-outline-primary" data-org-person-editor data-person="{{u.id}}" data-origin="users" title="Organisation und Bereichsrollen bearbeiten" aria-label="Organisation und Bereichsrollen von {{u.name}} bearbeiten"><i class="fa-solid fa-sitemap" aria-hidden="true"></i></button>
         {% if user.is_admin %}<a class="btn btn-sm btn-outline-secondary" href="/profile/identity?user_id={{ u.id }}" title="OIDC-Kontoverknüpfung" aria-label="OIDC-Kontoverknüpfung für {{u.name}}"><i class="fa-solid fa-link" aria-hidden="true"></i></a>{% endif %}
         {% if u.id != user.id %}
         <button class="btn btn-sm btn-outline-secondary" name="action" value="invite" data-bs-toggle="tooltip" title="{{ 'Einladung erneut senden' if not u.password_set else 'Passwort-Link senden' }}" aria-label="Link senden"><i class="fa-solid fa-paper-plane"></i></button>
