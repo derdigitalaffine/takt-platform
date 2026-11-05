@@ -451,3 +451,157 @@ def test_leadership_cannot_decide_own_internal_cancellation(db, task_people, uni
         db.query(LeaveRequest).filter_by(person_id=person.id).delete()
         db.query(LeavePolicy).filter_by(org_id=area.id).delete()
         db.commit()
+
+
+def test_settings_tab_ignores_hidden_fields_and_preserves_other_settings(
+    db, task_people, units,
+):
+    """Changing staffing rules must never silently change external procedures."""
+    _, area, _, _ = units
+    policy = LeavePolicy(
+        org_id=area.id, workflow="external",
+        external_attestation=True,
+        external_url="https://zeit.example.org",
+        minimum=3, conflict_mode="warning",
+        holiday_state="BE", internal_account=False,
+    )
+    db.add(policy)
+    db.commit()
+    try:
+        admin = login("admin@example.org", "admin-passwort-123")
+        result = admin.post(
+            f"/urlaub/regeln/{area.id}",
+            data={
+                "csrf": csrf_of(admin.get("/").text),
+                "policy_version": f"{area.id}:{policy.version}",
+                "topic": "besetzung", "action": "save",
+                "minimum": "2", "conflict_mode": "block",
+                "minimum_capacity": "0",
+                # Forged sibling value must be ignored server-side.
+                "workflow": "planning",
+                "external_url": "https://other.example.org",
+            },
+            follow_redirects=False,
+        )
+        assert result.status_code == 303, result.text
+        db.refresh(policy)
+        assert policy.minimum == 2 and policy.conflict_mode == "block"
+        assert policy.workflow == "external"
+        assert policy.external_attestation is True
+        assert policy.external_url == "https://zeit.example.org"
+        assert policy.holiday_state == "BE"
+    finally:
+        db.rollback()
+        db.query(LeavePolicy).filter_by(org_id=area.id).delete()
+        db.commit()
+
+
+def test_first_scoped_settings_save_preserves_inherited_workflow(
+    db, task_people, units,
+):
+    """A child unit editing holidays must not reset its parent's staffing rules."""
+    root, area, _, _ = units
+    parent = LeavePolicy(
+        org_id=root.id, workflow="internal", minimum=4,
+        conflict_mode="block", external_attestation=False,
+        approval_units=json.dumps([root.id]),
+    )
+    db.add(parent)
+    db.commit()
+    try:
+        assert db.get(LeavePolicy, area.id) is None
+        admin = login("admin@example.org", "admin-passwort-123")
+        result = admin.post(
+            f"/urlaub/regeln/{area.id}",
+            data={
+                "csrf": csrf_of(admin.get("/").text),
+                "policy_version": f"{root.id}:{parent.version}",
+                "topic": "feiertage", "action": "save",
+                "holiday_state": "BE",
+                # A cross-tab injection must not change the workflow.
+                "workflow": "external",
+            },
+            follow_redirects=False,
+        )
+        assert result.status_code == 303, result.text
+        local = db.get(LeavePolicy, area.id)
+        assert local is not None
+        assert local.holiday_state == "BE"
+        assert local.workflow == "internal"
+        assert local.minimum == 4 and local.conflict_mode == "block"
+        assert json.loads(local.approval_units) == [root.id]
+        assert local.external_attestation is False
+        page = admin.get(f"/urlaub/verwaltung/feiertage?unit={area.id}")
+        assert page.status_code == 200
+        assert 'name="holiday_state"' in page.text
+        assert 'name="workflow"' not in page.text
+    finally:
+        db.rollback()
+        db.query(LeavePolicy).filter(
+            LeavePolicy.org_id.in_([root.id, area.id])
+        ).delete(synchronize_session=False)
+        db.commit()
+
+
+def test_parent_only_approver_sees_assigned_request_not_unrelated_leave(
+    db, task_people, units,
+):
+    """An explicit parent approval is visible even without subtree role grants."""
+    root, area, _, _ = units
+    employee, reviewer, outsider = task_people[:3]
+    assigned(db, employee, area)
+    grant(db, root, reviewer, "approver", False)
+    grant(db, root, outsider, "viewer", True)
+    db.add(LeavePolicy(
+        org_id=area.id, workflow="internal",
+        approval_units=json.dumps([root.id]),
+    ))
+    db.commit()
+    try:
+        request = leave.save(db, employee, dict(
+            starts_on="2026-12-17", ends_on="2026-12-18",
+        ))
+        db.commit()
+        leave.command(db, employee, request.id, "request", request.version)
+        db.commit()
+        assert request.status == "requested"
+        assert not __import__("app").organization.allows(
+            db, reviewer, area.id, "approve"
+        )
+        approver = login(reviewer.email, "task-passwort-123")
+        result = approver.get(f"/urlaub/genehmigungen?unit={root.id}")
+        assert result.status_code == 200, result.text[:600]
+        assert f'id="leave-row-{request.id}"' in result.text
+        feed = approver.get(f"/urlaub/data?unit={root.id}")
+        assert feed.status_code == 200
+        assert any(r["id"] == request.id for r in feed.json()["requests"])
+        viewer = login(outsider.email, "task-passwort-123")
+        assert viewer.get(f"/urlaub/data?unit={root.id}").json()["requests"] == []
+    finally:
+        db.rollback()
+        db.query(LeaveRequest).filter_by(person_id=employee.id).delete()
+        db.query(LeavePolicy).filter_by(org_id=area.id).delete()
+        db.commit()
+
+
+def test_own_leave_remains_visible_when_leadership_selects_another_unit(
+    db, task_people, units,
+):
+    _, leadership_unit, _, own_unit = units
+    leader = task_people[0]
+    assigned(db, leader, own_unit)
+    grant(db, leadership_unit, leader, "lead", False)
+    try:
+        request = leave.save(db, leader, dict(
+            starts_on="2026-12-21", ends_on="2026-12-23",
+        ))
+        db.commit()
+        client = login(leader.email, "task-passwort-123")
+        page = client.get(f"/urlaub/mein-urlaub?unit={leadership_unit.id}")
+        assert page.status_code == 200
+        assert f'id="leave-row-{request.id}"' in page.text
+        assert f'href="/urlaub/planer?unit={own_unit.id}"' in page.text
+    finally:
+        db.rollback()
+        db.query(LeaveRequest).filter_by(person_id=leader.id).delete()
+        db.commit()
