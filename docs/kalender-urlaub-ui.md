@@ -1,6 +1,6 @@
 # Kalender und Urlaubsverwaltung: UI-Konzept und FullCalendar-Entscheidung
 
-Stand: 04.11.2026. Ergänzt das [fachliche Konzept](kalender-urlaub-konzept.md). Die bestätigten Regeln bleiben verbindlich. Dieses Dokument beschreibt die vereinbarte UI-Richtung. Personenzeitachse, Kalenderkern, Urlaubsworkflow und CalDAV sind in PR #184 integriert; den konkreten Prüfstand und Betriebsgrenzen nennt [die Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md).
+Konzeptstand: 04.11.2026; Integrationsstand: 05.11.2026. Ergänzt das [fachliche Konzept](kalender-urlaub-konzept.md) und dokumentiert die vereinbarte UI-Richtung. Kalenderkern, Personenzeitachse, Urlaubsworkflow und CalDAV wurden mit [PR #184](https://github.com/derdigitalaffine/takt-platform/pull/184) in `main` integriert. **Dieses Konzept ist keine Behauptung, dass jede hier skizzierte Komfortfunktion bereits ausgeliefert oder auf jedem Endgerät abgenommen wurde.** Verbindlich für den tatsächlichen Stand sind [Implementierung, Prüfungen und Betriebsgrenzen](kalender-urlaub-umsetzungsstand.md).
 
 ## 1. Verbindliche Technologieentscheidung
 
@@ -51,6 +51,8 @@ Die Hauptansicht zeigt standardmäßig den Fachbereich der Hauptzuordnung mit et
 Links bleibt die Namensspalte fixiert, oben die Datumsachse. Organisationseinheiten lassen sich gruppieren und einklappen. Personen mit mehreren Zuordnungen werden innerhalb desselben betrachteten Bereichs nicht doppelt gezählt; zusätzliche Einsätze werden kenntlich gemacht. Eine fachliche Bereichsansicht kann mehrere Einsatzzeilen zeigen, ohne diese als verschiedene Personen zu behandeln.
 
 Monat ist die Bearbeitungsansicht. Quartal und Jahr dienen vor allem der Übersicht; eine Auswahl kann zur präzisen Bearbeitung in den Monat wechseln. Die Jahresansicht quetscht 365 Tage nicht auf Bildschirmbreite. Fixierte Namen, Zoom und horizontales Scrollen bleiben erhalten. Kopf, Balken, Auswahl und Besetzungszeilen verwenden dieselbe Datumsprojektion.
+
+**Umgesetzt seit #184:** Die sichtbare Zeitspanne und die Zoomstufe werden für jede Organisationseinheit in der laufenden Browser-Sitzung gespeichert. Nach dem Speichern und Neuladen wird der gewählte Ausschnitt beibehalten, solange der neue Urlaub in diesem Ausschnitt liegt. Ein außerhalb liegender neuer Eintrag öffnet den passenden Zeitraum in **derselben Zoomstufe**. Dies betrifft die Browser-Sitzung, nicht eine dauerhaft serverseitig synchronisierte persönliche Ansicht. Mehrfachspeichern und erneutes Laden sind im Chromium-Test abgedeckt.
 
 ### Visuelle Sprache
 
