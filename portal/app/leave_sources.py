@@ -35,7 +35,7 @@ def illness_periods(db, person_ids=None):
             kind="illness", id=f"krank:{report.id}", person_id=report.user_id,
             starts_on=start.isoformat(), ends_on=finish.isoformat(),
             start_half="am", end_half="pm",
-            title="Kindkrank" if report.kind == "child" else "Krank",
+            title="Krank",  # Do not disclose the confidential child-care subtype.
         ))
     return result
 
