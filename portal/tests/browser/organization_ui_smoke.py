@@ -148,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix="takt-org-") as root:
                 expect(drawer.locator("[data-org-person-form]")).to_be_visible()
                 preview = drawer.locator("[data-org-person-preview]")
                 expect(preview).to_contain_text("Noch keine Änderungen")
-                drawer.locator('input[name^="role_"]:not(:checked)').first.check()
+                drawer.locator('details[open] input[name^="role_"]:not(:checked)').first.check()
                 expect(preview).to_contain_text("Rolle")
                 expect(preview).to_contain_text("Organisationseinheiten prüfen")
                 p.set_viewport_size({"width": 390, "height": 844})
