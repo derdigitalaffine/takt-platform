@@ -81,7 +81,15 @@ def serialize(row):
         **interval(row),
         status=row.status,
         version=row.version,
-        effective=json.loads(row.effective_json) if row.effective_json else None,
+        effective=(
+            {
+                key: value
+                for key, value in json.loads(row.effective_json).items()
+                if key in ("starts_on", "ends_on", "start_half", "end_half")
+            }
+            if row.effective_json
+            else None
+        ),
         external_attested=bool(row.attested_at),
         cancel_requested=row.cancel_requested
     )

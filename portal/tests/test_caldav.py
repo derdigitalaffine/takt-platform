@@ -52,6 +52,19 @@ def test_device_scope_etags_and_revocation(db, task_people):
         )
         assert changed.status_code == 204
         assert changed.headers["etag"] != tag
+        from app.calendar_models import CalendarAudit
+
+        history = list(
+            db.scalars(
+                select(CalendarAudit)
+                .where(CalendarAudit.calendar_id == cal.id)
+                .order_by(CalendarAudit.id)
+            )
+        )
+        assert [item.action for item in history] == ["create", "update"]
+        assert all(
+            item.device_id == device.id and item.actor_id == user.id for item in history
+        )
         device.revoked = True
         db.commit()
         assert c.get(url, headers=auth).status_code == 401

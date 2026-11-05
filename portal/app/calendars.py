@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import select, or_, func
 from fastapi import HTTPException
 from .db import User, GroupMember, utcnow
-from .calendar_models import Calendar, CalendarEvent, CalendarGrant
+from .calendar_models import Calendar, CalendarEvent, CalendarGrant, CalendarAudit
 from .org_models import OrgMembership
 from . import organization as org, ics
 
@@ -120,7 +120,22 @@ def event_data(row):
     return data
 
 
-def save_event(db, actor, calendar, data, row=None, *, raw_ical=None):
+def audit(db, actor, calendar, action, event=None, device_id=None):
+    db.add(
+        CalendarAudit(
+            calendar_id=calendar.id,
+            actor_id=actor.id,
+            device_id=device_id,
+            action=action,
+            event_uid=event.uid if event else "",
+            event_title=event.title if event else "",
+            version=event.version if event else calendar.version,
+        )
+    )
+
+
+def save_event(db, actor, calendar, data, row=None, *, raw_ical=None, device_id=None):
+    new = row is None
     if (
         row is None
         and db.scalar(
@@ -217,6 +232,7 @@ def save_event(db, actor, calendar, data, row=None, *, raw_ical=None):
     row.version = (row.version or 0) + 1
     db.add(row)
     db.flush()
+    audit(db, actor, calendar, "create" if new else "update", row, device_id)
     return row
 
 

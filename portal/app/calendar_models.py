@@ -138,3 +138,24 @@ class CalendarSyncState(Base):
     )
     token: Mapped[str] = mapped_column(String(100), unique=True)
     state_json: Mapped[str] = mapped_column(Text)
+
+
+class CalendarAudit(Base):
+    """Write provenance without copying event descriptions or device credentials."""
+
+    __tablename__ = "calendar_audit"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    calendar_id: Mapped[int] = mapped_column(
+        ForeignKey("calendars.id", ondelete="CASCADE"), index=True
+    )
+    event_uid: Mapped[str] = mapped_column(String(100), default="")
+    event_title: Mapped[str] = mapped_column(String(200), default="")
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("calendar_devices.id", ondelete="SET NULL"), nullable=True
+    )
+    action: Mapped[str] = mapped_column(String(20))
+    version: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

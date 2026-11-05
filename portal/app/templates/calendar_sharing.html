@@ -90,4 +90,5 @@
             </form>
         </section>
     {% endfor %}
+<details class="card card-body mt-4"><summary>Letzte Änderungen</summary><p class="small mt-3">Nur für Kalenderverantwortliche. Terminänderungen und Freigaben werden mit Person und Zeitpunkt protokolliert. Zugangsdaten und Beschreibungen werden nicht in dieses Protokoll kopiert.</p><ol class="list-group list-group-numbered">{% for entry in history %}<li class="list-group-item"><strong>{{{'create':'Termin angelegt','update':'Termin geändert','delete':'Termin gelöscht','metadata':'Kalender geändert','share':'Freigabe geändert'}.get(entry.action,entry.action)}}</strong>{% if entry.event_title %} · {{entry.event_title}}{% endif %}<div class="small text-secondary">{{entry.created_at|local}} · {{people[entry.actor_id].name if entry.actor_id in people else 'Ehemaliges Benutzerkonto'}}{% if entry.device_id %} · über Kalendergerät{% endif %}</div></li>{% else %}<li class="list-group-item">Noch keine Änderungen protokolliert.</li>{% endfor %}</ol></details>
 {% endblock %}

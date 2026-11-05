@@ -217,6 +217,7 @@ async def dav(request: Request, path: str = "", db: Session = Depends(get_db)):
         elif request.headers.get("if-none-match") != "*":
             raise HTTPException(428, "If-None-Match: * erforderlich.")
         if method == "DELETE":
+            calendars.audit(db, user, cal, "delete", event, device.id)
             db.delete(event)
             cal.version += 1
             db.commit()
@@ -261,7 +262,9 @@ async def dav(request: Request, path: str = "", db: Session = Depends(get_db)):
         if duplicate and (not event or duplicate.id != event.id):
             raise HTTPException(409, "UID bereits vorhanden.")
         new = event is None
-        event = calendars.save_event(db, user, cal, data, event, raw_ical=body)
+        event = calendars.save_event(
+            db, user, cal, data, event, raw_ical=body, device_id=device.id
+        )
         event.uid = uid
         event.dav_name = name
         device.last_used = utcnow()

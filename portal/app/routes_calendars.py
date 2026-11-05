@@ -156,6 +156,7 @@ async def calendar_event(
     if data.get("action") == "delete":
         if not row or str(row.version) != str(data.get("version")):
             raise HTTPException(409, "Der Termin wurde inzwischen geändert.")
+        calendars.audit(db, user, cal, "delete", row)
         db.delete(row)
         cal.version += 1
         db.commit()

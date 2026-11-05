@@ -7,7 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .main import app, get_db, current_user, check_csrf, render, redirect
 from .db import User, Group, Organization
-from .calendar_models import Calendar, CalendarGrant, CalendarFeed, CalendarEvent
+from .calendar_models import (
+    Calendar,
+    CalendarGrant,
+    CalendarFeed,
+    CalendarEvent,
+    CalendarAudit,
+)
 from . import calendars, leave, organization as org
 from .config import settings
 
@@ -56,6 +62,14 @@ def sharing(
         "calendar_sharing.html",
         user,
         calendar=cal,
+        history=list(
+            db.scalars(
+                select(CalendarAudit)
+                .where(CalendarAudit.calendar_id == cid)
+                .order_by(CalendarAudit.id.desc())
+                .limit(100)
+            )
+        ),
         units=[
             n
             for n in db.scalars(select(Organization).order_by(Organization.name))
@@ -148,6 +162,9 @@ async def grant(
         row.can_write = data.get("write") == "1"
         db.add(row)
     cal.version += 1
+    calendars.audit(
+        db, user, cal, "metadata" if data.get("action") == "metadata" else "share"
+    )
     db.commit()
     return redirect("/kalender/" + str(cid) + "/teilen")
 

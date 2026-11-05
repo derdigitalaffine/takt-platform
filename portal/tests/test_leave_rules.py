@@ -249,6 +249,7 @@ def test_account_charge_stays_stable_after_work_pattern_changes(db, task_people,
         )
         db.commit()
         assert leave_rules.account_balances(db, person.id)[0]["used"] == 1
+        assert "account_charge" not in leave.serialize(row)["effective"]
     finally:
         clean(db, person.id, [unit.id])
 
