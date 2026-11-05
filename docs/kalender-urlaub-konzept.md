@@ -1,6 +1,6 @@
 # Kalender, Organisation und Urlaubsplanung – Interviewstand 04.11.2026
 
-Dieses Dokument hält die Anforderungen aus dem Workshop-Interview fest. Die Umsetzung liegt in PR #182 und PR #184. Dieses Dokument hält die fachlichen Entscheidungen fest; den aktuellen Implementierungs- und Prüfstand dokumentiert [die Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md).
+Dieses Dokument bewahrt die fachlichen Anforderungen aus dem Workshop-Interview vom 04.11.2026. Die Umsetzung aus [PR #182](https://github.com/derdigitalaffine/takt-platform/pull/182) (Organisation) und [PR #184](https://github.com/derdigitalaffine/takt-platform/pull/184) (Kalender/Urlaub) ist seit 05.11.2026 in `main` enthalten. Dies bleibt das **Anforderungs- und Entscheidungsprotokoll**, nicht die Betriebsanleitung: tatsächliche Implementierung, Teststand und Grenzen stehen in der [Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md) sowie im [Admin-Handbuch](ADMIN-HANDBUCH.md#kalender--urlaubsplanung-konfigurieren).
 
 ## Verbindlich vereinbarte Anforderungen
 
@@ -40,12 +40,12 @@ Ein Kalenderbereich mit auswählbaren überlagerten Kalendern, Suche, Tages-/Woc
 
 Konfiguration über einfache Voreinstellungen und bei Bedarf Detailregeln; geerbte Einstellungen und tatsächliche Auswirkungen ausdrücklich anzeigen. Kein unübersichtlicher Schalterwald. Rollen und Personenverwaltung verwenden die gemeinsamen Takt-Komponenten.
 
-## Technische Leitplanken und vorhandene Grundlagen
+## Technische Leitplanken und Ausgangslage vor der Implementierung
 
 - `Organization`/`orgs.py`: bestehender Baum mit festen Typen, bereits in Ressourcen, Krankmelder, Rechtstexten und Anträgen referenziert. Bestehende IDs und Fachzuordnungen erhalten. Gruppen und Organisationszugehörigkeit erfüllen unterschiedliche Zwecke und werden nicht ungefragt gegenseitig synchronisiert.
 - `User.permissions`: globale Einzelrechte; bisher keine allgemein definierbare globale Rollentabelle. Neue Bereichsrollen benötigen einen eigenen, zentral geprüften Geltungsbereich und dürfen nicht zu globalen Rechten werden.
 - `Absence`/`absence.py`: bisher tagesgenau, Vertretungszustimmung kann Abwesenheitsstatus beeinflussen. Für Halbtage und den neuen Ablauf müssen tatsächliche Abwesenheit, Urlaubsentscheidung und Vertretungszustimmung sauber getrennt werden. Halbtagsurlaub darf keine ganztägigen Vertretungsrechte auslösen.
-- Vorhandene ICS-Pfade: Meetings/RSVP, Seminarteilnahmen, Ressourcenbuchungen und Belegungsabos, Terminbuchungsabos, festgelegte Terminumfragen. Aufgaben haben zusätzlich Kalenderdarstellungen; auch deren zeitliche Projektion gehört ins Inventar. `ics.py`, `resources.ics`, `bookings.to_ics` sind heute getrennte Erzeuger. Kein bestehender CalDAV-Server im untersuchten Code.
+- Vor PR #184 vorhandene ICS-Pfade: Meetings/RSVP, Seminarteilnahmen, Ressourcenbuchungen und Belegungsabos, Terminbuchungsabos, festgelegte Terminumfragen. Aufgaben haben zusätzlich Kalenderdarstellungen. `ics.py`, `resources.ics`, `bookings.to_ics` waren getrennte Erzeuger; ein gemeinsamer CalDAV-Server bestand **zu diesem Zeitpunkt** nicht. Der integrierte Stand ist in der [Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md) beschrieben.
 - Fachobjekte bleiben führend. Kalender stellt sie über Adapter dar, statt alle Fachmodelle durch kopierte Termine zu ersetzen. Freie Termine werden im Kalenderkern gespeichert.
 - Neue Tabellen und versionierte Migrationen für Mitgliedschaften, Bereichsrollen, Kalender, Freigaben, Urlaubsplanung, Regeln und Protokollierung. Keine unstrukturierten JSON-Listen für sicherheitskritische Berechtigungen.
 - Serverseitige Prüfungen vor jeder Abfrage/Mutation/Exportausgabe, einschließlich Suchtreffern, Zählern, Discovery, Batch-Reports und Synchronisation. Rollenrechte entziehen wirkt bei folgenden Anfragen; keine globale nutzerübergreifende Rechte-Caches.
@@ -63,7 +63,7 @@ Konfiguration über einfache Voreinstellungen und bei Bedarf Detailregeln; geerb
 5. Genehmigungsvarianten, Novatime-Parallelbetrieb, optionales Urlaubskonto und idempotente Abwesenheitsübernahme.
 6. CalDAV und Clientmatrix, modulweise Schreibfreigaben; kein pauschales Freischalten unfertiger Fachadapter.
 
-Die Reihenfolge ist ein technischer Vorschlag, keine bereits erfolgte Implementierung. Neue Module werden erst angeboten, wenn der jeweilige Ablauf durchgängig funktioniert.
+Diese Reihenfolge war der technische Umsetzungsplan des Interviews. Die in #182 und #184 abgeschlossenen Arbeiten sind inzwischen gemergt; das Kalender-/Urlaubsmodul wird trotzdem zunächst **deaktiviert** ausgeliefert und muss durch die Administration freigeschaltet werden. Client-Matrix und Betriebseinschränkungen bleiben in der [Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md) ausgewiesen.
 
 Pflichttests: Rechte über alle Hierarchieebenen und Gruppen, Haupt-/Zusatzzuordnungen, keine Doppelzählung, Tages-/Halbtags-/Teilzeitfälle, Schließtag mit Notbesetzung, mehrere gleichzeitig verbindlich werdende Anträge, veraltete Daten, Änderungen ohne Lücken/Duplikate, externe Selbstauskunft, datenschutzgerechte Kalenderprojektionen, CalDAV-/ICS-Clientmatrix, Rechteentzug, Serien/DST und vollständige bestehende CI. Browserprüfung mit 30 Personen je Fachbereich, Maus/Tastatur/Touch, Hell/Dunkel und konfiguriertem Branding. Vor Einsatz moderierter Test mit Mitarbeitenden und Leitung.
 
