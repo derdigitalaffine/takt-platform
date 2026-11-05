@@ -214,6 +214,7 @@ def page(
     )
     if section not in LEAVE_SECTIONS:
         raise HTTPException(404)
+    config_topic = topic or "verfahren"
     can_settings = bool(unit and org.allows(db, user, unit, "leave_settings"))
     can_approve = bool(unit and org.allows(db, user, unit, "approve"))
     if section == "verwaltung" and not can_settings:
@@ -268,7 +269,7 @@ def page(
         unit=unit,
         personal_unit=personal_unit,
         active_section=section,
-        config_topic=topic or "verfahren",
+        config_topic=config_topic,
         can_approve=can_approve,
         current_year=date.today().year,
         holiday_states=STATES,
