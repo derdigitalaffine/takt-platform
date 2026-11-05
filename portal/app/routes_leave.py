@@ -96,6 +96,24 @@ def can_see_leave_details(db, actor, person_id):
     return any(org.allows(db, actor, unit, cap) for cap in ("plan", "approve", "absence_manage"))
 
 
+def can_decide_request(db, actor, row):
+    """Only the explicitly assigned decision unit sees a pending request.
+
+    This also covers parent-level approvers whose role is intentionally scoped
+    to the parent (include_children=False), without expanding their general
+    access to every subordinate employee's leave details.
+    """
+    if actor.id == row.person_id:
+        return False
+    return (
+        row.status == "requested"
+        and org.allows(db, actor, leave.decision_unit(row), "approve")
+    ) or (
+        row.cancel_requested
+        and org.allows(db, actor, leave.cancellation_unit(db, row), "approve")
+    )
+
+
 def can_see_illness(db, actor, person_id):
     """Only the person and leadership may see the non-medical 'Krank' label."""
     if actor.id == person_id or actor.is_admin or actor.can("krank_admin"):
@@ -203,6 +221,14 @@ def page(
     if section == "genehmigungen" and not can_approve:
         raise HTTPException(403)
     people = visible_people(db, user, unit) if unit else []
+    try:
+        personal_unit = leave.primary(db, user.id)
+    except HTTPException:
+        personal_unit = None
+    # "Mein Urlaub" is always personal, even when leadership has selected a
+    # different team or department in the shared organization context.
+    if section == "mein-urlaub" and personal_unit and all(p.id != user.id for p in people):
+        people.append(user)
     ids = [p.id for p in people]
     rows = list(
         db.scalars(
@@ -214,7 +240,7 @@ def page(
     rows = [
         r for r in rows
         if can_read_request(db, user, r)
-        and can_see_leave_details(db, user, r.person_id)
+        and (can_see_leave_details(db, user, r.person_id) or can_decide_request(db, user, r))
     ]
     return render(
         request,
@@ -230,6 +256,7 @@ def page(
             json.loads(leave.policy(db, unit).approval_units or "[]") if unit else []
         ),
         unit=unit,
+        personal_unit=personal_unit,
         active_section=section,
         config_topic=topic or "verfahren",
         can_approve=can_approve,
@@ -314,7 +341,14 @@ def page(
         can_settings=can_settings,
         planners={p.id: leave.can_plan(db, user, p.id) for p in people},
         approvers={
-            r.id: org.allows(db, user, leave.decision_unit(r), "approve") for r in rows
+            r.id: r.person_id != user.id and org.allows(
+                db, user, leave.decision_unit(r), "approve"
+            ) for r in rows
+        },
+        cancel_approvers={
+            r.id: r.person_id != user.id and org.allows(
+                db, user, leave.cancellation_unit(db, r), "approve"
+            ) for r in rows
         },
         history_rights={r.id: can_read_history(db, user, r) for r in rows},
     )
@@ -361,7 +395,7 @@ def data(unit: int, user: User = Depends(current_user), db: Session = Depends(ge
     ):
         if not can_read_request(db, user, req):
             continue
-        if can_see_leave_details(db, user, req.person_id):
+        if can_see_leave_details(db, user, req.person_id) or can_decide_request(db, user, req):
             requests.append(leave.serialize(req))
         elif req.effective_json:
             # Colleagues only see availability, not an individual status or reason.
