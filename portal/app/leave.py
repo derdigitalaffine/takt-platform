@@ -129,6 +129,9 @@ def conflicts(db, p, keep=None):
             effective.append(
                 period(a.user_id, dict(starts_on=a.starts_on, ends_on=a.ends_on))
             )
+    from .leave_sources import staffing_periods
+    for record in staffing_periods(db, {uid for uid, _, _ in memberships}):
+        effective.append(period(record["person_id"], record))
     from .leave_rules import work_snapshot, capacity
 
     patterns = work_snapshot(db, p.start, p.end)
