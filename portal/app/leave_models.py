@@ -25,7 +25,7 @@ class LeavePolicy(Base):
     minimum: Mapped[int] = mapped_column(Integer, default=0)
     conflict_mode: Mapped[str] = mapped_column(String(10), default="warning")
     external_url: Mapped[str] = mapped_column(String(1000), default="")
-    external_attestation: Mapped[bool] = mapped_column(Boolean, default=True)
+    external_attestation: Mapped[bool] = mapped_column(Boolean, default=False)
     advanced: Mapped[bool] = mapped_column(Boolean, default=False)
     minimum_capacity: Mapped[int] = mapped_column(Integer, default=0)
     internal_account: Mapped[bool] = mapped_column(Boolean, default=False)
