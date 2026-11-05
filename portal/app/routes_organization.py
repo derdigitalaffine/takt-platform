@@ -31,6 +31,14 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
     rows = [(o, d) for o, d in all_rows if o.id in ancestors]
     if unit is not None and unit not in visible:
         raise HTTPException(403, "Diese Einheit ist nicht freigegeben.")
+    if unit is None and person is None and group is None:
+        import json
+        try:
+            remembered = json.loads(user.nav_json or "{}").get("last_org_unit")
+        except (ValueError, AttributeError):
+            remembered = None
+        if remembered in visible:
+            unit = remembered
     if unit is None and person is not None:
         unit = db.scalar(
             select(OrgMembership.org_id)
