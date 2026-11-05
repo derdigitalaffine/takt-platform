@@ -2,6 +2,24 @@
 
 **Stand: 05.11.2026.** Die Organisationsgrundlage aus [PR #182](https://github.com/derdigitalaffine/takt-platform/pull/182) und Kalender/Urlaub aus [PR #184](https://github.com/derdigitalaffine/takt-platform/pull/184) sind in `main` integriert. Fachliches Tracking: [Issue #183](https://github.com/derdigitalaffine/takt-platform/issues/183). Der Funktionsstand wird hier von noch offenen Geräte-/Betriebsprüfungen abgegrenzt.
 
+## Integrationsänderung in PR #185 (Reviewstand)
+
+Der [PR #185](https://github.com/derdigitalaffine/takt-platform/pull/185) trennt die bisherigen Kalender- und Urlaubseinstiege, ergänzt die fünf Urlaubs-Arbeitsbereiche und die fünf eigenen Verwaltungsunterseiten. Die Personenzeitachse bleibt primär, Detailbearbeitung sowie Konfliktvorschau werden seitlich dargestellt. Organisationsverwaltung und Benutzerliste öffnen denselben Seitenpanel-Editor mit atomarer Zuordnungs- und Mehrfachrollenbearbeitung, individueller Untereinheiten-Geltung und Kennzeichnung gleichberechtigter Leitungen/Stellvertretungen. Explorer/Tabelle und Informationsdichte sind umschaltbar.
+
+**Fachmodule bleiben führend:** bestätigte `Absence`-Datensätze und vorhandene Vertretungsregeln werden nicht neu angelegt; eindeutig zugeordnete Meldungen aus dem Krankmelder und bestätigte Teilnahmen aus dem Seminarmodul werden lesend auf Verfügbarkeit projiziert. Ohne zuständige Rolle werden fremde Gründe lediglich als „Abwesend“ ausgegeben. Der sichtbare Krankstatus ist für zuständige Leitung/Stellvertretung und die betroffene Person zugänglich; medizinische Inhalte werden nicht übertragen. Namen/E-Mail werden nicht verwendet, um fehlende Verknüpfungen zu erraten. Halbtagsscharfe Projektionen und überschaubare Datumsbereiche sind die aktuelle Planungsbasis; ein vollständiges minutengenaues Zeitkonto der externen ZE-Software entsteht hier **nicht**.
+
+Interne Genehmigung bleibt optional; für Leitung und Stellvertretung geht eigener Urlaub standardmäßig zur übergeordneten Einheit, ausdrückliche Genehmigungswege bleiben vorrangig und eine Selbstgenehmigung ist nicht erlaubt. Im externen Modus ist die **persönliche Selbstauskunft pro Einheit abschaltbar**. Schließzeiten können Leitungseinteilung, Selbsteintragung oder beides zulassen. Bestehende Fachrechte bleiben wirksam.
+
+### Zweite Qualitätsrunde (PR #185)
+
+Die [separate Security-/Datenschutz-Review- und Abnahmecheckliste](SECURITY-REVIEW-PR185.md) benennt die geprüften Berechtigungsgrenzen, die kanonischen Abwesenheitsquellen und verbleibende Betriebsprüfungen. Die Einstellung für die freiwillige Selbstauskunft der externen ZE-Software ist für neue Policys **standardmäßig ausgeschaltet**. Die vier Reiter für Urlaubsverfahren, Besetzung, Feiertage und Konten speichern nur ihre eigenen Werte; Eingabefelder anderer Reiter werden **serverseitig ignoriert**. Eine bestehende vollständige Policy kann nur im Verfahren-Reiter mit ausdrücklich benannter Wirkung zurückgesetzt werden.
+
+Für einen Elternbereich mit eingeschränkter Untereinheitenvererbung bleibt eine *ausdrücklich zugewiesene* Genehmigungsentscheidung sichtbar, ohne pauschalen Einblick in sämtliche Untereinheiten. Die eigene Urlaubsansicht ist auch beim Wechsel des gemeinsamen Arbeitskontexts erhalten. Reine Schließzeiten- und Verwaltungsansichten laden keine unnötigen Urlaubsdetail- und Besetzungslisten mehr.
+
+**Wichtige Bestandsgrenze:** Die vorhandene `LeavePolicy` vererbt vollständige Richtliniensätze, nicht einzelne Felder. Der erste lokale Reiter-Edit übernimmt die übrigen zum Speichern wirksamen Elternwerte als einmaligen Snapshot. Spätere Änderungen im Elternbereich werden für diese Felder **nicht** automatisch übernommen. Die Dokumentation grenzt dieses Verhalten ausdrücklich von einer noch nicht existierenden feldweisen Vererbung ab.
+
+**Abnahmegrenze:** Dieser Abschnitt beschreibt die Änderung **im PR-Review**, nicht bereits den freigegebenen Stand in `main`. Vor dem Merge sind vollständige Python-, Chromium- und Sicherheitsprüfungen des endgültigen Head-Commits erforderlich. Die früher dokumentierten grünen 660 Tests beziehen sich weiterhin auf PR #184, nicht automatisch auf #185.
+
 ## Implementiert
 
 - Kalenderkern mit persönlichen/geteilten, internen, öffentlichen und Organisationskalendern; zusätzliche Zielgruppe je Termin. Freigaben für Personen/Gruppen, getrenntes Publikationsrecht, identische Live-Prüfungen in Web, Export und CalDAV.

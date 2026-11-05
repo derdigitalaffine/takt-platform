@@ -59,7 +59,7 @@ Monat ist die Bearbeitungsansicht. Quartal und Jahr dienen vor allem der Übersi
 - Geplant: ruhiger umrandeter Balken, Beschriftung „Geplant“.
 - Beantragt: gestrichelter Balken, Beschriftung „Beantragt“.
 - Verbindlich: gefüllter Balken mit Symbol und Text. Die tatsächliche Herkunft bleibt im Detail sichtbar.
-- Extern genehmigt: zusätzlich ausdrücklich „Selbstauskunft“, nicht als verifizierte Novatime-Antwort darstellen.
+- Extern genehmigt: zusätzlich ausdrücklich „Selbstauskunft“, nicht als verifizierte Antwort der externen ZE-Software darstellen.
 - Änderung offen: bisherige wirksame Zeit bleibt sichtbar; neuer Vorschlag erscheint als zugehöriger Entwurf.
 - Andere wirksame Abwesenheit: neutral beschriftet, sensible Gründe werden nicht ausgeliefert.
 - Schließtage: eigener Hintergrund mit Bezeichnung. Notbesetzung wird getrennt kenntlich gemacht.
@@ -88,11 +88,11 @@ Bei Konflikten öffnet sich eine kompakte Liste mit Zeitpunkt, betroffenem Berei
 
 Ein Konfliktbanner fasst den gewählten Zeitraum zusammen. Es werden nicht gleichzeitig Toast, Dialog und Warnbox für denselben Sachverhalt angezeigt. Hinweise bleiben am betroffenen Zeitraum verlinkt.
 
-## 6. Komfortabler Novatime-Parallelbetrieb
+## 6. Parallelbetrieb mit externer ZE-Software
 
 In der Instanz mit externer Kontenverwaltung erscheinen weder erfundener Resturlaub noch ein leeres Kontowidget. „Mein Urlaub“ zeigt pro Zeitraum die tatsächlich nötigen Schritte, zum Beispiel „In Takt geplant“, „Extern beantragen“ und „Externe Genehmigung selbst bestätigen“. Reiner Planungsmodus zeigt diese Schritte nicht.
 
-Das Detail bietet kopierbare Datumsangaben und den konfigurierten Novatime-Link. Es behauptet keine technische Übertragung. Die eigene Bestätigung enthält den Hinweis „Selbstauskunft“ und gilt nur für die angezeigte Fassung des Zeitraums. Ein Planer darf diese Auskunft nicht stellvertretend erfinden.
+Das Detail bietet kopierbare Datumsangaben und den konfigurierten Link zur externen ZE-Software. Es behauptet keine technische Übertragung. Die eigene Bestätigung enthält den Hinweis „Selbstauskunft“ und gilt nur für die angezeigte Fassung des Zeitraums. Ein Planer darf diese Auskunft nicht stellvertretend erfinden.
 
 Offene externe Schritte werden im vorhandenen Takt-Eingang gesammelt, optional per E-Mail erinnert. Eine Änderung erhält nachvollziehbar einen neuen Prüfstand; der bisherige verbindliche Zeitraum bleibt bis zum Abschluss wirksam.
 

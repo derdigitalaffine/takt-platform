@@ -318,3 +318,5 @@
     position: static;
   }
 }
+
+.pt-role-tag { display:inline-block; margin-inline-start:.4rem; padding:.05rem .35rem; font-size:.68rem; font-weight:600; color:var(--bs-primary-text-emphasis); background:var(--bs-primary-bg-subtle); border-radius:var(--bs-border-radius-sm); vertical-align:middle; }

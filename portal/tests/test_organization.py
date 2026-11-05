@@ -675,3 +675,110 @@ def test_unified_logo_update_keeps_old_file_on_failure(
         a.logo = ""
         db.commit()
         orgs.discard_logo(old)
+
+
+def test_deputy_is_equal_to_leader_without_global_user_rights(db, task_people, units):
+    root, area, team, other = units
+    person, deputy = task_people[:2]
+    grant(db, area, deputy, "deputy", True)
+    assert os.allows(db, deputy, team.id, "plan")
+    assert os.allows(db, deputy, team.id, "approve")
+    assert os.allows(db, deputy, team.id, "view")
+    assert not os.allows(db, deputy, team.id, "roles")
+    assert not os.allows(db, deputy, other.id, "approve")
+    assert not deputy.can("users")
+
+
+def test_multi_role_bulk_scope_and_atomic_validation(db, task_people, units):
+    _, area, team, _ = units
+    person, second = task_people[:2]
+    admin = login(*ADMIN)
+    response = post(
+        admin, db, "role_many", org_id=area.id,
+        targets=[f"user:{person.id}", f"user:{second.id}"],
+        roles=["lead", "deputy"],
+        children_lead="1",
+    )
+    assert response.status_code == 303
+    for recipient in (person, second):
+        direct = list(db.scalars(
+            select(OrgRoleGrant).where(
+                OrgRoleGrant.user_id == recipient.id,
+                OrgRoleGrant.org_id == area.id,
+            )
+        ))
+        assert {r.role for r in direct} == {"lead", "deputy"}
+        assert {r.role: r.include_children for r in direct} == {
+            "lead": True, "deputy": False
+        }
+        assert os.allows(db, recipient, team.id, "approve")
+    before = db.scalar(select(OrgRoleGrant).where(
+        OrgRoleGrant.user_id == person.id, OrgRoleGrant.role == "lead"
+    )).id
+    bad = post(
+        admin, db, "role_many", org_id=area.id,
+        targets=[f"user:{person.id}", "user:99999999"],
+        roles=["planner"], children_planner="1",
+    )
+    assert bad.status_code == 422
+    assert db.get(OrgRoleGrant, before)
+    assert not db.scalar(select(OrgRoleGrant).where(
+        OrgRoleGrant.user_id == person.id, OrgRoleGrant.role == "planner",
+        OrgRoleGrant.org_id == area.id,
+    ))
+
+
+def test_shared_person_panel_edits_memberships_and_multiple_roles(
+    db, task_people, units,
+):
+    _, area, team, _ = units
+    person = task_people[0]
+    admin = login(*ADMIN)
+    url = f"/admin/organization/person/{person.id}"
+    panel = admin.get(url + "?origin=users&unit=" + str(area.id))
+    assert panel.status_code == 200
+    assert "Organisationszuordnungen und Bereichsrollen" in panel.text
+    version = db.get(OrgState, 1)
+    db.refresh(version)
+    posted = admin.post(
+        url,
+        data={
+            "csrf": csrf_of(admin.get("/").text),
+            "version": str(version.version),
+            "origin": "users",
+            f"member_{area.id}": "1",
+            "primary_unit": str(area.id),
+            f"staff_{area.id}": "yes",
+            f"capacity_{area.id}": "75",
+            f"role_{area.id}": ["lead", "planner"],
+            f"child_{area.id}_lead": "1",
+        },
+        follow_redirects=False,
+    )
+    assert posted.status_code == 303
+    assert posted.headers["location"] == "/admin/users"
+    row = db.scalar(select(OrgMembership).where(
+        OrgMembership.user_id == person.id, OrgMembership.org_id == area.id
+    ))
+    assert row.is_primary and row.counts_staff and row.capacity_percent == 75
+    roles = list(db.scalars(select(OrgRoleGrant).where(
+        OrgRoleGrant.user_id == person.id, OrgRoleGrant.org_id == area.id
+    )))
+    assert {role.role for role in roles} == {"lead", "planner"}
+    assert os.allows(db, person, team.id, "approve")
+    db.refresh(version)
+    stale = admin.post(
+        url,
+        data={"csrf": csrf_of(admin.get("/").text),
+              "version": str(version.version - 1)},
+        follow_redirects=False,
+    )
+    assert stale.status_code == 409
+
+
+def test_person_panel_rejects_unauthorized_grants(db, task_people, units):
+    _, area, team, _ = units
+    person, actor = task_people[:2]
+    grant(db, area, actor, "viewer", False)
+    c = client(actor)
+    assert c.get(f"/admin/organization/person/{person.id}").status_code == 403

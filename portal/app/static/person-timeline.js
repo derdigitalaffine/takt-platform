@@ -376,6 +376,8 @@
             nameCell = node("th", "pt-name");
           nameCell.scope = "row";
           nameCell.append(node("strong", "", person.name));
+          if (person.roleTag === "Leitung" || person.roleTag === "Stellvertretung")
+            nameCell.append(node("small", "pt-role-tag", person.roleTag));
           if (person.subtitle)
             nameCell.append(node("small", "", person.subtitle));
           row.append(nameCell);

@@ -15,9 +15,9 @@ Dieses Dokument bewahrt die fachlichen Anforderungen aus dem Workshop-Interview 
 9. Eigene Einträge durch Mitarbeitende, fremde Einträge durch zuständige Leitungen und explizit benannte Bereichsplaner. Planungsrechte sind von Genehmigungen, Konfiguration und externen Selbstauskünften getrennt.
 10. Mitarbeitende sehen im freigegebenen Bereich Namen, Zeiträume und Planungsstand. Kommentare, Begründungen und sensible Abwesenheitsgründe sind gesondert geschützt. Dies gilt in Weboberfläche, JSON, CalDAV und ICS gleichermaßen.
 11. Urlaub in ganzen und halben Tagen; Vormittag/Nachmittag passend zum Arbeitsmodell. Keine beliebigen Urlaubsstunden für die erste Fassung.
-12. Für die konkrete Instanz führt Novatime Arbeitszeit- und Urlaubskonten sowie die dortige Genehmigung. Keine Schnittstelle geplant. Takt darf keine Resturlaubsanzeige erfinden und keinen Novatime-Status als verifiziert behaupten.
+12. Für die konkrete Instanz führt eine externe ZE-Software Arbeitszeit- und Urlaubskonten sowie die dortige Genehmigung. Keine Schnittstelle geplant. Takt darf keine Resturlaubsanzeige erfinden und keinen Status aus der externen ZE-Software als verifiziert behaupten.
 13. Allgemeine Einstellung zur externen Kontenverwaltung. Optional internes Urlaubskonto mit Anspruch, Übertrag und Resturlaub für andere Installationen. Kontenverwaltung, Planungsgenauigkeit und Genehmigungsweg sind voneinander unabhängige Einstellungen mit verständlichen Voreinstellungen.
-14. Parallelbetrieb: konfigurierbarer Link zu Novatime, kopierbare Angaben, Aufgaben/Erinnerungen für noch extern zu erledigende Schritte. Mitarbeitende bestätigen externe Genehmigung selbst; sichtbar als „Extern genehmigt – Selbstauskunft“, mit Person und Zeitpunkt protokolliert. Geänderter Zeitraum erfordert neue Auskunft.
+14. Parallelbetrieb: konfigurierbarer Link zur externen ZE-Software, kopierbare Angaben, Aufgaben/Erinnerungen für noch extern zu erledigende Schritte. Mitarbeitende bestätigen externe Genehmigung selbst; sichtbar als „Extern genehmigt – Selbstauskunft“, mit Person und Zeitpunkt protokolliert. Geänderter Zeitraum erfordert neue Auskunft.
 15. Einzelne oder mehrtägige Schließzeiten mit Urlaubspflicht sind eigene Regelobjekte, keine Feiertage. Betroffene Organisationseinheiten/Unterbereiche und Ausnahmen auswählen. Automatische Vormerkung je Person als noch erforderliche Planung, ohne bereits genehmigten Urlaub doppelt zu erzeugen. Im reinen Planungsmodus keine künstliche Antragspflicht.
 16. Notbesetzung ausnehmen. Je Bereich Einteilung durch Leitung oder direkte Selbsteintragung. Erforderliche Besetzung und Konflikte sichtbar; abweichende Regeln für Schließzeiten ausdrücklich festlegen.
 17. Abwesenheiten: automatische Übernahme je Bereich zuschaltbar; nach interner Genehmigung, externer Selbstauskunft oder im reinen Planungsmodus nach „verbindlich“. Ein Urlaubseintrag allein gewährt keine Vertretungsrechte.
@@ -60,7 +60,7 @@ Konfiguration über einfache Voreinstellungen und bei Bedarf Detailregeln; geerb
 2. Kalenderkern und Rechte, Jahrestermine und freie Kalender, gemeinsame UI-Komponenten.
 3. Migration vorhandener Kalenderadapter und bestehender Links, sichere ICS-Abos.
 4. Besetzungs-/Arbeitsmodelle, Schließtage und Notbesetzung; einfache Planung zuerst durchgängig nutzbar machen.
-5. Genehmigungsvarianten, Novatime-Parallelbetrieb, optionales Urlaubskonto und idempotente Abwesenheitsübernahme.
+5. Genehmigungsvarianten, Parallelbetrieb mit externer ZE-Software, optionales Urlaubskonto und idempotente Abwesenheitsübernahme.
 6. CalDAV und Clientmatrix, modulweise Schreibfreigaben; kein pauschales Freischalten unfertiger Fachadapter.
 
 Diese Reihenfolge war der technische Umsetzungsplan des Interviews. Die in #182 und #184 abgeschlossenen Arbeiten sind inzwischen gemergt; das Kalender-/Urlaubsmodul wird trotzdem zunächst **deaktiviert** ausgeliefert und muss durch die Administration freigeschaltet werden. Client-Matrix und Betriebseinschränkungen bleiben in der [Abnahmeübersicht](kalender-urlaub-umsetzungsstand.md) ausgewiesen.

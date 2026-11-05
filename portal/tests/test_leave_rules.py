@@ -211,7 +211,8 @@ def test_planning_exception_requires_approver_and_preserves_external_attestation
     grant(db, unit, approver, "approver", False)
     db.add(
         LeavePolicy(
-            org_id=unit.id, workflow="external", minimum=1, conflict_mode="warning"
+            org_id=unit.id, workflow="external", external_attestation=True,
+            minimum=1, conflict_mode="warning"
         )
     )
     db.commit()

@@ -178,12 +178,12 @@ ITEMS: list[Item] = [
 ITEMS.append(Item("oidc", "admin", "/admin/oidc", "fa-key", "Nextcloud / OIDC-Anmeldung", lambda c: c.admin, _pre("/admin/oidc")))
 ITEMS.append(Item("seminars", "schedule", "/seminare", "fa-chalkboard-user", "Seminare & Lehrgänge", lambda c: "seminars" in c.modules, _pre("/seminare")))
 ITEMS.append(Item("circulation_reports", "work", "/umlaeufe/auswertung", "fa-chart-column", "Meine Umläufe & Rückmeldungen", lambda c: "circulations" in c.modules, _pre("/umlaeufe/auswertung")))
-ITEMS.append(Item("calendars", "schedule", "/kalender", "fa-calendar-days", "Kalender & Urlaub", lambda c: "calendars" in c.modules, _pre("/kalender")))
-ITEMS.append(Item("leave", "schedule", "/urlaub", "fa-umbrella-beach", "Urlaubsplanung", lambda c: "calendars" in c.modules, _pre("/urlaub")))
+ITEMS.append(Item("calendars", "schedule", "/kalender", "fa-calendar-days", "Kalender", lambda c: "calendars" in c.modules, _pre("/kalender")))
+ITEMS.append(Item("leave", "schedule", "/urlaub", "fa-umbrella-beach", "Urlaub", lambda c: "calendars" in c.modules, _pre("/urlaub")))
 BY_ID = {it.id: it for it in ITEMS}
 # Stable entry IDs preserve bookmarks and personal favorites.
 FAMILIES = [
-    ("calendars", "leave"),
+    ("calendars",), ("leave",),
     ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
     ("surveys", "polls", "votes"), ("shortlinks",),
     ("meetings", "meeting_plan"), ("seminars",),
@@ -207,7 +207,8 @@ DESCRIPTIONS = {
     "circulations": ("Teilen Sie Informationen und verfolgen Sie Rückmeldungen und Kenntnisnahmen.", "Aushänge lesen · Rückmeldungen geben", "Umlauf Sammelmappe Kenntnisnahme"),
     "surveys": ("Sammeln Sie Feedback, stimmen Sie gemeinsam ab oder finden Sie einen passenden Termin.", "Umfragen öffnen · Gemeinsam entscheiden", "Poll Vote Live Feedback Terminumfrage"),
     "shortlinks": ("Machen Sie lange Links leichter teilbar und erstellen Sie passende QR-Codes.", "Links verwalten · QR-Codes erstellen", "Link verkürzen QR"),
-    "calendars": ("Sehen Sie freigegebene Kalender und planen Sie Urlaub im eigenen Bereich. Verbinden Sie Kalendergeräte über eigene widerrufbare Zugänge.", "Kalender öffnen · Urlaub planen · Gerät verbinden", "Jahreskalender CalDAV Urlaub Besetzung"),
+    "calendars": ("Sehen Sie persönliche, freigegebene und organisatorische Kalender. Geräte verbinden Sie mit eigenen widerrufbaren Zugängen.", "Kalender öffnen · Gerät verbinden", "Jahreskalender CalDAV Termine"),
+    "leave": ("Planen Sie eigenen Urlaub, sehen Sie die Personenzeitachse und bearbeiten Sie berechtigte Genehmigungen oder Schließzeiten.", "Urlaubsplaner öffnen · Mein Urlaub · Genehmigungen", "Urlaub Abwesenheit Besetzung"),
     "meetings": ("Planen und nutzen Sie Online-Besprechungen. Verfügbare Aufnahmen und Transkripte finden Sie beim jeweiligen Meeting.", "Besprechungen öffnen · Meetings planen", "Video Konferenz Transkript Aufnahme"),
     "seminars": ("Finden Sie Veranstaltungen und verwalten Sie Ihre Teilnahmen. Zugewiesene Planer und Dozenten finden hier ihre Planung und Durchführung.", "Angebot ansehen · Teilnahmen öffnen", "Seminar Lehrgang Reihe Veranstaltung Dozent"),
     "resources": ("Finden Sie Räume, Plätze und Geräte. Prüfen Sie die Belegung und bearbeiten Sie freigegebene Buchungen.", "Ressourcen ansehen · Belegung prüfen", "Raumbuchung Ressourcen Belegungsplan Geräte"),
@@ -270,10 +271,21 @@ def prefs(user) -> dict:
     return {"fav": list(dict.fromkeys(fav)), "hidden": hidden, "closed": [g for g in data.get("closed", [g for g in GROUPS if g != "work"]) if g in GROUPS]}
 
 
-def dump(fav: list[str], hidden: list[str], closed=None) -> str:
+def dump(fav: list[str], hidden: list[str], closed=None, user=None) -> str:
     fav = list(dict.fromkeys(i for i in fav if i in BY_ID))[:MAX_FAVORITES]
     data = {"fav": fav, "hidden": [g for g in dict.fromkeys(hidden) if g in GROUPS]}
     if closed is not None: data["closed"] = list(dict.fromkeys(g for g in closed if g in GROUPS))
+    # Preserve independent display/context preferences when the existing
+    # favorites or menu-settings endpoint updates nav_json.
+    if user is not None:
+        try:
+            current = json.loads(user.nav_json or "{}")
+        except ValueError:
+            current = {}
+        if isinstance(current, dict):
+            for key in ("ui_density", "org_view", "last_org_unit"):
+                if key in current:
+                    data[key] = current[key]
     return json.dumps(data)
 
 

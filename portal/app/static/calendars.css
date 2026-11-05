@@ -51,3 +51,12 @@
     --fc-multimonth-min-width: 240px;
   }
 }
+
+/* Calendar-only surface enhancements; no extra calendar engine. */
+.calendar-workspace > aside .card { border-radius:var(--bs-border-radius-lg); border-color:var(--bs-border-color); }
+.calendar-workspace > aside .form-check { padding-top:.35rem; padding-bottom:.35rem; }
+.calendar-workspace > section { min-width:0; }
+.calendar-workspace .fc { border-radius:var(--bs-border-radius); }
+[data-density="compact"] .calendar-workspace .card-body { padding:.85rem; }
+[data-density="compact"] .calendar-workspace .form-check { padding-top:.12rem; padding-bottom:.12rem; }
+[data-density="compact"] .fc .fc-button { min-height:2.15rem; padding:.2rem .5rem; }

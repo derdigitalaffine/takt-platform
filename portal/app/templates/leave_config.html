@@ -3,6 +3,7 @@
     <input type="hidden" name="unit" value="{{ unit }}">
     <input type="hidden" name="action" value="{{ action }}">
 {% endmacro %}
+{% if active_section == 'mein-urlaub' %}
 {% if notices %}
     <details class="card card-body mb-4">
         <summary>Mein Eingang · {{ notices|length }} neue Hinweise</summary>
@@ -25,6 +26,8 @@
         {% endfor %}
     </section>
 {% endif %}
+{% endif %}
+{% if active_section == 'schliesszeiten' %}
 {% for closed in closures %}
     <section class="card card-body mb-3" id="closure-{{ closed.id }}">
         <h2 class="h6">Schließzeit: {{ closed.title }}</h2>
@@ -50,7 +53,7 @@
 {% if user.id in emergency.get(closed.id,[]) %}
     <p class="fw-semibold">Sie sind zur Notbesetzung eingeteilt.</p>
 {% endif %}
-{% if closed.enrollment=="self" or closure_managers[closed.id] %}
+{% if closed.enrollment in ('self','both') or closure_enrollers[closed.id] %}
     <form method="post"
           action="/urlaub/konfiguration"
           class="d-flex flex-wrap gap-2">
@@ -110,7 +113,7 @@
                 <label>
                     Einteilung<select class="form-select" name="enrollment">
                     <option value="lead" {{'selected' if closed.enrollment=='lead'}}>Durch Leitung</option>
-                    <option value="self" {{'selected' if closed.enrollment=='self'}}>Selbsteintragung</option>
+                    <option value="self" {{'selected' if closed.enrollment=='self'}}>Selbsteintragung</option><option value="both" {{'selected' if closed.enrollment=='both'}}>Leitung und freiwillige Meldung</option>
                     </select>
                 </label>
             </div>
@@ -124,3 +127,4 @@
 {% endif %}
 </section>
 {% endfor %}
+{% endif %}

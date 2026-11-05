@@ -63,8 +63,8 @@ async def configure(
         if not closed:
             raise HTTPException(404)
         uid = number(data.get("person_id") or user.id)
-        is_manager = org.allows(db, user, closed.org_id, "leave_settings")
-        if not is_manager and not (closed.enrollment == "self" and uid == user.id):
+        is_manager = (org.allows(db, user, closed.org_id, "leave_settings") or org.allows(db, user, closed.org_id, "plan"))
+        if not is_manager and not (closed.enrollment in ("self", "both") and uid == user.id):
             raise HTTPException(403)
         if closed.org_id not in org.active_path(db, leave.primary(db, uid)):
             raise HTTPException(403)
@@ -130,7 +130,7 @@ async def configure(
                 not title
                 or len(title) > 200
                 or not 0 <= minimum <= 10000
-                or enrollment not in ("lead", "self")
+                or enrollment not in ("lead", "self", "both")
             ):
                 raise HTTPException(422)
             from .db import Absence
@@ -193,7 +193,7 @@ async def configure(
                 not title
                 or len(title) > 200
                 or not 0 <= minimum <= 10000
-                or enrollment not in ("lead", "self")
+                or enrollment not in ("lead", "self", "both")
             ):
                 raise HTTPException(422)
             db.add(
@@ -320,4 +320,5 @@ async def configure(
         org.audit(db, user, unit, "leave_" + action)
     db.commit()
     flash(request, "Planungseinstellungen gespeichert.")
-    return redirect("/urlaub?unit=" + str(unit))
+    from .routes_leave import _return_to
+    return redirect(_return_to(request, "/urlaub/verwaltung", unit))

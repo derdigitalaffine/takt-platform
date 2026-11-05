@@ -129,6 +129,9 @@ def conflicts(db, p, keep=None):
             effective.append(
                 period(a.user_id, dict(starts_on=a.starts_on, ends_on=a.ends_on))
             )
+    from .leave_sources import staffing_periods
+    for record in staffing_periods(db, {uid for uid, _, _ in memberships}):
+        effective.append(period(record["person_id"], record))
     from .leave_rules import work_snapshot, capacity
 
     patterns = work_snapshot(db, p.start, p.end)
@@ -245,10 +248,30 @@ def decision_unit(row):
     return path[min(row.approval_step or 0, len(path) - 1)]
 
 
+def _default_approval_unit(db, person_id, unit):
+    """Leadership's own approval decisions belong to the next parent level.
+
+    Reuse the same fallback for initial requests and later cancellations,
+    including edits that have reset the draft approval_path.
+    """
+    path = org.active_path(db, unit)
+    if len(path) <= 1:
+        return unit
+    person = db.get(User, person_id)
+    leading = any(
+        g.role in ("lead", "deputy")
+        and g.org_id in path
+        and (g.org_id == unit or g.include_children)
+        for g in org.grants(db, person)
+    )
+    return path[1] if leading else unit
+
+
 def cancellation_unit(db, row):
-    return (json.loads(policy(db, row.org_id).approval_units or "[]") or [row.org_id])[
-        -1
-    ]
+    configured = json.loads(policy(db, row.org_id).approval_units or "[]")
+    return configured[-1] if configured else _default_approval_unit(
+        db, row.person_id, row.org_id
+    )
 
 
 def command(db, actor, request_id, action, version, reason=""):
@@ -279,6 +302,15 @@ def command(db, actor, request_id, action, version, reason=""):
     decision_unit = path[min(row.approval_step or 0, len(path) - 1)]
     if action in ("cancel", "request_cancel", "reject_cancel"):
         decision_unit = cancellation_unit(db, row)
+    # Cancelling or dismissing an effective internal approval is a decision,
+    # not an ordinary edit. Leaders and deputies may not decide their own case.
+    if (
+        cfg.workflow == "internal"
+        and row.effective_json
+        and actor.id == row.person_id
+        and action in ("cancel", "reject_cancel")
+    ):
+        raise HTTPException(403, "Eigene verbindliche Urlaubszeiten erfordern eine fremde Stornoentscheidung.")
     if action == "reject_cancel":
         if not row.cancel_requested or not org.allows(
             db, actor, decision_unit, "approve"
@@ -286,6 +318,9 @@ def command(db, actor, request_id, action, version, reason=""):
             raise HTTPException(403)
         row.cancel_requested = False
     elif action in ("approve", "reject"):
+        # A leader is also an employee: no one decides their own leave.
+        if actor.id == row.person_id:
+            raise HTTPException(403, "Eigener Urlaub darf nicht selbst genehmigt werden.")
         if (
             not org.allows(db, actor, decision_unit, "approve")
             or row.status != "requested"
@@ -302,7 +337,9 @@ def command(db, actor, request_id, action, version, reason=""):
             raise HTTPException(422, "Dieser Ablauf benötigt keinen internen Antrag.")
         row.status = "requested"
         row.requested_workflow = cfg.workflow
-        path = json.loads(cfg.approval_units or "[]") or [unit]
+        path = json.loads(cfg.approval_units or "[]")
+        if not path:
+            path = [_default_approval_unit(db, row.person_id, unit)]
         if any(node not in org.active_path(db, unit) for node in path):
             raise HTTPException(
                 422,
@@ -359,7 +396,9 @@ def command(db, actor, request_id, action, version, reason=""):
                 422, "Genehmigung oder externe Selbstauskunft erforderlich."
             )
         if action == "attest" and (
-            cfg.workflow != "external" or actor.id != row.person_id
+            cfg.workflow != "external"
+            or not cfg.external_attestation
+            or actor.id != row.person_id
         ):
             raise HTTPException(
                 403,

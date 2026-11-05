@@ -873,7 +873,21 @@ Unter **Abwesenheiten** (Menü „Mein Arbeitsplatz“) tragen Sie Urlaub oder a
 
 Werden Sie selbst als Vertretung eingetragen, bekommen Sie eine Mail. Möchten Sie jeder Vertretung vorher zustimmen, schalten Sie das im **Profil** unter „Vertretungen“ ein – Anfragen erscheinen dann unter Abwesenheiten und auf der Übersicht zum **Zustimmen** oder **Ablehnen**. Bei Krankheit tragen Gruppenleitungen bzw. die Personalstelle die Abwesenheit für Sie ein. Sind Sie früher zurück, beendet „Zurück“ die Abwesenheit.
 
-## 12e. Kalender & Urlaubsplanung
+## 12e. Kalender und Urlaub – getrennte Arbeitsbereiche
+
+**Kalender** und **Urlaub** sind zwei eigenständige Menüpunkte unter „Termine & Veranstaltungen“. Der Kalender verwaltet Termine und Gerätezugänge; Urlaub ist für die persönliche und gemeinsame Abwesenheitsplanung zuständig. Die neuen Änderungen werden in [PR #185](https://github.com/derdigitalaffine/takt-platform/pull/185) geprüft.
+
+Unter **Urlaub** stehen – je nach Berechtigung – fünf Bereiche zur Verfügung: **Planer**, **Mein Urlaub**, **Genehmigungen**, **Schließzeiten & Notbesetzung** und **Verwaltung**. Die Verwaltung trennt Urlaubsverfahren, Besetzungsregeln, Arbeitsmodelle, Feiertage und Konten in eigene Unterseiten. Mitarbeitende starten mit dem eigenen Urlaub; Leitungen, Stellvertretungen und Planende können die Teamzeitachse öffnen. Auf dem Handy bleibt der Editor vollständig bedienbar.
+
+**Planen:** Im Planer markieren Sie einen Zeitraum durch Ziehen oder Klicken und prüfen die vorausgefüllten Angaben im Detailbereich. Nach dem Speichern bleiben Monat/Quartal/Jahr und der zuletzt betrachtete Zeitraum je Einheit in der Browser-Sitzung erhalten. Die verbindliche Besetzung wird erneut auf dem Server geprüft; keine einzelne Drag-and-drop-Bewegung soll ohne Bestätigung automatisch Urlaub verbindlich ändern.
+
+**Leitungskennzeichen:** Bei fachlich relevanten Personen sehen Sie „Leitung“ bzw. „Stellvertretung“. Beide Rollen können für einen Bereich mehrfach und gleichzeitig vergeben sein. Wer eine dieser Rollen innehat, kann selbstverständlich auch eigenen Urlaub eintragen. Bei internem Workflow ist Selbstgenehmigung ausgeschlossen; standardmäßig wird die höhere Einheit gefragt. Ist die **externe ZE-Software** für Genehmigungen zuständig, gibt es keine zusätzliche interne Genehmigung. Die persönliche Aussage „Extern genehmigt“ kann die Verwaltung je Einheit einschalten; sie bleibt eine Selbstauskunft.
+
+**Weitere Abwesenheiten:** Bereits über **Abwesenheiten & Vertretungen** erfasste Zeiten, eindeutig zugeordnete Krankmeldungen und bestätigte Seminartermine fließen in die Anzeige und Besetzung ein, ohne als neue Urlaubsanträge gespeichert zu werden. Kolleginnen und Kollegen ohne Zuständigkeit sehen bei fremden Abwesenheiten nur „Abwesend“. Zuständige Vorgesetzte dürfen den erforderlichen Grund sehen, nicht aber Diagnosen, Atteste oder medizinische Anlagen. Vertretungsrechte bleiben weiterhin im bestehenden Abwesenheitsbereich.
+
+**Darstellung und Organisation:** Neben komfortabler Anzeige ist eine kompakte Darstellung wählbar, die auch in Kalender, Benutzer- und Organisationsverwaltung gilt. Die Auswahl wird persönlich gespeichert. Der zuletzt genutzte berechtigte Organisationsbereich wird nach Möglichkeit übernommen.
+
+
 
 Wenn die Verwaltung das Modul **Kalender & Urlaub** freigeschaltet hat, finden Sie unter **Termine & Veranstaltungen** die Einträge **Kalender & Urlaub** (`/kalender`) und **Urlaubsplanung** (`/urlaub`). Sichtbare Kalender und Urlaubsbereiche hängen von Ihren Organisationszuordnungen und den jeweiligen Freigaben ab.
 
@@ -886,7 +900,7 @@ Unter **Kalender & Urlaub** können Sie die Ihnen freigegebenen persönlichen, g
 1. **Urlaubsplanung** öffnen und die gewünschte, für Sie sichtbare **Organisationseinheit** auswählen. Dort sehen Sie die Personenzeitachse mit geplanten, beantragten und verbindlichen Zeiträumen und – je nach Freigabe – Besetzung und Schließzeiten.
 2. Mit **Monat**, **Quartal** oder **Jahr** den Überblick wählen. Zeitraum und Zoom merkt sich die Seite **für jede Einheit in der aktuellen Browser-Sitzung** – auch nach dem Speichern und Neuladen. Mehrere Urlaube im gerade sichtbaren Ausschnitt können Sie nacheinander eintragen, ohne ständig zurücknavigieren zu müssen. Liegt ein neuer Eintrag **außerhalb** des sichtbaren Zeitraums, zeigt der Kalender danach automatisch dessen Zeitraum an und **behält die Zoomstufe**.
 3. Über die Zeitachse oder das Formular **Zeitraum eintragen** Person, Beginn/Ende und bei Bedarf **Vormittag/Nachmittag** festlegen. Die Konfliktvorschau prüft die Besetzung; eine Planung ist noch keine verbindliche Genehmigung. Die gleiche Eingabe ist über Formular und Tastatur möglich, auch wenn das Zeichnen mit der Maus nicht passt.
-4. Abhängig von der Einstellung Ihres Bereichs wird Urlaub gemeinsam geplant, intern eingereicht/genehmigt oder nach externer Genehmigung von Ihnen **als Selbstauskunft** bestätigt. Ein eigener Eintrag in Takt ist **keine automatische Meldung an Novatime**. Im reinen Planungsmodus kann ein Zeitraum ausdrücklich verbindlich markiert werden.
+4. Abhängig von der Einstellung Ihres Bereichs wird Urlaub gemeinsam geplant, intern eingereicht/genehmigt oder nach externer Genehmigung von Ihnen **als Selbstauskunft** bestätigt. Ein eigener Eintrag in Takt ist **keine automatische Meldung an externe ZE-Software**. Im reinen Planungsmodus kann ein Zeitraum ausdrücklich verbindlich markiert werden.
 5. Eine Änderung eines bereits verbindlichen Urlaubs wird zunächst als neue Planung gespeichert. Bis zur nötigen Bestätigung bleibt der bisherige Zeitraum wirksam. Schließzeiten und Notbesetzung beachten die gesonderten Bereichsregeln. Nur berechtigte Planende oder Genehmigende können fremde Einträge bzw. Regeln ändern.
 
 **Wichtig – Unterschied zu Abwesenheiten:** Die zuvor beschriebene Seite **Abwesenheiten** verwaltet unter anderem Übergaben und Vertretungen. Eine optionale Übernahme eines verbindlichen Urlaubs in die Abwesenheitsübersicht verleiht **keine Vertretungsrechte**. Die in Takt angezeigten internen Urlaubskonten sind optional; für extern verwaltete Konten wird kein Resturlaub vorgetäuscht.

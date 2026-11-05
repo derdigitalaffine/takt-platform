@@ -140,6 +140,22 @@ with tempfile.TemporaryDirectory(prefix="takt-org-") as root:
                         full_page=True,
                     )
                 p.set_viewport_size({"width": 1440, "height": 1000})
+                # The same rights-checked editor is reusable from organization
+                # and users; its preview must describe actual field changes.
+                p.goto(finance_url)
+                p.locator("[data-org-person-editor]").first.click()
+                drawer = p.locator("#org-person-drawer")
+                expect(drawer.locator("[data-org-person-form]")).to_be_visible()
+                preview = drawer.locator("[data-org-person-preview]")
+                expect(preview).to_contain_text("Noch keine Änderungen")
+                drawer.locator('details[open] input[name^="role_"]:not(:checked)').first.check()
+                expect(preview).to_contain_text("Rolle")
+                expect(preview).to_contain_text("Organisationseinheiten prüfen")
+                p.set_viewport_size({"width": 390, "height": 844})
+                assert p.evaluate("document.documentElement.scrollWidth<=innerWidth+1")
+                drawer.get_by_role("button", name="Schließen").click()
+                expect(drawer).to_be_hidden()
+                p.set_viewport_size({"width": 1440, "height": 1000})
                 p.goto(BASE + "/admin/users")
                 expect(p.locator("body")).to_contain_text("Finanzplanung")
                 expect(p.locator("body")).to_contain_text("Hauptzuordnung")

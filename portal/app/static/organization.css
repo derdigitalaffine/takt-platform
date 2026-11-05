@@ -98,3 +98,45 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Unified organization explorer, table view and person-editor presentation. */
+.org-workspace { gap: 1.4rem; }
+.org-workspace .card { border-color: var(--bs-border-color); border-radius: var(--bs-border-radius-lg); }
+.org-workspace .card-body { min-width: 0; }
+.org-role-picker { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,15rem),1fr)); gap: .65rem; }
+.org-role-choice {
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  padding: .7rem .85rem; background: var(--bs-body-bg);
+}
+.org-role-choice:has(input[type="checkbox"]:checked) { border-color: var(--bs-primary-border-subtle); }
+.org-role-chip {
+  display: inline-flex; gap: .4rem; flex-wrap: wrap; align-items: center;
+  padding: .35rem .55rem; border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius); background: var(--bs-tertiary-bg);
+}
+.org-role-row { min-height: 60px; }
+.org-workspace[data-view="table"] { display: block; }
+.org-workspace[data-view="table"] > aside { display: none; }
+.org-workspace[data-view="table"] > div { width: 100%; }
+.org-table-overview[hidden] { display: none !important; }
+.org-table-overview .table { margin-bottom: 0; }
+.org-table-overview td, .org-table-overview th { vertical-align: middle; }
+.org-person-drawer { --bs-offcanvas-width: min(52rem,100vw); }
+.org-person-drawer .offcanvas-body { padding: clamp(1rem,2vw,1.8rem); }
+.org-editor-units { max-height: calc(100dvh - 17rem); overflow-y: auto; padding-inline-end: .35rem; }
+.org-editor-unit summary { cursor: pointer; list-style-position: inside; min-height: 48px; }
+.org-editor-unit .card-header { background: var(--bs-secondary-bg); }
+.org-editor-actions { position: sticky; bottom: 0; z-index: 1; }
+[data-density="compact"] .org-tree-row > a { min-height: 36px; padding-block: .35rem; }
+[data-density="compact"] .org-role-row { padding-block: .4rem; min-height: 40px; }
+[data-density="compact"] .org-workspace .list-group-item { padding-block: .35rem !important; }
+@media (max-width: 575px) {
+  .org-role-picker { grid-template-columns: minmax(0,1fr); }
+  .org-editor-units { max-height: none; }
+  .org-person-drawer .offcanvas-body { padding: .9rem; }
+}
+
+/* Keep large, individually inspectable bulk previews within the workspace. */
+[data-org-batch-preview] ul { max-height: 17rem; overflow-y: auto; padding-right: .65rem; }
+[data-org-person-preview] ul { max-height: 17rem; overflow-y: auto; padding-right: .65rem; }

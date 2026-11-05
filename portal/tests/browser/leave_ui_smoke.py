@@ -56,6 +56,8 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 p.get_by_label("Passwort", exact=True).fill("browser-test-password")
                 p.get_by_role("button", name="Anmelden", exact=True).click()
                 p.goto(base + "/urlaub")
+                expect(p.get_by_role("navigation", name="Urlaubsbereiche")).to_be_visible()
+                expect(p.get_by_role("link", name="Mein Urlaub", exact=True)).to_be_visible()
                 p.get_by_label("Organisationseinheit", exact=True).select_option(
                     label="Finanzen"
                 )
@@ -153,6 +155,13 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 assert p.evaluate(get_navigation)["date"] == "2027-04-12"
 
                 p.set_viewport_size({"width": 390, "height": 844})
+                # The editor is a full-height sheet on phones and can be
+                # opened/closed without losing the timeline underneath.
+                expect(p.locator("#leave-side-panel")).to_be_hidden()
+                p.locator("#leave-open-editor").click()
+                expect(p.locator("#leave-side-panel")).to_be_visible()
+                p.get_by_role("button", name="Bearbeitung schließen").click()
+                expect(p.locator("#leave-side-panel")).to_be_hidden()
                 p.wait_for_function(
                     "document.documentElement.scrollWidth<=innerWidth+1"
                 )
@@ -213,11 +222,12 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 expect(form.get_by_label("Ort", exact=True)).to_be_hidden()
                 form.get_by_role("button", name="Termin speichern", exact=True).click()
                 expect(form.get_by_label("Titel", exact=True)).to_have_value("")
-                p.goto(base + "/urlaub")
+                p.goto(base + "/urlaub/schliesszeiten")
                 p.get_by_label("Organisationseinheit", exact=True).select_option(
                     label="Finanzen"
                 )
                 p.get_by_role("button", name="Anzeigen", exact=True).click()
+                expect(p.get_by_role("navigation", name="Urlaubsbereiche")).to_be_visible()
                 closed = p.get_by_role(
                     "heading", name="Schließzeit: Betriebsruhe", exact=True
                 ).locator("..")

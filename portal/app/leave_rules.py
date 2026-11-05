@@ -167,6 +167,9 @@ def extra_conflicts(db, candidate, keep=None):
             absences.append(
                 period(row.user_id, dict(starts_on=row.starts_on, ends_on=row.ends_on))
             )
+    from .leave_sources import staffing_periods
+    for record in staffing_periods(db, {m.user_id for m in memberships}):
+        absences.append(period(record["person_id"], record))
     patterns = work_snapshot(db, candidate.start, candidate.end)
     tentative_periods = [
         period(
@@ -379,6 +382,11 @@ def closure_obligations(db, closed, people):
         for row in rows
         if row.effective_json
     ]
+    from .leave_sources import staffing_periods
+    effective.extend(
+        (rec["person_id"], period(rec["person_id"], rec))
+        for rec in staffing_periods(db, {p.id for p in people})
+    )
     tentative = [
         (
             row.person_id,
@@ -548,6 +556,8 @@ def planning_summary(db, unit, start, end):
             unavailable.append(
                 period(row.user_id, dict(starts_on=row.starts_on, ends_on=row.ends_on))
             )
+    from .leave_sources import staffing_periods
+    unavailable.extend(period(rec["person_id"], rec) for rec in staffing_periods(db, ids))
     days = []
     for offset in range((end - start).days):
         day = start + timedelta(days=offset)
@@ -623,6 +633,8 @@ def closure_status(db, closed):
             unavailable.append(
                 period(row.user_id, dict(starts_on=row.starts_on, ends_on=row.ends_on))
             )
+    from .leave_sources import staffing_periods
+    unavailable.extend(period(rec["person_id"], rec) for rec in staffing_periods(db, assigned))
     shortages = []
     start = date.fromisoformat(closed.starts_on)
     end = date.fromisoformat(closed.ends_on)
