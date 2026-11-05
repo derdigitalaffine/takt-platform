@@ -605,3 +605,28 @@ def test_own_leave_remains_visible_when_leadership_selects_another_unit(
         db.rollback()
         db.query(LeaveRequest).filter_by(person_id=leader.id).delete()
         db.commit()
+
+
+def test_external_url_validation_rejects_bad_hosts_without_persisting(
+    db, task_people, units,
+):
+    """Malformed hosts and credential-bearing links must not become saved hrefs."""
+    _, area, _, _ = units
+    admin = login("admin@example.org", "admin-passwort-123")
+    for value in ("https://[broken", "https://person:password@zeit.example.org",
+                  "https://zeit.example.org\\n.example.org"):
+        policy = db.get(LeavePolicy, area.id)
+        version = f"{policy.org_id}:{policy.version}" if policy else f"{area.id}:0"
+        response = admin.post(
+            f"/urlaub/regeln/{area.id}",
+            data={
+                "csrf": csrf_of(admin.get("/").text),
+                "policy_version": version,
+                "topic": "verfahren", "action": "save",
+                "workflow": "external", "external_url": value,
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 422, (value, response.status_code)
+        db.rollback()
+        assert db.get(LeavePolicy, area.id) is None
