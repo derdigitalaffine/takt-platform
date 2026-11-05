@@ -44,7 +44,7 @@
         for (const entry of form.querySelectorAll(".org-editor-unit")) {
           const count = entry.querySelectorAll('input[name^="role_"]:checked').length;
           const assigned = entry.querySelector('input[name^="member_"]');
-          if (count || assigned?.checked) changes.push(entry.querySelector("summary")?.textContent.trim().replace(/\\s+/g, " "));
+          if (count || assigned?.checked) changes.push(entry.querySelector("summary")?.textContent.trim().replace(/\s+/g, " "));
         }
         note.textContent = "Gemeinsame Transaktion für " + changes.length +
           " zugeordnete bzw. rollenführende Einheiten. Änderungen werden vollständig geprüft.";
