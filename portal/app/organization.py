@@ -22,6 +22,11 @@ ROLES = {
         {"view", "plan", "approve"},
         "Bereich ansehen, Planung und Genehmigungszuständigkeit; keine Rollen- oder Benutzerverwaltung.",
     ),
+    "deputy": (
+        "Stellvertretende Leitung",
+        {"view", "plan", "approve"},
+        "Dieselben fachlichen Planungs- und Genehmigungsrechte wie die Leitung; keine globale Benutzer- oder Rollenverwaltung.",
+    ),
     "planner": (
         "Bereichsplanung",
         {"view", "plan"},
