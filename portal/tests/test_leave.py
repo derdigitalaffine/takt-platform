@@ -630,3 +630,51 @@ def test_external_url_validation_rejects_bad_hosts_without_persisting(
         assert response.status_code == 422, (value, response.status_code)
         db.rollback()
         assert db.get(LeavePolicy, area.id) is None
+
+
+def test_deputy_own_leave_cancellation_stays_with_superior_after_edit(
+    db, task_people, units,
+):
+    """An edit must not reroute a deputy's approved leave to a local peer."""
+    root, area, _, _ = units
+    deputy, local_lead, parent_approver = task_people[:3]
+    assigned(db, deputy, area)
+    grant(db, area, deputy, "deputy", False)
+    grant(db, area, local_lead, "lead", False)
+    grant(db, root, parent_approver, "approver", False)
+    db.add(LeavePolicy(org_id=area.id, workflow="internal"))
+    db.commit()
+    try:
+        row = leave.save(db, deputy, dict(
+            starts_on="2026-12-02", ends_on="2026-12-03",
+        ))
+        db.commit()
+        leave.command(db, deputy, row.id, "request", row.version)
+        db.commit()
+        assert leave.decision_unit(row) == root.id
+        leave.command(db, parent_approver, row.id, "approve", row.version)
+        db.commit()
+        assert row.status == "binding" and row.effective_json
+
+        leave.save(db, deputy, dict(
+            starts_on="2026-12-10", ends_on="2026-12-11",
+            version=row.version,
+        ), row.id)
+        db.commit()
+        # Editing clears the draft approval path, not the supervisory hierarchy.
+        assert json.loads(row.approval_path) == []
+        assert leave.cancellation_unit(db, row) == root.id
+        leave.command(db, deputy, row.id, "request_cancel", row.version)
+        db.commit()
+        with pytest.raises(HTTPException) as denied:
+            leave.command(db, local_lead, row.id, "cancel", row.version)
+        assert denied.value.status_code == 403
+        db.rollback()
+        leave.command(db, parent_approver, row.id, "cancel", row.version)
+        db.commit()
+        assert not row.effective_json
+    finally:
+        db.rollback()
+        db.query(LeaveRequest).filter_by(person_id=deputy.id).delete()
+        db.query(LeavePolicy).filter_by(org_id=area.id).delete()
+        db.commit()
