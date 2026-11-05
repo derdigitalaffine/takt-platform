@@ -67,16 +67,12 @@
       }
       const list = document.createElement("ul");
       list.className = "mt-2 mb-0";
-      for (const recipient of recipients.slice(0, 15)) {
+      for (const recipient of recipients) {
         const li = document.createElement("li");
         li.textContent = recipient + ": " + roles.join(", ");
         list.append(li);
       }
-      if (recipients.length > 15) {
-        const li = document.createElement("li");
-        li.textContent = "… und " + (recipients.length - 15) + " weitere ausgewählte Einträge";
-        list.append(li);
-      }
+
       preview.append(list);
     };
     batch.addEventListener("change", renderPreview);
