@@ -11,10 +11,11 @@
 <div class="org-workspace" data-org-workspace>
     <section class="org-table-overview card mb-3" data-org-table hidden>
       <div class="card-header d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">Organisationseinheiten · Tabellenansicht</h2><span class="small text-secondary">{{org_rows|length}} Einträge</span></div>
+      <div class="card-body pb-2"><label class="visually-hidden" for="org-table-search">Organisationseinheiten durchsuchen</label><input id="org-table-search" type="search" class="form-control" placeholder="Organisationseinheit suchen …" data-org-table-search></div>
       <div class="table-responsive"><table class="table table-hover align-middle mb-0">
         <thead><tr><th>Organisationseinheit</th><th>Typ</th><th>Personen</th><th>Rollenzuweisungen</th><th>Status</th></tr></thead>
         <tbody>{% for node,depth in org_rows %}
-          {% if org_access[node.id].view %}<tr {{'class=table-active' if selected and selected.id==node.id}}>
+          {% if org_access[node.id].view %}<tr data-org-table-row data-name="{{node.name|lower}}" {{'class=table-active' if selected and selected.id==node.id}}>
             <td><a href="/admin/organization?unit={{node.id}}" data-org-unit-link="{{node.id}}" class="fw-semibold text-decoration-none">{{'— '*depth}}{{node.name}}</a></td>
             <td>{{org_kinds.get(node.kind,(node.kind,))[0]}}</td>
             <td>{{org_people_count.get(node.id,0)}}</td>
