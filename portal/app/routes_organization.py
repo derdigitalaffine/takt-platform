@@ -185,6 +185,54 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
     )
 
 
+
+@app.get("/ui/preferences")
+def get_ui_preferences(
+    user: User = Depends(current_user),
+):
+    import json
+    try:
+        prefs = json.loads(user.nav_json or "{}")
+    except ValueError:
+        prefs = {}
+    prefs = prefs if isinstance(prefs, dict) else {}
+    return {
+        "density": prefs.get("ui_density", "comfortable"),
+        "org_view": prefs.get("org_view", "explorer"),
+        "last_org_unit": prefs.get("last_org_unit"),
+    }
+
+
+@app.post("/ui/preferences", dependencies=[Depends(check_csrf)])
+async def set_ui_preferences(
+    request: Request,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    import json
+    form = await request.form()
+    try:
+        state = json.loads(user.nav_json or "{}")
+    except ValueError:
+        state = {}
+    state = state if isinstance(state, dict) else {}
+    allowed = {"density": ("ui_density", {"comfortable", "compact"}),
+               "org_view": ("org_view", {"explorer", "table"})}
+    for name, (stored, choices) in allowed.items():
+        if name in form:
+            if form[name] not in choices:
+                raise HTTPException(422, "Darstellung prüfen.")
+            state[stored] = form[name]
+    if "last_org_unit" in form:
+        oid = os.number(form["last_org_unit"])
+        if not os.allows(db, user, oid, "view"):
+            raise HTTPException(403)
+        state["last_org_unit"] = oid
+    user.nav_json = json.dumps(state, ensure_ascii=False)
+    db.commit()
+    return {"saved": True}
+
+
 @app.get("/admin/organization")
 def organization_page(
     request: Request,
