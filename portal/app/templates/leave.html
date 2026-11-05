@@ -8,10 +8,10 @@
 {% endblock %}
 {% block content %}
     {{ m.page_head('Urlaub', 'Persönliche Zeiten und Teamabwesenheiten gemeinsam planen, ohne doppelte Datenpflege.') }}
-    <form method="get" class="mb-4">
+    <form method="get" class="mb-3" data-ui-preferences data-csrf="{{csrf}}">
         <label class="form-label" for="leave-unit">Organisationseinheit</label>
         <div class="d-flex gap-2">
-            <select class="form-select" id="leave-unit" name="unit">
+            <select class="form-select" id="leave-unit" name="unit" data-org-context>
                 {% for n in units %}
                     <option value="{{ n.id }}" {{'selected' if n.id==unit}}>{{ n.name }}</option>
                 {% endfor %}
@@ -26,6 +26,7 @@
         <p class="small mb-3">{{{'planning':'Gemeinsame Planung ohne internen Genehmigungsworkflow.','internal':'Interne Genehmigung ist in diesem Bereich aktiviert.','external':'Genehmigung erfolgt in der externen ZE-Software. Takt zeigt ausschließlich eigene Selbstauskünfte.'}[policy.workflow]}}</p>
       </div>
 
+    <div class="d-flex flex-wrap justify-content-end gap-2 mb-2"><span class="small text-secondary align-self-center">Darstellung:</span><div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte"><button type="button" class="btn btn-outline-secondary" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button><button type="button" class="btn btn-outline-secondary" data-ui-density="compact" aria-pressed="false">Kompakt</button></div></div>
     <nav class="leave-section-nav" aria-label="Urlaubsbereiche">
       {% for key,label,icon in [('planer','Planer','fa-calendar-days'),('mein-urlaub','Mein Urlaub','fa-user'),('genehmigungen','Genehmigungen','fa-clipboard-check'),('schliesszeiten','Schließzeiten & Notbesetzung','fa-calendar-xmark'),('verwaltung','Verwaltung','fa-sliders')] %}
         {% if key not in ('genehmigungen','verwaltung') or (key=='genehmigungen' and can_approve) or (key=='verwaltung' and can_settings) %}
@@ -306,5 +307,5 @@
     <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
     <script src="/static/person-timeline.js"></script>
     <script src="/static/selection-picker.js"></script>
-    <script src="/static/leave.js"></script><script src="/static/leave-workspace.js"></script>
+    <script src="/static/leave.js"></script><script src="/static/leave-workspace.js"></script><script src="/static/ui-preferences.js" defer></script>
 {% endblock %}
