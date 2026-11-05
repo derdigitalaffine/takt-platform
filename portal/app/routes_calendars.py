@@ -21,7 +21,8 @@ def get_calendar(db, actor, cid, write=False):
 
 @app.get("/kalender")
 def calendar_page(
-    request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)
+    request: Request, unit: int | None = None,
+    user: User = Depends(current_user), db: Session = Depends(get_db)
 ):
     rows = [
         c
@@ -33,6 +34,16 @@ def calendar_page(
         for n in db.scalars(select(Organization).order_by(Organization.name))
         if org.allows(db, user, n.id, "plan")
     ]
+    import json
+    allowed_units = {n.id for n in units}
+    if unit is not None and unit not in allowed_units:
+        raise HTTPException(403)
+    if unit is None:
+        try:
+            remembered = json.loads(user.nav_json or "{}").get("last_org_unit")
+        except (ValueError, AttributeError):
+            remembered = None
+        unit = remembered if remembered in allowed_units else (units[0].id if units else None)
     return render(
         request,
         "calendars.html",
@@ -46,6 +57,7 @@ def calendar_page(
         },
         writable_calendars={c.id for c in rows if calendars.access(db, user, c, True)},
         units=units,
+        selected_org_unit=unit,
         closure_units=[
             n
             for n in db.scalars(select(Organization).order_by(Organization.name))
@@ -207,7 +219,7 @@ def closure_link(db, user, closed):
             None,
         )
     return (
-        "/urlaub"
+        "/urlaub/schliesszeiten"
         + ("?unit=" + str(unit) if unit else "")
         + "#closure-"
         + str(closed.id)
@@ -271,7 +283,7 @@ async def create_closure(
         not title
         or len(title) > 200
         or not 0 <= minimum <= 10000
-        or enrollment not in ("lead", "self")
+        or enrollment not in ("lead", "self", "both")
     ):
         raise HTTPException(422, "Schließzeit prüfen.")
     closed = Closure(
