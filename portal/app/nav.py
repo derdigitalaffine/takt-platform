@@ -178,12 +178,12 @@ ITEMS: list[Item] = [
 ITEMS.append(Item("oidc", "admin", "/admin/oidc", "fa-key", "Nextcloud / OIDC-Anmeldung", lambda c: c.admin, _pre("/admin/oidc")))
 ITEMS.append(Item("seminars", "schedule", "/seminare", "fa-chalkboard-user", "Seminare & Lehrgänge", lambda c: "seminars" in c.modules, _pre("/seminare")))
 ITEMS.append(Item("circulation_reports", "work", "/umlaeufe/auswertung", "fa-chart-column", "Meine Umläufe & Rückmeldungen", lambda c: "circulations" in c.modules, _pre("/umlaeufe/auswertung")))
-ITEMS.append(Item("calendars", "schedule", "/kalender", "fa-calendar-days", "Kalender & Urlaub", lambda c: "calendars" in c.modules, _pre("/kalender")))
-ITEMS.append(Item("leave", "schedule", "/urlaub", "fa-umbrella-beach", "Urlaubsplanung", lambda c: "calendars" in c.modules, _pre("/urlaub")))
+ITEMS.append(Item("calendars", "schedule", "/kalender", "fa-calendar-days", "Kalender", lambda c: "calendars" in c.modules, _pre("/kalender")))
+ITEMS.append(Item("leave", "schedule", "/urlaub", "fa-umbrella-beach", "Urlaub", lambda c: "calendars" in c.modules, _pre("/urlaub")))
 BY_ID = {it.id: it for it in ITEMS}
 # Stable entry IDs preserve bookmarks and personal favorites.
 FAMILIES = [
-    ("calendars", "leave"),
+    ("calendars",), ("leave",),
     ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
     ("surveys", "polls", "votes"), ("shortlinks",),
     ("meetings", "meeting_plan"), ("seminars",),
