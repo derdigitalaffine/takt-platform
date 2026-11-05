@@ -575,6 +575,7 @@ async def settings_save(
         row.minimum = minimum
         row.conflict_mode = mode
         row.external_url = url[:1000]
+        row.external_attestation = data.get("external_attestation") == "1"
         row.sync_absence = data.get("sync_absence") == "1"
         row.notify_only_warnings = data.get("notify_only_warnings") == "1"
         import json, math
