@@ -37,6 +37,57 @@
       if (target) target.open = true;
     }),
   );
+  const batch = document.querySelector("[data-org-role-batch]");
+  if (batch) {
+    const preview = batch.querySelector("[data-org-batch-preview]");
+    const renderPreview = () => {
+      const recipients = [...batch.querySelectorAll('input[name="targets"]:checked')]
+        .map((input) => input.closest("label")?.querySelector("[data-selection-title]")?.textContent.trim() || input.value);
+      const roles = [...batch.querySelectorAll('input[name="roles"]:checked')]
+        .map((input) => {
+          const card = input.closest(".org-role-choice");
+          const label = card.querySelector(".form-check-label")?.textContent.trim() || input.value;
+          const subtree = card.querySelector('input[name^="children_"]')?.checked;
+          return label + (subtree ? " (mit Untereinheiten)" : " (nur diese Einheit)");
+        });
+      preview.replaceChildren();
+      const header = document.createElement("strong");
+      header.textContent = roles.length + " Rollen für " + recipients.length + " ausgewählte Personen/Gruppen ergänzen";
+      preview.append(header);
+      if (!recipients.length || !roles.length) {
+        preview.append(document.createTextNode(" · Bitte Empfänger und Rollen wählen."));
+        return;
+      }
+      const list = document.createElement("ul");
+      list.className = "mt-2 mb-0";
+      for (const recipient of recipients.slice(0, 15)) {
+        const li = document.createElement("li");
+        li.textContent = recipient + ": " + roles.join(", ");
+        list.append(li);
+      }
+      if (recipients.length > 15) {
+        const li = document.createElement("li");
+        li.textContent = "… und " + (recipients.length - 15) + " weitere ausgewählte Einträge";
+        list.append(li);
+      }
+      preview.append(list);
+    };
+    batch.addEventListener("change", renderPreview);
+    batch.addEventListener("click", (event) => {
+      if (event.target.closest("[data-selection-all], [data-selection-clear]"))
+        requestAnimationFrame(renderPreview);
+    });
+    batch.addEventListener("submit", (event) => {
+      if (!batch.querySelector('input[name="roles"]:checked') ||
+          !batch.querySelector('input[name="targets"]:checked')) {
+        event.preventDefault();
+        preview.textContent = "Mindestens eine Rolle und eine Person/Gruppe auswählen.";
+        preview.focus();
+      }
+    });
+    preview.tabIndex = -1;
+    renderPreview();
+  }
   window.addEventListener("hashchange", openHash);
   openHash();
 })();
