@@ -128,7 +128,7 @@
                 {% endif %}
                 {% if row_policy.workflow=="external" and row.person_id==user.id and row.status=="planned" %}
                     <div class="alert alert-info">
-                        <p>Urlaub auch in der externen ZE-Software beantragen. Nach dessen Genehmigung bestätigen Sie hier Ihre Selbstauskunft.</p>
+                        {% if row_policy.external_attestation %}<p>Urlaub in der externen ZE-Software beantragen. Nach der dortigen Entscheidung können Sie die Genehmigung hier freiwillig als Selbstauskunft bestätigen; Takt prüft sie nicht technisch.</p>{% else %}<p>Die Genehmigung erfolgt ausschließlich in der externen ZE-Software. Hier ist nur die Planung sichtbar; in Takt ist keine zusätzliche Bestätigung erforderlich.</p>{% endif %}
                         {% if row_policy.external_url %}
                             <a class="btn btn-outline-primary"
                                href="{{ row_policy.external_url }}"
@@ -154,10 +154,10 @@
                                         value="bind">Verbindlich markieren</button>
                             {% elif row_policy.workflow=="internal" %}
                                 <button class="btn btn-primary" name="action" value="request">Antrag einreichen</button>
-                            {% elif row.person_id==user.id %}
+                            {% elif row.person_id==user.id and row_policy.external_attestation %}
                                 <button class="btn btn-primary"
                                         name="action"
-                                        value="attest" {{'hidden' if not row_policy.external_attestation}}>Externe Genehmigung selbst bestätigen (Selbstauskunft)</button>
+                                        value="attest">Externe Genehmigung selbst bestätigen (Selbstauskunft)</button>
                             {% endif %}
                         {% endif %}
                         {% if row.status=="requested" and approvers[row.id] %}
