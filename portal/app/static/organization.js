@@ -11,8 +11,12 @@
       tree.clientHeight / 2;
   const rows = [...document.querySelectorAll("[data-org-row]")],
     byId = new Map(rows.map((row) => [row.dataset.id, row]));
-  search.addEventListener("input", () => {
-    const query = search.value.toLocaleLowerCase().trim();
+  const tableSearch = document.querySelector("[data-org-table-search]");
+  const tableRows = [...document.querySelectorAll("[data-org-table-row]")];
+  function filterOrganizations(input) {
+    const query = input.value.toLocaleLowerCase().trim();
+    if (input !== search) search.value = input.value;
+    if (tableSearch && input !== tableSearch) tableSearch.value = input.value;
     const visible = new Set();
     for (const row of rows) {
       if (!row.dataset.name.includes(query)) continue;
@@ -23,8 +27,11 @@
       }
     }
     rows.forEach((row) => (row.hidden = !visible.has(row)));
+    tableRows.forEach((row) => (row.hidden = !row.dataset.name.includes(query)));
     document.querySelector("[data-org-empty]").hidden = visible.size > 0;
-  });
+  }
+  search.addEventListener("input", () => filterOrganizations(search));
+  tableSearch?.addEventListener("input", () => filterOrganizations(tableSearch));
   function openHash() {
     const target = location.hash
       ? document.getElementById(location.hash.slice(1))
