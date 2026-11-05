@@ -424,3 +424,30 @@ def test_illness_source_reduces_staffing_without_duplicate_absence_records(
         db.query(LeavePolicy).filter_by(org_id=area.id).delete()
         db.delete(report)
         db.commit()
+
+def test_leadership_cannot_decide_own_internal_cancellation(db, task_people, units):
+    """A deputy is still an employee; cancelling effective leave needs another approver."""
+    _, area, _, _ = units
+    person = task_people[0]
+    assigned(db, person, area)
+    grant(db, area, person, "deputy")
+    db.add(LeavePolicy(org_id=area.id, workflow="internal"))
+    db.commit()
+    try:
+        row = leave.save(db, person, dict(
+            starts_on="2026-12-15", ends_on="2026-12-16",
+        ))
+        row.status = "binding"
+        row.effective_json = json.dumps(leave.interval(row))
+        row.cancel_requested = True
+        db.commit()
+        for action in ("cancel", "reject_cancel"):
+            with pytest.raises(HTTPException) as denied:
+                leave.command(db, person, row.id, action, row.version)
+            assert denied.value.status_code == 403
+            db.rollback()
+    finally:
+        db.rollback()
+        db.query(LeaveRequest).filter_by(person_id=person.id).delete()
+        db.query(LeavePolicy).filter_by(org_id=area.id).delete()
+        db.commit()
