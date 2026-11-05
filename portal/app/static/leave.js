@@ -345,7 +345,7 @@
         );
     }
     for (const row of data.absences || [])
-      addEvent(row, row, "absence:" + row.id, "absence", "Abwesend");
+      addEvent(row, row, "absence:" + row.id, "absence", row.title || "Abwesend");
     let summaryKey = "";
     const calendar = new FullCalendar.Calendar(el, {
       plugins: [view.plugin],
