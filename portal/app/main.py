@@ -1153,7 +1153,21 @@ def module_catalog(request: Request, q: str = "", category: str = "", sort: str 
                    rows=[row for row in rows if row["group"] == key])
               for key, label in categories.items()]
     groups = [group for group in groups if group["rows"]]
-    favorites = [row for row in all_rows if row["fav"]]
+    # Fast links mirror the *exact* existing pinned navigation entries, not
+    # only their family heads (e.g. a pinned "Besprechung planen" stays visible).
+    visible_items = {it.id: it for it in nav.visible(c)}
+    favorites = [
+        dict(id=it.id, label=("Geteilte Formulare" if it.id == "forms"
+                            and not c.can("forms") else it.label),
+             url=it.url, icon=it.icon, group=it.group)
+        for key in nav.prefs(user)["fav"]
+        if (it := visible_items.get(key)) is not None
+    ]
+    if sort == "favorites":
+        groups.sort(key=lambda group: (
+            -sum(row["fav"] for row in group["rows"]),
+            list(categories).index(group["key"]),
+        ))
     return render(
         request, "module_catalog.html", user, rows=rows, groups=groups,
         categories=categories, counts=counts, favorites=favorites,
