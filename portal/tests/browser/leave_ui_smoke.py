@@ -68,6 +68,14 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                     "button", name="Als geplant speichern", exact=True
                 ).click()
                 expect(p.locator("article")).to_contain_text("Geplant")
+                p.locator("#leave-request-search").fill("nicht-vorhandene-person")
+                expect(p.locator("#leave-request-no-matches")).to_be_visible()
+                expect(p.locator(".leave-request-card:visible")).to_have_count(0)
+                p.locator("#leave-request-search").clear()
+                expect(p.locator(".leave-request-card:visible")).to_have_count(1)
+                p.locator("#leave-status-filter").select_option("planned")
+                expect(p.locator(".leave-request-card:visible")).to_have_count(1)
+                p.locator("#leave-status-filter").select_option("")
                 expect(p.locator("#leave-calendar .fc-toolbar-title")).to_contain_text(
                     "Dezember 2026"
                 )
