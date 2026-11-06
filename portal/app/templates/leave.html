@@ -9,7 +9,7 @@
 {% endblock %}
 {% block content %}
 <div class="planning-workspace planning-leave">
-    {{ m.page_head('Urlaub', 'Persönliche Zeiten und Teamabwesenheiten gemeinsam planen, ohne doppelte Datenpflege.') }}
+    {{ m.page_head('Urlaub', 'Persönliche Zeiten und Teamabwesenheiten planen.') }}
     <div class="planning-context"><div><p class="planning-context-title">Organisationseinheit</p><p class="planning-context-lead">Urlaubsplanung und Verfügbarkeit</p><p class="planning-supporting mb-0">Persönliche Zeiten, Teamplanung und Entscheidungen an einem Ort.</p></div>
     <form method="get" class="mb-0" data-ui-preferences data-csrf="{{csrf}}">
         <label class="form-label" for="leave-unit">Organisationseinheit</label>
@@ -334,5 +334,5 @@
     <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
     <script src="/static/person-timeline.js"></script>
     <script src="/static/selection-picker.js"></script>
-    <script src="/static/leave.js"></script><script src="/static/leave-workspace.js"></script><script src="/static/ui-preferences.js" defer></script><script src="/static/planning-polish.js" defer></script>
+    <script src="/static/leave.js"></script><script src="/static/leave-workspace.js"></script><script src="/static/ui-preferences.js" defer></script><script src="/static/planning-polish.js" defer></script><script src="/static/leave-navigation.js" defer></script>
 {% endblock %}

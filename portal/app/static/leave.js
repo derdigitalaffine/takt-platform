@@ -1,5 +1,13 @@
 /* The timeline proposes changes; the same server commands handle every input method. */
-(async () => {
+window.taktInitLeave = async () => {
+  window.taktDisposeLeave?.();
+  const lifecycle = new AbortController();
+  let activeCalendar = null;
+  window.taktDisposeLeave = () => {
+    lifecycle.abort();
+    activeCalendar?.destroy();
+    activeCalendar = null;
+  };
   "use strict";
   const el = document.getElementById("leave-calendar");
   if (!el) return;
@@ -43,7 +51,7 @@
     } else if (!event.shiftKey && document.activeElement === last) {
       first.focus(); event.preventDefault();
     }
-  });
+  }, { signal: lifecycle.signal });
   const feedback = document.getElementById("leave-feedback");
   let requests = [],
     people = [];
@@ -276,6 +284,7 @@
     const data = await send(
       "/urlaub/data?unit=" + encodeURIComponent(el.dataset.unit),
     );
+    if (lifecycle.signal.aborted || !el.isConnected) return;
     requests = data.requests;
     people = data.people;
     for (const button of document.querySelectorAll("[data-leave-edit]"))
@@ -430,6 +439,7 @@
     });
     view.attach(calendar);
     calendar.render();
+    activeCalendar = calendar;
     // Direct links from "Mein Urlaub" and closure coverage open the
     // exact editable request without creating a second planning form.
     const direct = new URL(location.href);
@@ -463,4 +473,5 @@
   } catch (error) {
     report(error);
   }
-})();
+};
+window.taktInitLeave();

@@ -1,6 +1,6 @@
 /* Progressive enhancements shared by calendar and leave pages.
    Filtering is visual only; backend permissions and canonical data stay intact. */
-(() => {
+window.taktInitPlanningPolish = () => {
   "use strict";
   const root = document.querySelector(".planning-workspace");
   if (!root) return;
@@ -99,4 +99,5 @@
     detail.hidden = !detail.hidden;
     legendButton.setAttribute("aria-expanded", String(!detail.hidden));
   });
-})();
+};
+window.taktInitPlanningPolish();

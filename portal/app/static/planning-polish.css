@@ -564,3 +564,46 @@
     scrollbar-width:thin;
   }
 }
+
+/* Calendar and leave share a restrained, single-level workspace header. */
+.planning-workspace .planning-context {
+  padding: .65rem .9rem;
+  margin-block: .3rem .75rem;
+  gap: .65rem;
+  align-items: center;
+}
+.planning-workspace .planning-context-title { margin-bottom: .1rem; }
+.planning-workspace .planning-context-lead { font-size: .94rem; }
+.planning-workspace .calendar-simple-start { margin-bottom: .7rem; }
+.planning-workspace .calendar-mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+.planning-workspace .calendar-mode-choice {
+  flex: 1 1 11rem;
+  min-height: 2.8rem;
+  padding: .4rem .65rem;
+  gap: .5rem;
+  align-items: center;
+}
+.planning-workspace .calendar-mode-choice small { display: none; }
+.planning-workspace .calendar-mode-choice strong { font-size: .86rem; }
+.planning-workspace .calendar-mode-icon {
+  width: 1.8rem;
+  height: 1.8rem;
+  flex: 0 0 1.8rem;
+}
+.planning-workspace .calendar-year-information { padding: .65rem .85rem; margin-top: .55rem; }
+.planning-workspace .leave-workspace-heading p:last-child { margin-bottom: .5rem !important; }
+.planning-workspace .leave-section-nav { margin-bottom: .7rem; }
+[data-density="compact"] .planning-workspace .calendar-mode-choice {
+  min-height: 2.5rem;
+  padding: .3rem .5rem;
+}
+@media (max-width: 575.98px) {
+  .planning-workspace .calendar-mode-switch { display: flex; gap: .35rem; }
+  .planning-workspace .calendar-mode-choice { flex: 1 1 8.8rem; min-height: 2.8rem; }
+}
+
+.planning-workspace .calendar-year-information[hidden] { display: none !important; }
