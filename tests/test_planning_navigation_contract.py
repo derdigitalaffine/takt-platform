@@ -14,6 +14,8 @@ def test_calendar_mode_switch_is_progressive_and_client_side():
     template = (TEMPLATES / "calendars.html").read_text(encoding="utf-8")
 
     assert 'data-calendar-mode-link' in template
+    assert 'calendar-year-information' in template
+    assert "'hidden' if not year_mode" in template
     assert 'href="/kalender/jahr' in template
     assert 'href="/kalender?ansicht=termine' in template
     assert "event.preventDefault()" in js
