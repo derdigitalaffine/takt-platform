@@ -4,11 +4,14 @@
 {% block head %}
     <link rel="stylesheet" href="/static/person-timeline.css">
     <link rel="stylesheet" href="/static/leave-workspace.css">
+    <link rel="stylesheet" href="/static/planning-polish.css">
     <link rel="stylesheet" href="/static/selection-picker.css">
 {% endblock %}
 {% block content %}
+<div class="planning-workspace planning-leave">
     {{ m.page_head('Urlaub', 'Persönliche Zeiten und Teamabwesenheiten gemeinsam planen, ohne doppelte Datenpflege.') }}
-    <form method="get" class="mb-3" data-ui-preferences data-csrf="{{csrf}}">
+    <div class="planning-context"><div><p class="planning-context-title">Organisationseinheit</p><p class="planning-context-lead">Urlaubsplanung und Verfügbarkeit</p><p class="planning-supporting mb-0">Persönliche Zeiten, Teamplanung und Entscheidungen an einem Ort.</p></div>
+    <form method="get" class="mb-0" data-ui-preferences data-csrf="{{csrf}}">
         <label class="form-label" for="leave-unit">Organisationseinheit</label>
         <div class="d-flex gap-2">
             <select class="form-select" id="leave-unit" name="unit" data-org-context>
@@ -16,12 +19,13 @@
                     <option value="{{ n.id }}" {{'selected' if n.id==unit}}>{{ n.name }}</option>
                 {% endfor %}
             </select>
-            <button class="btn btn-outline-primary">Anzeigen</button>
+            <button class="btn btn-outline-primary" type="submit">Anzeigen</button>
         </div>
     </form>
+    </div>
 
     {% if unit %}
-      <div class="leave-workspace-heading">
+      <div class="leave-workspace-heading planning-supporting">
         <p class="small text-secondary mb-1">{{{'planer':'Teamplanung und Verfügbarkeit','mein-urlaub':'Meine Zeiten und nächsten Schritte','genehmigungen':'Offene Entscheidungen','schliesszeiten':'Schließtage und Notbesetzung','verwaltung':'Regeln der Organisationseinheit'}[active_section]}} · {{ (units|selectattr('id','equalto',unit)|first).name }}</p>
         <p class="small mb-3">{{{'planning':'Gemeinsame Planung ohne internen Genehmigungsworkflow.','internal':'Interne Genehmigung ist in diesem Bereich aktiviert.','external':'Genehmigung erfolgt in der externen ZE-Software. Takt zeigt ausschließlich eigene Selbstauskünfte.'}[policy.workflow]}}</p>
       </div>
@@ -51,25 +55,28 @@
       {% include "leave_config.html" %}
       {% if active_section == 'planer' %}
         <div class="leave-planner-layout"><div class="leave-planner-primary">
+      <div class="planning-section-heading"><h2 class="h5"><i class="fa-solid fa-people-group me-2" aria-hidden="true"></i>Personenzeitachse</h2><span class="planning-count">{{ people|length }} Personen</span></div>
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-          <span class="small text-secondary">Personenzeitachse · Datum und Zoom bleiben beim Speichern erhalten</span>
+          <span class="planning-supporting">Datum und Zoom bleiben erhalten. Änderungen werden vor dem Verbindlichmachen geprüft.</span>
           {% if can_create %}<button type="button" id="leave-open-editor" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Zeitraum eintragen</button>{% endif %}
         </div>
-        <div id="leave-calendar" class="mb-4" data-unit="{{ unit }}"></div>
-        <p class="small text-secondary">Eintrag anklicken zum Prüfen oder Ändern. Alternativ können Sie alle Zeiträume über das Formular bearbeiten.</p>
+        <div class="planning-legend" aria-label="Legende der Urlaubsplanung"><span class="planning-legend-item"><i class="planning-legend-mark" aria-hidden="true"></i>Geplant</span><span class="planning-legend-item"><i class="planning-legend-mark is-requested" aria-hidden="true"></i>Beantragt</span><span class="planning-legend-item"><i class="planning-legend-mark is-binding" aria-hidden="true"></i>Verbindlich</span><span class="planning-legend-item"><i class="planning-legend-mark is-absence" aria-hidden="true"></i>Abwesend</span><span class="planning-legend-item"><i class="planning-legend-mark is-warning" aria-hidden="true"></i>Besetzungshinweis</span></div>
+      <div id="leave-calendar" class="mb-3" data-unit="{{ unit }}" aria-label="Interaktive Personenzeitachse"></div>
+        <p class="planning-supporting">Zeitraum markieren oder im Formular erfassen. Einträge zur Bearbeitung auswählen; Konflikte werden serverseitig geprüft.</p>
         </div><aside class="leave-planner-side" aria-label="Urlaubszeit erfassen und prüfen" id="leave-side-panel">
         <div class="d-flex justify-content-end mb-2 leave-close-panel"><button type="button" id="leave-close-editor" class="btn btn-outline-secondary btn-sm" aria-label="Bearbeitung schließen"><i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Schließen</button></div>
-        <div id="leave-feedback" class="alert alert-danger" role="alert" hidden></div>
+        <div id="leave-feedback" class="alert alert-danger" role="alert" aria-live="assertive" hidden tabindex="-1"></div>
         <section id="leave-preview"
                  class="card card-body mb-3"
                  aria-live="polite"
                  hidden>
-            <h2 class="h6">Konfliktvorschau</h2>
+            <h2 class="h6"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Konfliktvorschau</h2>
             <div id="leave-preview-content"></div>
         </section>
         {% if can_create %}
-<section id="leave-editor" class="card card-body mb-4">
-            <h2 class="h5" id="leave-editor-title">Zeitraum eintragen</h2>
+<section id="leave-editor" class="card card-body mb-4 planning-panel">
+            <h2 class="h5" id="leave-editor-title" tabindex="-1">Zeitraum eintragen</h2>
+            <p class="planning-supporting">Ganze oder halbe Tage erfassen. Ein Entwurf ist keine automatische Genehmigung.</p>
             <p id="leave-edit-note" class="small" hidden>Die Änderung wird als neuer Entwurf gespeichert. Der bisherige verbindliche Zeitraum bleibt bis zur erneuten Bestätigung bestehen.</p>
             <form id="leave-form" method="post" action="/urlaub" class="row g-3">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -302,13 +309,14 @@
 
       {% endif %}
     {% else %}
-        <p>Für die Urlaubsplanung ist zunächst eine Organisationszuordnung erforderlich.</p>
+        <div class="planning-empty" role="status"><span class="planning-muted-icon mb-2"><i class="fa-solid fa-building" aria-hidden="true"></i></span><h2>Organisationseinheit erforderlich</h2><p>Für die Urlaubsplanung ist zunächst eine aktive Organisationszuordnung erforderlich. Die Verwaltung kann diese im bestehenden Personen-Editor hinterlegen.</p></div>
     {% endif %}
+</div>
 {% endblock %}
 {% block scripts %}
     <script src="/static/vendor/fullcalendar/index.global.min.js"></script>
     <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
     <script src="/static/person-timeline.js"></script>
     <script src="/static/selection-picker.js"></script>
-    <script src="/static/leave.js"></script><script src="/static/leave-workspace.js"></script><script src="/static/ui-preferences.js" defer></script>
+    <script src="/static/leave.js"></script><script src="/static/leave-workspace.js"></script><script src="/static/ui-preferences.js" defer></script><script src="/static/planning-polish.js" defer></script>
 {% endblock %}
