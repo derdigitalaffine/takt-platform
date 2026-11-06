@@ -1,6 +1,9 @@
 /* Leave subsection navigation and progressive enhancement of the existing forms. */
-(() => {
+window.taktInitLeaveWorkspace = () => {
   "use strict";
+  window.taktDisposeLeaveWorkspace?.();
+  const lifecycle = new AbortController();
+  window.taktDisposeLeaveWorkspace = () => lifecycle.abort();
   const calendarPresent = !!document.getElementById("leave-calendar");
   const policy = document.querySelector("[data-leave-policy-topic]");
   if (policy) {
@@ -47,5 +50,6 @@
         }
       }
     }
-  });
-})();
+  }, { signal: lifecycle.signal });
+};
+window.taktInitLeaveWorkspace();
