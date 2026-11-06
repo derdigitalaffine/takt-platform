@@ -1122,18 +1122,44 @@ async def nav_pin(request: Request, user: User = Depends(current_user), db: Sess
 
 
 @app.get("/module")
-def module_catalog(request: Request, q: str = "", category: str = "", user: User = Depends(current_user)):
+def module_catalog(request: Request, q: str = "", category: str = "", sort: str = "",
+                   user: User = Depends(current_user)):
+    """Permission-filtered module hub. Search and sorting never expand access."""
     from . import nav
     import unicodedata
+
     def norm(value):
-        return "".join(ch for ch in unicodedata.normalize("NFKD", value.casefold()) if not unicodedata.combining(ch))
+        return "".join(ch for ch in unicodedata.normalize("NFKD", value.casefold())
+                       if not unicodedata.combining(ch))
+
     c = nav_ctx(request, user)
-    rows = nav.catalog(c)
-    categories = {row["group"]: row["category"] for row in rows}
-    rows = [row for row in rows if (not category or row["group"] == category)
-            and norm(q) in norm(" ".join(str(row[k]) for k in ("label", "description", "keywords", "examples")))]
-    return render(request, "module_catalog.html", user, rows=rows, categories=categories, q=q,
-                  category=category, admin_available=any(it.group == "admin" for it in nav.visible(c)))
+    all_rows = nav.catalog(c)  # Already restricted by enabled modules and effective rights.
+    categories = {key: nav.GROUPS[key] for key in nav.GROUPS
+                  if any(row["group"] == key for row in all_rows)}
+    counts = {key: sum(row["group"] == key for row in all_rows) for key in categories}
+    q = q.strip()[:160]
+    category = category if category in categories else ""
+    sort = sort if sort in {"", "az", "favorites"} else ""
+    for row in all_rows:
+        row["search_text"] = " ".join(str(row[key]) for key in
+                                    ("label", "description", "keywords", "examples"))
+    rows = [row for row in all_rows if (not category or row["group"] == category)
+            and norm(q) in norm(row["search_text"])]
+    if sort == "az":
+        rows.sort(key=lambda row: norm(row["label"]))
+    elif sort == "favorites":
+        rows.sort(key=lambda row: (not row["fav"], norm(row["label"])))
+    groups = [dict(key=key, label=label,
+                   rows=[row for row in rows if row["group"] == key])
+              for key, label in categories.items()]
+    groups = [group for group in groups if group["rows"]]
+    favorites = [row for row in all_rows if row["fav"]]
+    return render(
+        request, "module_catalog.html", user, rows=rows, groups=groups,
+        categories=categories, counts=counts, favorites=favorites,
+        total=len(all_rows), q=q, category=category, sort=sort,
+        admin_available=any(it.group == "admin" for it in nav.visible(c)),
+    )
 
 
 @app.post("/module/favorite", dependencies=[Depends(check_csrf)])
@@ -1146,14 +1172,28 @@ async def module_favorite(request: Request, user: User = Depends(current_user), 
     target = db.get(User, user.id)
     p = nav.prefs(target)
     fav = [key for key in p["fav"] if key != item]
+    from urllib.parse import urlencode
+    # Keep the user's search context without accepting arbitrary redirect URLs.
+    q = str(data.get("q", "")).strip()[:160]
+    available_groups = {r["group"] for r in nav.catalog(nav_ctx(request, user))}
+    category = str(data.get("category", ""))
+    sort = str(data.get("sort", ""))
+    params = {}
+    if q:
+        params["q"] = q
+    if category in available_groups:
+        params["category"] = category
+    if sort in {"az", "favorites"}:
+        params["sort"] = sort
+    back = "/module" + ("?" + urlencode(params) if params else "") + "#module-" + item
     if data.get("on") == "1":
         if len(fav) >= nav.MAX_FAVORITES:
             flash(request, f"Höchstens {nav.MAX_FAVORITES} Favoriten.")
-            return redirect("/module")
+            return redirect(back)
         fav.append(item)
     target.nav_json = nav.dump(fav, p["hidden"], p["closed"], user=target)
     db.commit()
-    return redirect("/module")
+    return redirect(back)
 
 
 @app.get("/admin")
