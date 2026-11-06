@@ -11,6 +11,9 @@
   const checkboxes = sourceList
     ? [...sourceList.querySelectorAll('input[type="checkbox"][data-calendar]')]
     : [];
+  const inlineSources = sourceList
+    ? [...sourceList.querySelectorAll("form[data-inline-source]")]
+    : [];
 
   function filterSources() {
     if (!sourceList || !search) return;
@@ -34,6 +37,11 @@
       // Native clicks preserve the existing FullCalendar source listeners.
       for (const input of checkboxes) {
         if (input.checked !== selected) input.click();
+      }
+      for (const form of inlineSources) {
+        const button = form.querySelector("button[aria-pressed]");
+        if (button && (button.getAttribute("aria-pressed") === "true") !== selected)
+          form.requestSubmit();
       }
       const live = root.querySelector("#calendar-source-feedback");
       if (live) live.textContent = selected
