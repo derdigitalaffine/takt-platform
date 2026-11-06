@@ -49,7 +49,7 @@
     fields[key].addEventListener("change", duration);
   const calendar = new FullCalendar.Calendar(el, {
     locale: "de",
-    initialView: "dayGridMonth",
+    initialView: el.dataset.calendarMode === "year" ? "multiMonthYear" : "dayGridMonth",
     height: "auto",
     headerToolbar: {
       left: "prev,next today",
@@ -134,22 +134,59 @@
     },
   });
   calendar.render();
-  const closureCheckbox = document.querySelector("[data-closures]");
-  let closureSource;
-  function loadClosures() {
-    if (closureSource) {
-      closureSource.remove();
-      closureSource = null;
-    }
-    if (closureCheckbox.checked)
-      closureSource = calendar.addEventSource({
-        id: "closures",
-        url: "/kalender/organisationstermine",
-        success: (data) => data.events,
+  // Ephemeral read-only Fachkalender: same server-side projector as attached
+  // calendar sources, no additional Calendar rows and no duplicated terms.
+  // Forms remain a safe POST fallback for browsers without JavaScript.
+  const overlays = new Map();
+  function showOverlay(form, on) {
+    const kind = form.dataset.inlineSource;
+    const button = form.querySelector("button");
+    if (!button) return;
+    if (!on) {
+      overlays.get(kind)?.remove();
+      overlays.delete(kind);
+    } else if (!overlays.has(kind)) {
+      const source = calendar.addEventSource({
+        id: "fach:" + kind,
+        events: async (info, success, failure) => {
+          try {
+            const params = new URLSearchParams({
+              start: info.startStr,
+              end: info.endStr,
+            });
+            const response = await fetch(
+              "/kalender/quellen/" + encodeURIComponent(kind) + "/data?" + params,
+              { credentials: "same-origin" },
+            );
+            if (!response.ok) throw Error("Fachkalender konnte nicht geladen werden.");
+            const data = await response.json();
+            success(data.events);
+          } catch (error) {
+            document.getElementById("calendar-error").textContent = error.message;
+            failure(error);
+          }
+        },
       });
+      overlays.set(kind, source);
+    }
+    button.setAttribute("aria-pressed", String(on));
+    button.classList.toggle("is-active", on);
+    const icon = button.querySelector(".calendar-source-toggle-icon");
+    if (icon) {
+      icon.classList.toggle("fa-regular", !on);
+      icon.classList.toggle("fa-solid", on);
+      icon.classList.toggle("fa-circle", !on);
+      icon.classList.toggle("fa-circle-check", on);
+    }
   }
-  closureCheckbox.addEventListener("change", loadClosures);
-  loadClosures();
+  for (const overlay of document.querySelectorAll("[data-inline-source]")) {
+    overlay.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const button = overlay.querySelector("button");
+      showOverlay(overlay, button?.getAttribute("aria-pressed") !== "true");
+    });
+    if (overlay.dataset.sourceDefault === "true") showOverlay(overlay, true);
+  }
   function toggleKind() {
     const closed = fields.kind.value === "closure";
     document.getElementById("closure-fields").hidden = !closed;
@@ -169,6 +206,27 @@
     toggleTimes();
   }
   fields.kind.addEventListener("change", toggleKind);
+  document.querySelector("[data-year-new-event]")?.addEventListener("click", (event) => {
+    const button = event.currentTarget;
+    form.reset();
+    fields.id.value = "";
+    fields.version.value = "";
+    fields.kind.disabled = false;
+    fields.kind.value = "event";
+    fields.calendar_id.disabled = false;
+    fields.calendar_id.value = button.dataset.calendarId;
+    document.getElementById("event-delete").hidden = true;
+    const now = new Date();
+    const day = localValue(now).slice(0, 10);
+    fields.start.value = day;
+    fields.end.value = day;
+    fields.all_day.checked = true;
+    toggleKind();
+    const editor = document.getElementById("event-editor");
+    editor.open = true;
+    editor.scrollIntoView({ block: "start", behavior: "smooth" });
+    fields.title.focus({ preventScroll: true });
+  });
   for (const check of document.querySelectorAll("[data-calendar]")) {
     function update() {
       const id = check.dataset.calendar;
