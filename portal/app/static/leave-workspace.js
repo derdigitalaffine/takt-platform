@@ -37,7 +37,7 @@
       }
       const copy = event.target.closest("[data-leave-copy]");
       if (copy) {
-        const heading = copy.closest(".leave-request-card")?.querySelector("h2")?.textContent;
+        const heading = copy.closest(".leave-request-card")?.querySelector("h3, h2")?.textContent;
         if (!heading) return;
         try {
           await navigator.clipboard.writeText(heading.trim());
