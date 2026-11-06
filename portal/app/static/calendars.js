@@ -56,6 +56,10 @@
       center: "title",
       right: "dayGridMonth,timeGridWeek,listMonth,multiMonthYear",
     },
+    loading(isLoading) {
+      const indicator = document.getElementById("calendar-loading");
+      if (indicator) indicator.hidden = !isLoading;
+    },
     eventClick(info) {
       const event = info.event;
       if (event.extendedProps.source && event.extendedProps.url) {
