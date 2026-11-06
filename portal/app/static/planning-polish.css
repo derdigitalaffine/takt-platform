@@ -547,3 +547,20 @@
   .planning-workspace .calendar-mode-choice.active,
   .planning-workspace .calendar-source-toggle.is-active { outline:2px solid Highlight; }
 }
+
+@media (max-width: 575.98px) {
+  /* The five FullCalendar views must not force horizontal page scrolling. */
+  .planning-workspace .calendar-workspace .fc .fc-header-toolbar {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    row-gap:.6rem;
+  }
+  .planning-workspace .calendar-workspace .fc .fc-toolbar-chunk { min-width:0; }
+  .planning-workspace .calendar-workspace .fc .fc-toolbar-chunk:last-child {
+    flex:1 1 100%;
+    width:100%;
+    overflow-x:auto;
+    scrollbar-width:thin;
+  }
+}
