@@ -1,23 +1,48 @@
 {% extends "base.html" %}{% import '_macros.html' as m with context %}
 {% block title %}Kalender{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/ui-density.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}
 {% block content %}
+<div class="planning-workspace planning-calendar">
 {% call m.page_head('Kalender','Persönliche und gemeinsame Termine in einer Übersicht.') %}
-    <a class="btn btn-outline-primary" href="/urlaub">Urlaubsplanung</a>
+    {% if writable_calendars or closure_units %}<button type="button" class="btn btn-primary" data-planning-open-editor="#event-editor"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neuer Termin</button>{% endif %}
+    <a class="btn btn-outline-primary" href="/urlaub">Urlaub & Verfügbarkeit</a>
     <a class="btn btn-outline-secondary" href="/kalender/geraete">Gerät verbinden</a>
     <a class="btn btn-outline-secondary" href="/kalender/abos">Lesend abonnieren</a>
 {% endcall %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-ui-preferences data-csrf="{{csrf}}"><div class="d-flex flex-wrap align-items-center gap-3"><p class="small text-secondary mb-0">Persönliche und freigegebene Kalender ohne doppelte Fachdatensätze.</p>{% if units %}<form method="get" action="/kalender" class="d-flex align-items-center gap-2"><label class="small fw-semibold mb-0" for="calendar-workspace-unit">Arbeitsbereich</label><select class="form-select form-select-sm w-auto" id="calendar-workspace-unit" name="unit" data-org-context>{% for n in units %}<option value="{{n.id}}" {{'selected' if n.id==selected_org_unit}}>{{n.name}}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-primary" type="submit">Anzeigen</button></form>{% endif %}</div><div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte"><button type="button" class="btn btn-outline-secondary" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button><button type="button" class="btn btn-outline-secondary" data-ui-density="compact" aria-pressed="false">Kompakt</button></div></div>
+<section class="planning-context" aria-label="Arbeitsbereich und Anzeige" data-ui-preferences data-csrf="{{csrf}}">
+  <div><p class="planning-context-title">Kalenderübersicht</p>
+    <p class="planning-context-lead">Termine, Fachkalender und Freigaben an einem Ort</p>
+    <p class="planning-supporting mb-0">{{ calendars|length }} Kalenderquellen · Änderungen bleiben im jeweiligen Fachmodul.</p>
+  </div>
+  <div class="planning-actions">
+    {% if units %}<form method="get" action="/kalender" class="d-flex flex-wrap align-items-end gap-2">
+      <div><label class="form-label mb-1" for="calendar-workspace-unit">Organisationseinheit</label><select class="form-select form-select-sm" id="calendar-workspace-unit" name="unit" data-org-context>{% for n in units %}<option value="{{n.id}}" {{'selected' if n.id==selected_org_unit}}>{{n.name}}</option>{% endfor %}</select></div>
+      <button class="btn btn-sm btn-outline-primary" type="submit">Anzeigen</button>
+    </form>{% endif %}
+    <div><span class="form-label d-block mb-1">Informationsdichte</span><div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte"><button type="button" class="btn btn-outline-secondary" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button><button type="button" class="btn btn-outline-secondary" data-ui-density="compact" aria-pressed="false">Kompakt</button></div></div>
+  </div>
+</section>
 <div class="row g-4 calendar-workspace">
     <aside class="col-12 col-lg-3">
-        <section class="card card-body">
-            <h2 class="h6">Meine Kalender</h2>
+        <details class="planning-panel" open>
+            <summary><i class="fa-solid fa-layer-group me-2" aria-hidden="true"></i>Meine Kalender</summary>
+            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-2">
+              <label class="small text-secondary mb-0" for="calendar-source-search">Kalenderauswahl</label>
+              <span id="calendar-source-match-count" class="small text-secondary" aria-live="polite"></span>
+            </div>
+            <input type="search" id="calendar-source-search" class="form-control form-control-sm mb-2" placeholder="Kalender suchen" autocomplete="off" aria-controls="calendar-source-list">
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-calendar-choose="all">Alle anzeigen</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-calendar-choose="none">Alle ausblenden</button>
+            </div>
+            <span class="visually-hidden" id="calendar-source-feedback" role="status"></span>
             <label class="form-check" {{'hidden' if has_closure_source}}>
                 <input class="form-check-input" type="checkbox" data-closures {{'checked' if not has_closure_source}}>
                 <span class="form-check-label">Schließzeiten meines Bereichs</span>
             </label>
+            <div id="calendar-source-list" class="calendar-source-list">
             {% for cal in calendars %}
-                <label class="form-check">
+                <label class="form-check" data-calendar-source>
                     <input class="form-check-input"
                            type="checkbox"
                            data-calendar="{{ cal.id }}"
@@ -31,11 +56,13 @@
                     <a class="small" href="/kalender/oeffentlich/{{ cal.id }}">Öffentliche Ansicht</a>
                 {% endif %}
             {% else %}
-                <p>Noch kein Kalender verfügbar.</p>
+                <div class="planning-empty"><strong>Keine Kalender freigegeben</strong><p class="small mt-1">Freigaben oder einen eigenen Kalender anlegen, um Termine anzuzeigen.</p></div>
             {% endfor %}
-        </section>
-        <details class="card card-body mt-3">
-            <summary>Fachkalender einblenden</summary>
+            </div>
+            <p id="calendar-source-empty" class="planning-supporting mb-0" hidden>Keine Kalender entsprechen der Suche.</p>
+        </details>
+        <details class="planning-panel mt-3">
+            <summary><i class="fa-solid fa-link me-1" aria-hidden="true"></i>Fachkalender einblenden</summary>
             <form method="post" action="/kalender/quellen">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 <label class="form-label" for="calendar-select-1">Kalenderquelle</label>
@@ -49,8 +76,8 @@
             </form>
         </details>
         {% if user.can("calendars") %}
-            <details class="card card-body mt-3">
-                <summary>Kalender anlegen</summary>
+            <details class="planning-panel mt-3">
+                <summary><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Eigenen Kalender anlegen</summary>
                 <form method="post" action="/kalender" class="mt-3">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <label class="form-label">
@@ -85,11 +112,18 @@
             </details>
         {% endif %}
     </aside>
-    <section class="col-12 col-lg-9">
-        <div id="shared-calendar"></div>
-        <div id="calendar-error" role="alert" class="text-danger"></div>
-        <details class="card card-body mt-4" id="event-editor" {{'hidden' if not writable_calendars and not closure_units}}>
-            <summary>Termin oder Schließzeit anlegen</summary>
+    <section class="col-12 col-lg-9 planning-stage" aria-label="Kalender und Terminbearbeitung">
+        <div class="planning-section-heading">
+          <h2 class="h5"><i class="fa-regular fa-calendar me-2" aria-hidden="true"></i>Terminübersicht</h2>
+          <span class="planning-count">{{ calendars|length }} Kalender</span>
+        </div>
+        <p class="planning-supporting mb-3">Ansicht und Zeitraum im Kalenderkopf wechseln. Einen Termin auswählen, um Details zu sehen oder ihn berechtigt zu bearbeiten.</p>
+        <div id="calendar-loading" class="planning-supporting mb-2" role="status" aria-live="polite" hidden><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Kalenderdaten werden geladen …</div>
+        <div id="shared-calendar" aria-label="Interaktiver Kalender"></div>
+        <div id="calendar-error" role="alert" class="text-danger small mt-2" aria-live="assertive"></div>
+        <details class="card card-body mt-4 planning-panel planning-event-editor" id="event-editor" {{'hidden' if not writable_calendars and not closure_units}}>
+            <summary><i class="fa-solid fa-pen-to-square me-2" aria-hidden="true"></i>Termin oder Schließzeit erfassen</summary>
+            <p class="planning-supporting mt-3 mb-2">Daten und Freigaben werden beim Speichern serverseitig geprüft. Bei Serien sind Änderungen ausdrücklich zu bestätigen.</p>
             <form id="calendar-event-form" class="row g-3 mt-1">
                 <input name="id" type="hidden">
                 <input name="version" type="hidden">
@@ -253,8 +287,8 @@
 </textarea>
                     </label>
                 </div>
-                <div>
-                    <button class="btn btn-primary">Termin speichern</button>
+                <div class="planning-actions">
+                    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Termin speichern</button>
                     <button type="reset" class="btn btn-outline-secondary">Neuer Termin</button>
                     <button type="button"
                             id="event-delete"
@@ -266,9 +300,11 @@
         </details>
     </section>
 </div>
+</div>
 {% endblock %}
 {% block scripts %}<script src="/static/ui-preferences.js" defer></script>
     <script src="/static/vendor/fullcalendar/index.global.min.js"></script>
     <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
     <script src="/static/calendars.js"></script>
+    <script src="/static/planning-polish.js" defer></script>
 {% endblock %}
