@@ -3,7 +3,7 @@
 {% block head %}<link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}
 {% block content %}
 <div class="planning-workspace planning-calendar">
-{% call m.page_head('Kalender & Jahresplanung','Der gemeinsame Jahresplan und alle berechtigt sichtbaren Fachtermine – ohne doppelte Pflege.') %}
+{% call m.page_head('Kalender','Termine und Jahresplanung im Überblick.') %}
     {% if writable_calendars or closure_units %}<button type="button" class="btn btn-primary" data-planning-open-editor="#event-editor"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neuer Termin</button>{% endif %}
     <a class="btn btn-outline-primary" href="/urlaub">Urlaub & Verfügbarkeit</a>
     <a class="btn btn-outline-secondary" href="/kalender/geraete">Gerät verbinden</a>
