@@ -24,7 +24,8 @@ window.taktInitLeaveWorkspace = () => {
     if (!calendarPresent) {
       const edit = event.target.closest("[data-leave-edit-link]");
       if (edit) {
-        location.assign(edit.dataset.leaveEditLink);
+        if (window.taktNavigateLeave) window.taktNavigateLeave(edit.dataset.leaveEditLink);
+        else location.assign(edit.dataset.leaveEditLink);
         return;
       }
       const closure = event.target.closest("[data-closure-plan]");
@@ -35,7 +36,8 @@ window.taktInitLeaveWorkspace = () => {
           end: closure.dataset.end, start_half: closure.dataset.startHalf || "am",
           end_half: closure.dataset.endHalf || "pm",
         });
-        location.assign("/urlaub/planer?" + params.toString());
+        if (window.taktNavigateLeave) window.taktNavigateLeave("/urlaub/planer?" + params.toString());
+        else location.assign("/urlaub/planer?" + params.toString());
         return;
       }
       const copy = event.target.closest("[data-leave-copy]");
