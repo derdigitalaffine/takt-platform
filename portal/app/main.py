@@ -1112,7 +1112,7 @@ async def nav_pin(request: Request, user: User = Depends(current_user), db: Sess
     target = db.get(User, user.id)
     p = nav.prefs(target)
     fav = [i for i in p["fav"] if i != item]
-    if data.get("on") == "1" and item in nav.BY_ID:
+    if data.get("on") == "1" and item in {it.id for it in nav.visible(nav_ctx(request, user))}:
         if len(fav) >= nav.MAX_FAVORITES:
             return JSONResponse({"ok": False, "fav": fav, "error": f"Höchstens {nav.MAX_FAVORITES} Favoriten."}, status_code=400)
         fav.append(item)
