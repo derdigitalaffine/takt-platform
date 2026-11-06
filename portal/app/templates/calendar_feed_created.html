@@ -1,11 +1,13 @@
 {% extends "base.html" %}
+{% block title %}Kalenderabonnement erstellt{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}
 {% block content %}
-    <h1 class="h3">Abonnement erstellt</h1>
-    <p>Diesen Link im Kalenderprogramm als Internetkalender abonnieren. Wer den Link kennt, kann die freigegebenen Termine lesen. Der Link wird hier nur einmal angezeigt.</p>
-    <label class="form-label">
-        Abonnement-Adresse<input class="form-control" readonly value="{{ url }}">
-    </label>
-    <p>
-        <a href="/kalender/abos">Meine Abonnements verwalten</a>
-    </p>
+<div class="planning-workspace planning-aux">
+<h1 class="h3">Abonnement erstellt</h1>
+<p class="planning-callout"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Dieser persönliche Abolink ist ein Zugangsmittel. Nicht veröffentlichen oder weiterleiten. In den Abonnementeinstellungen kann er jederzeit widerrufen werden.</p>
+<label class="form-label" for="feed-link">Abonnement-Adresse</label>
+<input id="feed-link" class="form-control" readonly aria-describedby="feed-hint" value="{{url}}">
+<p class="planning-supporting mt-2" id="feed-hint">Diesen Link im Kalenderprogramm als Internetkalender abonnieren. Der Link wird hier nur einmal angezeigt. Änderungen erfolgen weiterhin in Takt.</p>
+<div class="planning-actions mt-3"><a class="btn btn-outline-primary" href="/kalender/abos">Meine Abonnements verwalten</a><a class="btn btn-outline-secondary" href="/kalender/hilfe">Einrichtungshilfe</a></div>
+</div>
 {% endblock %}
