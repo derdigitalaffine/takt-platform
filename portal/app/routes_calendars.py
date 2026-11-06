@@ -45,7 +45,9 @@ def calendar_page(
         except (ValueError, AttributeError):
             remembered = None
         unit = remembered if remembered in allowed_units else (units[0].id if units else None)
-    year_mode = request.url.path == "/kalender/jahr"
+    # The calendar entry point is the shared annual overview; the monthly
+    # working view remains available via ?ansicht=termine and all old deep links.
+    year_mode = request.url.path == "/kalender/jahr" or request.query_params.get("ansicht") != "termine"
     attached = {c.source for c in rows if c.source != "free"}
     # Existing subscriptions remain canonical. Only missing projections get an
     # ephemeral one-click control; no shadow Calendar rows are created.
