@@ -1,6 +1,9 @@
 /* Lightweight account-backed presentation preferences; no permission changes. */
-(() => {
+window.taktInitUiPreferences = () => {
   "use strict";
+  window.taktDisposeUiPreferences?.();
+  const lifecycle = new AbortController();
+  window.taktDisposeUiPreferences = () => lifecycle.abort();
   const root = document.querySelector("[data-ui-preferences]");
   if (!root) return;
   const csrf = root.dataset.csrf;
@@ -35,8 +38,8 @@
   }
   fetch("/ui/preferences", { credentials: "same-origin" })
     .then((response) => response.ok ? response.json() : state)
-    .then((prefs) => { state = { ...state, ...prefs }; apply(); })
-    .catch(() => apply());
+    .then((prefs) => { if (lifecycle.signal.aborted) return; state = { ...state, ...prefs }; apply(); })
+    .catch(() => { if (!lifecycle.signal.aborted) apply(); });
   document.addEventListener("click", async (event) => {
     const density = event.target.closest("[data-ui-density]");
     if (density) {
@@ -61,7 +64,7 @@
       catch (_) { /* Navigation is still possible without saving preference. */ }
       location.assign(link.href);
     }
-  });
+  }, { signal: lifecycle.signal });
   const selector = root.querySelector("select[data-org-context]");
   if (selector?.form) {
     selector.form.addEventListener("submit", async (event) => {
@@ -71,4 +74,5 @@
       HTMLFormElement.prototype.submit.call(selector.form);
     });
   }
-})();
+}};
+window.taktInitUiPreferences();
