@@ -183,6 +183,8 @@ Die integrierte Neugestaltung wird in [PR #185](https://github.com/derdigitalaff
 
 ### Startseite
 
+Die persönliche **[Modulübersicht](docs/MODULE-HUB-REDESIGN.md)** unter `/module` zeigt ausschließlich erlaubte Funktionen als durchsuchbare, nach Fachbereichen gruppierte Karten. Favoriten sind mit der Hauptnavigation synchronisiert; Suche, Sortierung und Favoriten funktionieren auch ohne JavaScript. Berechtigungen, abgeschaltete Module und vorhandene Ziel-URLs bleiben serverseitig maßgeblich.
+
 - Nach der Anmeldung steht **Handlungsbedarf – Jetzt bearbeiten** mit den aktuell bearbeitbaren persönlichen Prozess-, Umlauf- und Ressourcenaufgaben immer oben. **Meine Aufgaben** trennt persönliche Arbeit, Gruppenpool, Vertretung und wartende Schritte. Termine, Favoriten und weitere berechtigte Inhalte ergänzen die Übersicht. **Optionale Kacheln per Ziehen oder Auf-/Ab-Schaltflächen sortieren und ausblenden.**
 
 ### Kartenbrowser und Kartenlayer (abschaltbares Modul)

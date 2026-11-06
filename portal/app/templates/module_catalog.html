@@ -1,22 +1,171 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m with context %}
 {% block title %}Ihre Module{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/ui-density.css">
+<link rel="stylesheet" href="/static/module-hub.css">
+{% endblock %}
 {% block content %}
-{% call m.page_head('Ihre Module', 'Hier finden Sie die Bereiche, die Sie mit Ihrem Konto nutzen können. Die verfügbaren Funktionen richten sich nach Ihren Rechten und Freigaben.') %}{% endcall %}
-<form method="get" action="/module" role="search" class="row g-2 mb-4">
-  <div class="col-md-6"><label class="form-label" for="module-q">Modul oder Tätigkeit suchen</label><input id="module-q" class="form-control" type="search" name="q" value="{{q}}" placeholder="Zum Beispiel DMS, Raum oder Feedback"></div>
-  <div class="col-md-4"><label class="form-label" for="module-category">Fachbereich</label><select id="module-category" name="category" class="form-select"><option value="">Alle verfügbaren</option>{% for key,label in categories.items() %}<option value="{{key}}" {% if category==key %}selected{% endif %}>{{label}}</option>{% endfor %}</select></div>
-  <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Suchen</button></div>
-</form>
-<p class="small text-secondary">{{rows|length}} verfügbare Bereiche{% if q or category %} · <a href="/module">Filter zurücksetzen</a>{% endif %}</p>
-<div class="module-catalog">
-{% for row in rows %}<article class="card"><div class="card-body">
-  <div class="small text-secondary">{{row.category}}</div><h2 class="h5"><i class="fa-solid {{row.icon}} me-2 text-primary" aria-hidden="true"></i>{{row.label}}</h2>
-  <p class="module-description mb-0">{{row.description}}</p><p class="small text-secondary mb-0">{{row.examples}}</p>
-  <div class="d-flex flex-wrap gap-2 align-items-center"><a class="btn btn-outline-primary" href="{{row.url}}">Öffnen<span class="visually-hidden">: {{row.label}}</span></a>
-  <form method="post" action="/module/favorite"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="id" value="{{row.id}}"><input type="hidden" name="on" value="{{'0' if row.fav else '1'}}"><button class="btn btn-outline-secondary" aria-pressed="{{'true' if row.fav else 'false'}}" aria-label="{{row.label}}: {{'Favorit entfernen' if row.fav else 'Als Favorit merken'}}"><i class="fa-{{'solid' if row.fav else 'regular'}} fa-star" aria-hidden="true"></i></button></form></div>
-  {% if row.links %}<details><summary class="small">Verfügbare Ansichten</summary><ul class="small mt-2 mb-0">{% for link in row.links %}<li><a href="{{link.url}}">{{link.label}}</a></li>{% endfor %}</ul></details>{% endif %}
-</div></article>{% else %}<div class="card card-body"><h2 class="h5">Keine passenden Module gefunden</h2><p>Setzen Sie die Suche zurück, um alle für Sie verfügbaren Bereiche zu sehen.</p><a href="/module">Alle verfügbaren Module</a></div>{% endfor %}
+<div class="module-hub" data-module-hub>
+  <header class="module-hub-hero">
+    <div class="module-hub-hero-content">
+      <div class="module-hub-eyebrow"><span class="module-hub-signal" aria-hidden="true"></span> Ihr digitaler Arbeitsplatz</div>
+      <h1>Ihre Module<span class="module-hub-title-dot" aria-hidden="true">.</span></h1>
+      <p>Alles, was Sie für Ihre Arbeit brauchen – übersichtlich, schnell erreichbar und genau auf Ihre Berechtigungen abgestimmt.</p>
+      <div class="module-hub-hero-actions">
+        <a class="btn btn-primary" href="#module-discovery"><i class="fa-solid fa-compass me-2" aria-hidden="true"></i>Module entdecken</a>
+        <a class="btn btn-outline-secondary" href="/profile/menu"><i class="fa-solid fa-sliders me-2" aria-hidden="true"></i>Arbeitsplatz anpassen</a>
+      </div>
+    </div>
+    <div class="module-hub-hero-aside" aria-label="Ihr Modulüberblick">
+      <div class="module-hub-art" aria-hidden="true">
+        <span class="module-hub-art-tile"><i class="fa-solid fa-layer-group"></i></span>
+        <span class="module-hub-art-tile"><i class="fa-regular fa-calendar-days"></i></span>
+        <span class="module-hub-art-tile"><i class="fa-solid fa-shield-halved"></i></span>
+        <span class="module-hub-art-tile"><i class="fa-solid fa-bolt"></i></span>
+      </div>
+      <div class="module-hub-hero-metrics">
+        <div><strong>{{total}}</strong><span>für Sie verfügbare Module</span></div>
+        <div><strong>{{favorites|length}}</strong><span>gemerkte Favoriten</span></div>
+      </div>
+    </div>
+  </header>
+
+  {% if favorites %}
+  <section class="module-hub-favorites" aria-labelledby="module-favorites-heading">
+    <div class="module-hub-section-title">
+      <div><span class="module-hub-overline"><i class="fa-solid fa-star me-1" aria-hidden="true"></i> Schnellzugriff</span><h2 id="module-favorites-heading">Ihre Favoriten</h2>
+        <p>Die wichtigsten Bereiche mit einem Klick öffnen.</p></div>
+      <a href="/profile/menu" class="module-hub-inline-link">Favoriten verwalten <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <nav aria-label="Favorisierte Module" class="module-hub-favorite-list">
+      {% for row in favorites %}
+      <a class="module-hub-favorite" href="{{row.url}}">
+        <span class="module-hub-favorite-icon module-hub-tone-{{row.group}}" aria-hidden="true"><i class="fa-solid {{row.icon}}"></i></span>
+        <span class="module-hub-favorite-label">{{row.label}}</span>
+        <i class="fa-solid fa-arrow-up-right-from-square module-hub-favorite-arrow" aria-hidden="true"></i>
+      </a>
+      {% endfor %}
+    </nav>
+  </section>
+  {% endif %}
+
+  <section id="module-discovery" class="module-hub-discovery" aria-labelledby="module-discovery-heading">
+    <div class="module-hub-section-title">
+      <div><span class="module-hub-overline">Entdecken &amp; starten</span><h2 id="module-discovery-heading">Alle verfügbaren Bereiche</h2>
+        <p>Nach Namen oder Aufgabe suchen, einen Fachbereich wählen oder Module als Favorit merken.</p></div>
+      <span class="module-hub-total" aria-label="{{rows|length}} von {{total}} Modulen angezeigt">{{rows|length}} <span>von {{total}}</span></span>
+    </div>
+
+    <form method="get" action="/module" role="search" class="module-hub-filters" id="module-filters">
+      <div class="module-hub-search">
+        <label class="form-label" for="module-q">Modul oder Tätigkeit suchen</label>
+        <div class="module-hub-search-control">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input id="module-q" class="form-control" type="search" name="q" maxlength="160" value="{{q}}"
+                 placeholder="Was möchten Sie heute erledigen?" autocomplete="off" spellcheck="false">
+          {% if q %}<a class="module-hub-clear" href="/module{% if category or sort %}?{% if category %}category={{category}}{% endif %}{% if category and sort %}&amp;{% endif %}{% if sort %}sort={{sort}}{% endif %}{% endif %}" aria-label="Suchbegriff löschen"><i class="fa-solid fa-xmark" aria-hidden="true"></i></a>{% endif %}
+        </div>
+      </div>
+      <div class="module-hub-filter">
+        <label class="form-label" for="module-category">Fachbereich</label>
+        <select id="module-category" name="category" class="form-select">
+          <option value="">Alle Fachbereiche</option>
+          {% for key,label in categories.items() %}
+          <option value="{{key}}" {% if category==key %}selected{% endif %}>{{label}} ({{counts[key]}})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="module-hub-filter module-hub-sort">
+        <label class="form-label" for="module-sort">Sortierung</label>
+        <select id="module-sort" name="sort" class="form-select">
+          <option value="" {% if not sort %}selected{% endif %}>Nach Fachbereich</option>
+          <option value="favorites" {% if sort=="favorites" %}selected{% endif %}>Favoriten zuerst</option>
+          <option value="az" {% if sort=="az" %}selected{% endif %}>Alphabetisch A–Z</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary module-hub-search-submit"><i class="fa-solid fa-magnifying-glass me-2" aria-hidden="true"></i>Suchen</button>
+    </form>
+
+    {% if categories %}
+    <nav class="module-hub-categories" aria-label="Nach Fachbereichen filtern">
+      <a href="/module{% if q or sort %}?{% if q %}q={{q|urlencode}}{% endif %}{% if q and sort %}&amp;{% endif %}{% if sort %}sort={{sort}}{% endif %}{% endif %}" class="module-hub-category {{'is-selected' if not category}}" {% if not category %}aria-current="true"{% endif %}>Alle Bereiche <span>{{total}}</span></a>
+      {% for key,label in categories.items() %}
+      <a href="/module?category={{key}}{% if q %}&amp;q={{q|urlencode}}{% endif %}{% if sort %}&amp;sort={{sort}}{% endif %}"
+         class="module-hub-category {{'is-selected' if category==key}}" {% if category==key %}aria-current="true"{% endif %}>{{label}} <span>{{counts[key]}}</span></a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    <p class="module-hub-result-note" role="status" aria-live="polite">{{rows|length}} von {{total}} verfügbaren Modulen
+      {% if q %} für <strong>„{{q}}“</strong>{% endif %}{% if category %} im Fachbereich <strong>{{categories[category]}}</strong>{% endif %}
+      {% if q or category or sort %}<a href="/module" class="module-hub-reset">Alle Module anzeigen</a>{% endif %}
+    </p>
+
+    <div class="module-hub-results" id="module-results">
+      {% for group in groups %}
+      <section class="module-hub-group" aria-labelledby="module-group-{{group.key}}">
+        <div class="module-hub-group-head">
+          <span class="module-hub-group-icon module-hub-tone-{{group.key}}" aria-hidden="true">
+            <i class="fa-solid {{ {'work':'fa-people-group','schedule':'fa-calendar-check','service':'fa-file-circle-check','know':'fa-book-open','personal':'fa-user-group','admin':'fa-gear'}.get(group.key,'fa-layer-group') }}"></i>
+          </span>
+          <div><h3 id="module-group-{{group.key}}">{{group.label}}</h3><span>{{group.rows|length}} {{'Modul' if group.rows|length == 1 else 'Module'}}</span></div>
+        </div>
+
+        <div class="module-catalog">
+          {% for row in group.rows %}
+          <article class="module-hub-card module-hub-tone-{{row.group}}" id="module-{{row.id}}">
+            <div class="module-hub-card-top">
+              <span class="module-hub-card-icon" aria-hidden="true"><i class="fa-solid {{row.icon}}"></i></span>
+              <form method="post" action="/module/favorite" class="module-hub-star-form">
+                <input type="hidden" name="csrf" value="{{csrf}}">
+                <input type="hidden" name="id" value="{{row.id}}">
+                <input type="hidden" name="on" value="{{'0' if row.fav else '1'}}">
+                <input type="hidden" name="q" value="{{q}}">
+                <input type="hidden" name="category" value="{{category}}">
+                <input type="hidden" name="sort" value="{{sort}}">
+                <button type="submit" class="module-hub-star {{'is-favorite' if row.fav}}" aria-pressed="{{'true' if row.fav else 'false'}}"
+                        title="{{'Favorit entfernen' if row.fav else 'Als Favorit merken'}}"
+                        aria-label="{{row.label}}: {{'Favorit entfernen' if row.fav else 'Als Favorit merken'}}">
+                  <i class="fa-{{'solid' if row.fav else 'regular'}} fa-star" aria-hidden="true"></i>
+                </button>
+              </form>
+            </div>
+            <div class="module-hub-card-body">
+              <div class="module-hub-card-kicker">{{row.category}}</div>
+              <h4>{{row.label}}</h4>
+              <p class="module-description">{{row.description}}</p>
+              <p class="module-hub-card-examples">{{row.examples}}</p>
+            </div>
+            <div class="module-hub-card-bottom">
+              <a class="module-hub-card-open" href="{{row.url}}">Öffnen<span class="visually-hidden">: {{row.label}}</span><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+              {% if row.links %}<details class="module-hub-card-links">
+                <summary>Verfügbare Ansichten <span class="module-hub-link-count">{{row.links|length}}</span></summary>
+                <ul>{% for link in row.links %}<li><a href="{{link.url}}">{{link.label}} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></li>{% endfor %}</ul>
+              </details>{% endif %}
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+      {% else %}
+      <div class="module-hub-empty" role="status">
+        <span class="module-hub-empty-icon"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>
+        <h3>Keine passenden Module gefunden</h3>
+        <p>{% if total %}Versuchen Sie einen anderen Suchbegriff oder wählen Sie einen anderen Fachbereich. Es werden ausschließlich Ihre verfügbaren Module durchsucht.{% else %}Für Ihr Konto sind derzeit keine Module freigeschaltet. Wenden Sie sich bei Bedarf an Ihre Portalverwaltung.{% endif %}</p>
+        {% if total %}<a href="/module" class="btn btn-primary">Alle verfügbaren Module <i class="fa-solid fa-arrow-right ms-2" aria-hidden="true"></i></a>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {% if admin_available %}
+  <aside class="module-hub-admin" aria-labelledby="module-admin-title">
+    <span class="module-hub-admin-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+    <div><h2 id="module-admin-title">Administration</h2>
+      <p>Benutzer, Konfiguration und Portalbetrieb – entsprechend Ihren persönlichen Verwaltungsrechten.</p></div>
+    <a class="btn btn-outline-primary" href="/admin">Administration öffnen <i class="fa-solid fa-arrow-right ms-2" aria-hidden="true"></i></a>
+  </aside>
+  {% endif %}
+  <p class="module-hub-footnote"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Hier erscheinen nur Module, für die Sie berechtigt sind. Favoriten verändern keine Zugriffsrechte.</p>
 </div>
-{% if admin_available %}<aside class="card card-body mt-4"><h2 class="h5">Administration</h2><p>Benutzer, Fachkonfiguration und Portalbetrieb – entsprechend Ihren Verwaltungsrechten.</p><a href="/admin">Administration öffnen</a></aside>{% endif %}
 {% endblock %}
