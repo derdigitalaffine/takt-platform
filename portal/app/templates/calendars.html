@@ -24,11 +24,11 @@
 </section>
 <section class="calendar-simple-start" aria-label="Kalenderansicht wählen">
   <nav class="calendar-mode-switch" aria-label="Planungsansicht">
-    <a href="/kalender/jahr{% if selected_org_unit %}?unit={{selected_org_unit}}{% endif %}" class="calendar-mode-choice {{'active' if year_mode}}" {% if year_mode %}aria-current="page"{% endif %}>
+    <a href="/kalender/jahr{% if selected_org_unit %}?unit={{selected_org_unit}}{% endif %}" data-calendar-mode-link class="calendar-mode-choice {{'active' if year_mode}}" {% if year_mode %}aria-current="page"{% endif %}>
       <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-calendar-days"></i></span>
       <span><strong>Jahresplanung</strong><small>12 Monate, gemeinsame Termine und Abwesenheiten</small></span>
     </a>
-    <a href="/kalender?ansicht=termine{% if selected_org_unit %}&amp;unit={{selected_org_unit}}{% endif %}" class="calendar-mode-choice {{'active' if not year_mode}}" {% if not year_mode %}aria-current="page"{% endif %}>
+    <a href="/kalender?ansicht=termine{% if selected_org_unit %}&amp;unit={{selected_org_unit}}{% endif %}" data-calendar-mode-link class="calendar-mode-choice {{'active' if not year_mode}}" {% if not year_mode %}aria-current="page"{% endif %}>
       <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-calendar-week"></i></span>
       <span><strong>Termine &amp; Monat</strong><small>Einzeltermine, Woche und Tagesansicht</small></span>
     </a>
@@ -178,7 +178,7 @@
         </div>
         <p class="planning-supporting mb-3">Das ganze Jahr oder einzelne Monate ansehen. Fachtermine links direkt ein- und ausblenden; zum Bearbeiten einen Termin öffnen.</p>
         <div id="calendar-loading" class="planning-supporting mb-2" role="status" aria-live="polite" hidden><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Kalenderdaten werden geladen …</div>
-        <div id="shared-calendar" aria-label="Interaktiver Kalender" data-calendar-mode="{{'year' if year_mode else 'month'}}"></div>
+        <div id="shared-calendar" aria-label="Interaktiver Kalender" data-calendar-mode="{{'year' if year_mode else 'month'}}" data-calendar-date="{{calendar_date}}" data-calendar-user="{{user.id}}"></div>
         <div id="calendar-error" role="alert" class="text-danger small mt-2" aria-live="assertive"></div>
         <details class="card card-body mt-4 planning-panel planning-event-editor" id="event-editor" {{'hidden' if not writable_calendars and not closure_units}}>
             <summary><i class="fa-solid fa-pen-to-square me-2" aria-hidden="true"></i>Termin oder Schließzeit erfassen</summary>
