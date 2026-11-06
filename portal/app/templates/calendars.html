@@ -92,6 +92,9 @@
                 {% if user.is_admin or user.id==cal.owner_id %}
                   <a class="calendar-source-manage" href="/kalender/{{cal.id}}/teilen">Freigaben</a>
                 {% endif %}
+                {% if cal.visibility=="public" %}
+                  <a class="calendar-source-manage" href="/kalender/oeffentlich/{{cal.id}}">Öffentliche Ansicht</a>
+                {% endif %}
               </div>
             {% endfor %}
             {% if source_choices or (calendars|rejectattr('source','equalto','free')|list) %}
