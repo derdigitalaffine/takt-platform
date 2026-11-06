@@ -70,6 +70,13 @@
       const indicator = document.getElementById("calendar-loading");
       if (indicator) indicator.hidden = !isLoading;
     },
+    datesSet(info) {
+      // The built-in FullCalendar toolbar also changes views. Keep the
+      // workspace mode indicator consistent with those view buttons.
+      queueMicrotask(() => {
+        if (el.isConnected) markMode(info.view.type === "multiMonthYear" ? "year" : "month");
+      });
+    },
     eventClick(info) {
       const event = info.event;
       if (event.extendedProps.source && event.extendedProps.url) {
