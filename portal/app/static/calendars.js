@@ -54,7 +54,7 @@
     headerToolbar: {
       left: "prev,next today",
       center: "title",
-      right: "dayGridMonth,timeGridWeek,listMonth,multiMonthYear",
+      right: "dayGridMonth,timeGridWeek,timeGridDay,listMonth,multiMonthYear",
     },
     loading(isLoading) {
       const indicator = document.getElementById("calendar-loading");
