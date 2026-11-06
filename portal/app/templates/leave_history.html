@@ -1,10 +1,11 @@
 {% extends "base.html" %}{% import '_macros.html' as m with context %}
-{% block title %}Urlaubsverlauf{% endblock %}{% block content %}
+{% block title %}Urlaubsverlauf{% endblock %}{% block head %}<link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}{% block content %}
+<div class="planning-workspace planning-aux">
 {% call m.page_head('Änderungen und Entscheidungen',person.name) %}
     <a class="btn btn-outline-secondary"
        href="/urlaub?unit={{ row.org_id }}">Urlaubsplanung</a>
 {% endcall %}
-<p>Dieser Verlauf ist für die betroffene Person und berechtigte Genehmigende sichtbar.</p>
+<p class="planning-callout"><i class="fa-solid fa-lock me-2" aria-hidden="true"></i>Dieser Verlauf ist ausschließlich für die betroffene Person und berechtigte Genehmigende sichtbar. Die Anzeige enthält keine Diagnosen oder medizinischen Nachweise.</p>
 <ol class="list-group list-group-numbered">
     {% for item in history %}
         <li class="list-group-item">
@@ -14,6 +15,8 @@
                 <p class="mb-0 text-break">{{ item.detail }}</p>
             {% endif %}
         </li>
+    {% else %}<li class="list-group-item">Noch keine Änderungen oder Entscheidungen protokolliert.</li>
     {% endfor %}
 </ol>
+</div>
 {% endblock %}
