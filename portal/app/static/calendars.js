@@ -5,6 +5,15 @@
   const form = document.getElementById("calendar-event-form"),
     fields = form.elements,
     sources = new Map();
+  const preferenceKey = "takt-calendar-visible-v1:" + el.dataset.calendarUser;
+  let sourcePreference = null;
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(preferenceKey) || "null");
+    if (stored && Array.isArray(stored.knownIds) && Array.isArray(stored.knownKinds))
+      sourcePreference = stored;
+  } catch (_) {
+    // Browsing must still work when session storage is unavailable or corrupt.
+  }
   const localValue = (date) => {
     const d = new Date(date);
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
@@ -50,6 +59,7 @@
   const calendar = new FullCalendar.Calendar(el, {
     locale: "de",
     initialView: el.dataset.calendarMode === "year" ? "multiMonthYear" : "dayGridMonth",
+    initialDate: el.dataset.calendarDate || undefined,
     height: "auto",
     headerToolbar: {
       left: "prev,next today",
@@ -134,10 +144,35 @@
     },
   });
   calendar.render();
+  for (const link of document.querySelectorAll("[data-calendar-mode-link]")) {
+    link.addEventListener("click", () => {
+      const current = calendar.getDate();
+      if (!current || Number.isNaN(current.getTime())) return;
+      const target = new URL(link.href);
+      target.searchParams.set("date", localValue(current).slice(0, 10));
+      link.href = target.toString();
+    });
+  }
   // Ephemeral read-only Fachkalender: same server-side projector as attached
   // calendar sources, no additional Calendar rows and no duplicated terms.
   // Forms remain a safe POST fallback for browsers without JavaScript.
   const overlays = new Map();
+  function rememberSelection() {
+    const controls = [...document.querySelectorAll("input[data-calendar]")];
+    const forms = [...document.querySelectorAll("form[data-inline-source]")];
+    const snapshot = {
+      knownIds: controls.map((item) => item.dataset.calendar),
+      ids: controls.filter((item) => item.checked).map((item) => item.dataset.calendar),
+      knownKinds: forms.map((item) => item.dataset.inlineSource),
+      kinds: forms.filter((item) => item.querySelector("button")?.getAttribute("aria-pressed") === "true")
+        .map((item) => item.dataset.inlineSource),
+    };
+    try {
+      sessionStorage.setItem(preferenceKey, JSON.stringify(snapshot));
+    } catch (_) {
+      // Preferences are optional; no change to live calendar visibility.
+    }
+  }
   function showOverlay(form, on) {
     const kind = form.dataset.inlineSource;
     const button = form.querySelector("button");
@@ -184,8 +219,14 @@
       event.preventDefault();
       const button = overlay.querySelector("button");
       showOverlay(overlay, button?.getAttribute("aria-pressed") !== "true");
+      rememberSelection();
     });
-    if (overlay.dataset.sourceDefault === "true") showOverlay(overlay, true);
+    const kind = overlay.dataset.inlineSource;
+    const alreadyChosen = sourcePreference?.knownKinds?.includes(kind);
+    const enabled = alreadyChosen
+      ? sourcePreference.kinds?.includes(kind)
+      : overlay.dataset.sourceDefault === "true";
+    if (enabled) showOverlay(overlay, true);
   }
   function toggleKind() {
     const closed = fields.kind.value === "closure";
@@ -228,6 +269,9 @@
     fields.title.focus({ preventScroll: true });
   });
   for (const check of document.querySelectorAll("[data-calendar]")) {
+    const id = check.dataset.calendar;
+    if (sourcePreference?.knownIds?.includes(id))
+      check.checked = sourcePreference.ids?.includes(id);
     function update() {
       const id = check.dataset.calendar;
       if (!check.checked) {
@@ -266,7 +310,10 @@
         }),
       );
     }
-    check.addEventListener("change", update);
+    check.addEventListener("change", () => {
+      update();
+      rememberSelection();
+    });
     update();
   }
   form.addEventListener("reset", () => {
