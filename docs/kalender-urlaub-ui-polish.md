@@ -35,6 +35,13 @@ Die bestehenden Takt-Komponenten – Bootstrap-Designsystem, FullCalendar Standa
 | Schließzeiten & Notbesetzung | Status „Besetzung abgedeckt/Notbesetzung offen“, Anzahl, separate Hinweise bei fehlender Abdeckung; keine neue Closure-Tabelle |
 | Verwaltung | Einhaltung bestehender fünf Seiten; verständliche Arbeitsmodell-Zählung und fehlende-Konfiguration-Hinweise, weiterhin separate CSRF- und Rechteprüfungen |
 
+## Navigation ohne kompletten Seitenwechsel
+
+- Kalender: Jahres- und Monatsmodus werden über dieselbe FullCalendar-Instanz gewechselt. Die direkten URLs bleiben als No-JavaScript-Fallback und für Lesezeichen gültig. Die History API hält den Wechsel im Browserverlauf; das Datum bleibt beim Umschalten erhalten.
+- Urlaub: Unterseiten werden weiterhin unverändert serverseitig mit ihren jeweiligen Berechtigungen und Feldern gerendert. Die progressive Navigation lädt diese HTML-Antwort im selben Ursprung und ersetzt ausschließlich den Urlaubsarbeitsbereich. Bei Weiterleitungen, Fehlern und ungültigen Antworten erfolgt eine normale Navigation.
+- Nach dem Austausch werden lokale Suche, Informationsdichte, Auswahlpicker, Urlaubsplaner und dessen Tastaturereignisse kontrolliert reinitialisiert; die vorige Zeitachse wird zerstört. Formular-POSTs, externe Workflows sowie weitere Module bleiben beim vorhandenen Verhalten.
+- Die Kopfbereiche sind bewusst kompakt. Der Jahresplan-Einrichtungsbereich ist auch bei initialer Monatsansicht im DOM vorhanden, wird jedoch nur in der Jahresansicht gezeigt.
+
 ## Accessibility, Datenschutz, technische Grenzen
 
 Die gesamte UI benutzt vorhandene Kontrast- und Theme-Tokens, legt bei Tastaturfokus einen klaren Ring an und berücksichtigt `prefers-reduced-motion` sowie Systemfarben mit `forced-colors`. Der mobile Dialog wird mit Fokusfang und Fokuswiederherstellung verbessert. Kalenderquellensuche und Statusfilter sind **rein lokal auf bereits serverseitig freigegebene Inhalte begrenzt**. Es werden weder vertrauliche Krankgründe noch weitergehende Zugriffsrechte an den Client übertragen.
