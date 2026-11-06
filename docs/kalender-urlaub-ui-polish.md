@@ -31,7 +31,7 @@ Die bestehenden Takt-Komponenten – Bootstrap-Designsystem, FullCalendar Standa
 | Planer | Personenanzahl, klarer Hinweis auf Zeitauswahl/Konfliktprüfung, Legende für Geplant/Beantragt/Verbindlich/Abwesend/Besetzungshinweis; Zeitachse mit sticky Namen und ruhigerem Layout |
 | Eingabe- und Konfliktpanel | Beibehaltenes rechtsseitiges Panel und mobile Vollansicht; Kennzeichnung der Entwurfssituation und Screenreader-Fehlerstatus |
 | Mobile Bedienung | Editor trägt `role=dialog`, `aria-modal`, beschrifteten Titel; Tab/Shift+Tab bleiben im offenen Dialog, Escape und Schließen stellen den bisherigen Fokus wieder her |
-| Mein Urlaub / Genehmigungen | Status wird zusätzlich zu Farbsignalen als Textpille angezeigt. Einträge haben semantisch passendere Überschriften und klarere Leerzustände |
+| Mein Urlaub / Genehmigungen | Status wird zusätzlich zu Farbsignalen als Textpille angezeigt. Eine lokale Suche nach sichtbaren Personen-/Zeitraumangaben, ein Statusfilter, Ergebniszähler und klare Leerzustände beschleunigen den Alltag – ohne weitere Datenabfragen oder zusätzliche Berechtigungen. |
 | Schließzeiten & Notbesetzung | Status „Besetzung abgedeckt/Notbesetzung offen“, Anzahl, separate Hinweise bei fehlender Abdeckung; keine neue Closure-Tabelle |
 | Verwaltung | Einhaltung bestehender fünf Seiten; verständliche Arbeitsmodell-Zählung und fehlende-Konfiguration-Hinweise, weiterhin separate CSRF- und Rechteprüfungen |
 
