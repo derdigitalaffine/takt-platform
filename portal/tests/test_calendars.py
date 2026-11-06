@@ -359,14 +359,13 @@ def test_global_year_calendar_one_click_create_is_idempotent_and_private_to_logi
                 db.commit()
 
 
-def test_inline_fachkalender_does_not_expose_other_people_absence_rows(db, task_people):
+def test_inline_fachkalender_does_not_expose_other_people_absence_rows(db, task_people, units):
     """The same existing leave projector restricts every inline request to its actor."""
     from app.leave_models import LeaveRequest
-    from app import leave
 
     first, other = task_people[:2]
     row = LeaveRequest(
-        person_id=first.id, org_id=1, status="binding",
+        person_id=first.id, org_id=units[1].id, status="binding",
         starts_on="2026-12-14", ends_on="2026-12-16",
         effective_json='{"starts_on":"2026-12-14","ends_on":"2026-12-16","start_half":"am","end_half":"pm"}',
     )
