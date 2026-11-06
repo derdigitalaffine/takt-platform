@@ -74,5 +74,5 @@ window.taktInitUiPreferences = () => {
       HTMLFormElement.prototype.submit.call(selector.form);
     });
   }
-}};
+};
 window.taktInitUiPreferences();
