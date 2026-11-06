@@ -186,6 +186,14 @@
 .planning-workspace .calendar-workspace .fc { --fc-today-bg-color: var(--bs-primary-bg-subtle); }
 .planning-workspace .calendar-workspace .fc .fc-header-toolbar { margin-bottom: 1.1rem; }
 .planning-workspace .calendar-workspace .fc .fc-toolbar-title { font-weight: 700; letter-spacing: -.015em; font-size: clamp(1.12rem, 1.5vw, 1.4rem); }
+.planning-workspace .calendar-workspace .fc .fc-toolbar-chunk { max-width: 100%; }
+.planning-workspace .calendar-workspace .fc .fc-toolbar-chunk:has(.fc-button-group) {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: .2rem .1rem;
+}
+.planning-workspace .calendar-workspace .fc .fc-button-group { white-space: nowrap; }
+
 .planning-workspace .calendar-workspace .fc .fc-button { border-radius: .55rem; }
 .planning-workspace .calendar-workspace .fc .fc-button-group .fc-button { border-radius: 0; }
 .planning-workspace .calendar-workspace .fc .fc-button-group .fc-button:first-child { border-start-start-radius: .55rem; border-end-start-radius: .55rem; }
