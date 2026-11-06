@@ -59,6 +59,31 @@
     });
   });
 
+  const requestSearch = root.querySelector("#leave-request-search");
+  const statusFilter = root.querySelector("#leave-status-filter");
+  const filteredCount = root.querySelector("#leave-request-filter-count");
+  const emptyResults = root.querySelector("#leave-request-no-matches");
+  const requestCards = [...root.querySelectorAll("#leave-request-list .leave-request-card")];
+  function filterRequests() {
+    if (!requestSearch || !statusFilter) return;
+    const term = requestSearch.value.trim().toLocaleLowerCase("de");
+    const status = statusFilter.value;
+    let count = 0;
+    for (const card of requestCards) {
+      const searchText = card.querySelector("h3, h2")?.textContent
+        .toLocaleLowerCase("de") || "";
+      card.hidden = !(searchText.includes(term) &&
+        (!status || card.dataset.status === status));
+      if (!card.hidden) count += 1;
+    }
+    if (filteredCount) filteredCount.textContent = count + " von " +
+      requestCards.length + " Einträgen";
+    if (emptyResults) emptyResults.hidden = count !== 0 || requestCards.length === 0;
+  }
+  requestSearch?.addEventListener("input", filterRequests);
+  statusFilter?.addEventListener("change", filterRequests);
+  filterRequests();
+
   const legendButton = root.querySelector("[data-planning-help]");
   legendButton?.addEventListener("click", () => {
     const detail = root.querySelector("#planning-help-detail");
