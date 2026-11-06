@@ -40,8 +40,7 @@
       <span><strong>Mein Urlaub</strong><small>Eigene Abwesenheiten und Anträge</small></span>
     </a>{% endif %}
   </nav>
-  {% if year_mode %}
-  <div class="calendar-year-information">
+  <div class="calendar-year-information" {{'hidden' if not year_mode}}>
     {% if shared_year %}
       <span class="calendar-year-ok" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
       <div><strong>Gemeinsamer Jahresplan: {{shared_year.title}}</strong>
@@ -63,7 +62,6 @@
       <div><strong>Jahresübersicht sofort verfügbar</strong><p class="mb-0">Berechtigte Termine sind schon sichtbar. Einen zusätzlichen gemeinsamen Kalender kann die zuständige Verwaltung anlegen.</p></div>
     {% endif %}
   </div>
-  {% endif %}
 </section>
 <div class="row g-4 calendar-workspace">
     <aside class="col-12 col-lg-3">
