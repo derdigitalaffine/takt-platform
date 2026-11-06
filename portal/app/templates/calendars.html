@@ -42,7 +42,8 @@
             </label>
             <div id="calendar-source-list" class="calendar-source-list">
             {% for cal in calendars %}
-                <label class="form-check" data-calendar-source>
+                <div data-calendar-source class="planning-source-item">
+                <label class="form-check">
                     <input class="form-check-input"
                            type="checkbox"
                            data-calendar="{{ cal.id }}"
@@ -55,6 +56,7 @@
                 {% if cal.visibility=="public" %}
                     <a class="small" href="/kalender/oeffentlich/{{ cal.id }}">Öffentliche Ansicht</a>
                 {% endif %}
+                </div>
             {% else %}
                 <div class="planning-empty"><strong>Keine Kalender freigegeben</strong><p class="small mt-1">Freigaben oder einen eigenen Kalender anlegen, um Termine anzuzeigen.</p></div>
             {% endfor %}
