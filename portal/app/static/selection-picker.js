@@ -1,5 +1,5 @@
 /* Native checkboxes keep the form usable without JavaScript. All rights stay on the server. */
-(() => {
+window.taktInitSelectionPicker = () => {
   const fold = (value) =>
     value
       .normalize("NFKD")
@@ -123,4 +123,5 @@
     });
     render();
   }
-})();
+};
+window.taktInitSelectionPicker();
