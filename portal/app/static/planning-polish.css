@@ -605,3 +605,5 @@
   .planning-workspace .calendar-mode-switch { display: flex; gap: .35rem; }
   .planning-workspace .calendar-mode-choice { flex: 1 1 8.8rem; min-height: 2.8rem; }
 }
+
+.planning-workspace .calendar-year-information[hidden] { display: none !important; }
