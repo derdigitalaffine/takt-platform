@@ -123,14 +123,17 @@
       {% endif %}
       {% if active_section in ('planer', 'mein-urlaub', 'genehmigungen') %}
         <section class="leave-requests" aria-label="{{'Offene Genehmigungen' if active_section=='genehmigungen' else 'Meine Urlaubszeiten' if active_section=='mein-urlaub' else 'Urlaubseinträge'}}">
-          <h2 class="h5">{{'Offene Genehmigungen' if active_section=='genehmigungen' else 'Meine Urlaubszeiten' if active_section=='mein-urlaub' else 'Urlaubseinträge'}}</h2>
+          <div class="planning-section-heading"><h2 class="h5">{{'Offene Genehmigungen' if active_section=='genehmigungen' else 'Meine Urlaubszeiten' if active_section=='mein-urlaub' else 'Urlaubseinträge'}}</h2><span class="planning-count">{{rows|length}} Einträge</span></div>{% if active_section=='genehmigungen' %}<p class="planning-supporting">Nur Vorgänge in Ihrer Zuständigkeit. Entscheidungen und Ausnahmen werden nachvollziehbar protokolliert.</p>{% endif %}
 {% for row in rows %}
         {% if active_section == 'planer' or (active_section == 'mein-urlaub' and row.person_id == user.id) or (active_section == 'genehmigungen' and ((row.status == 'requested' and approvers[row.id]) or (row.cancel_requested and cancel_approvers[row.id]))) %}
             {% set row_policy = row_policies[row.id] %}
-            <article id="leave-row-{{ row.id }}" class="card card-body mb-3 leave-request-card">
-                <h2 class="h6">{{ (people|selectattr('id','equalto',row.person_id)|first).name}} · {{ row.starts_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.start_half=='am' else 'Nachmittag'}}) bis {{ row.ends_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.end_half=='am' else 'Nachmittag'}})</h2>
-                <p>{{{'planned':'Geplant','requested':'Beantragt','binding':'Verbindlich','rejected':'Abgelehnt','cancelled':'Storniert'}[row.status]}}{% if row.attested_at %} · Extern genehmigt (Selbstauskunft){% endif %}{% if row.effective_json and row.status!="binding" %} · Bisheriger verbindlicher Zeitraum gilt bis zur Entscheidung weiter.{% endif %}
-                </p>
+            <article id="leave-row-{{ row.id }}" class="card card-body mb-3 leave-request-card" data-status="{{row.status}}">
+                <h3 class="h6">{{ (people|selectattr('id','equalto',row.person_id)|first).name}} · {{ row.starts_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.start_half=='am' else 'Nachmittag'}}) bis {{ row.ends_on.split("-")|reverse|join('.') }} ({{'Vormittag' if row.end_half=='am' else 'Nachmittag'}})</h3>
+                <div class="planning-request-meta mb-2">
+  <span class="planning-status" data-status="{{row.status}}">{{{'planned':'Geplant','requested':'Beantragt','binding':'Verbindlich','rejected':'Abgelehnt','cancelled':'Storniert'}[row.status]}}</span>
+  {% if row.attested_at %}<span class="planning-status" title="Persönliche Angabe, nicht technisch geprüft">Extern genehmigt · Selbstauskunft</span>{% endif %}
+  {% if row.effective_json and row.status!="binding" %}<span class="planning-supporting">Bisheriger verbindlicher Zeitraum gilt bis zur Entscheidung weiter.</span>{% endif %}
+</div>
                 {% if history_rights[row.id] %}
                     <a class="small mb-2" href="/urlaub/{{ row.id }}/verlauf">Änderungen und Entscheidungen</a>
                 {% endif %}
@@ -207,7 +210,7 @@
             </article>
         {% endif %}
         {% else %}
-            <p>In diesem Bereich sind noch keine Urlaubszeiten geplant.</p>
+            <div class="planning-empty"><span class="planning-muted-icon mb-2"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span><h3>{{'Keine offenen Entscheidungen' if active_section=='genehmigungen' else 'Noch keine Urlaubszeiten'}}</h3><p>{{'Für diesen Bereich stehen aktuell keine Genehmigungen aus.' if active_section=='genehmigungen' else 'Neue Planungen erscheinen hier und in der Personenzeitachse. Fachabwesenheiten bleiben in ihren Originalmodulen.'}}</p></div>
         {% endfor %}
 
         </section>
