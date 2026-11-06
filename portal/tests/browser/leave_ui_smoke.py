@@ -83,7 +83,7 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 p.get_by_role(
                     "button", name="Verbindlich markieren", exact=True
                 ).click()
-                expect(p.locator("article > p").first).to_contain_text("Verbindlich")
+                expect(p.locator("article .planning-status[data-status='binding']").first).to_contain_text("Verbindlich")
                 p.get_by_role("button", name="Zeitraum bearbeiten", exact=True).click()
                 p.locator("#leave-starts_on-display").fill("14.12.2026")
                 p.locator("#leave-ends_on-display").fill("16.12.2026")
@@ -99,7 +99,7 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                     p.get_by_role(
                         "button", name="Verbindlich markieren", exact=True
                     ).click()
-                expect(p.locator("article > p").first).to_contain_text("Verbindlich")
+                expect(p.locator("article .planning-status[data-status='binding']").first).to_contain_text("Verbindlich")
                 expect(p.locator("#leave-calendar .pt-table")).to_be_visible()
                 # Multiple saves within the visible quarter must not reset the
                 # chosen zoom or calendar anchor.
@@ -160,6 +160,11 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 expect(p.locator("#leave-side-panel")).to_be_hidden()
                 p.locator("#leave-open-editor").click()
                 expect(p.locator("#leave-side-panel")).to_be_visible()
+                expect(p.locator("#leave-side-panel")).to_have_attribute("aria-modal", "true")
+                p.keyboard.press("Escape")
+                expect(p.locator("#leave-side-panel")).to_be_hidden()
+                expect(p.locator("#leave-open-editor")).to_be_focused()
+                p.locator("#leave-open-editor").click()
                 p.get_by_role("button", name="Bearbeitung schließen").click()
                 expect(p.locator("#leave-side-panel")).to_be_hidden()
                 p.wait_for_function(
@@ -172,6 +177,8 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 )
                 p.set_viewport_size({"width": 1440, "height": 1000})
                 p.goto(base + "/kalender")
+                expect(p.get_by_role("heading", name="Terminübersicht")).to_be_visible()
+                expect(p.locator("#calendar-source-search")).to_be_visible()
                 p.locator("summary").filter(has_text="Kalender anlegen").click()
                 p.get_by_label("Name", exact=True).fill("Gemeinsame Jahrestermine")
                 p.get_by_role("button", name="Kalender anlegen", exact=True).click()
@@ -202,7 +209,19 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                     p.get_by_role("button", name="Freigabe entziehen", exact=True)
                 ).to_have_count(2)
                 p.goto(base + "/kalender")
-                p.locator("#event-editor summary").click()
+                p.locator("#calendar-source-search").fill("Gemeinsame Jahrestermine")
+                expect(p.locator("[data-calendar-source]:visible")).to_have_count(1)
+                expect(p.locator("#calendar-source-match-count")).to_contain_text("1 von")
+                p.locator("[data-calendar-choose='none']").click()
+                expect(p.get_by_label("Gemeinsame Jahrestermine", exact=True)).not_to_be_checked()
+                p.locator("[data-calendar-choose='all']").click()
+                expect(p.get_by_label("Gemeinsame Jahrestermine", exact=True)).to_be_checked()
+                p.locator("#calendar-source-search").clear()
+                p.get_by_role("button", name="Kompakt", exact=True).click()
+                expect(p.locator("html")).to_have_attribute("data-density", "compact")
+                p.get_by_role("button", name="Komfortabel", exact=True).click()
+                p.get_by_role("button", name="Neuer Termin", exact=True).click()
+                expect(p.locator("#event-editor")).to_have_attribute("open", "")
                 form = p.locator("#calendar-event-form")
                 form.get_by_label("Titel", exact=True).fill("Jahresauftakt")
                 form.get_by_label("Ganztägig", exact=True).check()
@@ -230,7 +249,7 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 expect(p.get_by_role("navigation", name="Urlaubsbereiche")).to_be_visible()
                 closed = p.get_by_role(
                     "heading", name="Schließzeit: Betriebsruhe", exact=True
-                ).locator("..")
+                ).locator("xpath=ancestor::section[1]")
                 expect(closed).to_contain_text("Notbesetzung in")
                 with p.expect_navigation(wait_until="domcontentloaded"):
                     closed.get_by_role(
