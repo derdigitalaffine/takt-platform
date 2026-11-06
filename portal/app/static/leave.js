@@ -473,5 +473,5 @@ window.taktInitLeave = async () => {
   } catch (error) {
     report(error);
   }
-}};
+};
 window.taktInitLeave();
