@@ -5,7 +5,7 @@
 ## Bedienung
 
 1. **Kalender öffnen:** `/kalender` zeigt sofort das ganze Jahr (die bisherige Monatsansicht bleibt über **Termine & Monat** bzw. `/kalender?ansicht=termine` erreichbar). Die bestehende `/kalender/jahr`-Verknüpfung ist ein direkter Jahreslink. Tag, Woche, Monat, Liste und Jahr funktionieren weiterhin mit FullCalendar Standard.
-2. **Benötigte Fachtermine einblenden:** Im dauerhaft sichtbaren Abschnitt **Was möchten Sie sehen?** einen Fachkalender einmal anklicken. Ein zweiter Klick blendet ihn wieder aus. Die Auswahl betrifft die aktuelle Kalenderanzeige; der Fachdatensatz bleibt beim Ursprung.
+2. **Benötigte Fachtermine einblenden:** Im dauerhaft sichtbaren Abschnitt **Was möchten Sie sehen?** einen Fachkalender einmal anklicken. Ein zweiter Klick blendet ihn wieder aus. Die Auswahl wird pro angemeldetem Konto in der aktuellen Browser-Sitzung gemerkt und bleibt beim Wechsel zwischen Jahres- und Monatsansicht erhalten. Sie ist eine lokale Anzeigepräferenz, keine zusätzliche Fachfreigabe. Der Fachdatensatz bleibt beim Ursprung.
 3. **Eigene und gemeinsame Kalender:** Berechtigte bestehende Kalender stehen direkt darüber, unabhängig von der Quelle. „Alle zeigen / Alle ausblenden“ berücksichtigt **auch** die Fachkalender. Die Suche filtert sichtbare Auswahlmöglichkeiten, nicht die Fach- oder Personenrechte.
 4. **Jahresplanung für alle einrichten:** Wenn noch kein passender gemeinsamer Jahreskalender vorhanden ist, gibt es eine **einzige, explizite Einrichtungsaktion**. Personen mit `calendar_publish` und `calendars` können einen internen Kalender **Jahresplanung** einrichten, der für alle angemeldeten Portalnutzer **lesbar** ist. Personen mit Kalender- und bereichsbezogenen Planungsrechten können stattdessen einen Bereichskalender erstellen. Wiederholtes Klicken erzeugt keinen zweiten Kalender desselben Geltungsbereichs.
 5. **Termin erfassen:** Im bestehenden gemeinsamen Jahresplan führt **Jahrestermin eintragen** direkt in den bewährten Editor und wählt den richtigen Kalender vor. Schreibrechte bleiben strikt an die Kalenderrolle/Freigabe gebunden; ein gemeinsamer Lesekalender erlaubt nicht automatisch das Schreiben.
@@ -29,7 +29,7 @@
 
 ## UI und Barrierefreiheit
 
-Die Oberfläche bleibt beim vorhandenen Takt-/Bootstrap-Design, unterstützt Hell/Dunkel und Komfort/Kompakt, hat große Schaltflächen und ausdrücklich ausgeschriebene Zustände. Drei klar getrennte Wege führen zu **Jahresplanung**, **Termine & Monat** und **Teamabwesenheiten**. Die Jahresansicht ist auch ohne individuelle Einrichtung nutzbar. Der Layoutmodus passt die Navigation und Fachkalender-Auswahl an kleine Bildschirme an, ohne neue Frameworks.
+Die Oberfläche bleibt beim vorhandenen Takt-/Bootstrap-Design, unterstützt Hell/Dunkel und Komfort/Kompakt, hat große Schaltflächen und ausdrücklich ausgeschriebene Zustände. Drei klar getrennte Wege führen zu **Jahresplanung**, **Termine & Monat** und **Teamabwesenheiten**. Die Jahresansicht ist auch ohne individuelle Einrichtung nutzbar. Beim Wechsel der Planungsansicht bleibt das gewählte Kalenderdatum als geprüfter URL-Parameter erhalten, damit ein ausgewähltes Planungsjahr nicht verloren geht. Der Layoutmodus passt die Navigation und Fachkalender-Auswahl an kleine Bildschirme an, ohne neue Frameworks.
 
 Ohne JavaScript zeigt die Jahres-/Monatsauswahl weiterhin die korrekte serverseitig gerenderte Seite. Ein Fachkalender-Button fällt dann auf den bisherigen, CSRF-geschützten `POST /kalender/quellen`-Mechanismus zurück, damit ein Fachkalender dauerhaft angebunden werden kann.
 
