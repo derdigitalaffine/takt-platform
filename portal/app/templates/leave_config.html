@@ -28,9 +28,11 @@
 {% endif %}
 {% endif %}
 {% if active_section == 'schliesszeiten' %}
+<div class="planning-section-heading"><h2 class="h5"><i class="fa-solid fa-calendar-xmark me-2" aria-hidden="true"></i>Schließzeiten und Notbesetzung</h2><span class="planning-count">{{closures|length}} Schließzeiten</span></div>
+<p class="planning-supporting">Einteilungen, freiwillige Meldungen und Mindestbesetzung bleiben mit den vorhandenen Kalenderobjekten verknüpft.</p>
 {% for closed in closures %}
     <section class="card card-body mb-3" id="closure-{{ closed.id }}">
-        <h2 class="h6">Schließzeit: {{ closed.title }}</h2>
+        <div class="planning-section-heading"><h3 class="h6 mb-0">Schließzeit: {{ closed.title }}</h3><span class="planning-status" data-status="{{'requested' if closure_statuses[closed.id].shortages else 'binding'}}">{{'Notbesetzung offen' if closure_statuses[closed.id].shortages else 'Besetzung abgedeckt'}}</span></div>
         <p>{{closure_statuses[closed.id].assigned}} {{'Person' if closure_statuses[closed.id].assigned==1 else 'Personen'}} zur Notbesetzung eingeteilt.</p>
         {% if closure_statuses[closed.id].shortages %}<details class="alert alert-warning"><summary>Notbesetzung in {{closure_statuses[closed.id].shortages|length}} Tageshälften nicht gedeckt</summary><ul class="mt-2">{% for gap in closure_statuses[closed.id].shortages %}<li>{{gap.day}} · {{'Vormittag' if gap.half=='am' else 'Nachmittag'}}: {{gap.available}} verfügbar, {{closed.emergency_minimum}} erforderlich</li>{% endfor %}</ul></details>{% endif %}
         <p>{{ closed.starts_on }} bis {{ closed.ends_on }} · Mindest-Notbesetzung: {{ closed.emergency_minimum }}</p>
@@ -126,5 +128,7 @@
     </details>
 {% endif %}
 </section>
+{% else %}
+<div class="planning-empty mb-3"><span class="planning-muted-icon mb-2"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span><h3>Keine Schließzeiten hinterlegt</h3><p>Geplante Schließtage erscheinen hier mit Notbesetzungsstand. Berechtigte Personen können sie im anschließenden Formular anlegen.</p></div>
 {% endfor %}
 {% endif %}

@@ -1,6 +1,6 @@
-{% extends "base.html" %}{% import '_macros.html' as m with context %}{% block content %}{{ m.page_head('Gerätezugang erstellt',device.name) }}<div class="card card-body">
-<p>Übertragen Sie diese Angaben jetzt in Ihren Kalenderclient. Das Gerätepasswort wird nur einmal angezeigt.</p>
-<dl>
+{% extends "base.html" %}{% import '_macros.html' as m with context %}{% block head %}<link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}{% block content %}<div class="planning-workspace planning-aux">{{ m.page_head('Gerätezugang erstellt',device.name) }}<div class="card card-body">
+<p class="planning-callout"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i><strong>Einmalige Anzeige:</strong> Das Gerätepasswort ist vertraulich. Übertragen Sie die Angaben nur auf Ihr eigenes Gerät und widerrufen Sie den Zugang bei Verlust.</p>
+<dl class="planning-credentials">
     <dt>Server</dt>
     <dd>
         <code>{{ server }}</code>
@@ -26,5 +26,6 @@
 <p>Apple Kalender und Thunderbird können CalDAV verwenden. Für Android ist eine passende CalDAV-Synchronisationsapp erforderlich. Bei Outlook hängt die Einrichtung von der Variante und gegebenenfalls einem Zusatzprogramm ab.</p>
 <a class="btn btn-outline-primary" href="/kalender/hilfe">Einrichtungshilfe</a>
 <a class="btn btn-outline-secondary" href="/kalender/geraete">Zu meinen Geräten</a>
+</div>
 </div>
 {% endblock %}

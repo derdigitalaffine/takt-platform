@@ -6,23 +6,43 @@
   const form = document.getElementById("leave-form");
   const sidePanel = document.getElementById("leave-side-panel");
   const editorOpener = document.getElementById("leave-open-editor");
+  let editorReturnFocus = null;
   function closeMobileEditor() {
     if (!sidePanel?.classList.contains("is-open")) return;
     sidePanel.classList.remove("is-open");
     sidePanel.removeAttribute("role");
     sidePanel.removeAttribute("aria-modal");
-    editorOpener?.focus();
+    sidePanel.removeAttribute("aria-labelledby");
+    const target = editorReturnFocus?.isConnected ? editorReturnFocus : editorOpener;
+    target?.focus();
   }
   function openEditor() {
     if (!sidePanel || !window.matchMedia("(max-width: 580px)").matches) return;
+    if (!sidePanel.classList.contains("is-open")) editorReturnFocus = document.activeElement;
     sidePanel.classList.add("is-open");
     sidePanel.setAttribute("role", "dialog");
     sidePanel.setAttribute("aria-modal", "true");
+    sidePanel.setAttribute("aria-labelledby", "leave-editor-title");
   }
   editorOpener?.addEventListener("click", () => edit(null));
   document.getElementById("leave-close-editor")?.addEventListener("click", closeMobileEditor);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeMobileEditor();
+    if (!sidePanel?.classList.contains("is-open")) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMobileEditor();
+    }
+    if (event.key !== "Tab") return;
+    const focusable = [...sidePanel.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+    )].filter((element) => !element.hidden && element.getClientRects().length);
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      last.focus(); event.preventDefault();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      first.focus(); event.preventDefault();
+    }
   });
   const feedback = document.getElementById("leave-feedback");
   let requests = [],

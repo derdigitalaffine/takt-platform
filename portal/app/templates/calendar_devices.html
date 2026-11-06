@@ -1,12 +1,11 @@
-{% extends "base.html" %}{% import '_macros.html' as m with context %}{% block title %}Kalendergeräte{% endblock %}{% block content %}
+{% extends "base.html" %}{% import '_macros.html' as m with context %}{% block title %}Kalendergeräte{% endblock %}{% block head %}<link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}{% block content %}
+<div class="planning-workspace planning-aux">
 {% call m.page_head('Kalendergeräte','Eigene Geräte verbinden und Zugänge einzeln verwalten.') %}
     <a class="btn btn-outline-secondary" href="/kalender">Kalender</a>
 {% endcall %}
-<p>
-    <a href="/kalender/hilfe">Einrichtung für iPhone, Android, Thunderbird und Outlook</a>
-</p>
+<p class="planning-callout mb-4"><i class="fa-solid fa-circle-info me-2" aria-hidden="true"></i>Gerätezugänge sind unabhängig vom Portalpasswort und jederzeit widerrufbar. <a href="/kalender/hilfe">Einrichtung für iPhone, Android, Thunderbird und Outlook</a></p>
 <section class="card card-body mb-4">
-    <h2 class="h5">Gerät verbinden</h2>
+    <div class="planning-section-heading"><h2 class="h5">Gerät verbinden</h2><span class="planning-count">{{ calendars|length }} freigegebene Kalender</span></div>
     <form method="post" action="/kalender/geraete">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label class="form-label">
@@ -65,7 +64,7 @@
 {% endif %}
 {% for device in devices %}
     <section class="card card-body mb-3">
-        <h2 class="h6">{{ device.name }}</h2>
+        <div class="planning-section-heading"><h2 class="h6">{{ device.name }}</h2><span class="planning-status" data-status="{{'cancelled' if device.revoked else 'binding' if not (device.expires_at and device.expires_at <= now) else 'cancelled'}}">{{'Widerrufen' if device.revoked else 'Abgelaufen' if device.expires_at and device.expires_at <= now else 'Aktiv'}}</span></div>
         <p>{{'Widerrufen' if device.revoked else 'Abgelaufen' if device.expires_at and device.expires_at <= now else 'Aktiv'}} · Letzter Zugriff: {{ device.last_used|local if device.last_used else 'noch keiner' }} · {{'Gültig bis ' ~ device.expires_at if device.expires_at else 'bis zum Widerruf'}}</p>
         {% if not device.revoked %}
             <form method="post" action="/kalender/geraete/{{ device.id }}/widerrufen">
@@ -100,5 +99,6 @@
             </details>
         {% endif %}
     </section>
-{% endfor %}
+{% else %}<div class="planning-empty mt-3"><h2>Noch keine Gerätezugänge</h2><p>Für jedes Gerät einen eigenen Zugang anlegen. So kann ein verlorenes Gerät einzeln gesperrt werden.</p></div>{% endfor %}
+</div>
 {% endblock %}

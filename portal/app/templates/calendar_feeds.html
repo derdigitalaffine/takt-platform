@@ -1,8 +1,12 @@
 {% extends "base.html" %}{% import '_macros.html' as m with context %}
+{% block title %}Kalenderabonnements{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}
 {% block content %}
+<div class="planning-workspace planning-aux">
     {% call m.page_head('Kalender lesend abonnieren','Ein eigener Link pro Abo, jederzeit widerrufbar.') %}
         <a class="btn btn-outline-secondary" href="/kalender">Kalender</a>
     {% endcall %}
+    <p class="planning-callout mb-3"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Abonnements sind ausschließlich lesend. Der individuelle Link ist ein Zugangsmittel und darf nicht öffentlich geteilt werden.</p>
     <form method="post" class="card card-body">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label>
@@ -20,7 +24,7 @@
     {% for feed in feeds %}
         <section class="card card-body mt-3">
             <h2 class="h6">{{ feed.name }}</h2>
-            <p>{{'Widerrufen' if feed.revoked else 'Aktiv'}}</p>
+            <p><span class="planning-status" data-status="{{'cancelled' if feed.revoked else 'binding'}}">{{'Widerrufen' if feed.revoked else 'Aktiv'}}</span></p>
             {% if not feed.revoked %}
                 <form method="post" action="/kalender/abos/{{ feed.id }}/widerrufen">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -28,5 +32,6 @@
                 </form>
             {% endif %}
         </section>
-    {% endfor %}
+    {% else %}<div class="planning-empty mt-3"><h2>Noch keine Abonnements</h2><p>Ein neues Abo gibt einem Kalenderprogramm lesenden Zugriff auf genau den ausgewählten Kalender.</p></div>{% endfor %}
+</div>
 {% endblock %}
