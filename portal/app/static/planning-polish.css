@@ -302,3 +302,25 @@
 .planning-workspace.planning-aux [id^="calendar-"] {
   scroll-margin-top: 5.5rem;
 }
+
+.planning-workspace .planning-request-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: .65rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: .8rem;
+  padding: .8rem;
+  background: var(--bs-tertiary-bg);
+  margin-bottom: 1rem;
+}
+.planning-workspace .planning-request-tools > div:first-child { flex: 1 1 15rem; }
+.planning-workspace .planning-request-tools > div:nth-child(2) { flex: 0 1 12rem; }
+.planning-workspace .planning-request-tools .form-label { display: block; font-size: .78rem; margin-bottom: .25rem; }
+.planning-workspace .planning-request-tools .form-control,
+.planning-workspace .planning-request-tools .form-select { width: 100%; }
+.planning-workspace #leave-request-list > article[hidden] { display: none !important; }
+[data-density="compact"] .planning-workspace .planning-request-tools { padding: .55rem; gap: .4rem; }
+@media (max-width: 575.98px) {
+  .planning-workspace .planning-request-tools > div:nth-child(2) { flex: 1 1 9rem; }
+}
