@@ -3,80 +3,137 @@
 {% block head %}<link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/planning-polish.css">{% endblock %}
 {% block content %}
 <div class="planning-workspace planning-calendar">
-{% call m.page_head('Kalender','Persönliche und gemeinsame Termine in einer Übersicht.') %}
+{% call m.page_head('Kalender & Jahresplanung','Der gemeinsame Jahresplan und alle berechtigt sichtbaren Fachtermine – ohne doppelte Pflege.') %}
     {% if writable_calendars or closure_units %}<button type="button" class="btn btn-primary" data-planning-open-editor="#event-editor"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neuer Termin</button>{% endif %}
     <a class="btn btn-outline-primary" href="/urlaub">Urlaub & Verfügbarkeit</a>
     <a class="btn btn-outline-secondary" href="/kalender/geraete">Gerät verbinden</a>
     <a class="btn btn-outline-secondary" href="/kalender/abos">Lesend abonnieren</a>
 {% endcall %}
 <section class="planning-context" aria-label="Arbeitsbereich und Anzeige" data-ui-preferences data-csrf="{{csrf}}">
-  <div><p class="planning-context-title">Kalenderübersicht</p>
-    <p class="planning-context-lead">Termine, Fachkalender und Freigaben an einem Ort</p>
-    <p class="planning-supporting mb-0">{{ calendars|length }} Kalenderquellen · Änderungen bleiben im jeweiligen Fachmodul.</p>
+  <div><p class="planning-context-title">{{"Jahresüberblick" if year_mode else "Kalenderübersicht"}}</p>
+    <p class="planning-context-lead">{{"Das ganze Jahr auf einen Blick" if year_mode else "Einzeltermine und Ihre Kalender"}}</p>
+    <p class="planning-supporting mb-0">{{ calendars|length }} eigene/geteilte Kalender · Fachkalender jederzeit zuschaltbar.</p>
   </div>
   <div class="planning-actions">
-    {% if units %}<form method="get" action="/kalender" class="d-flex flex-wrap align-items-end gap-2">
+    {% if units %}<form method="get" action="/kalender" class="d-flex flex-wrap align-items-end gap-2">{% if not year_mode %}<input type="hidden" name="ansicht" value="termine">{% endif %}
       <div><label class="form-label mb-1" for="calendar-workspace-unit">Organisationseinheit</label><select class="form-select form-select-sm" id="calendar-workspace-unit" name="unit" data-org-context>{% for n in units %}<option value="{{n.id}}" {{'selected' if n.id==selected_org_unit}}>{{n.name}}</option>{% endfor %}</select></div>
       <button class="btn btn-sm btn-outline-primary" type="submit">Anzeigen</button>
     </form>{% endif %}
     <div><span class="form-label d-block mb-1">Informationsdichte</span><div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte"><button type="button" class="btn btn-outline-secondary" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button><button type="button" class="btn btn-outline-secondary" data-ui-density="compact" aria-pressed="false">Kompakt</button></div></div>
   </div>
 </section>
+<section class="calendar-simple-start" aria-label="Kalenderansicht wählen">
+  <nav class="calendar-mode-switch" aria-label="Planungsansicht">
+    <a href="/kalender/jahr{% if selected_org_unit %}?unit={{selected_org_unit}}{% endif %}" class="calendar-mode-choice {{'active' if year_mode}}" {% if year_mode %}aria-current="page"{% endif %}>
+      <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-calendar-days"></i></span>
+      <span><strong>Jahresplanung</strong><small>12 Monate, gemeinsame Termine und Abwesenheiten</small></span>
+    </a>
+    <a href="/kalender?ansicht=termine{% if selected_org_unit %}&amp;unit={{selected_org_unit}}{% endif %}" class="calendar-mode-choice {{'active' if not year_mode}}" {% if not year_mode %}aria-current="page"{% endif %}>
+      <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-calendar-week"></i></span>
+      <span><strong>Termine &amp; Monat</strong><small>Einzeltermine, Woche und Tagesansicht</small></span>
+    </a>
+    {% if units %}<a class="calendar-mode-choice calendar-mode-secondary" href="/urlaub/planer?unit={{selected_org_unit}}">
+      <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-people-group"></i></span>
+      <span><strong>Teamabwesenheiten</strong><small>Personenplan und Besetzung prüfen</small></span>
+    </a>{% else %}<a class="calendar-mode-choice calendar-mode-secondary" href="/urlaub/mein-urlaub">
+      <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-user-clock"></i></span>
+      <span><strong>Mein Urlaub</strong><small>Eigene Abwesenheiten und Anträge</small></span>
+    </a>{% endif %}
+  </nav>
+  {% if year_mode %}
+  <div class="calendar-year-information">
+    {% if shared_year %}
+      <span class="calendar-year-ok" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
+      <div><strong>Gemeinsamer Jahresplan: {{shared_year.title}}</strong>
+        <p class="mb-0">{{'Für alle angemeldeten Personen sichtbar' if shared_year.visibility=='internal' else 'Für die Organisationseinheit sichtbar'}} · Ereignisse im vorhandenen Kalender erfassen und teilen.</p>
+      </div>
+      {% if shared_year.id in writable_calendars %}<button type="button" class="btn btn-sm btn-primary" data-year-new-event data-calendar-id="{{shared_year.id}}"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Jahrestermin eintragen</button>{% endif %}
+    {% elif user.can("calendars") and (user.can("calendar_publish") or selected_org_unit) %}
+      <span class="calendar-year-ok" aria-hidden="true"><i class="fa-regular fa-calendar-plus"></i></span>
+      <div><strong>Gemeinsamen Jahresplan einrichten</strong>
+        <p class="mb-0">Ein Kalender für alle Berechtigten. Es wird nur ein bestehender Kalenderdatensatz angelegt – keine Kopie von Fachterminen.</p></div>
+      <form method="post" action="/kalender/jahresplanung" class="calendar-year-create">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <input type="hidden" name="scope" value="{{'internal' if user.can('calendar_publish') else 'organization'}}">
+        {% if selected_org_unit %}<input type="hidden" name="unit" value="{{selected_org_unit}}">{% endif %}
+        <button class="btn btn-sm btn-primary" type="submit">{{'Für alle anlegen' if user.can('calendar_publish') else 'Für meinen Bereich anlegen'}}</button>
+      </form>
+    {% else %}
+      <span class="calendar-year-ok" aria-hidden="true"><i class="fa-solid fa-circle-info"></i></span>
+      <div><strong>Jahresübersicht sofort verfügbar</strong><p class="mb-0">Berechtigte Termine sind schon sichtbar. Einen zusätzlichen gemeinsamen Kalender kann die zuständige Verwaltung anlegen.</p></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
 <div class="row g-4 calendar-workspace">
     <aside class="col-12 col-lg-3">
-        <details class="planning-panel" open>
-            <summary><i class="fa-solid fa-layer-group me-2" aria-hidden="true"></i>Meine Kalender</summary>
-            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-2">
-              <label class="small text-secondary mb-0" for="calendar-source-search">Kalenderauswahl</label>
-              <span id="calendar-source-match-count" class="small text-secondary" aria-live="polite"></span>
-            </div>
-            <input type="search" id="calendar-source-search" class="form-control form-control-sm mb-2" placeholder="Kalender suchen" autocomplete="off" aria-controls="calendar-source-list">
-            <div class="d-flex flex-wrap gap-2 mb-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" data-calendar-choose="all">Alle anzeigen</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" data-calendar-choose="none">Alle ausblenden</button>
-            </div>
-            <span class="visually-hidden" id="calendar-source-feedback" role="status"></span>
-            <label class="form-check" {{'hidden' if has_closure_source}}>
-                <input class="form-check-input" type="checkbox" data-closures {{'checked' if not has_closure_source}}>
-                <span class="form-check-label">Schließzeiten meines Bereichs</span>
-            </label>
-            <div id="calendar-source-list" class="calendar-source-list">
-            {% for cal in calendars %}
-                <div data-calendar-source class="planning-source-item">
+        <section class="planning-panel calendar-source-panel" aria-labelledby="calendar-sources-heading">
+          <div class="calendar-source-heading">
+            <h2 class="h6 mb-0" id="calendar-sources-heading"><i class="fa-solid fa-layer-group me-2" aria-hidden="true"></i>Was möchten Sie sehen?</h2>
+            <p class="planning-supporting mb-0">Fachkalender mit einem Klick zuschalten – ganz ohne Einrichtung.</p>
+          </div>
+          <label class="visually-hidden" for="calendar-source-search">Kalender und Fachkalender durchsuchen</label>
+          <input type="search" id="calendar-source-search" class="form-control form-control-sm mb-2" placeholder="Kalender oder Fachtermin suchen …" autocomplete="off" aria-controls="calendar-source-list">
+          <div class="calendar-source-actions">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-calendar-choose="all">Alle zeigen</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-calendar-choose="none">Alle ausblenden</button>
+            <span id="calendar-source-match-count" class="planning-supporting" role="status" aria-live="polite"></span>
+          </div>
+          <div id="calendar-source-list" class="calendar-source-list">
+            {% if calendars|selectattr('source','equalto','free')|list %}
+            <h3 class="calendar-source-group-title">Gemeinsame &amp; eigene Kalender</h3>
+            {% endif %}
+            {% for cal in calendars if cal.source == "free" %}
+              <div data-calendar-source class="planning-source-item calendar-source-choice">
                 <label class="form-check">
-                    <input class="form-check-input"
-                           type="checkbox"
-                           data-calendar="{{ cal.id }}"
-                           checked>
-                    <span class="form-check-label">{{ cal.title }}</span>
+                  <input class="form-check-input" type="checkbox" data-calendar="{{cal.id}}" checked>
+                  <span class="form-check-label">{{cal.title}}</span>
                 </label>
-                {% if cal.source=="free" and (user.is_admin or user.id==cal.owner_id) %}
-                    <a class="small d-block mb-2" href="/kalender/{{ cal.id }}/teilen">Freigaben verwalten</a>
+                {% if user.is_admin or user.id==cal.owner_id %}
+                  <a class="calendar-source-manage" href="/kalender/{{cal.id}}/teilen">Freigaben</a>
                 {% endif %}
-                {% if cal.visibility=="public" %}
-                    <a class="small" href="/kalender/oeffentlich/{{ cal.id }}">Öffentliche Ansicht</a>
-                {% endif %}
-                </div>
-            {% else %}
-                <div class="planning-empty"><strong>Keine Kalender freigegeben</strong><p class="small mt-1">Freigaben oder einen eigenen Kalender anlegen, um Termine anzuzeigen.</p></div>
+              </div>
             {% endfor %}
-            </div>
-            <p id="calendar-source-empty" class="planning-supporting mb-0" hidden>Keine Kalender entsprechen der Suche.</p>
-        </details>
-        <details class="planning-panel mt-3">
-            <summary><i class="fa-solid fa-link me-1" aria-hidden="true"></i>Fachkalender einblenden</summary>
-            <form method="post" action="/kalender/quellen">
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                <label class="form-label" for="calendar-select-1">Kalenderquelle</label>
-<select id="calendar-select-1" class="form-select" name="source">
-                    {% for key,title in sources.items() %}
-                        <option value="{{ key }}">{{ title }}</option>
-                    {% endfor %}
-                    </select>
-                <p class="small">Die Daten bleiben im Fachmodul. Berechtigungen werden bei jedem Abruf erneut geprüft; Änderungen erfolgen im Original.</p>
-                <button class="btn btn-outline-primary">Quelle einblenden</button>
+            {% if source_choices or (calendars|rejectattr('source','equalto','free')|list) %}
+              <h3 class="calendar-source-group-title">Fachkalender</h3>
+            {% endif %}
+            {% for cal in calendars if cal.source != "free" %}
+              <div data-calendar-source class="planning-source-item calendar-source-choice">
+                <label class="form-check">
+                  <input class="form-check-input" type="checkbox" data-calendar="{{cal.id}}" {{'checked' if cal.source in recommended_sources}}>
+                  <span class="form-check-label">{{cal.title}}</span>
+                </label>
+                <span class="calendar-source-note">Mit Geräten verknüpft</span>
+              </div>
+            {% endfor %}
+            {% for source in source_choices %}
+              <div data-calendar-source class="calendar-source-choice calendar-inline-source">
+                <form method="post" action="/kalender/quellen" data-inline-source="{{source.key}}" data-source-default="{{'true' if source.suggested else 'false'}}">
+                  <input type="hidden" name="csrf" value="{{csrf}}">
+                  <input type="hidden" name="source" value="{{source.key}}">
+                  <button type="submit" class="calendar-source-toggle" aria-pressed="false" aria-label="{{source.label}} anzeigen oder ausblenden">
+                    <i class="fa-regular fa-circle calendar-source-toggle-icon" aria-hidden="true"></i>
+                    <span>{{source.label}}</span>
+                  </button>
+                </form>
+              </div>
+            {% endfor %}
+          </div>
+          <p class="planning-supporting mt-2 mb-0" id="calendar-source-empty" hidden>Keine Quellen entsprechen dieser Suche.</p>
+          <p class="visually-hidden" id="calendar-source-feedback" role="status" aria-live="polite"></p>
+          <details class="calendar-source-advanced">
+            <summary>Fachkalender auch auf Geräten nutzen</summary>
+            <p class="planning-supporting mt-2">Nur dafür dauerhaft zu Ihren Kalendern hinzufügen. Die Termine bleiben in den Fachmodulen und werden nicht kopiert.</p>
+            <form method="post" action="/kalender/quellen" class="d-flex flex-wrap gap-2">
+              <input type="hidden" name="csrf" value="{{csrf}}">
+              <label class="visually-hidden" for="calendar-attach-source">Fachkalender dauerhaft hinzufügen</label>
+              <select id="calendar-attach-source" name="source" class="form-select form-select-sm flex-grow-1">
+                {% for key,title in sources.items() %}<option value="{{key}}">{{title}}</option>{% endfor %}
+              </select>
+              <button class="btn btn-outline-secondary btn-sm" type="submit">Dauerhaft hinzufügen</button>
             </form>
-        </details>
+          </details>
+        </section>
         {% if user.can("calendars") %}
             <details class="planning-panel mt-3">
                 <summary><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Eigenen Kalender anlegen</summary>
@@ -119,9 +176,9 @@
           <h2 class="h5"><i class="fa-regular fa-calendar me-2" aria-hidden="true"></i>Terminübersicht</h2>
           <span class="planning-count">{{ calendars|length }} Kalender</span>
         </div>
-        <p class="planning-supporting mb-3">Ansicht und Zeitraum im Kalenderkopf wechseln. Einen Termin auswählen, um Details zu sehen oder ihn berechtigt zu bearbeiten.</p>
+        <p class="planning-supporting mb-3">Das ganze Jahr oder einzelne Monate ansehen. Fachtermine links direkt ein- und ausblenden; zum Bearbeiten einen Termin öffnen.</p>
         <div id="calendar-loading" class="planning-supporting mb-2" role="status" aria-live="polite" hidden><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Kalenderdaten werden geladen …</div>
-        <div id="shared-calendar" aria-label="Interaktiver Kalender"></div>
+        <div id="shared-calendar" aria-label="Interaktiver Kalender" data-calendar-mode="{{'year' if year_mode else 'month'}}"></div>
         <div id="calendar-error" role="alert" class="text-danger small mt-2" aria-live="assertive"></div>
         <details class="card card-body mt-4 planning-panel planning-event-editor" id="event-editor" {{'hidden' if not writable_calendars and not closure_units}}>
             <summary><i class="fa-solid fa-pen-to-square me-2" aria-hidden="true"></i>Termin oder Schließzeit erfassen</summary>
