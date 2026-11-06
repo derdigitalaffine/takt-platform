@@ -144,15 +144,50 @@
     },
   });
   calendar.render();
-  for (const link of document.querySelectorAll("[data-calendar-mode-link]")) {
-    link.addEventListener("click", () => {
-      const current = calendar.getDate();
-      if (!current || Number.isNaN(current.getTime())) return;
+  // Both planning modes are FullCalendar views. Preserve the calendar instance,
+  // loaded sources, editor state and document instead of navigating to a new page.
+  const modeLinks = [...document.querySelectorAll("[data-calendar-mode-link]")];
+  const modeFor = (url) => url.pathname === "/kalender/jahr" ? "year" : "month";
+  function markMode(mode) {
+    for (const link of modeLinks) {
+      const selected = modeFor(new URL(link.href)) === mode;
+      link.classList.toggle("active", selected);
+      if (selected) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    }
+    el.dataset.calendarMode = mode;
+    const heading = document.querySelector(".planning-context-title");
+    const lead = document.querySelector(".planning-context-lead");
+    if (heading) heading.textContent = mode === "year" ? "Jahresüberblick" : "Kalenderübersicht";
+    if (lead) lead.textContent = mode === "year"
+      ? "Das ganze Jahr auf einen Blick" : "Einzeltermine und Ihre Kalender";
+    const yearInfo = document.querySelector(".calendar-year-information");
+    if (yearInfo) yearInfo.hidden = mode !== "year";
+  }
+  function selectMode(mode, date) {
+    const view = mode === "year" ? "multiMonthYear" : "dayGridMonth";
+    if (date) calendar.gotoDate(date);
+    calendar.changeView(view);
+    markMode(mode);
+  }
+  for (const link of modeLinks) {
+    link.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey ||
+          event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
       const target = new URL(link.href);
-      target.searchParams.set("date", localValue(current).slice(0, 10));
-      link.href = target.toString();
+      target.searchParams.set("date", localValue(calendar.getDate()).slice(0, 10));
+      const mode = modeFor(target);
+      selectMode(mode);
+      if (target.href !== location.href) history.pushState({ planningMode: mode }, "", target);
     });
   }
+  window.addEventListener("popstate", () => {
+    if (!location.pathname.startsWith("/kalender")) return;
+    const mode = modeFor(new URL(location.href));
+    selectMode(mode, new URL(location.href).searchParams.get("date"));
+  });
+  markMode(el.dataset.calendarMode);
   // Ephemeral read-only Fachkalender: same server-side projector as attached
   // calendar sources, no additional Calendar rows and no duplicated terms.
   // Forms remain a safe POST fallback for browsers without JavaScript.
