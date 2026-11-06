@@ -147,7 +147,7 @@
 .module-hub-inline-link:hover { text-decoration: underline; }
 .module-hub-favorite-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit,minmax(min(100%,12.6rem),1fr));
+  grid-template-columns: repeat(auto-fill,minmax(min(100%,12.6rem),1fr));
   gap: .65rem;
 }
 .module-hub-favorite {
@@ -289,7 +289,7 @@
 .module-hub-group-head span:not(.module-hub-group-icon) { color: var(--bs-secondary-color); font-size: .79rem; }
 .module-hub .module-catalog {
   display: grid;
-  grid-template-columns: repeat(auto-fit,minmax(min(100%,17.6rem),1fr));
+  grid-template-columns: repeat(auto-fill,minmax(min(100%,17.6rem),1fr));
   gap: clamp(.7rem,1.3vw,1rem);
 }
 .module-hub-card {
