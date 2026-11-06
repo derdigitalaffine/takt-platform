@@ -283,3 +283,103 @@ def test_bulk_calendar_grants_validate_whole_selection(db, task_people):
         db.query(CalendarGrant).filter_by(calendar_id=cal.id).delete()
         db.delete(cal)
         db.commit()
+
+
+def test_year_view_defaults_and_inline_fachkalender_are_read_only(db, task_people):
+    """The year starts immediately; showing a Fachkalender creates no shadows."""
+    from sqlalchemy import func
+
+    client = login("admin@example.org", "admin-passwort-123")
+    page = client.get("/kalender")
+    assert page.status_code == 200, page.text[:500]
+    assert 'data-calendar-mode="year"' in page.text
+    assert 'href="/kalender/jahr' in page.text
+    assert 'name="source" value="holidays"' in page.text
+    assert "Was möchten Sie sehen?" in page.text
+    detail = client.get("/kalender?ansicht=termine")
+    assert detail.status_code == 200
+    assert 'data-calendar-mode="month"' in detail.text
+
+    before = db.scalar(select(func.count(Calendar.id)))
+    path = "/kalender/quellen/holidays/data"
+    response = client.get(path, params={
+        "start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z",
+    })
+    assert response.status_code == 200, response.text[:500]
+    assert isinstance(response.json()["events"], list)
+    assert response.json()["canWrite"] is False
+    assert db.scalar(select(func.count(Calendar.id))) == before
+    assert client.get("/kalender/quellen/unknown/data").status_code == 404
+    assert client.get(path, params={
+        "start": "2026-01-01", "end": "2028-01-01",
+    }).status_code == 422
+
+
+def test_global_year_calendar_one_click_create_is_idempotent_and_private_to_login(
+    db, task_people,
+):
+    from sqlalchemy import func
+    from app.calendar_models import CalendarAudit
+
+    admin = login("admin@example.org", "admin-passwort-123")
+    csrf = csrf_of(admin.get("/kalender").text)
+    query = select(Calendar).where(
+        Calendar.visibility == "internal", Calendar.source == "free",
+        Calendar.title.in_(["Jahresplanung", "Gemeinsame Jahrestermine"]),
+    )
+    previous = db.scalar(query.order_by(Calendar.id))
+    before = db.scalar(select(func.count(Calendar.id)))
+    try:
+        for _ in range(2):
+            res = admin.post("/kalender/jahresplanung",
+                data={"csrf": csrf, "scope": "internal"},
+                follow_redirects=False)
+            assert res.status_code == 303, res.text[:400]
+            assert res.headers["location"].startswith("/kalender/jahr")
+        created = db.scalar(query.order_by(Calendar.id))
+        assert created is not None and created.visibility == "internal"
+        assert db.scalar(select(func.count(Calendar.id))) == before + (not bool(previous))
+        member = login(task_people[0].email, "task-passwort-123")
+        assert f'data-calendar="{created.id}"' in member.get("/kalender").text
+        denied = member.post("/kalender/jahresplanung",
+            data={"csrf": csrf_of(member.get("/kalender").text), "scope": "internal"},
+            follow_redirects=False)
+        assert denied.status_code == 403
+        invalid = admin.post("/kalender/jahresplanung",
+            data={"csrf": csrf, "scope": "public"},
+            follow_redirects=False)
+        assert invalid.status_code == 422
+    finally:
+        db.rollback()
+        if previous is None:
+            created = db.scalar(query.order_by(Calendar.id))
+            if created is not None:
+                db.query(CalendarAudit).filter_by(calendar_id=created.id).delete()
+                db.delete(created)
+                db.commit()
+
+
+def test_inline_fachkalender_does_not_expose_other_people_absence_rows(db, task_people):
+    """The same existing leave projector restricts every inline request to its actor."""
+    from app.leave_models import LeaveRequest
+    from app import leave
+
+    first, other = task_people[:2]
+    row = LeaveRequest(
+        person_id=first.id, org_id=1, status="binding",
+        starts_on="2026-12-14", ends_on="2026-12-16",
+        effective_json='{"starts_on":"2026-12-14","ends_on":"2026-12-16","start_half":"am","end_half":"pm"}',
+    )
+    db.add(row)
+    db.commit()
+    try:
+        client = login(other.email, "task-passwort-123")
+        res = client.get("/kalender/quellen/leave/data", params={
+            "start": "2026-12-01T00:00:00Z", "end": "2027-01-01T00:00:00Z",
+        })
+        assert res.status_code == 200
+        assert not any(e["id"] == f"leave:{row.id}" for e in res.json()["events"])
+    finally:
+        db.rollback()
+        db.delete(row)
+        db.commit()
