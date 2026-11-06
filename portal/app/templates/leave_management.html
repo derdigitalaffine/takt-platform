@@ -4,7 +4,7 @@
     <input type="hidden" name="action" value="{{ action }}">
 {% endmacro %}
 {% if active_section=='schliesszeiten' and can_settings %}
-    <details class="card card-body mb-3">
+    <details class="card card-body planning-panel mb-3">
         <summary>Schließzeit anlegen</summary>
         <form method="post" action="/urlaub/konfiguration" class="row g-3 mt-1">
             {{ meta("closure") }}
@@ -48,6 +48,8 @@
     </details>
 {% endif %}
 {% if active_section=='verwaltung' and config_topic=='arbeitsmodelle' and can_settings %}
+    <div class="planning-section-heading"><h2 class="h5">Arbeitsmodelle</h2><span class="planning-count">{{work_patterns|length}} Zuordnungen</span></div>
+    <p class="planning-supporting">Hinterlegte Wochenmuster fließen in die bestehende Besetzungsberechnung ein. Es entsteht kein separates Arbeitszeitkonto.</p>
     {% for pattern in work_patterns %}
         <div class="card card-body mb-3">
             <p>Arbeitsmodell: {{ (people|selectattr('id','equalto',pattern.person_id)|first).name}} · {{ pattern.starts_on }} bis {{ pattern.ends_on }}</p>
@@ -56,8 +58,10 @@
                 <button class="btn btn-outline-danger">Arbeitsmodell entfernen</button>
             </form>
         </div>
+    {% else %}
+        <div class="planning-empty mb-3"><h3>Noch keine Arbeitsmodelle zugeordnet</h3><p>Arbeitsmodelle können abweichende Arbeitstage und Teilkapazitäten abbilden. Die Zuordnung erfolgt im bestehenden Fachmodell.</p></div>
     {% endfor %}
-    <details class="card card-body mb-3">
+    <details class="card card-body planning-panel mb-3">
         <summary>Arbeitsmodell zuordnen</summary>
         <p class="small mt-3">Kapazität pro Tageshälfte: 1 = vollständig verfügbar, 0 = arbeitsfrei, Zwischenwerte entsprechend anteilig. Es wird kein zusätzlicher Vollzeitfaktor multipliziert. Im einfachen Besetzungsmodus werden diese Gewichte nicht verwendet.</p>
         <form method="post" action="/urlaub/konfiguration">
@@ -111,7 +115,7 @@
     </details>
 {% endif %}
 {% if active_section=='verwaltung' and config_topic=='urlaubskonten' and can_settings %}
-    <details class="card card-body mb-3">
+    <details class="card card-body planning-panel mb-3">
         <summary>Internen Urlaubsanspruch pflegen</summary>
         <p class="small mt-3">Nur für Bereiche mit aktivierter interner Kontenverwaltung. Bei externer Verwaltung bleiben Kontenanzeigen ausgeblendet.</p>
         <form method="post" action="/urlaub/konfiguration" class="row g-3">
@@ -164,7 +168,7 @@
     </details>
 {% endif %}
 {% if active_section=='mein-urlaub' %}
-<details class="card card-body mb-3">
+<details class="card card-body planning-panel mb-3">
     <summary>Meine Benachrichtigungen</summary>
     <form method="post" action="/urlaub/konfiguration" class="mt-3">
         {{ meta("notifications") }}
@@ -182,8 +186,8 @@
 {% endif %}
 
 {% if active_section=='verwaltung' and config_topic=='arbeitsmodelle' and can_settings %}
-<details class="card card-body mb-3"><summary>Abweichende Arbeitstage</summary><p class="small mt-3">Für einen einmalig arbeitsfreien Tag oder einen ausdrücklich geplanten Sonderdienst, auch an einem Feiertag. Die Werte ersetzen an diesem Datum das reguläre Arbeitsmodell. Urlaub und Abwesenheiten werden weiterhin in ihren jeweiligen Funktionen erfasst.</p>
+<details class="card card-body planning-panel mb-3"><summary>Abweichende Arbeitstage</summary><p class="small mt-3">Für einen einmalig arbeitsfreien Tag oder einen ausdrücklich geplanten Sonderdienst, auch an einem Feiertag. Die Werte ersetzen an diesem Datum das reguläre Arbeitsmodell. Urlaub und Abwesenheiten werden weiterhin in ihren jeweiligen Funktionen erfasst.</p>
 {% for item in work_days %}<div class="border-bottom py-2"><span>{{people|selectattr('id','equalto',item.person_id)|map(attribute='name')|first}} · {{item.day}} · Vormittag {{item.am}}, Nachmittag {{item.pm}}</span><form method="post" action="/urlaub/konfiguration">{{meta('work_day_remove')}}<input type="hidden" name="work_day_id" value="{{item.id}}"><button class="btn btn-sm btn-outline-danger">Abweichenden Arbeitstag entfernen</button></form></div>{% endfor %}
 <form method="post" action="/urlaub/konfiguration" class="row g-3 mt-1">{{meta('work_day')}}<div class="col-12">{{sp.picker('work-day-people','person_ids',work_choices)}}</div><div class="col-md-6"><label for="work-day-date" class="form-label">Datum</label><input id="work-day-date" name="day" type="date" class="form-control" required></div>{% for key,title in [('am','Vormittag'),('pm','Nachmittag')] %}<div class="col-md-6"><label class="form-label" for="work-day-{{key}}">{{title}} (0 = arbeitsfrei, 1 = verfügbar)</label><input id="work-day-{{key}}" name="{{key}}" type="number" min="0" max="1" step="0.01" value="0" class="form-control" required></div>{% endfor %}<div><button class="btn btn-primary" data-selection-submit>Arbeitstag für Auswahl speichern</button></div></form></details>
 {% endif %}
-{% if active_section=='verwaltung' and config_topic=='feiertage' and user.is_admin %}<details class="card card-body mb-3"><summary>Portalweite Feiertagsvorgabe für Urlaub</summary><p class="small mt-3">Gilt für Bereiche ohne eigene Vorgabe. Die Einstellung für Ressourcenpreise bleibt davon unabhängig.</p><form method="post" action="/urlaub/konfiguration">{{meta('global_holidays')}}<label for="leave-global-holidays" class="form-label">Feiertagskalender</label><select id="leave-global-holidays" name="holiday_state" class="form-select mb-3"><option value="none" {{'selected' if portal_holiday_state=='none'}}>Keine automatischen Feiertage</option>{% for code,title in holiday_states.items() %}<option value="{{code}}" {{'selected' if portal_holiday_state==code}}>{{title}}</option>{% endfor %}</select><button class="btn btn-outline-primary">Portalvorgabe speichern</button></form></details>{% endif %}
+{% if active_section=='verwaltung' and config_topic=='feiertage' and user.is_admin %}<details class="card card-body planning-panel mb-3"><summary>Portalweite Feiertagsvorgabe für Urlaub</summary><p class="small mt-3">Gilt für Bereiche ohne eigene Vorgabe. Die Einstellung für Ressourcenpreise bleibt davon unabhängig.</p><form method="post" action="/urlaub/konfiguration">{{meta('global_holidays')}}<label for="leave-global-holidays" class="form-label">Feiertagskalender</label><select id="leave-global-holidays" name="holiday_state" class="form-select mb-3"><option value="none" {{'selected' if portal_holiday_state=='none'}}>Keine automatischen Feiertage</option>{% for code,title in holiday_states.items() %}<option value="{{code}}" {{'selected' if portal_holiday_state==code}}>{{title}}</option>{% endfor %}</select><button class="btn btn-outline-primary">Portalvorgabe speichern</button></form></details>{% endif %}
