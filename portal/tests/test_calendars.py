@@ -299,6 +299,10 @@ def test_year_view_defaults_and_inline_fachkalender_are_read_only(db, task_peopl
     detail = client.get("/kalender?ansicht=termine")
     assert detail.status_code == 200
     assert 'data-calendar-mode="month"' in detail.text
+    dated = client.get("/kalender?ansicht=termine&date=2027-07-10")
+    assert dated.status_code == 200
+    assert 'data-calendar-date="2027-07-10"' in dated.text
+    assert client.get("/kalender?date=not-a-date").status_code == 422
 
     before = db.scalar(select(func.count(Calendar.id)))
     path = "/kalender/quellen/holidays/data"
