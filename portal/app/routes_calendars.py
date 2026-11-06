@@ -22,9 +22,20 @@ def get_calendar(db, actor, cid, write=False):
 @app.get("/kalender")
 @app.get("/kalender/jahr")
 def calendar_page(
-    request: Request, unit: int | None = None,
+    request: Request, unit: int | None = None, date: str | None = None,
     user: User = Depends(current_user), db: Session = Depends(get_db)
 ):
+    from datetime import date as calendar_date_type
+
+    if date:
+        try:
+            chosen_date = calendar_date_type.fromisoformat(date)
+            if not 1970 <= chosen_date.year <= 2200:
+                raise ValueError("calendar year")
+        except (ValueError, TypeError):
+            raise HTTPException(422, "Kalenderdatum prüfen.")
+    else:
+        chosen_date = None
     rows = [
         c
         for c in db.scalars(select(Calendar).order_by(Calendar.title))
@@ -74,6 +85,7 @@ def calendar_page(
         user,
         calendars=rows,
         year_mode=year_mode,
+        calendar_date=chosen_date.isoformat() if chosen_date else "",
         shared_year=shared_year,
         source_choices=source_choices,
         recommended_sources=(
