@@ -99,5 +99,5 @@ window.taktInitPlanningPolish = () => {
     detail.hidden = !detail.hidden;
     legendButton.setAttribute("aria-expanded", String(!detail.hidden));
   });
-}};
+};
 window.taktInitPlanningPolish();
