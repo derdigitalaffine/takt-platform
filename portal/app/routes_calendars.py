@@ -20,6 +20,7 @@ def get_calendar(db, actor, cid, write=False):
 
 
 @app.get("/kalender")
+@app.get("/kalender/jahr")
 def calendar_page(
     request: Request, unit: int | None = None,
     user: User = Depends(current_user), db: Session = Depends(get_db)
@@ -44,11 +45,39 @@ def calendar_page(
         except (ValueError, AttributeError):
             remembered = None
         unit = remembered if remembered in allowed_units else (units[0].id if units else None)
+    year_mode = request.url.path == "/kalender/jahr"
+    attached = {c.source for c in rows if c.source != "free"}
+    # Existing subscriptions remain canonical. Only missing projections get an
+    # ephemeral one-click control; no shadow Calendar rows are created.
+    source_choices = [
+        dict(key=kind, label=meta[0],
+             suggested=(kind in (
+                 {"holidays", "closures", "seminars", "leave"} if year_mode
+                 else {"meetings", "seminars", "tasks", "leave", "holidays", "closures"}
+             )))
+        for kind, meta in calendar_sources.SOURCES.items()
+        if calendar_sources.enabled(db, kind) and kind not in attached
+    ]
+    shared_year = next((
+        c for c in rows
+        if c.source == "free"
+        and c.title.casefold().strip() in {"jahresplanung", "gemeinsame jahrestermine"}
+        and (c.visibility == "internal" or (
+            c.visibility == "organization" and c.org_id == unit
+        ))
+    ), None)
     return render(
         request,
         "calendars.html",
         user,
         calendars=rows,
+        year_mode=year_mode,
+        shared_year=shared_year,
+        source_choices=source_choices,
+        recommended_sources=(
+            {"holidays", "closures", "seminars", "leave"} if year_mode
+            else {"meetings", "seminars", "tasks", "leave", "holidays", "closures"}
+        ),
         has_closure_source=any(c.source == "closures" for c in rows),
         sources={
             key: val[0]
@@ -64,6 +93,60 @@ def calendar_page(
             if org.allows(db, user, n.id, "leave_settings")
         ],
     )
+
+
+@app.post("/kalender/jahresplanung", dependencies=[Depends(check_csrf)])
+async def create_year_plan(
+    request: Request,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """One explicit action creates the existing shared-calendar *type*.
+
+    No automatic public sharing, no extra calendar model and no duplicate
+    on repeated clicks. A global plan is visible to signed-in users only;
+    the organization variant follows existing organization ACLs.
+    """
+    from .leave import lock
+
+    if not user.can("calendars"):
+        raise HTTPException(403)
+    data = await request.form()
+    scope = str(data.get("scope", ""))
+    if scope not in {"internal", "organization"}:
+        raise HTTPException(422, "Gültige Sichtbarkeit auswählen.")
+    unit = int(data["unit"]) if str(data.get("unit", "")).isdigit() else None
+    if scope == "internal":
+        if not user.can("calendar_publish"):
+            raise HTTPException(403)
+        visibility, org_id = "internal", None
+    else:
+        if unit is None or not org.allows(db, user, unit, "plan"):
+            raise HTTPException(403)
+        visibility, org_id = "organization", unit
+
+    lock(db)
+    from sqlalchemy import or_
+    existing = db.scalar(
+        select(Calendar).where(
+            Calendar.source == "free",
+            Calendar.visibility == visibility,
+            Calendar.org_id.is_(None) if org_id is None else Calendar.org_id == org_id,
+            or_(Calendar.title == "Jahresplanung", Calendar.title == "Gemeinsame Jahrestermine"),
+        ).order_by(Calendar.id)
+    )
+    if existing is None:
+        existing = Calendar(
+            title="Jahresplanung", source="free",
+            owner_id=user.id, visibility=visibility, org_id=org_id,
+            include_children=True,
+        )
+        db.add(existing)
+        db.flush()
+        calendars.audit(db, user, existing, "create")
+    db.commit()
+    suffix = "?unit=" + str(unit) if org_id else ""
+    return redirect("/kalender/jahr" + suffix + "#shared-calendar")
 
 
 @app.post("/kalender", dependencies=[Depends(check_csrf)])
@@ -299,6 +382,27 @@ async def create_closure(
     org.audit(db, user, unit, "leave_closure", closure=closed.id)
     db.commit()
     return dict(id=closed.id)
+
+
+@app.get("/kalender/quellen/{kind}/data")
+def inline_source_events(
+    kind: str,
+    start: str | None = None,
+    end: str | None = None,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Display a canonical Fachkalender without creating a subscription.
+
+    Project() performs live record-level ACL filtering, exactly as for
+    attached read-only calendar objects and their ICS/DAV representations.
+    """
+    from .calendar_recurrence import window
+
+    if not calendar_sources.enabled(db, kind):
+        raise HTTPException(404)
+    a, b = window(start, end)
+    return dict(events=calendar_sources.project(db, user, kind, a, b), canWrite=False)
 
 
 @app.post("/kalender/quellen", dependencies=[Depends(check_csrf)])
