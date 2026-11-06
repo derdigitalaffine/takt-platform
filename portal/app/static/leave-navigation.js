@@ -37,6 +37,7 @@
       current.replaceWith(replacement);
       document.title = html.title;
       if (push) history.pushState({ leaveWorkspace: true }, "", url);
+      window.taktInitSelectionPicker?.();
       window.taktInitLeaveWorkspace?.();
       window.taktInitUiPreferences?.();
       window.taktInitPlanningPolish?.();
@@ -56,6 +57,7 @@
       }
     }
   }
+  window.taktNavigateLeave = (url) => navigate(new URL(url, location.href).href);
   document.addEventListener("click", (event) => {
     const link = event.target.closest("a[href]");
     if (!eligible(link) || event.defaultPrevented || event.button !== 0 ||
