@@ -17,7 +17,7 @@ Die bestehenden Takt-Komponenten – Bootstrap-Designsystem, FullCalendar Standa
 | --- | --- |
 | Startseite | Arbeitsbereichsleiste, direkter Einstieg „Neuer Termin“, getrennte Übersicht, ruhigeres Raster |
 | Kalenderquellen | Aufklappbares Panel, lokale Suche, Trefferzähler, Alle anzeigen/ausblenden, Freigabe-Links bleiben bei der zugehörigen Quelle |
-| Monats-/Wochen-/Jahres-/Listenansicht | Verfeinerte FullCalendar-Schaltflächen, Fokusmarkierungen, Platzverteilung und Datumsüberschriften, bestehende Kalenderengine und API unverändert |
+| Tag-/Wochen-/Monats-/Jahres-/Listenansicht | Zusätzlich ist die FullCalendar-Standardansicht **Tag** direkt erreichbar. Verfeinerte Schaltflächen, Fokusmarkierungen, Datumsüberschriften und bei schmalen Displays horizontal bedienbare Ansichtsoptionen; Kalenderengine und API bleiben unverändert. |
 | Datenabruf | Screenreaderfreundlicher Ladestatus; bestehende serverseitige Fehlertexte bleiben erhalten |
 | Termin- und Schließzeiteditor | Bessere Kennzeichnung, verständliche Hilfetexte und sichtbar gruppierte Primär-/Sekundäraktionen. Serieneingriffe bleiben ausdrücklich zustimmungsbedürftig |
 | Gerätezugänge, Abo-Links | Visuell ausgezeichnete aktive/widerrufene Zugänge, bessere Warnung zu sensiblen Zugangslinks, hilfreiche Leerzustände |
