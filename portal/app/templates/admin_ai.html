@@ -93,11 +93,11 @@
     <div class="card-body d-flex align-items-end flex-wrap gap-3">
       <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ai-knowledge-enable" name="enabled" value="1" {% if cfg.ai_knowledge_enabled == '1' %}checked{% endif %}>
         <label class="form-check-label" for="ai-knowledge-enable"><strong>Wissenssuche aktivieren</strong></label></div>
-      <div><label class="form-label" for="ai-retention">Geplante Aufbewahrungsfrist (Tage)</label>
+      <div><label class="form-label" for="ai-retention">Aufbewahrungsfrist (Tage)</label>
         <input class="form-control" type="number" id="ai-retention" name="retention" min="1" max="3650" value="{{ cfg.ai_retention_days }}"></div>
       <button class="btn btn-primary" type="submit">Einstellungen speichern</button>
     </div>
-    <div class="card-footer small text-secondary">Eine automatische Löschung und weiterführende Richtlinien werden gesondert umgesetzt. Die Frist ist bis dahin ein vorgemerkter Verwaltungswert.</div>
+    <div class="card-footer small text-secondary">Persönliche Unterhaltungen, die länger nicht genutzt wurden, werden durch den TAKT-Hintergrunddienst stündlich nach dieser Frist gelöscht. Backup-Aufbewahrung wird separat geregelt.</div>
   </form>
   <div class="row g-3">
     <div class="col-lg-6">
