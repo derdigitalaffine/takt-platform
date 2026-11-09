@@ -2,26 +2,130 @@
 {% import "_macros.html" as m with context %}
 {% block title %}Interne Anliegen{% endblock %}
 {% block content %}
-{% call m.page_head('Interne Anliegen', 'Mängel, Beschaffung, Wünsche und vertrauliche Beschwerden strukturiert einreichen und verfolgen.') %}
-<a href="/anliegen/neu" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i>Anliegen einreichen</a>
+{% call m.page_head('Interne Anliegen', 'Ihr Eingang für Meldungen, Bestellungen, Beschwerden und Verbesserungsvorschläge.') %}
+  {% if may_submit %}<a href="/anliegen/neu" class="btn btn-primary"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neues Anliegen</a>{% endif %}
+  {% if user.is_admin %}<a href="/anliegen/kategorien" class="btn btn-outline-secondary"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Routing verwalten</a>{% endif %}
 {% endcall %}
-<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-  <span class="text-secondary small">{{ cases|length }} für Sie sichtbare Anliegen</span>
-  {% if user.is_admin %}<a class="btn btn-sm btn-outline-secondary ms-auto" href="/anliegen/kategorien"><i class="fa-solid fa-sliders me-1"></i>Kategorien &amp; Zuständigkeiten</a>{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3">
+    <a class="card h-100 text-decoration-none {{ 'border-primary' if scope == 'assigned' }}" href="/anliegen?scope=assigned">
+      <div class="card-body">
+        <div class="small text-secondary"><i class="fa-solid fa-user-check me-1" aria-hidden="true"></i>Mein Eingang</div>
+        <div class="h3 mb-0 mt-1 text-body">{{ assigned_count }}</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="card h-100 text-decoration-none {{ 'border-primary' if scope == 'reported' }}" href="/anliegen?scope=reported">
+      <div class="card-body">
+        <div class="small text-secondary"><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Von mir gemeldet</div>
+        <div class="h3 mb-0 mt-1 text-body">{{ reported_count }}</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="card h-100 text-decoration-none {{ 'border-primary' if scope == 'orders' }}" href="/anliegen?scope=orders">
+      <div class="card-body">
+        <div class="small text-secondary"><i class="fa-solid fa-boxes-stacked me-1" aria-hidden="true"></i>Meine Bestellungen</div>
+        <div class="h5 mb-0 mt-2 text-body">Lieferstatus prüfen</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a class="card h-100 text-decoration-none {{ 'border-primary' if scope == 'all' }}" href="/anliegen?scope=all">
+      <div class="card-body">
+        <div class="small text-secondary"><i class="fa-solid fa-layer-group me-1" aria-hidden="true"></i>Alle sichtbaren</div>
+        <div class="h5 mb-0 mt-2 text-body">Gesamtübersicht</div>
+      </div>
+    </a>
+  </div>
 </div>
-<div class="card"><div class="card-body p-0">
-  {% if cases %}<div class="table-responsive"><table class="table table-hover align-middle mb-0">
-    <thead><tr><th>Nummer</th><th>Anliegen</th><th>Kategorie</th><th>Zuständig</th><th>Status</th><th>Aktualisiert</th></tr></thead>
-    <tbody>{% for case in cases %}<tr>
-      <td class="text-nowrap small">ANL-{{ '%06d'|format(case.id) }}</td>
-      <td><a class="fw-semibold text-decoration-none" href="/anliegen/{{ case.id }}">{{ case.title }}</a>{% if case.confidential %}<span class="badge text-bg-secondary ms-2"><i class="fa-solid fa-lock me-1"></i>Vertraulich</span>{% endif %}</td>
-      <td><i class="fa-solid {{case.category.icon}} me-1 text-secondary"></i>{{case.category.title}}</td>
-      <td>{{case.assignee.name if case.assignee else 'Noch nicht zugewiesen'}}</td>
-      <td><span class="badge text-bg-{{ 'success' if case.status in ('done','closed') else ('warning' if case.status=='unassigned' else 'primary') }}">{{statuses[case.status]}}</span></td>
-      <td class="small text-secondary text-nowrap">{{case.updated_at|local('%d.%m.%Y')}}</td>
-    </tr>{% endfor %}</tbody>
-  </table></div>{% else %}
-  <div class="text-center py-5"><i class="fa-solid fa-inbox fa-2x text-secondary mb-3"></i><h2 class="h5">Noch keine Anliegen</h2><p class="text-secondary">Erfassen Sie Ihr erstes Anliegen, der Empfänger wird über die Kategorie ermittelt.</p><a href="/anliegen/neu" class="btn btn-primary">Anliegen einreichen</a></div>
-  {% endif %}
-</div></div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" action="/anliegen" class="row g-3 align-items-end" aria-label="Interne Anliegen filtern">
+      <input type="hidden" name="scope" value="{{ scope }}">
+      <div class="col-12 col-md-5"><label for="anliegen-search" class="form-label">Suche</label>
+        <input type="search" class="form-control" id="anliegen-search" name="q" value="{{ query }}" maxlength="100" placeholder="Titel oder Vorgang suchen …"></div>
+      <div class="col-6 col-md-3"><label for="anliegen-category-filter" class="form-label">Kategorie</label>
+        <select id="anliegen-category-filter" class="form-select" name="category_id">
+          <option value="0">Alle Kategorien</option>
+          {% for cat in categories %}<option value="{{ cat.id }}" {% if selected_category == cat.id %}selected{% endif %}>{{ cat.title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2"><label for="anliegen-status-filter" class="form-label">Status</label>
+        <select id="anliegen-status-filter" class="form-select" name="status">
+          <option value="all">Alle Status</option>
+          {% for key,label in statuses.items() %}<option value="{{ key }}" {% if selected_status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button class="btn btn-primary flex-grow-1" type="submit">Filtern</button>
+        <a class="btn btn-outline-secondary" href="/anliegen?scope={{ scope }}" aria-label="Filter zurücksetzen"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+  <h2 class="h6 mb-0">{{ 'Meine zugewiesenen Anliegen' if scope == 'assigned' else ('Meine Bestellungen' if scope == 'orders' else ('Von mir eingereicht' if scope == 'reported' else 'Alle sichtbaren Anliegen')) }}</h2>
+  <span class="small text-secondary">{{ cases|length }} {{ 'Ergebnis' if cases|length == 1 else 'Ergebnisse' }}{% if cases|length == 250 %} (Anzeige auf 250 begrenzt){% endif %}</span>
+</div>
+<div class="card">
+  <div class="card-body p-0">
+    {% if cases %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr>
+          <th class="text-nowrap">Vorgang</th><th>Anliegen / Kategorie</th>
+          <th class="text-nowrap">Zuständig</th><th>Status / Lieferung</th>
+          <th>Direkt erledigen</th>
+        </tr></thead>
+        <tbody>
+        {% for case in cases %}
+          <tr>
+            <td class="small text-nowrap"><strong>ANL-{{ '%06d'|format(case.id) }}</strong>
+              <div class="text-secondary">{{ case.updated_at|local('%d.%m.%Y') }}</div></td>
+            <td style="min-width:15rem"><a class="fw-semibold text-decoration-none" href="/anliegen/{{ case.id }}">{{ case.title }}</a>
+              {% if case.confidential %}<span class="badge text-bg-secondary ms-1"><i class="fa-solid fa-lock" aria-hidden="true"></i> Vertraulich</span>{% endif %}
+              <div class="small text-secondary mt-1"><i class="fa-solid {{ case.category.icon }} me-1" aria-hidden="true"></i>{{ case.category.title }}</div></td>
+            <td class="small">{{ case.assignee.name if case.assignee else 'Noch nicht zugewiesen' }}</td>
+            <td class="small">
+              <span class="badge text-bg-{{ 'success' if case.status in ('delivered','done','closed') else ('warning' if case.status in ('unassigned','partially_delivered') else 'primary') }}">{{ statuses[case.status] }}</span>
+              {% if case.category.procurement and case.supplier_name %}
+              <div class="small text-secondary mt-1">Lieferant: {{ case.supplier_name }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if quick_actions.get(case.id) %}
+              <form method="post" action="/anliegen/{{ case.id }}/status" class="d-flex flex-wrap gap-1">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="return_to" value="list">
+                {% for action in quick_actions[case.id] %}
+                <button type="submit" class="btn btn-sm {{ 'btn-outline-success' if action in ('delivered','done') else 'btn-outline-primary' }}" name="status" value="{{ action }}">
+                  <i class="fa-solid {{ 'fa-truck-fast' if action == 'ordered' else ('fa-box-open' if action in ('partially_delivered','delivered') else ('fa-check' if action == 'done' else 'fa-play')) }} me-1" aria-hidden="true"></i>{{ statuses[action] }}
+                </button>
+                {% endfor %}
+              </form>
+              {% else %}
+              <a class="btn btn-sm btn-outline-secondary" href="/anliegen/{{ case.id }}">Details</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 px-3">
+      <i class="fa-solid fa-inbox fa-2x text-secondary mb-3" aria-hidden="true"></i>
+      <h3 class="h5">Keine Anliegen für diese Auswahl</h3>
+      <p class="text-secondary">Ändern Sie die Filter oder wählen Sie eine andere Ansicht.</p>
+      {% if may_submit %}<a href="/anliegen/neu" class="btn btn-primary">Neues Anliegen einreichen</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+<p class="small text-secondary mt-3">Vertrauliche Beschwerden sind ausschließlich für Meldende und eindeutig berechtigte Empfänger sichtbar. Statusänderungen und Zuweisungen werden protokolliert.</p>
 {% endblock %}
