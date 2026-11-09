@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}KI-Chat{% endblock %}
+{% block content %}
+{{ m.page_head('KI-Chat', 'Persönlicher, geschützter KI-Arbeitsplatz mit optionaler Recherche in freigegebenem TAKT-Wissen.') }}
+
+<div class="row g-3">
+  <aside class="col-12 col-xl-3" aria-label="Persönliche KI-Unterhaltungen">
+    <div class="card">
+      <div class="card-header">Unterhaltungen</div>
+      <div class="card-body">
+        <form method="post" action="/ki/new" class="mb-3">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="form-label small" for="ai-new-provider">Modell für neue Unterhaltung</label>
+          <select class="form-select mb-2" id="ai-new-provider" name="provider_id" {% if not providers %}disabled{% endif %}>
+            {% for provider in providers %}<option value="{{ provider.id }}">{{ provider.name }} ({{ provider.model_id }})</option>{% endfor %}
+          </select>
+          <button class="btn btn-primary w-100" type="submit" {% if not providers %}disabled{% endif %}><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neuer Chat</button>
+        </form>
+        {% if not providers %}
+        <div class="alert alert-warning small">Noch kein aktiver KI-Provider eingerichtet. {% if user.is_admin %}<a href="/admin/ai">KI konfigurieren</a>{% endif %}</div>
+        {% endif %}
+        <div class="list-group list-group-flush" role="list">
+          {% for chat in chats %}
+          <a href="/ki?chat={{ chat.id }}" class="list-group-item list-group-item-action {{ 'active' if current and current.id == chat.id }}" {% if current and current.id == chat.id %}aria-current="page"{% endif %}>{{ chat.title }}</a>
+          {% else %}<p class="text-secondary small">Noch keine Unterhaltungen vorhanden.</p>{% endfor %}
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="col-12 col-xl-9" aria-label="KI-Unterhaltung">
+    <div class="card">
+      {% if current %}
+      <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
+        <strong>{{ current.title }}</strong>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-sm btn-outline-secondary" href="/ki/{{ current.id }}/export"><i class="fa-solid fa-file-export me-1" aria-hidden="true"></i>Export</a>
+          <details>
+            <summary class="btn btn-sm btn-outline-secondary">Verwalten</summary>
+            <form method="post" action="/ki/{{ current.id }}/rename" class="my-2 d-flex gap-2">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <input type="text" name="title" class="form-control form-control-sm" maxlength="160" value="{{ current.title }}" aria-label="Unterhaltung umbenennen" required>
+              <button class="btn btn-sm btn-primary" type="submit">Speichern</button>
+            </form>
+            <form method="post" action="/ki/{{ current.id }}/delete">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Unterhaltung löschen</button>
+            </form>
+          </details>
+        </div>
+      </div>
+      <div class="card-body">
+        <ol class="list-unstyled mb-4" aria-label="Chatnachrichten">
+          {% for item in chat_messages %}
+          <li class="mb-3 {{ 'ms-md-5' if item.role == 'user' else 'me-md-5' }}">
+            <div class="border rounded p-3 {{ 'bg-body-tertiary' if item.role == 'user' else '' }}">
+              <div class="small fw-semibold mb-2"><i class="fa-solid {{ 'fa-user' if item.role == 'user' else 'fa-brain' }} me-1" aria-hidden="true"></i>{{ 'Sie' if item.role == 'user' else 'KI-Assistent' }}</div>
+              <div class="text-break" style="white-space:pre-wrap">{{ item.content }}</div>
+              {% if item.sources %}
+              <div class="border-top mt-3 pt-2">
+                <strong class="small">Verwendete interne Quellen</strong>
+                <ul class="small mb-0">
+                  {% for source in item.sources %}<li><a href="{{ source.url }}">{{ source.title }}</a></li>{% endfor %}
+                </ul>
+              </div>
+              {% endif %}
+              {% if item.model %}<div class="small text-secondary mt-2">Modell: {{ item.model }}</div>{% endif %}
+            </div>
+          </li>
+          {% else %}
+          <li class="text-secondary">Schreiben Sie Ihre erste Nachricht. Auf Wunsch können freigegebene interne Wissensquellen herangezogen werden.</li>
+          {% endfor %}
+        </ol>
+        <form method="post" action="/ki/{{ current.id }}/message" enctype="multipart/form-data">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="mb-2">
+            <label class="form-label" for="ai-prompt">Ihre Nachricht</label>
+            <textarea class="form-control" id="ai-prompt" name="message" rows="4" maxlength="8000" placeholder="Wie kann ich Ihnen helfen?" required></textarea>
+          </div>
+          {% if knowledge_available %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="use_knowledge" id="ai-use-knowledge" value="1">
+            <label class="form-check-label" for="ai-use-knowledge">Freigegebene interne TAKT-Wissensdatenbank einbeziehen</label>
+          </div>
+          {% endif %}
+          {% if vision_available %}
+          <div class="mb-3">
+            <label class="form-label" for="ai-image">Optionales Bild zur Analyse (JPEG, PNG oder WebP, max. 4 MB)</label>
+            <input type="file" class="form-control" id="ai-image" name="image" accept="image/jpeg,image/png,image/webp">
+            <div class="form-text">Das Bild wird nur für diese Anfrage übertragen und nicht im Chatverlauf gespeichert.</div>
+          </div>
+          {% endif %}
+          <button type="submit" class="btn btn-primary" {% if not providers %}disabled{% endif %}><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Nachricht senden</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="card-body py-5 text-center">
+        <i class="fa-solid fa-brain fa-2x text-secondary mb-3" aria-hidden="true"></i>
+        <h2 class="h5">Ihr persönlicher KI-Arbeitsplatz</h2>
+        <p class="text-secondary">Wählen Sie links eine Unterhaltung oder eröffnen Sie einen neuen Chat.</p>
+        <p class="small text-secondary mb-0">KI-Antworten können fehlerhaft sein. Prüfen Sie wichtige Angaben anhand der Originalquelle.</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

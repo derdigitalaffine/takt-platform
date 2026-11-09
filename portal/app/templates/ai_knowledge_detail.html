@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ doc.title }} – KI-Wissen{% endblock %}
+{% block content %}
+{{ m.page_head(doc.title, 'Freigegebener interner Wissenseintrag für die KI-Recherche.') }}
+<p><a href="/ki"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zurück zum KI-Chat</a></p>
+<div class="card"><div class="card-body">
+  <div class="text-break" style="white-space:pre-wrap">{{ doc.body_md }}</div>
+</div></div>
+{% endblock %}

@@ -135,7 +135,7 @@ templates.env.globals["form_constraints"] = lambda item: _forms_mod().validation
 templates.env.globals["form_rule_hint"] = lambda item: _forms_mod().validation_hint(item)
 templates.env.globals["perm_modules"] = {"processes": "applications", "app_create": "applications", "formblocks": "forms",
                                          "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources",
-                                         "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks"}
+                                         "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai"}
 templates.env.globals.update(planning_when=planning.when, cancel_recipients=planning.cancel_recipients, local_input=planning.local_input,
                              is_upcoming=planning.is_upcoming, rsvp_labels=planning.RSVP_LABELS,
                              rsvp_summary=planning.rsvp_summary)
@@ -175,6 +175,7 @@ templates.env.filters["local"] = lambda dt, fmt="%d.%m.%Y, %H:%M": to_local(dt).
 
 # Modul: (Einstellung, Rechte-Schlüssel, Pfad-Präfixe)
 MODULES = {
+    "ai": ("KI-Chat", "module_ai", ("/ki",)),
     "calendars": ("Kalender & Urlaub", "module_calendars", ("/kalender", "/urlaub", "/caldav", "/.well-known/caldav")),
     "tasks": ("Aufgaben & Zusammenarbeit", "module_tasks", ("/aufgaben",)),
     "seminars": ("Seminare & Lehrgänge", "module_seminars", ("/seminare",)),
@@ -2914,6 +2915,7 @@ from . import routes_absences  # noqa: E402,F401
 from . import routes_sessions  # noqa: E402,F401
 from . import routes_circulations  # noqa: E402,F401
 from . import routes_laws  # noqa: E402,F401
+from . import routes_ai  # noqa: E402,F401
 from . import routes_maps  # noqa: E402,F401
 from . import routes_payments  # noqa: E402,F401
 from . import routes_votes  # noqa: E402,F401

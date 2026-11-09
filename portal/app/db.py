@@ -124,6 +124,9 @@ PERMISSIONS = {
     "processes": ("Prozesse", "fa-diagram-project", "Bearbeitungsprozesse für Online-Anträge im Prozesseditor gestalten und veröffentlichen"),
     "app_create": ("Online-Anträge einrichten", "fa-file-signature", "Formulare zu Online-Anträgen machen (Aktenzeichen, Frist, Zuständigkeit) und wieder zurückstellen"),
     "maps_admin": ("Kartenlayer & Geocoding", "fa-layer-group", "Kartenlayer, Kartenstandard und die Adresssuche (Nominatim) einrichten"),
+    "ai_chat": ("KI-Chat verwenden", "fa-brain", "Persönliche KI-Unterhaltungen mit freigegebenen Sprachmodellen"),
+    "ai_knowledge": ("KI-Wissensrecherche", "fa-book-open", "Freigegebene interne Wissensbestände bei KI-Fragen verwenden"),
+    "ai_vision": ("KI-Bildanalyse", "fa-image", "Eigene Bilder an freigegebene multimodale Modelle übermitteln"),
     "maps": ("Karten", "fa-map-location-dot", "Im Kartenbrowser eigene WMS/WFS-Layer hinzufügen, Karten speichern und teilen"),
     "payments": ("Zahlungen", "fa-euro-sign", "Zahlungsübersicht und Export, Zahlungen als bezahlt markieren, erstatten und stornieren"),
     "resources": ("Ressourcen", "fa-building", "Bürgerhäuser, Räume, Grillplätze, Geräte anlegen, Buchungen bearbeiten, Belegungskalender teilen"),
@@ -2762,6 +2765,9 @@ def seed_orgs(db) -> None:
 
 
 DEFAULT_SETTINGS = {
+    "module_ai": "0",  # Optional; disabled until explicitly activated.
+    "ai_knowledge_enabled": "0",
+    "ai_retention_days": "90",
     "module_tasks": "0",
     "module_calendars": "0",
     "calendar_device_days": "0",
@@ -3072,6 +3078,7 @@ def _migrate() -> None:
 def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import task_models  # noqa: F401 – register additive native-task tables
+    from . import ai_models  # noqa: F401 – register additive AI tables
     Base.metadata.create_all(engine)
     _migrate()
     with SessionLocal() as db:

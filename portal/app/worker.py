@@ -459,6 +459,8 @@ async def run_forever() -> None:
             if time.monotonic() - _last_chat_prune[0] >= 3600:
                 _last_chat_prune[0] = time.monotonic()
                 await asyncio.to_thread(chat.prune)
+                from . import ai_lifecycle
+                await asyncio.to_thread(ai_lifecycle.purge_expired)
                 from . import form_mail
                 await asyncio.to_thread(form_mail.purge_expired)
                 await asyncio.to_thread(purge_form_drafts)

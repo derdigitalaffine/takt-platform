@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}KI-Verwaltung{% endblock %}
+{% block content %}
+{{ m.page_head('KI & Sprachmodelle', 'OpenAI-kompatible Provider serverseitig verwalten. Zugangsdaten werden verschlüsselt gespeichert und nicht an Browser oder Fachmodule weitergereicht.') }}
+
+<div class="alert alert-info" role="note">
+  <i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>
+  Die KI wird unter <a href="/admin/modules">Module</a> gesondert eingeschaltet.
+  Interne Inhalte werden ausschließlich nach Freigabe für eine konkrete Anfrage an den gewählten KI-Provider übermittelt.
+  Es findet keine Internetrecherche statt.
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-xxl-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="fa-solid fa-server me-2"></i>Konfigurierte Provider</div>
+      <div class="card-body">
+        {% if providers %}
+        <div class="list-group mb-3">
+          {% for p in providers %}
+          <div class="list-group-item">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div><div class="fw-semibold">{{ p.name }} <span class="badge text-bg-{{ 'success' if p.active else 'secondary' }}">{{ 'Aktiv' if p.active else 'Deaktiviert' }}</span></div>
+                <div class="small text-secondary">{{ p.model_id }}</div><div class="small text-break">{{ p.base_url }}</div></div>
+              <a class="btn btn-sm btn-outline-secondary" href="/admin/ai?edit={{ p.id }}" aria-label="{{ p.name }} bearbeiten">Bearbeiten</a>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <form method="post" action="/admin/ai/test">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="provider_id" value="{{ p.id }}">
+                <button class="btn btn-sm btn-outline-primary" name="mode" value="models" type="submit">Modellliste prüfen</button>
+              </form>
+              <form method="post" action="/admin/ai/test">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="provider_id" value="{{ p.id }}">
+                <button class="btn btn-sm btn-outline-primary" name="mode" value="text" type="submit">Text testen</button>
+              </form>
+              <form method="post" action="/admin/ai/provider/{{ p.id }}/delete">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}<p class="text-secondary">Noch kein Provider eingerichtet.</p>{% endif %}
+        <a href="/admin/ai" class="btn btn-outline-primary"><i class="fa-solid fa-plus me-1"></i>Neuer Provider</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xxl-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="fa-solid fa-sliders me-2"></i>{{ 'Provider bearbeiten' if selected else 'Provider hinzufügen' }}</div>
+      <div class="card-body">
+        <form action="/admin/ai/provider" method="post" class="row g-3">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="provider_id" value="{{ selected.id if selected else 0 }}">
+          <div class="col-md-6"><label class="form-label" for="ai-name">Bezeichnung</label>
+            <input class="form-control" id="ai-name" name="name" maxlength="120" value="{{ selected.name if selected else '' }}" placeholder="Interner LLM-Server" required></div>
+          <div class="col-md-6"><label class="form-label" for="ai-model">Modell-ID / Alias</label>
+            <input class="form-control" id="ai-model" name="model_id" maxlength="200" value="{{ selected.model_id if selected else '' }}" placeholder="mein-modell" required></div>
+          <div class="col-12"><label class="form-label" for="ai-base">OpenAI-kompatible Basis-URL</label>
+            <input class="form-control" type="url" id="ai-base" name="base_url" maxlength="500" value="{{ selected.base_url if selected else '' }}" placeholder="https://llm.example.org/api" required>
+            <div class="form-text">Den tatsächlichen API-Basispfad eingeben, auch <code>/api</code> möglich. TAKT ergänzt <code>/models</code> und <code>/chat/completions</code>; kein erzwungenes <code>/v1</code>.</div></div>
+          <div class="col-md-6"><label class="form-label" for="ai-text-key">Text-API-Schlüssel</label>
+            <input class="form-control" type="password" id="ai-text-key" name="text_key" autocomplete="new-password" placeholder="{{ masked_text or 'Neuen Schlüssel sicher eintragen' }}">
+            <div class="form-text">Leer lassen, um einen bereits gespeicherten Schlüssel beizubehalten.</div></div>
+          <div class="col-md-6"><label class="form-label" for="ai-image-key">Bild-API-Schlüssel</label>
+            <input class="form-control" type="password" id="ai-image-key" name="image_key" autocomplete="new-password" placeholder="{{ masked_image or 'Optionaler separater Schlüssel' }}">
+            <div class="form-text">Wird nur für die Bildanalyse verwendet.</div></div>
+          <div class="col-md-4"><label class="form-label" for="ai-timeout">Timeout in Sekunden</label>
+            <input class="form-control" id="ai-timeout" type="number" min="5" max="180" name="timeout_seconds" value="{{ selected.timeout_seconds if selected else 180 }}"></div>
+          <div class="col-md-8 d-flex flex-column justify-content-end gap-2">
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ai-active" name="active" value="1" {% if selected and selected.active %}checked{% endif %}>
+              <label class="form-check-label" for="ai-active">Provider aktivieren</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ai-private" name="allow_private" value="1" {% if selected and selected.allow_private %}checked{% endif %}>
+              <label class="form-check-label" for="ai-private">Private / interne Netzwerkziele ausdrücklich zulassen</label></div>
+          </div>
+          <div class="col-12"><p class="small text-secondary mb-2">Nur HTTPS; Zertifikatsprüfung bleibt aktiviert. Für produktive Nutzung getrennte technische Konten verwenden. Ein Providerwechsel übermittelt nie automatisch bisherige Gespräche an einen anderen Anbieter.</p>
+            <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Provider speichern</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="knowledge" class="mt-4">
+  {{ m.page_head('Interne Wissensdatenbank', 'Manuell kuratierte Inhalte und ausgewählte Rechtstexte. Nur ausdrücklich freigegebene Quellen werden verwendet.') }}
+  <form method="post" action="/admin/ai/knowledge/settings" class="card mb-3">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="card-body d-flex align-items-end flex-wrap gap-3">
+      <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ai-knowledge-enable" name="enabled" value="1" {% if cfg.ai_knowledge_enabled == '1' %}checked{% endif %}>
+        <label class="form-check-label" for="ai-knowledge-enable"><strong>Wissenssuche aktivieren</strong></label></div>
+      <div><label class="form-label" for="ai-retention">Aufbewahrungsfrist (Tage)</label>
+        <input class="form-control" type="number" id="ai-retention" name="retention" min="1" max="3650" value="{{ cfg.ai_retention_days }}"></div>
+      <button class="btn btn-primary" type="submit">Einstellungen speichern</button>
+    </div>
+    <div class="card-footer small text-secondary">Persönliche Unterhaltungen, die länger nicht genutzt wurden, werden durch den TAKT-Hintergrunddienst stündlich nach dieser Frist gelöscht. Backup-Aufbewahrung wird separat geregelt.</div>
+  </form>
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="card h-100"><div class="card-header">Wissenseintrag erstellen</div><div class="card-body">
+        <form method="post" action="/admin/ai/knowledge">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label for="ai-doc-title" class="form-label">Titel</label>
+          <input class="form-control mb-3" id="ai-doc-title" name="title" maxlength="200" required>
+          <label for="ai-doc-body" class="form-label">Wissen als Markdown/Text</label>
+          <textarea id="ai-doc-body" class="form-control mb-3" name="body_md" rows="6" maxlength="80000" required></textarea>
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="enabled" value="1" id="ai-doc-enable" checked><label class="form-check-label" for="ai-doc-enable">Für KI freigeben</label></div>
+          <button class="btn btn-primary" type="submit">Wissen hinzufügen</button>
+        </form>
+        <hr class="my-4">
+        <form method="post" action="/admin/ai/knowledge/upload" enctype="multipart/form-data">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label for="ai-import-file" class="form-label">Dokument als Wissen importieren</label>
+          <input type="file" class="form-control mb-2" id="ai-import-file" name="file" accept=".pdf,.docx,.txt,.md" required>
+          <label for="ai-import-title" class="form-label">Optionaler Dokumenttitel</label>
+          <input type="text" class="form-control mb-2" id="ai-import-title" name="title" maxlength="200">
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="enabled" value="1" id="ai-import-enable"><label class="form-check-label" for="ai-import-enable">Nach Import für KI freigeben</label></div>
+          <div class="form-text mb-2">PDF, DOCX, TXT oder Markdown bis 5 MB. Nur Textebene; gescannte PDFs benötigen vorher OCR. Der extrahierte Text wird gespeichert, nicht die Originaldatei.</div>
+          <button class="btn btn-outline-primary" type="submit">Importieren</button>
+        </form>
+      </div></div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card h-100"><div class="card-header">Vorhandenes Wissen</div><div class="card-body">
+        {% for doc in docs %}
+        <details class="border-bottom pb-2 mb-2" id="knowledge-{{ doc.id }}">
+          <summary class="fw-semibold">{{ doc.title }} <span class="badge text-bg-{{ 'success' if doc.enabled else 'secondary' }}">{{ 'Freigegeben' if doc.enabled else 'Inaktiv' }}</span></summary>
+          <form method="post" action="/admin/ai/knowledge" class="pt-3">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="doc_id" value="{{ doc.id }}">
+            <label class="form-label" for="ai-kt-{{ doc.id }}">Titel</label>
+            <input class="form-control mb-2" id="ai-kt-{{ doc.id }}" name="title" maxlength="200" value="{{ doc.title }}" required>
+            <label class="form-label" for="ai-kb-{{ doc.id }}">Inhalt</label>
+            <textarea class="form-control mb-2" id="ai-kb-{{ doc.id }}" name="body_md" rows="5" maxlength="80000" required>{{ doc.body_md }}</textarea>
+            <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="enabled" value="1" {% if doc.enabled %}checked{% endif %}><span class="form-check-label">Freigeben</span></label>
+            <button class="btn btn-sm btn-primary" type="submit">Änderungen speichern</button>
+          </form>
+          <form method="post" action="/admin/ai/knowledge/{{ doc.id }}/delete" class="mt-2"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger" type="submit">Eintrag löschen</button></form>
+        </details>
+        {% else %}<p class="text-secondary">Noch keine eigenen Einträge vorhanden.</p>{% endfor %}
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section id="laws" class="mt-4">
+  {{ m.page_head('Rechtstexte als KI-Wissen', 'Aktuell nur ausdrücklich gewählte veröffentlichte Rechtstexte. Geschützte und unveröffentlichte Entwürfe werden nicht automatisch übernommen.') }}
+  <div class="card"><div class="card-body">
+    <form method="post" action="/admin/ai/laws">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="row g-2" style="max-height:24rem;overflow-y:auto">
+        {% for law in laws %}
+        <div class="col-12 col-lg-6"><label class="form-check border rounded p-2 ps-4 h-100">
+          <input class="form-check-input" type="checkbox" name="law" value="{{ law.id }}" {% if law.id in allowed_laws %}checked{% endif %}>
+          <span class="form-check-label">{{ law.title }}{% if law.internal %} <span class="badge text-bg-secondary">Intern</span>{% endif %}</span>
+        </label></div>
+        {% else %}<p class="text-secondary">Keine veröffentlichten Rechtstexte vorhanden.</p>{% endfor %}
+      </div>
+      <button class="btn btn-primary mt-3" type="submit">Freigabeauswahl speichern</button>
+    </form>
+  </div></div>
+</section>
+{% endblock %}
