@@ -447,9 +447,9 @@ def complete_task(db: Session, task: AnliegenProcessTask, actor: User,
             raise ProcessEngineError("Eine Aufgabe kann nur als erledigt abgeschlossen werden.")
         if not isinstance(checks or [], list):
             raise ProcessEngineError("Ungültige Prüfpunkte.")
-        checkset = set(checks or [])
         if any(not isinstance(c, str) for c in checks or []):
             raise ProcessEngineError("Ungültige Prüfpunkte.")
+        checkset = set(checks or [])
         checklist = step.get("checklist") or []
         if not checkset.issubset(set(checklist)) or not set(checklist).issubset(checkset):
             raise ProcessEngineError("Bitte alle erforderlichen Prüfpunkte bestätigen.")
