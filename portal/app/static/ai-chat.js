@@ -21,7 +21,7 @@
 
   var controller = null;
   var temporary = form.dataset.aiTemporary === '1';
-  var transientHistory = []; // Never written to localStorage or to the TAKT database.
+  var transientHistory = []; // Browser-memory only; never persisted by TAKT.
   if (temporary) {
     // A back/forward cache may otherwise retain the previous page's DOM and
     // JS heap. Explicitly erase both when the temporary chat is left.
