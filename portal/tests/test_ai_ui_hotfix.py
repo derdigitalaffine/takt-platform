@@ -23,9 +23,10 @@ def _member(email: str, permissions: str) -> None:
 
 
 def _shortcut_before_groups(html: str) -> bool:
-    # The top-level link must remain visible even when the Wissen group was hidden or collapsed.
-    before_groups = html.split('data-group="fav"', 1)[0]
-    return 'data-agent-dock' in html
+    # The dock launcher must be in the GLOBAL header (not hidden in the
+    # sidebar, on the page, or as a floating button).
+    header = html.split('<nav class="navbar app-navbar', 1)[-1].split('</nav>', 1)[0]
+    return 'data-agent-dock' in header and 'data-agent-open' in header
 
 
 def test_ki_chat_is_visible_as_primary_link_when_module_is_enabled():
@@ -48,6 +49,19 @@ def test_ki_chat_shortcut_respects_user_permission():
     assert not _shortcut_before_groups(denied.get("/").text)
     assert denied.get("/ki").status_code == 403
     assert allowed.get("/ki").status_code == 200
+
+
+def test_agent_header_launcher_uses_compact_button_not_floating_overlay():
+    settings(module_ai="1")
+    html = login("admin@example.org", "admin-passwort-123").get("/").text
+    assert 'class="agent-header-control"' in html
+    assert 'class="btn btn-link agent-dock-launch"' in html
+    assert 'aria-controls="agent-dock-panel"' in html
+    assert 'aria-expanded="false"' in html
+    css = (Path(__file__).resolve().parents[1] / "app" / "static" / "agent.css").read_text()
+    assert ".agent-dock-launch{position:fixed" not in css
+    assert ".app-navbar .agent-dock-launch{" in css
+
 
 
 def test_module_cards_have_distinct_descriptions_and_stats_for_ki_tasks_calendars():
