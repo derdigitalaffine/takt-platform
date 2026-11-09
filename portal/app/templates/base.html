@@ -51,7 +51,9 @@
       </a>
     </div>
     <div class="d-flex align-items-center gap-1">
-
+      {% if user and takt_agent_available(user) %}
+      {% include '_agent_panel.html' %}
+      {% endif %}
       {% include '_theme_switch.html' %}
       {% if user %}
       <div class="dropdown">
