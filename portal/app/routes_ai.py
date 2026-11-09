@@ -8,6 +8,9 @@ import asyncio
 import contextlib
 import io
 import json
+import time
+from markdown_it import MarkdownIt
+from markupsafe import Markup, escape
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -28,6 +31,16 @@ chat_user = require("ai_chat")
 _MAX_IMAGE = 4 * 1024 * 1024
 _MAX_PROMPT = 8000
 _AI_HEARTBEAT_SECONDS = 5
+# Markdown is rendered server-side with raw HTML and linkification disabled.
+# This is the only HTML accepted by the streaming chat frontend.
+_AI_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "maxNesting": 20}).enable(["table", "strikethrough"])
+# Avoid automatic network requests to images embedded in model-generated Markdown.
+_AI_MARKDOWN.renderer.rules["image"] = lambda tokens, idx, options, env: str(escape(tokens[idx].content))
+
+
+def _ai_markdown(text: str) -> str:
+    return _AI_MARKDOWN.render(text or "")
+
 
 
 def _provider(db: Session, provider_id: int, *, active: bool = False) -> AIProvider:
@@ -71,8 +84,10 @@ def _message_view(db: Session, user: User, row: AIMessage) -> dict:
         sources = [{"url": "", "title": "Ungültige Quellenreferenz"}]
     if not isinstance(sources, list) or not ai_knowledge.sources_accessible(db, user, sources):
         return {"role": row.role, "content": "[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]",
+                "html": Markup(_ai_markdown("[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]")),
                 "sources": [], "model": row.model_id}
     return {"role": row.role, "content": row.content,
+            "html": Markup(_ai_markdown(row.content)) if row.role == "assistant" else None,
             "sources": sources, "model": row.model_id}
 
 
@@ -440,14 +455,12 @@ async def ai_message_updates(
     links = [{"title": src["title"], "url": src["url"]} for src in sources]
     owner_id = user.id
 
-    async def generate():
-        """Drip heartbeat frames while waiting for slow JSON models, and tokens for SSE ones.
 
-        The producer task uses bounded backpressure; disconnect cancels it so no
-        unneeded provider request or partial answer is persisted.
-        """
+    async def generate():
+        """Keep slow JSON providers responsive without losing token streaming or safe Markdown."""
         queue = asyncio.Queue(maxsize=32)
         started = asyncio.get_running_loop().time()
+        last_render = 0.0
         yield _sse("status", {"message": (
             "Antwort wird live übertragen …" if profile.stream_enabled
             else "Modell verarbeitet die Anfrage …"
@@ -469,7 +482,7 @@ async def ai_message_updates(
             except asyncio.CancelledError:
                 raise
             except Exception:
-                # No exception text from third-party providers reaches the browser.
+                # Do not reveal provider exception details to the browser.
                 await queue.put(("error", "Die KI-Verarbeitung konnte nicht abgeschlossen werden."))
 
         producer = asyncio.create_task(produce())
@@ -488,14 +501,20 @@ async def ai_message_updates(
                 if kind == "delta":
                     response_parts.append(payload)
                     yield _sse("delta", {"text": payload})
+                    if profile.stream_enabled:
+                        now = time.monotonic()
+                        # Retain the existing server-side Markdown renderer and its
+                        # throttling. The client never parses untrusted Markdown itself.
+                        if now - last_render >= 0.12:
+                            yield _sse("render", {"html": _ai_markdown("".join(response_parts))})
+                            last_render = now
                 elif kind == "error":
                     yield _sse("error", {"message": payload})
                     return
                 elif kind == "end":
                     answer = "".join(response_parts)
                     if not answer.strip():
-                        yield _sse("error", {"message":
-                            "Der KI-Provider hat keinen Antworttext geliefert."})
+                        yield _sse("error", {"message": "Der KI-Provider hat keinen Antworttext geliefert."})
                         return
                     with SessionLocal() as store:
                         current = store.get(AIConversation, chat_id)
@@ -503,8 +522,7 @@ async def ai_message_updates(
                         if (current is None or current.owner_id != owner_id or
                                 actor is None or not actor.active or
                                 not actor.can("ai_chat") or "ai" not in enabled_modules()):
-                            yield _sse("error", {"message":
-                                "Die Unterhaltung ist nicht mehr freigegeben."})
+                            yield _sse("error", {"message": "Die Unterhaltung ist nicht mehr freigegeben."})
                             return
                         store.add(AIMessage(
                             conversation_id=chat_id, role="assistant", content=answer,
@@ -513,7 +531,8 @@ async def ai_message_updates(
                         ))
                         current.updated_at = utcnow()
                         store.commit()
-                    yield _sse("done", {"sources": links, "model": profile.model_id})
+                    yield _sse("done", {"sources": links, "model": profile.model_id,
+                                        "html": _ai_markdown(answer)})
                     return
         finally:
             if not producer.done():

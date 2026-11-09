@@ -563,5 +563,29 @@
   });
   window.addEventListener('beforeunload', function (ev) { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
 
+  // Schmale, kontrollierte Anbindung für den KI-Assistenten; alle normalen Baukastenwege bleiben erhalten.
+  window.TaktFormBuilderAI = {
+    types: function () { return TYPES; },
+    snapshot: function () {
+      return { title: form.elements.namedItem('title').value,
+               description: form.elements.namedItem('description').value,
+               items: JSON.parse(JSON.stringify(items)) };
+    },
+    apply: function (draft, mode) {
+      var wasEmpty = items.length === 0;
+      if (mode === 'replace') {
+        items = draft.items;
+      } else {
+        items = items.concat(draft.items);
+      }
+      if (mode === 'replace' || wasEmpty) {
+        if (draft.title) { form.elements.namedItem('title').value = draft.title; }
+        if (draft.description) { form.elements.namedItem('description').value = draft.description; }
+      }
+      selected = null;
+      render();
+      markDirty();
+    }
+  };
   render();
 })();

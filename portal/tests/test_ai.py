@@ -375,7 +375,6 @@ def test_sse_does_not_persist_failed_partial_response(monkeypatch):
             AIMessage.conversation_id == cid, AIMessage.role == "assistant"))
 
 
-
 def test_slow_json_provider_emits_progress_heartbeats(monkeypatch):
     """Non-SSE models keep an active response stream while inference is pending."""
     import app.routes_ai as routes_ai
@@ -412,4 +411,6 @@ def test_async_chat_frontend_shows_progress_and_supports_abort():
     assert "data-ai-stop" in js
     assert "setInterval(updateStatus, 1000)" in js
     assert "eventData.kind === 'heartbeat'" in js
+    assert "prompt.addEventListener('keydown'" in js
+    assert "ai-message-markdown" in js
     assert "event.preventDefault()" in js

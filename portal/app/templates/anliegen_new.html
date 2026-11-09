@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Anliegen einreichen{% endblock %}
+{% block content %}
+{{m.page_head('Neues internes Anliegen', 'Wählen Sie die passende Kategorie. TAKT ermittelt die zuständige Person anhand der administrativen Regeln.')}}
+<div class="row g-3"><div class="col-12 col-xl-8">
+<div class="card"><div class="card-body">
+<form method="post" action="/anliegen/neu" id="anliegen-create">
+  <input type="hidden" name="csrf" value="{{csrf}}">
+  <label class="form-label" for="anliegen-category">Art des Anliegens</label>
+  <select class="form-select mb-3" name="category_id" id="anliegen-category" required>
+    {% for cat in categories %}<option value="{{cat.id}}" data-confidential="{{'1' if cat.confidential else '0'}}">{{cat.title}}</option>{% endfor %}
+  </select>
+  <div class="alert alert-warning small" id="anliegen-secret" hidden><i class="fa-solid fa-lock me-1"></i>Vertrauliche Beschwerden werden ausschließlich für Sie und die eindeutig zuständige Leitung angezeigt. Sie werden nicht als allgemeine Aufgabe erstellt. KI-Entwürfe sind in dieser Kategorie aus Datenschutzgründen deaktiviert.</div>
+  <label class="form-label" for="anliegen-title">Kurzer Titel</label>
+  <input id="anliegen-title" name="title" class="form-control mb-3" minlength="3" maxlength="200" placeholder="Worum geht es?" required>
+  <label class="form-label" for="anliegen-description">Beschreibung</label>
+  <textarea id="anliegen-description" name="description" class="form-control mb-2" rows="7" minlength="5" maxlength="10000" placeholder="Beschreiben Sie den Bedarf oder Mangel möglichst konkret." required></textarea>
+  <p class="form-text">Bitte keine unnötigen personenbezogenen oder besonders schutzwürdigen Angaben eintragen.</p>
+  {% if ai_available %}
+  <button id="anliegen-ai" class="btn btn-outline-primary mb-3" type="button" data-action="/anliegen/ki-entwurf"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Mit KI strukturieren</button>
+  <p class="small text-secondary">Nur nach Ihrem Klick wird die bisherige Beschreibung an den konfigurierten KI-Provider übermittelt. Der Vorschlag wird nicht automatisch eingereicht oder zugewiesen.</p>
+  <div class="small mb-3" role="status" aria-live="polite" id="anliegen-ai-status"></div>
+  {% endif %}
+  <div class="d-flex flex-wrap gap-2"><button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane me-1"></i>Verbindlich einreichen</button><a href="/anliegen" class="btn btn-outline-secondary">Abbrechen</a></div>
+</form>
+</div></div></div>
+<div class="col-12 col-xl-4"><div class="card"><div class="card-body">
+<h2 class="h6"><i class="fa-solid fa-route me-2"></i>So funktioniert es</h2>
+<ol class="small text-secondary ps-3"><li>Kategorie wählen und Anliegen beschreiben.</li><li>TAKT ermittelt die hinterlegte Person oder Organisationsleitung.</li><li>Bei unklarer Zuständigkeit bleibt die Meldung zunächst offen.</li><li>Reguläre Anliegen können mit vorhandenen TAKT-Aufgaben verknüpft werden.</li></ol>
+</div></div></div></div>
+{% endblock %}
+{% block scripts %}<script src="/static/anliegen.js"></script>{% endblock %}
