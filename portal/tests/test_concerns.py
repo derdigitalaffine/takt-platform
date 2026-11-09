@@ -1,5 +1,6 @@
 """Interne Anliegen: routing, confidential content, task integration and AI draft."""
 from sqlalchemy import select
+import pytest
 
 from app import ai_provider
 from app.concern_models import Concern, ConcernCategory
@@ -8,6 +9,27 @@ from app.org_models import OrgMembership, OrgRoleGrant
 from app.security import hash_password
 from app.task_models import Task
 from conftest import login, settings, csrf_of
+
+
+@pytest.fixture(autouse=True)
+def _remove_test_concerns():
+    """Keep tests deterministic: no new native tasks survive into other test modules."""
+    with SessionLocal() as db:
+        initial_concerns = set(db.scalars(select(Concern.id)))
+        initial_tasks = set(db.scalars(select(Task.id)))
+    yield
+    with SessionLocal() as db:
+        new_concerns = list(db.scalars(select(Concern).where(
+            Concern.id.not_in(initial_concerns)))) if initial_concerns else list(db.scalars(select(Concern)))
+        new_tasks = list(db.scalars(select(Task).where(
+            Task.id.not_in(initial_tasks)))) if initial_tasks else list(db.scalars(select(Task)))
+        # Release the concern->task foreign key before deleting its task.
+        for item in new_concerns:
+            db.delete(item)
+        db.flush()
+        for task in new_tasks:
+            db.delete(task)
+        db.commit()
 
 
 def _staff(email: str, permissions: str = "") -> int:
