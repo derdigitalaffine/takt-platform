@@ -20,6 +20,17 @@
   if (!messages || !scroller || !jump || !status || !hint || !submit || !stop || !prompt) return;
 
   var controller = null;
+  var startedAt = 0;
+  var ticker = null;
+  var baseStatus = '';
+  var activeProgress = null;
+
+  function updateStatus() {
+    if (!controller || !activeProgress) return;
+    var seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    activeProgress.textContent = (baseStatus || 'KI arbeitet …') + ' (' + seconds + ' s)';
+  }
+
   var workspace = document.querySelector('[data-ai-workspace]');
   var conversations = document.querySelector('.ai-chat-conversations');
   function resizeWorkspace() {
@@ -183,6 +194,11 @@
     scrollToLatest();
 
     controller = new AbortController();
+    startedAt = Date.now();
+    baseStatus = 'Verbindung zum KI-Modell wird aufgebaut …';
+    activeProgress = progress;
+    updateStatus();
+    ticker = window.setInterval(updateStatus, 1000);
     submit.disabled = true;
     stop.disabled = false;
     stop.hidden = false;
@@ -234,7 +250,8 @@
           if (!eventData) continue;
 
           if (eventData.kind === 'status') {
-            progress.textContent = String(eventData.value.message || 'Die KI arbeitet …');
+            baseStatus = String(eventData.value.message || 'Die KI arbeitet …');
+            updateStatus();
             status.textContent = 'KI verarbeitet die Anfrage …';
           } else if (eventData.kind === 'delta') {
             var chunk = String(eventData.value.text || '');
@@ -244,11 +261,15 @@
             assistantBubble.content.appendChild(document.createTextNode(chunk));
             if (!receivedText) {
               receivedText = true;
-              progress.textContent = 'Antwort wird live übertragen …';
+              baseStatus = 'Antwort wird live übertragen …';
+              updateStatus();
               status.textContent = 'KI antwortet …';
             }
             if (follow) scrollToLatest();
             else updateJump();
+          } else if (eventData.kind === 'heartbeat') {
+            baseStatus = 'Die KI arbeitet weiter …';
+            updateStatus();
           } else if (eventData.kind === 'render') {
             if (typeof eventData.value.html === 'string') {
               var followRender = isAtBottom();
@@ -301,6 +322,8 @@
       }
       updateJump();
     } finally {
+      if (ticker !== null) { window.clearInterval(ticker); ticker = null; }
+      activeProgress = null;
       controller = null;
       submit.disabled = initiallyDisabled;
       stop.disabled = true;

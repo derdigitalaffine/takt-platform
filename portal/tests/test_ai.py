@@ -373,3 +373,44 @@ def test_sse_does_not_persist_failed_partial_response(monkeypatch):
     with SessionLocal() as db:
         assert not db.scalar(select(AIMessage.id).where(
             AIMessage.conversation_id == cid, AIMessage.role == "assistant"))
+
+
+def test_slow_json_provider_emits_progress_heartbeats(monkeypatch):
+    """Non-SSE models keep an active response stream while inference is pending."""
+    import app.routes_ai as routes_ai
+    _enable()
+    _user("ai-heartbeat@example.org")
+    pid = _provider()
+    with SessionLocal() as db:
+        db.get(AIProvider, pid).stream_enabled = False
+        db.commit()
+
+    async def slow_complete(provider, messages, *, image=False, max_tokens=1024):
+        await asyncio.sleep(0.045)
+        return "Antwort nach Wartezeit"
+
+    monkeypatch.setattr(ai_provider, "complete", slow_complete)
+    monkeypatch.setattr(routes_ai, "_AI_HEARTBEAT_SECONDS", 0.005)
+    c = login("ai-heartbeat@example.org", "passwort-123")
+    csrf = csrf_of(c.get("/ki").text)
+    chat_id = int(c.post("/ki/new", data={"csrf": csrf, "provider_id": pid})
+                  .headers["location"].split("=")[1])
+    r = c.post(f"/ki/{chat_id}/message/updates",
+               data={"csrf": csrf, "message": "Bitte denken."})
+    assert r.status_code == 200
+    assert "event: status" in r.text
+    assert "event: heartbeat" in r.text
+    assert "Antwort nach Wartezeit" in r.text
+    assert "event: done" in r.text
+
+
+def test_async_chat_frontend_shows_progress_and_supports_abort():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "app" / "static" / "ai-chat.js").read_text()
+    assert "new AbortController()" in js
+    assert "data-ai-stop" in js
+    assert "setInterval(updateStatus, 1000)" in js
+    assert "eventData.kind === 'heartbeat'" in js
+    assert "prompt.addEventListener('keydown'" in js
+    assert "ai-message-markdown" in js
+    assert "event.preventDefault()" in js
