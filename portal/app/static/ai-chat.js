@@ -40,7 +40,8 @@
   function updateStatus() {
     if (!controller || !activeProgress) return;
     var seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-    activeProgress.textContent = (baseStatus || 'KI arbeitet …') + ' (' + seconds + ' s)';
+    var progressLabel = activeProgress.querySelector('[data-ai-progress-label]');
+    if (progressLabel) progressLabel.textContent = (baseStatus || 'TAKT überlegt …') + ' (' + seconds + ' s)';
   }
 
   var workspace = document.querySelector('[data-ai-workspace]');
@@ -93,7 +94,7 @@
     bubble.className = 'ai-message-bubble';
     var label = document.createElement('div');
     label.className = 'ai-message-label';
-    label.textContent = role === 'user' ? 'Sie' : 'KI-Assistent';
+    label.textContent = role === 'user' ? 'Du' : 'TAKT Agent';
     var content = document.createElement('div');
     content.className = 'ai-message-text text-break';
     content.setAttribute('data-ai-message-text', '');
@@ -135,7 +136,19 @@
   function progressText(bubble) {
     var progress = document.createElement('div');
     progress.className = 'ai-message-progress';
-    progress.textContent = 'Verbindung zum KI-Modell wird aufgebaut …';
+    progress.setAttribute('role', 'status');
+    progress.setAttribute('aria-live', 'polite');
+    var label = document.createElement('span');
+    label.setAttribute('data-ai-progress-label', '');
+    label.textContent = 'Ich überlege kurz …';
+    progress.appendChild(label);
+    var dots = document.createElement('span');
+    dots.className = 'ai-typing-dots';
+    dots.setAttribute('aria-hidden', 'true');
+    for (var index = 0; index < 3; index++) {
+      dots.appendChild(document.createElement('span'));
+    }
+    progress.appendChild(dots);
     bubble.appendChild(progress);
     return progress;
   }
@@ -225,9 +238,10 @@
     const userBubble = messageBubble('user', question);
     const assistantBubble = messageBubble('assistant', '');
     const progress = progressText(assistantBubble.bubble);
+    assistantBubble.item.classList.add('ai-message--streaming');
     controller = new AbortController();
     submit.disabled = true; stop.disabled = false; stop.hidden = false;
-    status.textContent = 'TAKT Agent prüft Bereiche und plant …';
+    status.textContent = 'Ich schaue mir deine Nachricht an …';
     hint.textContent = '';
     scrollToLatest();
     try {
@@ -254,16 +268,35 @@
         li.appendChild(link); list.appendChild(li);
       }
       if (list.children.length) assistantBubble.bubble.appendChild(list);
-      progress.remove();
-      status.textContent = data.open_url ? 'Der ausgefüllte Vorschlag wird im Programmbereich geöffnet …' : 'Antwort gespeichert.';
-      updateTitle(question); scrollToLatest();
-      if (data.open_url && /^\/(?:aufgaben|anliegen|forms|dms|kalender)(?:[/?#]|$)/.test(data.open_url)
-          && !data.open_url.includes('\\')) {
-        if (window.self !== window.top && window.frameElement?.hasAttribute('data-agent-frame')) window.parent.location.assign(data.open_url);
-        else window.location.assign(data.open_url);
+      // A suggested destination is informational only. Navigating the
+      // application requires the user's explicit click, never a model output.
+      if (typeof data.open_url === 'string' &&
+          /^\/(?:aufgaben|anliegen|forms|dms|kalender|processes)(?:[/?#]|$)/.test(data.open_url) &&
+          !data.open_url.startsWith('//') && !data.open_url.includes('\\')) {
+        var actionBox = document.createElement('div');
+        actionBox.className = 'ai-agent-destination';
+        var explanation = document.createElement('span');
+        explanation.textContent = data.proposals && data.proposals.length ?
+          'Ich habe einen Vorschlag vorbereitet. Über den Link gelangst du zur Prüfung – gespeichert wird erst nach deiner Bestätigung.' :
+          'Ich kann dich dorthin führen. Öffne den Bereich über diesen Link:';
+        var link = document.createElement('a');
+        link.className = 'btn btn-sm btn-primary';
+        link.href = data.open_url;
+        // A deliberate click opens the original TAKT page, not the tiny dock.
+        if (window.self !== window.top) link.target = '_top';
+        link.textContent = data.proposals && data.proposals.length ?
+          'Vorschlag prüfen' : 'Bereich öffnen';
+        actionBox.appendChild(explanation);
+        actionBox.appendChild(link);
+        assistantBubble.bubble.appendChild(actionBox);
       }
+      progress.remove();
+      assistantBubble.item.classList.remove('ai-message--streaming');
+      status.textContent = data.open_url ? 'Link bereit – du entscheidest, wann du wechselst.' : 'Antwort bereit.';
+      updateTitle(question); scrollToLatest();
     } catch (error) {
-      progress.textContent = error.name === 'AbortError' ? 'Planung abgebrochen. Es wurde nichts gespeichert.' : error.message;
+      progress.textContent = error.name === 'AbortError' ? 'Abgebrochen. Es wurde nichts geändert.' : error.message;
+      assistantBubble.item.classList.remove('ai-message--streaming');
       assistantBubble.item.classList.add('ai-message--error');
       hint.textContent = progress.textContent;
     } finally {
@@ -304,7 +337,7 @@
     submit.disabled = true;
     stop.disabled = false;
     stop.hidden = false;
-    status.textContent = 'KI-Anfrage wird gesendet …';
+    status.textContent = 'Deine Nachricht wird gesendet …';
     hint.textContent = '';
 
     var accepted = false;
@@ -355,7 +388,7 @@
           if (eventData.kind === 'status') {
             baseStatus = String(eventData.value.message || 'Die KI arbeitet …');
             updateStatus();
-            status.textContent = 'KI verarbeitet die Anfrage …';
+            status.textContent = 'Ich denke darüber nach …';
           } else if (eventData.kind === 'delta') {
             var chunk = String(eventData.value.text || '');
             if (temporary) rawTemporaryAnswer += chunk;
@@ -367,7 +400,7 @@
               receivedText = true;
               baseStatus = 'Antwort wird live übertragen …';
               updateStatus();
-              status.textContent = 'KI antwortet …';
+              status.textContent = 'Ich antworte …';
             }
             if (follow) scrollToLatest();
             else updateJump();
