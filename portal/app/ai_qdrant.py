@@ -163,7 +163,8 @@ async def query(db, model_id: str, query_vector: list[float], *,
                               not_found_ok=True)
     except QdrantError:
         return []  # Local cosine search remains authoritative.
-    points = data.get("result", {}).get("points", []) if isinstance(data, dict) else []
+    result = data.get("result") if isinstance(data, dict) else None
+    points = result.get("points", []) if isinstance(result, dict) else []
     if not isinstance(points, list):
         return []
     out = []
