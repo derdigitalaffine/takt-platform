@@ -1104,9 +1104,13 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     user = current_user(request, db)
     modules = enabled_modules()
     top, cache = home.overview(db, user, modules)
-    from . import birthdays
-    birthday_next = birthdays.upcoming(db, user, today=to_local(utcnow()).date())
-    return render(request, "home.html", user, birthday_next=birthday_next, tiles=home.tiles(db, user, modules, nav_ctx(request, user), cache),
+    from . import birthdays, calendar_sources
+    birthday_available = calendar_sources.enabled(db, "birthdays")
+    birthday_next = (
+        birthdays.upcoming(db, user, today=to_local(utcnow()).date())
+        if birthday_available else []
+    )
+    return render(request, "home.html", user, birthday_available=birthday_available, birthday_next=birthday_next, tiles=home.tiles(db, user, modules, nav_ctx(request, user), cache),
                   top=top, quick=home.quick_actions(user, modules), now=utcnow())
 
 
