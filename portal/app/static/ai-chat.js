@@ -40,7 +40,9 @@
   function updateStatus() {
     if (!controller || !activeProgress) return;
     var seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-    activeProgress.textContent = (baseStatus || 'KI arbeitet …') + ' (' + seconds + ' s)';
+    var caption = activeProgress.querySelector('[data-ai-progress-caption]');
+    if (caption) caption.textContent = (baseStatus || 'TAKT denkt nach …') + ' (' + seconds + ' s)';
+    else activeProgress.textContent = (baseStatus || 'TAKT denkt nach …') + ' (' + seconds + ' s)';
   }
 
   var workspace = document.querySelector('[data-ai-workspace]');
@@ -57,6 +59,23 @@
   resizeWorkspace();
   window.addEventListener('resize', resizeWorkspace);
   if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeWorkspace);
+
+  var fontSelect = document.querySelector('[data-ai-font-size]');
+  function setChatFont(value) {
+    var size = Number(value);
+    if (![90, 100, 110, 120, 135].includes(size)) size = 100;
+    if (workspace) workspace.style.setProperty('--ai-chat-text-size', (size / 100) + 'rem');
+    if (fontSelect) fontSelect.value = String(size);
+    try { window.localStorage.setItem('takt-agent-font-size', String(size)); }
+    catch (_) { /* A private browser may disable local storage. */ }
+  }
+  if (fontSelect) {
+    var savedSize = '100';
+    try { savedSize = window.localStorage.getItem('takt-agent-font-size') || '100'; }
+    catch (_) { /* Default stays available. */ }
+    setChatFont(savedSize);
+    fontSelect.addEventListener('change', function () { setChatFont(fontSelect.value); });
+  }
 
   var initiallyDisabled = submit.disabled;
 
@@ -93,7 +112,7 @@
     bubble.className = 'ai-message-bubble';
     var label = document.createElement('div');
     label.className = 'ai-message-label';
-    label.textContent = role === 'user' ? 'Sie' : 'KI-Assistent';
+    label.textContent = role === 'user' ? 'Du' : 'TAKT Agent';
     var content = document.createElement('div');
     content.className = 'ai-message-text text-break';
     content.setAttribute('data-ai-message-text', '');
@@ -135,7 +154,17 @@
   function progressText(bubble) {
     var progress = document.createElement('div');
     progress.className = 'ai-message-progress';
-    progress.textContent = 'Verbindung zum KI-Modell wird aufgebaut …';
+    progress.setAttribute('role', 'status');
+    progress.setAttribute('aria-live', 'polite');
+    var caption = document.createElement('span');
+    caption.setAttribute('data-ai-progress-caption', '');
+    caption.textContent = 'TAKT denkt nach …';
+    var dots = document.createElement('span');
+    dots.className = 'ai-typing-dots';
+    dots.setAttribute('aria-hidden', 'true');
+    for (var i = 0; i < 3; i++) dots.appendChild(document.createElement('i'));
+    progress.appendChild(dots);
+    progress.appendChild(caption);
     bubble.appendChild(progress);
     return progress;
   }
@@ -225,9 +254,15 @@
     const userBubble = messageBubble('user', question);
     const assistantBubble = messageBubble('assistant', '');
     const progress = progressText(assistantBubble.bubble);
+    assistantBubble.item.classList.add('ai-message--typing');
     controller = new AbortController();
+    startedAt = Date.now();
+    baseStatus = 'TAKT überlegt …';
+    activeProgress = progress;
+    updateStatus();
+    ticker = window.setInterval(updateStatus, 1000);
     submit.disabled = true; stop.disabled = false; stop.hidden = false;
-    status.textContent = 'TAKT Agent prüft Bereiche und plant …';
+    status.textContent = 'TAKT antwortet …';
     hint.textContent = '';
     scrollToLatest();
     try {
@@ -255,18 +290,36 @@
       }
       if (list.children.length) assistantBubble.bubble.appendChild(list);
       progress.remove();
-      status.textContent = data.open_url ? 'Der ausgefüllte Vorschlag wird im Programmbereich geöffnet …' : 'Antwort gespeichert.';
-      updateTitle(question); scrollToLatest();
-      if (data.open_url && /^\/(?:aufgaben|anliegen|forms|dms|kalender)(?:[/?#]|$)/.test(data.open_url)
-          && !data.open_url.includes('\\')) {
-        if (window.self !== window.top && window.frameElement?.hasAttribute('data-agent-frame')) window.parent.location.assign(data.open_url);
-        else window.location.assign(data.open_url);
+      assistantBubble.item.classList.remove('ai-message--typing');
+      // A provider may suggest a route, but only a user click can navigate.
+      if (typeof data.open_url === 'string' &&
+          /^\/(?:aufgaben|anliegen|forms|dms|kalender|processes)(?:[/?#]|$)/.test(data.open_url) &&
+          !data.open_url.includes('\\') && !data.open_url.startsWith('//')) {
+        var navigation = document.createElement('div');
+        navigation.className = 'ai-agent-navigation';
+        var lead = document.createElement('p');
+        lead.textContent = data.plan_id ?
+          'Ich habe einen Vorschlag vorbereitet. Du kannst ihn im TAKT-Modul prüfen und freigeben:' :
+          'Ich kann dich zum passenden TAKT-Modul führen. Hier ist dein Link:';
+        var link = document.createElement('a');
+        link.className = 'btn btn-sm btn-outline-primary ai-agent-navigation-link';
+        link.href = data.open_url;
+        link.textContent = data.plan_id ? 'Vorschlag im Modul öffnen' : 'TAKT-Modul öffnen';
+        navigation.appendChild(lead);
+        navigation.appendChild(link);
+        assistantBubble.bubble.appendChild(navigation);
       }
+      status.textContent = data.open_url ? 'Link vorbereitet – du entscheidest, ob du ihn öffnest.' :
+        (data.intent === 'chat' ? 'Antwort fertig.' : 'Antwort gespeichert.');
+      updateTitle(question); scrollToLatest();
     } catch (error) {
       progress.textContent = error.name === 'AbortError' ? 'Planung abgebrochen. Es wurde nichts gespeichert.' : error.message;
       assistantBubble.item.classList.add('ai-message--error');
       hint.textContent = progress.textContent;
     } finally {
+      if (ticker !== null) { window.clearInterval(ticker); ticker = null; }
+      activeProgress = null;
+      assistantBubble.item.classList.remove('ai-message--typing');
       controller = null; submit.disabled = initiallyDisabled;
       stop.disabled = true; stop.hidden = true; prompt.focus({preventScroll: true});
     }
@@ -292,7 +345,7 @@
     var userBubble = messageBubble('user', userText);
     var assistantBubble = messageBubble('assistant', '');
     var progress = progressText(assistantBubble.bubble);
-    assistantBubble.item.classList.add('ai-message--streaming');
+    assistantBubble.item.classList.add('ai-message--streaming', 'ai-message--typing');
     scrollToLatest();
 
     controller = new AbortController();
@@ -365,6 +418,7 @@
             assistantBubble.content.appendChild(document.createTextNode(chunk));
             if (!receivedText) {
               receivedText = true;
+              assistantBubble.item.classList.remove('ai-message--typing');
               baseStatus = 'Antwort wird live übertragen …';
               updateStatus();
               status.textContent = 'KI antwortet …';
@@ -392,7 +446,7 @@
       if (serverError) throw new Error(serverError);
       if (!finished) throw new Error('Die Verbindung wurde vor Ende der Antwort unterbrochen.');
 
-      assistantBubble.item.classList.remove('ai-message--streaming');
+      assistantBubble.item.classList.remove('ai-message--streaming', 'ai-message--typing');
       if (doneData && typeof doneData.html === 'string') {
         assistantBubble.content.classList.add('ai-message-markdown');
         assistantBubble.content.innerHTML = doneData.html;
@@ -430,7 +484,7 @@
       updateJump();
       prompt.focus({preventScroll: true});
     } catch (error) {
-      assistantBubble.item.classList.remove('ai-message--streaming');
+      assistantBubble.item.classList.remove('ai-message--streaming', 'ai-message--typing');
       if (rejected) {
         userBubble.item.remove();
         assistantBubble.item.remove();
