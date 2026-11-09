@@ -41,9 +41,7 @@ def new_anliegen(request: Request, user: User = Depends(current_user), db: Sessi
     categories = list(db.scalars(select(AnliegenCategory).where(
         AnliegenCategory.enabled.is_(True)).order_by(AnliegenCategory.position, AnliegenCategory.title)))
     return render(request, "anliegen_new.html", user, categories=categories,
-                  ai_available=("ai" in enabled_modules() and user.can("ai_chat") and
-                                db.scalar(select(Anliegen.id).limit(1)) is not None or
-                                ("ai" in enabled_modules() and user.can("ai_chat"))))
+                  ai_available=("ai" in enabled_modules() and user.can("ai_chat")))
 
 
 @app.post("/anliegen/neu", dependencies=[Depends(check_csrf)])
