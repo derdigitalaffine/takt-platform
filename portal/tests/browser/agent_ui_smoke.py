@@ -150,6 +150,57 @@ def exercise(page):
     assert frame.evaluate("document.documentElement.scrollHeight <= innerHeight + 1 && document.querySelector('[data-ai-chat-form]').getBoundingClientRect().bottom <= innerHeight + 1")
     page.screenshot(path=str(OUTPUT / 'agent-dock-mobile.png'), full_page=True)
     chat.get_by_role('button', name='Nachricht senden', exact=True).click()
+    # Even in the floating dock, the assistant must never take over the host
+    # page. Only a click on the offered link may move into the native form.
+    expect(page).to_have_url(re.compile(r'127\.0\.0\.1:8765/
+        print('Dock errors:', errors, flush=True)
+        print('Dock chat:', chat.locator('body').inner_text(), flush=True)
+        raise
+    expect(page.locator('[data-agent-draft]')).to_contain_text('Geburtstag')
+    expect(page.locator('form[action="/agent/draft/review"] [name="title"]')).to_have_value('Geburtstage der Belegschaft')
+    page.get_by_role('button', name='Vorschlag prüfen', exact=True).click()
+    expect(page.locator('[data-agent-final-preview]')).to_contain_text('Geburtstag')
+    page.get_by_role('button', name='Diesen Schritt verbindlich speichern', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/forms/[0-9]+$'))
+    assert not errors, errors
+
+
+with tempfile.TemporaryDirectory(prefix='takt-agent-browser-') as root:
+    env = {**os.environ, 'DATA_DIR': root + '/data', 'RECORDINGS_DIR': root + '/recordings',
+           'CADDY_CONF_DIR': root + '/caddy'}
+    with (OUTPUT / 'agent-server.log').open('w') as log:
+        server = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'agent_ui_app:app', '--app-dir', 'tests/browser',
+                                   '--host', '127.0.0.1', '--port', '8765', '--lifespan', 'off'],
+                                  env=env, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            for _ in range(80):
+                try:
+                    if httpx.get(BASE + '/login', timeout=1).status_code == 200:
+                        break
+                except httpx.HTTPError:
+                    pass
+                if server.poll() is not None:
+                    raise RuntimeError('Agent fixture failed; see agent-server.log')
+                time.sleep(.25)
+            else:
+                raise RuntimeError('Agent fixture startup timed out')
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                try:
+                    page = browser.new_page(viewport=dict(width=1440, height=1000))
+                    exercise(page)
+                finally:
+                    browser.close()
+        finally:
+            server.terminate()
+            try:
+                server.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server.kill(); server.wait(timeout=5)
+print('Central agent browser flows passed: edited native forms, sequential confirmation, history, protected manual intake and mobile layout.')
+))
+    expect(chat.locator('.ai-agent-destination a')).to_be_visible()
+    chat.locator('.ai-agent-destination a').click()
     try:
         expect(page).to_have_url(re.compile(r'/forms\?agent_plan='))
     except Exception:
