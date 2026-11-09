@@ -38,7 +38,17 @@
       {% if current %}
       <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <strong class="text-truncate ai-chat-heading" data-ai-chat-title>{{ current.title }}</strong>
-        <div class="d-flex gap-2 flex-wrap align-items-center">
+        <div class="d-flex gap-2 flex-wrap align-items-center ai-chat-header-controls">
+          <label class="ai-font-size-control" title="Schriftgröße für die Unterhaltung">
+            <i class="fa-solid fa-text-height" aria-hidden="true"></i><span class="visually-hidden">Schriftgröße</span>
+            <select class="form-select form-select-sm" data-ai-font-size aria-label="Schriftgröße im KI-Chat">
+              <option value="90">Klein · 90 %</option>
+              <option value="100" selected>Normal · 100 %</option>
+              <option value="110">Groß · 110 %</option>
+              <option value="120">Sehr groß · 120 %</option>
+              <option value="135">Extra groß · 135 %</option>
+            </select>
+          </label>
           {% if temporary %}
           <span class="small text-secondary"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Nicht im Verlauf gespeichert</span>
           <label class="visually-hidden" for="ai-temporary-model">Modell für temporären Chat</label>
@@ -84,7 +94,7 @@
           <li class="ai-message {{ 'ai-message--user' if item.role == 'user' else 'ai-message--assistant' }}" data-ai-message>
             <div class="ai-message-avatar" aria-hidden="true"><i class="fa-solid {{ 'fa-user' if item.role == 'user' else 'fa-brain' }}"></i></div>
             <div class="ai-message-bubble">
-              <div class="ai-message-label">{{ 'Sie' if item.role == 'user' else 'TAKT Agent' }}</div>
+              <div class="ai-message-label">{{ 'Du' if item.role == 'user' else 'TAKT Agent' }}</div>
               {% if item.role == 'assistant' %}<div class="ai-message-text ai-message-markdown text-break" data-ai-message-text>{{ item.html }}</div>{% else %}<div class="ai-message-text text-break" data-ai-message-text>{{ item.content }}</div>{% endif %}
               {% if item.sources %}
               <div class="ai-message-sources">
@@ -105,7 +115,7 @@
             </div>
           </li>
           {% else %}
-          <li class="ai-chat-empty" data-ai-empty><i class="fa-solid fa-brain fa-2x mb-3" aria-hidden="true"></i><p class="mb-1 fw-semibold">Was möchten Sie wissen?</p><p class="small mb-0">Stellen Sie Ihre Frage – TAKT antwortet hier direkt.</p></li>
+          <li class="ai-chat-empty" data-ai-empty><i class="fa-solid fa-brain fa-2x mb-3" aria-hidden="true"></i><p class="mb-1 fw-semibold">Was möchtest du wissen?</p><p class="small mb-0">Frag einfach drauflos oder lass dir bei TAKT helfen.</p></li>
           {% endfor %}
         </ol>
         </div>
@@ -118,12 +128,12 @@
           {% endif %}
           {% if not temporary %}
           <input type="hidden" name="chat_id" value="{{ current.id }}">
-          <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="use_agent" value="1" checked><span class="form-check-label">TAKT unterstützen · passende Bereiche finden und Vorschläge vorausfüllen</span></label>
-          <p class="small text-secondary">Antworten und Wissen bleiben hier. Schreibvorschläge öffnen eine ausgefüllte Fachmaske und werden dort geprüft und bestätigt. Ohne Bedienunterstützung steht der reine Antwortmodus mit Streaming bereit.</p>
+          <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="use_agent" value="1" checked><span class="form-check-label">Bei Aufgaben in TAKT helfen</span></label>
+          <p class="small text-secondary ai-chat-composer-note">Frag mich alles – für konkrete TAKT-Aufträge bereite ich auf Wunsch passende Schritte vor. Ich öffne keine Fachmodule ungefragt; du entscheidest über jeden Link und jede Änderung.</p>
           {% endif %}
           <div class="ai-chat-compose-main">
-            <label class="visually-hidden" for="ai-prompt">Ihre Nachricht</label>
-            <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Frage oder Auftrag an TAKT Agent …" required></textarea>
+            <label class="visually-hidden" for="ai-prompt">Deine Nachricht</label>
+            <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Frag etwas oder beschreibe, was ich in TAKT für dich vorbereiten soll …" required></textarea>
           </div>
           {% if knowledge_available or vision_available or web_available %}
           <details class="ai-chat-options"><summary><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Weitere Optionen</summary>
@@ -161,9 +171,9 @@
       {% else %}
       <div class="card-body py-5 text-center">
         <i class="fa-solid fa-brain fa-2x text-secondary mb-3" aria-hidden="true"></i>
-        <h2 class="h5">Ihr TAKT-Agent-Arbeitsplatz</h2>
-        <p class="text-secondary">Starten Sie links eine neue Unterhaltung.</p>
-        <p class="small text-secondary mb-0">KI-Antworten können fehlerhaft sein. Prüfen Sie wichtige Angaben anhand der Originalquelle.</p>
+        <h2 class="h5">Dein TAKT-Agent-Arbeitsplatz</h2>
+        <p class="text-secondary">Starte links eine neue Unterhaltung.</p>
+        <p class="small text-secondary mb-0">KI-Antworten können Fehler enthalten. Prüfe wichtige Angaben anhand ihrer Quellen.</p>
       </div>
       {% endif %}
     </div>
