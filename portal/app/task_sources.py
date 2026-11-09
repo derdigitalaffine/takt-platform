@@ -7,7 +7,7 @@ from . import tasks as ts
 from .db import DmsRecord, Recording
 from .task_models import Task
 
-LABELS = {'dms': 'Ablage', 'recording': 'Aufzeichnung'}
+LABELS = {'dms': 'Ablage', 'recording': 'Aufzeichnung', 'anliegen': 'Interne Anliegen'}
 
 
 def source_info(db, user, kind, source_id, *, required=False):
@@ -20,6 +20,14 @@ def source_info(db, user, kind, source_id, *, required=False):
             row = db.get(DmsRecord, int(raw))
             if row and not row.archived_at and dms.record_level(db, user, row):
                 info.update(row=row, href=f'/dms/r/{row.id}')
+        elif kind == 'anliegen' and 'anliegen' in enabled_modules():
+            from . import anliegen
+            try:
+                row = anliegen.get(db, user, int(raw))
+                if not row.confidential:
+                    info.update(row=row, href=f'/anliegen/{row.id}')
+            except HTTPException:
+                pass
         elif kind == 'recording' and user.can('video'):
             try:
                 row = own_recording(db, int(raw), user)
