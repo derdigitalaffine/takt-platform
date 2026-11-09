@@ -480,7 +480,10 @@ a.dash-num:hover > span { text-decoration: underline; }
   width: 1.7rem; height: 1.7rem; border-radius: .4rem; font-size: .8rem; opacity: 0; transition: opacity .12s ease; }
 .nav-pin.is-on { color: #e0a800; }
 .app-nav .nav-item:hover > .nav-pin, .nav-pin:focus-visible { opacity: 1; }
-.app-nav .nav-item:hover > .nav-link .badge { margin-right: 1.5rem; }
+/* Reserve the pin's space permanently: hover must never move badges or wrap task labels. */
+.app-sidebar .app-nav .nav-item[data-nav-id] > .nav-link { padding-right: 2.4rem; white-space: nowrap; min-height: 2.6rem; }
+.app-nav .nav-item[data-nav-id] > .nav-link .badge { flex: 0 0 auto; margin-right: 0 !important; }
+.app-nav .nav-item[data-nav-id] > .nav-link .nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav-pin:hover { background: var(--bs-tertiary-bg); color: #e0a800; }
 @media (hover: none) { .nav-favs .nav-pin { opacity: .6; } }
 .nav-group-title { display: flex; align-items: center; gap: .4rem; padding: .45rem .75rem .3rem; font-size: .72rem; letter-spacing: .08em;
