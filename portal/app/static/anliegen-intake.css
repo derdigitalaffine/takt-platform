@@ -1,0 +1,28 @@
+/* Intentionally limited to internal Anliegen intake. Uses TAKT Bootstrap variables. */
+.anliegen-intake{max-width:910px}
+.anliegen-intake .card{border-radius:1rem;border:1px solid var(--bs-border-color);overflow:hidden}
+.anliegen-hero{background:linear-gradient(155deg,var(--bs-primary-bg-subtle),var(--bs-body-bg) 34%)}
+.anliegen-eyebrow{font-size:.77rem;font-weight:700;letter-spacing:.055em;text-transform:uppercase;color:var(--bs-primary-text-emphasis)}
+.anliegen-prompt{font-size:1.06rem;line-height:1.65;min-height:12.5rem;padding:1rem 1.1rem;resize:vertical;background:var(--bs-body-bg)}
+.anliegen-prompt:focus{border-color:var(--bs-primary);box-shadow:0 0 0 .2rem rgba(var(--bs-primary-rgb),.13)}
+.anliegen-ai-cta{padding:.75rem 1.25rem;border-radius:.75rem;font-weight:650}
+.anliegen-review-summary{display:flex;align-items:center;gap:.85rem;cursor:pointer;list-style:none;padding:1rem 1.2rem;user-select:none}
+.anliegen-review-summary::-webkit-details-marker{display:none}
+.anliegen-review-summary:hover{background:var(--bs-tertiary-bg)}
+.anliegen-review-summary:focus-visible{outline:3px solid var(--bs-primary);outline-offset:-3px}
+.anliegen-summary-icon{display:grid;place-items:center;width:2.7rem;height:2.7rem;flex:none;color:var(--bs-primary);background:var(--bs-primary-bg-subtle);border-radius:.75rem}
+.anliegen-chevron{color:var(--bs-secondary-color);transition:transform .2s ease}
+.anliegen-review[open] .anliegen-chevron{transform:rotate(180deg)}
+.anliegen-review .form-control,.anliegen-review .form-select{border-radius:.65rem;padding:.7rem .9rem}
+.anliegen-review textarea{resize:vertical;line-height:1.6;min-height:9rem}
+.anliegen-recipient-preview{border:1px solid var(--bs-border-color);padding:.75rem .95rem;border-radius:.65rem;background:var(--bs-tertiary-bg);color:var(--bs-body-color)}
+.anliegen-recipient-preview[data-ready="true"]{border-color:var(--bs-success-border-subtle);background:var(--bs-success-bg-subtle);color:var(--bs-success-text-emphasis)}
+.anliegen-recipient-preview[data-ready="false"]{border-color:var(--bs-warning-border-subtle);background:var(--bs-warning-bg-subtle);color:var(--bs-warning-text-emphasis)}
+.anliegen-status{background:var(--bs-tertiary-bg);border-radius:.6rem;padding:.7rem .9rem}
+.anliegen-status[data-state="success"]{color:var(--bs-success-text-emphasis);background:var(--bs-success-bg-subtle)}
+.anliegen-status[data-state="error"]{color:var(--bs-danger-text-emphasis);background:var(--bs-danger-bg-subtle)}
+.anliegen-submit-bar{border-top:1px solid var(--bs-border-color);padding-top:1.15rem}
+.anliegen-submit-bar .btn-lg{font-weight:650;border-radius:.7rem}
+.anliegen-intake [hidden]{display:none!important}
+@media(max-width:575.98px){.anliegen-review-summary{padding:.85rem}.anliegen-prompt{font-size:1rem;min-height:11rem}.anliegen-submit-bar .btn{width:100%;margin-bottom:.45rem}}
+@media(prefers-reduced-motion:reduce){.anliegen-chevron{transition:none}}
