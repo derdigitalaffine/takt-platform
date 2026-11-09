@@ -74,6 +74,7 @@ async def birthday_settings_save(
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from None
+    org.audit(db, user, oid, "birthday_settings", scope=str(form.get("scope")), leap=str(form.get("leap")), caldav=form.get("caldav") == "1", ics=form.get("ics") == "1")
     db.commit()
     flash(request, "Geburtstagseinstellungen für " + unit.name + " gespeichert.")
     return redirect("/kalender/geburtstage/einstellungen")
