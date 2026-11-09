@@ -135,7 +135,7 @@ templates.env.globals["form_constraints"] = lambda item: _forms_mod().validation
 templates.env.globals["form_rule_hint"] = lambda item: _forms_mod().validation_hint(item)
 templates.env.globals["perm_modules"] = {"processes": "applications", "app_create": "applications", "formblocks": "forms",
                                          "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources",
-                                         "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai"}
+                                         "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "concerns_manage": "concerns", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai"}
 templates.env.globals.update(planning_when=planning.when, cancel_recipients=planning.cancel_recipients, local_input=planning.local_input,
                              is_upcoming=planning.is_upcoming, rsvp_labels=planning.RSVP_LABELS,
                              rsvp_summary=planning.rsvp_summary)
