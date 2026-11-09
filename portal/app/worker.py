@@ -421,9 +421,6 @@ async def run_forever() -> None:
                     await asyncio.to_thread(notify.process_queue)
                 from . import task_schedule
                 await asyncio.to_thread(task_schedule.tick)
-                # Opt-in durable RAG indexer; bounded to two documents per cycle.
-                from . import ai_vector_jobs
-                await ai_vector_jobs.tick()
                 from . import seminars
                 if await asyncio.to_thread(seminars.tick):
                     await asyncio.to_thread(notify.process_queue)
