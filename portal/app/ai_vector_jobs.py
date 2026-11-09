@@ -98,7 +98,7 @@ def counts(db) -> dict[str, int]:
     return {key: rows.count(key) for key in ("pending", "running", "failed", "done")}
 
 
-async def tick() -> int:
+async def tick(doc_id: int | None = None) -> int:
     """Process at most BATCH_SIZE jobs; no model requests while disabled."""
     with SessionLocal() as db:
         if not active(db):
@@ -114,8 +114,10 @@ async def tick() -> int:
                 (AIIndexJob.lease_until.is_(None)) |
                 (AIIndexJob.lease_until <= now)),
         )
-        job_ids = list(db.scalars(select(AIIndexJob.id).where(due)
-                                  .order_by(AIIndexJob.id).limit(BATCH_SIZE)))
+        jobs_query = select(AIIndexJob.id).where(due)
+        if doc_id is not None:
+            jobs_query = jobs_query.where(AIIndexJob.knowledge_id == doc_id)
+        job_ids = list(db.scalars(jobs_query.order_by(AIIndexJob.id).limit(BATCH_SIZE)))
     done = 0
     for job_id in job_ids:
         with SessionLocal() as db:
