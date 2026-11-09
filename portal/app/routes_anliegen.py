@@ -215,6 +215,9 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
                                                     or (task.group_id is not None
                                                         and task.group_id in acting_groups))))
                                  for task in tasks]))
+    process_names = {rule.id: (db.get(Process, rule.process_id).name
+                               if db.get(Process, rule.process_id) else "Unbekannter Prozess")
+                     for rule in process_rules}
     return render(request, "anliegen_detail.html", user, case=case, events=events,
                   statuses=service.STATUSES,
                   choices=service.next_states(case),
@@ -222,7 +225,8 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
                   tasks_enabled=("tasks" in enabled_modules()),
                   is_order=case.category.key in service.ORDER_KEYS,
                   process_enabled=process_enabled, process_rules=process_rules,
-                  process_cards=cards, process_token=uuid4().hex)
+                  process_cards=cards, process_token=uuid4().hex,
+                  process_names=process_names)
 
 
 @app.post("/anliegen/{case_id:int}/status", dependencies=[Depends(check_csrf)])
