@@ -57,11 +57,13 @@ def update_status(db, case, actor, new_status, *, supplier="", order_reference="
         raise HTTPException(422, "Dieser Statuswechsel ist nicht zulässig.")
     if new_status in ORDER_STATES and case.category.key not in ORDER_KEYS:
         raise HTTPException(422, "Lieferstatus nur für Bestellungen verfügbar.")
-    if new_status == "ordered":
+    if case.category.key in ORDER_KEYS:
+        # Allow correcting supplier/reference during later delivery steps.
         case.supplier = supplier.strip()[:160] or case.supplier
         case.order_reference = order_reference.strip()[:120] or case.order_reference
         if expected_delivery_at is not None:
             case.expected_delivery_at = expected_delivery_at
+    if new_status == "ordered":
         case.ordered_at = case.ordered_at or utcnow()
     if new_status == "delivered":
         case.delivered_at = utcnow()
@@ -72,7 +74,7 @@ def update_status(db, case, actor, new_status, *, supplier="", order_reference="
         from . import tasks
         task = db.get(Task, case.task_id)
         if task:
-            task.status = ("done" if new_status in ("done", "closed", "delivered")
+            task.status = ("done" if new_status in ("done", "closed")
                            else "open" if new_status == "open"
                            else "in_progress")
             tasks.audit(db, task, actor, "status",
