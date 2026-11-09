@@ -17,12 +17,12 @@ from urllib.parse import urlsplit
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func, or_
 from sqlalchemy.orm import Session
 
 from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector, AIDmsSource
-from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms, ai_qdrant
-from .db import LawText, User, DmsRecord, SessionLocal, get_settings, set_setting, utcnow
+from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms, ai_qdrant, ai_source_policy, ai_index_status
+from .db import LawText, User, DmsRecord, DmsArea, SessionLocal, get_settings, set_setting, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
                    flash, get_db, rate_limit, redirect, render, require)
 from .security import decrypt, encrypt, mask_secret
@@ -92,8 +92,8 @@ def _message_view(db: Session, user: User, row: AIMessage) -> dict:
 
 
 @app.get("/admin/ai")
-def admin_ai(request: Request, edit: int | None = None, user: User = Depends(admin_user),
-             db: Session = Depends(get_db)):
+def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
+             user: User = Depends(admin_user), db: Session = Depends(get_db)):
     providers = list(db.scalars(select(AIProvider).order_by(AIProvider.id)))
     selected = db.get(AIProvider, edit) if edit else None
     cfg = get_settings(db)
@@ -101,22 +101,50 @@ def admin_ai(request: Request, edit: int | None = None, user: User = Depends(adm
     laws = list(db.scalars(select(LawText).where(LawText.published.is_(True)).order_by(LawText.title)))
     allowed = set(db.scalars(select(AILawSource.law_id)))
     allowed_dms = set(db.scalars(select(AIDmsSource.record_id)))
+    law_excluded = ai_source_policy.read_ids(cfg.get("ai_laws_excluded_ids")) or set()
+    dms_excluded = ai_source_policy.read_ids(cfg.get("ai_dms_excluded_ids")) or set()
+    dms_excluded_areas = ai_source_policy.read_ids(cfg.get("ai_dms_excluded_areas")) or set()
+    dms_q = dms_q.strip()[:100]
+    candidates = select(DmsRecord).where(DmsRecord.kind == "manuell")
+    if dms_q:
+        candidates = candidates.where(or_(
+            DmsRecord.title.ilike(f"%{dms_q}%"),
+            DmsRecord.note.ilike(f"%{dms_q}%")))
     dms_candidates = [
-        item for item in db.scalars(
-            select(DmsRecord).where(DmsRecord.kind == "manuell")
-            .order_by(DmsRecord.id.desc()).limit(400))
+        item for item in db.scalars(candidates.order_by(DmsRecord.id.desc()).limit(1200))
         if ai_dms.eligible(item)
     ]
-    dms_candidates.sort(key=lambda item: (item.id not in allowed_dms, -item.id))
+    dms_candidates.sort(key=lambda item: (
+        item.id not in (allowed_dms | dms_excluded), -item.id))
     dms_candidates = dms_candidates[:120]
-    vector_count = len(list(db.scalars(select(AIKnowledgeVector.id))))
+    dms_areas = list(db.scalars(select(DmsArea).order_by(DmsArea.code, DmsArea.name)))
+    dms_eligible_count = db.scalar(select(func.count(DmsRecord.id)).where(
+        DmsRecord.kind == "manuell", DmsRecord.archived_at.is_(None),
+        DmsRecord.response_id.is_(None), DmsRecord.person_id.is_(None),
+        DmsRecord.booking_id.is_(None), DmsRecord.note != "",
+        or_(DmsRecord.applicant.is_(None), DmsRecord.applicant == ""),
+        or_(DmsRecord.applicant_email.is_(None), DmsRecord.applicant_email == "")
+    )) or 0
+    index_health = ai_index_status.status(db, docs)
     return render(request, "admin_ai.html", user, providers=providers, selected=selected,
                   masked_text=mask_secret(decrypt(selected.text_key_enc)) if selected else "",
                   masked_image=mask_secret(decrypt(selected.image_key_enc)) if selected else "",
                   cfg=cfg, docs=docs, laws=laws, allowed_laws=allowed,
+                  law_excluded=law_excluded, dms_excluded=dms_excluded,
+                  dms_excluded_areas=dms_excluded_areas, dms_areas=dms_areas,
+                  dms_eligible_count=dms_eligible_count, dms_q=dms_q,
                   dms_candidates=dms_candidates, allowed_dms=allowed_dms,
-                   vector_count=vector_count, vector_jobs=ai_vector_jobs.counts(db),
-                   masked_web_key=mask_secret(decrypt(cfg.get('ai_web_key_enc', ''))))
+                  vector_count=index_health["vectors"], vector_jobs=index_health["jobs"],
+                  index_health=index_health,
+                  masked_web_key=mask_secret(decrypt(cfg.get('ai_web_key_enc', ''))))
+
+
+@app.get("/admin/ai/index/status")
+def admin_ai_index_status(
+    request: Request, user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    return JSONResponse(ai_index_status.status(db))
 
 
 @app.post("/admin/ai/provider", dependencies=[Depends(check_csrf)])
@@ -310,13 +338,24 @@ def admin_ai_dms_source(
         raise HTTPException(400, "Nur manuelle Ablageeinträge ohne Bürger-/Vorgangsbezug dürfen KI-Quellen sein.")
     if get_settings(db).get("module_dms", "1") != "1":
         raise HTTPException(404, "Die Ablage ist deaktiviert.")
-    source = db.get(AIDmsSource, record_id)
-    if allowed == "1" and source is None:
-        db.add(AIDmsSource(record_id=record_id))
-    elif allowed != "1" and source is not None:
-        db.delete(source)
+    cfg = get_settings(db)
+    if cfg.get("ai_dms_include_all") == "1":
+        excluded = ai_source_policy.read_ids(cfg.get("ai_dms_excluded_ids"))
+        if excluded is None:
+            raise HTTPException(400, "Ungültige Ausnahmeliste; bitte Einstellungen prüfen.")
+        if allowed == "1":
+            excluded.discard(record_id)
+        else:
+            excluded.add(record_id)
+        set_setting(db, "ai_dms_excluded_ids", ai_source_policy.encoded_ids(excluded))
+    else:
+        source = db.get(AIDmsSource, record_id)
+        if allowed == "1" and source is None:
+            db.add(AIDmsSource(record_id=record_id))
+        elif allowed != "1" and source is not None:
+            db.delete(source)
     db.commit()
-    flash(request, "KI-Freigabe des Ablageeintrags aktualisiert. Alle DMS-Leserechte gelten weiterhin.")
+    flash(request, "KI-Quellenregel aktualisiert. Die ursprünglichen DMS-Leserechte gelten weiterhin.")
     return redirect("/admin/ai#dms-sources")
 
 
@@ -393,11 +432,78 @@ def admin_ai_knowledge_delete(request: Request, doc_id: int, user: User = Depend
     return redirect("/admin/ai#knowledge")
 
 
+@app.post("/admin/ai/laws/mode", dependencies=[Depends(check_csrf)])
+def admin_ai_laws_mode(
+    request: Request, include_all: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    set_setting(db, "ai_laws_include_all", "1" if include_all == "1" else "0")
+    db.commit()
+    flash(request, "Automatische Rechtstextsammlung aktualisiert. Ausnahmen gelten weiterhin.")
+    return redirect("/admin/ai#laws")
+
+
+@app.post("/admin/ai/laws/{law_id:int}/source", dependencies=[Depends(check_csrf)])
+def admin_ai_law_source(
+    request: Request, law_id: int, allowed: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    law = db.get(LawText, law_id)
+    if law is None or not law.published:
+        raise HTTPException(400, "Nur veröffentlichte Rechtstexte können ausgewählt werden.")
+    cfg = get_settings(db)
+    if cfg.get("ai_laws_include_all") == "1":
+        excluded = ai_source_policy.read_ids(cfg.get("ai_laws_excluded_ids"))
+        if excluded is None:
+            raise HTTPException(400, "Ungültige Ausnahmeliste; bitte Einstellungen prüfen.")
+        if allowed == "1":
+            excluded.discard(law_id)
+        else:
+            excluded.add(law_id)
+        set_setting(db, "ai_laws_excluded_ids", ai_source_policy.encoded_ids(excluded))
+    else:
+        source = db.get(AILawSource, law_id)
+        if allowed == "1" and source is None:
+            db.add(AILawSource(law_id=law_id))
+        elif allowed != "1" and source is not None:
+            db.delete(source)
+    db.commit()
+    flash(request, "Rechtsquellenregel gespeichert.")
+    return redirect("/admin/ai#laws")
+
+
+@app.post("/admin/ai/dms/settings", dependencies=[Depends(check_csrf)])
+async def admin_ai_dms_settings(
+    request: Request, include_all: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    if get_settings(db).get("module_dms", "1") != "1" and include_all == "1":
+        raise HTTPException(400, "Ablage ist deaktiviert.")
+    form = await request.form()
+    raw = form.getlist("exclude_area")
+    if len(raw) > 500 or any(not value.isascii() or not value.isdigit() for value in raw):
+        raise HTTPException(400, "Ungültige Bereichsausnahmen.")
+    excluded_areas = {int(value) for value in raw}
+    existing = set(db.scalars(select(DmsArea.id)))
+    if excluded_areas - existing:
+        raise HTTPException(400, "Unbekannter Ablagebereich.")
+    set_setting(db, "ai_dms_excluded_areas", ai_source_policy.encoded_ids(excluded_areas))
+    set_setting(db, "ai_dms_include_all", "1" if include_all == "1" else "0")
+    db.commit()
+    flash(request, "Ablage-Wissenssammlung gespeichert. Bereichs- und Benutzerrechte bleiben wirksam.")
+    return redirect("/admin/ai#dms-sources")
+
+
 @app.post("/admin/ai/laws", dependencies=[Depends(check_csrf)])
 async def admin_ai_laws(request: Request, user: User = Depends(admin_user),
                         db: Session = Depends(get_db)):
+    if get_settings(db).get("ai_laws_include_all") == "1":
+        raise HTTPException(400, "Einzelauswahl im Automatikmodus über die Ausnahmen bearbeiten.")
     data = await request.form()
-    selected = {int(v) for v in data.getlist("law") if v.isascii() and v.isdigit()}
+    entries = data.getlist("law")
+    if len(entries) > 10000 or any(not str(v).isascii() or not str(v).isdigit() for v in entries):
+        raise HTTPException(400, "Ungültige Rechtstext-Auswahl.")
+    selected = {int(v) for v in entries}
     eligible = set(db.scalars(select(LawText.id).where(LawText.published.is_(True))))
     if selected - eligible:
         raise HTTPException(400, "Unzulässige Rechtstext-Auswahl.")
