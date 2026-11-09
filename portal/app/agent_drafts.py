@@ -108,7 +108,7 @@ def edited(db, user, original, data):
     tool = raw["tool"]
     allowed = {
         "create_form": ("title",),
-        "create_task": ("title", "description", "priority", "assignee_id"),
+        "create_task": ("title", "description", "priority", "assignee_id", "due_date", "due_time", "starts_at", "tags", "checklist"),
         "create_anliegen": ("title", "description", "category_id"),
         "assign_task": ("assignee_id",), "set_task_priority": ("priority",),
         "set_task_status": (), "assign_anliegen": ("assignee_id",),
