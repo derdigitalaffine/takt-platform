@@ -2935,6 +2935,8 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "anliegen_categories": {"procurement": "BOOLEAN NOT NULL DEFAULT 0"},
+    "anliegen": {"supplier_name": "VARCHAR(160) NOT NULL DEFAULT ''", "order_reference": "VARCHAR(160) NOT NULL DEFAULT ''"},
     "ai_providers": {"stream_enabled": "BOOLEAN NOT NULL DEFAULT 0"},
     "leave_policies": {"holiday_state": "VARCHAR(8) NOT NULL DEFAULT 'inherit'",
                        "external_attestation": "BOOLEAN NOT NULL DEFAULT 0"},
