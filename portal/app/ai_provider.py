@@ -127,3 +127,87 @@ async def complete(provider, messages: list[dict], *, image: bool = False, max_t
     if not isinstance(content, str):
         raise AIProviderError("Der KI-Provider hat kein lesbares Nachrichtenfeld geliefert.")
     return content[:40_000]
+
+
+
+async def stream_completion(provider, messages: list[dict], *, image: bool = False,
+                            max_tokens: int = 1024):
+    """Yield OpenAI-compatible SSE content tokens from a streaming provider.
+
+    The caller is responsible for saving the complete answer. Non-streaming
+    providers continue to use complete() with stream=False.
+    """
+    if not provider.active:
+        raise AIProviderError("Der gewählte KI-Provider ist deaktiviert.")
+    token = decrypt(provider.image_key_enc if image else provider.text_key_enc)
+    if not token:
+        raise AIProviderError("Für den KI-Provider ist kein API-Zugang eingerichtet.")
+    await validate_destination(provider.base_url, provider.allow_private)
+    payload = {"model": provider.model_id, "stream": True,
+               "max_tokens": max(64, min(int(max_tokens), 2048)), "messages": messages}
+    headers = {"Authorization": "Bearer " + token,
+               "Accept": "text/event-stream", "Content-Type": "application/json"}
+    timeout = max(5, min(int(provider.timeout_seconds or 180), 180))
+    total = 0
+    done = False
+    data_lines = []
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as client:
+            async with client.stream(
+                "POST", endpoint(provider.base_url, "chat/completions"),
+                headers=headers, json=payload,
+            ) as response:
+                if response.status_code in (301, 302, 303, 307, 308):
+                    raise AIProviderError("Der Provider hat eine nicht zugelassene Weiterleitung gesendet.")
+                if response.status_code == 401:
+                    raise AIProviderError("Der KI-Provider hat den API-Schlüssel abgelehnt (401).")
+                if response.status_code == 403:
+                    raise AIProviderError("Der KI-Provider hat den Zugriff verweigert (403).")
+                if response.status_code == 429:
+                    raise AIProviderError("Das Anfragelimit des KI-Providers ist erreicht (429).")
+                if response.status_code >= 400:
+                    raise AIProviderError(f"Der KI-Provider meldet einen Fehler (HTTP {response.status_code}).")
+                if "text/event-stream" not in response.headers.get("content-type", "").lower():
+                    raise AIProviderError(
+                        "Dieser Provider liefert keinen SSE-Stream. Streaming in der KI-Verwaltung deaktivieren."
+                    )
+                async for line in response.aiter_lines():
+                    if len(line) > 100_000:
+                        raise AIProviderError("Der KI-Provider hat eine zu große Streaming-Nachricht geliefert.")
+                    if line.startswith("data:"):
+                        data_lines.append(line[5:].lstrip())
+                    elif not line.strip():
+                        if not data_lines:
+                            continue
+                        payload_text = "\n".join(data_lines)
+                        data_lines.clear()
+                        if payload_text == "[DONE]":
+                            done = True
+                            break
+                        try:
+                            obj = json.loads(payload_text)
+                        except ValueError as exc:
+                            raise AIProviderError("Ungültige Streaming-Nachricht des KI-Providers.") from exc
+                        if not isinstance(obj, dict):
+                            raise AIProviderError("Ungültiges Streaming-Format.")
+                        if obj.get("error"):
+                            raise AIProviderError("Der KI-Provider hat den Stream mit einem Fehler abgebrochen.")
+                        choices = obj.get("choices")
+                        if not isinstance(choices, list) or not choices:
+                            continue
+                        choice = choices[0] if isinstance(choices[0], dict) else {}
+                        delta = choice.get("delta")
+                        content = delta.get("content") if isinstance(delta, dict) else None
+                        if isinstance(content, str) and content:
+                            total += len(content)
+                            if total > 40_000:
+                                raise AIProviderError("Die Textantwort überschreitet das Ausgabelimit.")
+                            yield content
+                        if choice.get("finish_reason"):
+                            done = True
+                if not done:
+                    raise AIProviderError("Die Streaming-Verbindung wurde unvollständig beendet.")
+    except AIProviderError:
+        raise
+    except (httpx.TimeoutException, httpx.TransportError) as exc:
+        raise AIProviderError("Der KI-Provider ist nicht erreichbar oder antwortet zu langsam.") from exc
