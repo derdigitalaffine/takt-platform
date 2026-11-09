@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Interne Anliegen{% endblock %}
+{% block content %}
+{% call m.page_head('Interne Anliegen', 'Mängel melden, Bestellungen anstoßen, Beschwerden einreichen und die Bearbeitung nachvollziehen.') %}
+<a class="btn btn-primary" href="/anliegen/neu"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Neues Anliegen</a>
+{% if can_manage %}<a class="btn btn-outline-secondary" href="/admin/anliegen"><i class="fa-solid fa-route me-2" aria-hidden="true"></i>Zuständigkeiten</a>{% endif %}
+{% endcall %}
+<div class="row g-3 mb-4">
+  <div class="col-md-6"><div class="card h-100"><div class="card-body d-flex align-items-start gap-3">
+    <span class="stat-icon"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i></span>
+    <div><strong>Einfach melden</strong><p class="small text-secondary mb-0">Kategorie auswählen, Sachverhalt beschreiben und absenden. Die zuständige Person wird aus den hinterlegten Regeln ermittelt.</p></div>
+  </div></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-body d-flex align-items-start gap-3">
+    <span class="stat-icon"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span>
+    <div><strong>Vertrauliche Beschwerden</strong><p class="small text-secondary mb-0">Beschwerden werden automatisch der eindeutigen vorgesetzten Person zugewiesen. In der allgemeinen Aufgabenliste steht kein Beschwerdetext.</p></div>
+  </div></div></div>
+</div>
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
+    <strong>Meine Meldungen und Bearbeitungsaufträge</strong>
+    <span class="badge text-bg-secondary">{{ items|length }} sichtbar</span>
+  </div>
+  <div class="card-body">
+    {% if items %}
+    <div class="table-responsive"><table class="table table-hover align-middle js-table w-100">
+      <thead><tr><th>Vorgang</th><th>Anliegen</th><th>Kategorie</th><th>Verantwortlich</th><th>Status</th><th>Rolle</th></tr></thead>
+      <tbody>
+      {% for item in items %}
+      <tr>
+        <td><a class="fw-semibold" href="/anliegen/{{ item.id }}">{{ item.reference }}</a>
+            <div class="small text-secondary">{{ item.created_at|local('%d.%m.%Y') }}</div></td>
+        <td><a href="/anliegen/{{ item.id }}">{{ item.title }}</a>
+            {% if item.confidential %}<div class="small text-secondary"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Vertraulich</div>{% endif %}</td>
+        <td>{{ item.category.title }}</td>
+        <td>{{ item.assignee.name }}</td>
+        <td><span class="badge text-bg-secondary">{{ statuses.get(item.task.status, item.task.status) if item.task else 'Nicht zugewiesen' }}</span></td>
+        <td class="small text-secondary">{% if item.reporter_id == user.id %}Gemeldet{% elif item.assignee_id == user.id %}Bearbeitung{% else %}Verwaltung{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    <div class="text-center p-4">
+      <i class="fa-solid fa-inbox fa-2x text-secondary mb-3" aria-hidden="true"></i>
+      <h2 class="h5">Noch keine Anliegen</h2>
+      <p class="text-secondary">Melden Sie einen internen Bedarf oder einen Mangel. TAKT übernimmt die Zuordnung als Aufgabe.</p>
+      <a class="btn btn-primary" href="/anliegen/neu">Erstes Anliegen erfassen</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
