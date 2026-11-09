@@ -141,8 +141,9 @@ def test_admin_retry_reschedules_only_failed_jobs_without_network():
 
 def test_qdrant_auto_sync_requires_explicit_opt_in(monkeypatch):
     _setup()
-    settings(ai_qdrant_enabled="1", ai_qdrant_auto_sync="0",
-             ai_qdrant_revision="2", ai_qdrant_synced_revision="1")
+    settings(ai_vector_auto_index="0", ai_qdrant_enabled="1",
+             ai_qdrant_auto_sync="0", ai_qdrant_revision="2",
+             ai_qdrant_synced_revision="1")
     from app import ai_qdrant
     calls = []
     async def fake_rebuild(db):
