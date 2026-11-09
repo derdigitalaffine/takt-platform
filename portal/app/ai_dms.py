@@ -76,6 +76,9 @@ def retrieve(db, user, question: str, limit: int = 2) -> list[dict]:
         DmsRecord.response_id.is_(None),
         DmsRecord.person_id.is_(None),
         DmsRecord.booking_id.is_(None),
+        DmsRecord.note != "",
+        or_(DmsRecord.applicant.is_(None), DmsRecord.applicant == ""),
+        or_(DmsRecord.applicant_email.is_(None), DmsRecord.applicant_email == ""),
         or_(*[
             or_(DmsRecord.title.ilike(f"%{word}%"),
                 DmsRecord.note.ilike(f"%{word}%"))
