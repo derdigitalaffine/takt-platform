@@ -3026,6 +3026,7 @@ from . import routes_circulations  # noqa: E402,F401
 from . import routes_laws  # noqa: E402,F401
 from . import routes_ai  # noqa: E402,F401
 from . import routes_anliegen  # noqa: E402,F401
+from . import routes_anliegen_processes  # noqa: E402,F401
 from . import routes_maps  # noqa: E402,F401
 from . import routes_payments  # noqa: E402,F401
 from . import routes_votes  # noqa: E402,F401
