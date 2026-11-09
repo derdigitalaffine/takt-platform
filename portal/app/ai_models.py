@@ -114,3 +114,13 @@ class AIIndexJob(Base):
     next_attempt_at: Mapped[object] = mapped_column(DateTime, nullable=True)
     lease_until: Mapped[object] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
+
+
+class AIDmsSource(Base):
+    """Explicit AI-use approval for a DMS manual record; no source text copied.
+
+    Original DMS area/user ACLs remain authoritative at retrieval time.
+    """
+    __tablename__ = "ai_dms_sources"
+    record_id: Mapped[int] = mapped_column(
+        ForeignKey("dms_records.id", ondelete="CASCADE"), primary_key=True)
