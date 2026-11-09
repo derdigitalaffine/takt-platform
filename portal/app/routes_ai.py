@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
 from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector
@@ -230,6 +230,9 @@ def admin_ai_knowledge_save(request: Request, doc_id: int = Form(0), title: str 
     if doc is None:
         doc = AIKnowledge()
         db.add(doc)
+    # Purge old embeddings immediately when content or publication state changes.
+    if doc.id is not None and (doc.body_md != body_md or not (enabled == "1")):
+        db.execute(delete(AIKnowledgeVector).where(AIKnowledgeVector.knowledge_id == doc.id))
     doc.title = title
     doc.body_md = body_md
     doc.enabled = enabled == "1"
@@ -274,6 +277,7 @@ def admin_ai_knowledge_delete(request: Request, doc_id: int, user: User = Depend
     doc = db.get(AIKnowledge, doc_id)
     if doc is None:
         raise HTTPException(404)
+    db.execute(delete(AIKnowledgeVector).where(AIKnowledgeVector.knowledge_id == doc.id))
     db.delete(doc)
     db.commit()
     flash(request, "Wissenseintrag gelöscht.")
