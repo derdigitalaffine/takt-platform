@@ -7,7 +7,7 @@ process editor; no implicit escalation from a module permission to org scope.
 import json
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from . import anliegen as cases, organization
@@ -91,6 +91,18 @@ def _event(db: Session, rule: AnliegenProcessRule, actor: User, action: str):
                                    process_version_id=rule.process_version_id))
 
 
+def _lock(db: Session, rule: AnliegenProcessRule, expected: int | None):
+    if expected is None or expected != rule.state_version:
+        raise HTTPException(409, "Die Prozessregel wurde inzwischen geändert. Bitte neu laden.")
+    affected = db.execute(update(AnliegenProcessRule)
+                          .where(AnliegenProcessRule.id == rule.id,
+                                 AnliegenProcessRule.state_version == expected)
+                          .values(state_version=expected + 1))
+    if affected.rowcount != 1:
+        raise HTTPException(409, "Die Prozessregel wurde gleichzeitig geändert.")
+    rule.state_version = expected + 1
+
+
 def _latest_version(db: Session, process: Process) -> ProcessVersion:
     if not process:
         raise HTTPException(422, "Prozess nicht gefunden.")
@@ -138,7 +150,8 @@ def create_draft(db: Session, actor: User, category_id: int, process_id: int,
     return rule
 
 
-def update_draft(db: Session, rule: AnliegenProcessRule, actor: User, policy: dict):
+def update_draft(db: Session, rule: AnliegenProcessRule, actor: User, policy: dict,
+                 *, expected: int | None = None):
     require_rule_access(db, actor, rule)
     if rule.state != "draft":
         raise HTTPException(409, "Nur Entwürfe sind änderbar. Bitte eine neue Revision erstellen.")
@@ -150,12 +163,14 @@ def update_draft(db: Session, rule: AnliegenProcessRule, actor: User, policy: di
         raise HTTPException(422, "Bitte eine Startart wählen.")
     if rule.org_id is not None and "auto" in normalized["start_modes"]:
         raise HTTPException(422, "Automatik für organisationsbezogene Regeln ist noch nicht freigegeben.")
+    _lock(db, rule, expected)
     rule.policy_json = json.dumps(normalized, ensure_ascii=False)
     rule.updated_at = utcnow()
     _event(db, rule, actor, "draft_updated")
 
 
-def submit_review(db: Session, rule: AnliegenProcessRule, actor: User):
+def submit_review(db: Session, rule: AnliegenProcessRule, actor: User,
+                  *, expected: int | None = None):
     require_rule_access(db, actor, rule)
     if rule.state != "draft":
         raise HTTPException(409, "Nur Entwürfe können zur Prüfung eingereicht werden.")
@@ -163,12 +178,14 @@ def submit_review(db: Session, rule: AnliegenProcessRule, actor: User):
     policy = policies.normalize_policy(json.loads(rule.policy_json or "{}"))
     if not policy["start_modes"]:
         raise HTTPException(422, "Mindestens eine Startart ist erforderlich.")
+    _lock(db, rule, expected)
     rule.state = "review"
     rule.updated_at = utcnow()
     _event(db, rule, actor, "review_requested")
 
 
-def approve(db: Session, rule: AnliegenProcessRule, actor: User):
+def approve(db: Session, rule: AnliegenProcessRule, actor: User,
+            *, expected: int | None = None):
     require_rule_access(db, actor, rule, approval=True)
     if rule.state != "review":
         raise HTTPException(409, "Nur geprüfte Regeln können aktiviert werden.")
@@ -186,6 +203,7 @@ def approve(db: Session, rule: AnliegenProcessRule, actor: User):
         raise HTTPException(422, "Automatik für organisationsbezogene Regeln ist noch nicht freigegeben.")
     if "auto" in policy["start_modes"] and not actor.can("anliegen_manage"):
         raise HTTPException(403, "Automatische Starts benötigen eine berechtigte Verwaltungsidentität.")
+    _lock(db, rule, expected)
     # One active revision per category, process and exact organizational scope.
     active = list(db.scalars(select(AnliegenProcessRule).where(
         AnliegenProcessRule.id != rule.id,
@@ -197,24 +215,30 @@ def approve(db: Session, rule: AnliegenProcessRule, actor: User):
     for old in active:
         old.state, old.updated_at = "retired", utcnow()
         _event(db, old, actor, "superseded")
+    db.flush()  # satisfy partial unique active-rule indexes before activating
     rule.process_version_id = version.id
     rule.approved_by_id = actor.id
     rule.state, rule.updated_at = "active", utcnow()
     _event(db, rule, actor, "activated")
 
 
-def revise(db: Session, rule: AnliegenProcessRule, actor: User) -> AnliegenProcessRule:
+def revise(db: Session, rule: AnliegenProcessRule, actor: User,
+           *, expected: int | None = None) -> AnliegenProcessRule:
     require_rule_access(db, actor, rule)
     if rule.state not in ("review", "active", "retired"):
         raise HTTPException(409, "Die Regel ist bereits als Entwurf bearbeitbar.")
+    if expected is None or rule.state_version != expected:
+        raise HTTPException(409, "Die Prozessregel wurde inzwischen geändert. Bitte neu laden.")
     return create_draft(db, actor, rule.category_id, rule.process_id,
                         rule.org_id, json.loads(rule.policy_json))
 
 
-def retire(db: Session, rule: AnliegenProcessRule, actor: User):
+def retire(db: Session, rule: AnliegenProcessRule, actor: User,
+           *, expected: int | None = None):
     require_rule_access(db, actor, rule, approval=True)
     if rule.state != "active":
         raise HTTPException(409, "Nur aktive Regeln können deaktiviert werden.")
+    _lock(db, rule, expected)
     rule.state, rule.updated_at = "retired", utcnow()
     _event(db, rule, actor, "retired")
 
