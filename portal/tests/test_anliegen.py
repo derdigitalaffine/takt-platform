@@ -229,3 +229,102 @@ def test_ai_draft_requires_user_action_never_creates_a_case(monkeypatch):
         "text": "Ich möchte vertrauliche Details formulieren.",
     })
     assert deny.status_code == 403
+
+
+def test_ordering_workflow_fast_actions_and_assignee_filters():
+    _enabled()
+    sender = _user("anliegen-order-sender@example.org")
+    owner = _user("anliegen-order-manager@example.org")
+    cat = _cat("office_furniture")
+    admin = login(*ADMIN)
+    token = csrf_of(admin.get("/anliegen/kategorien").text)
+    change = admin.post(f"/anliegen/kategorien/{cat}", data={
+        "csrf": token, "title": "Büromöbel", "routing": "person",
+        "assignee_id": owner, "enabled": "1",
+    })
+    assert change.status_code == 303
+    with SessionLocal() as db:
+        assert db.get(AnliegenCategory, cat).assignee_id == owner
+    preview_client = login("anliegen-order-sender@example.org", "test-anliegen-pass")
+    preview = preview_client.get(f"/anliegen/empfaenger-vorschau?category_id={cat}")
+    assert preview.status_code == 200
+    assert preview.json()["ready"] is True
+    assert "anliegen-order-manager" in preview.json()["recipient"]
+    reporter, cid = _post_case(
+        "anliegen-order-sender@example.org", cat, "Stuhl beschaffen",
+        "Ein ergonomischer Bürostuhl wird benötigt.")
+    recipient = login("anliegen-order-manager@example.org", "test-anliegen-pass")
+    csrf = csrf_of(recipient.get(f"/anliegen/{cid}").text)
+    assert f"Stuhl beschaffen" in recipient.get("/anliegen?view=mine").text
+    assert "Stuhl beschaffen" in recipient.get("/anliegen?view=orders").text
+    assert "Stuhl beschaffen" in recipient.get(
+        f"/anliegen?view=orders&category_id={cat}&status=open&q=Stuhl").text
+    ordered = recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "ordered", "supplier": "Möbelpartner",
+        "order_reference": "BEST-123", "expected_delivery": "2026-12-10",
+        "back": "orders",
+    })
+    assert ordered.status_code == 303
+    assert ordered.headers["location"] == "/anliegen?view=orders"
+    with SessionLocal() as db:
+        row = db.get(Anliegen, cid)
+        assert row.status == "ordered"
+        assert row.supplier == "Möbelpartner"
+        assert row.order_reference == "BEST-123"
+        assert row.expected_delivery_at.year == 2026
+        assert db.get(Task, row.task_id).status == "in_progress"
+    assert recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "partially_delivered"}).status_code == 303
+    assert recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "delivered"}).status_code == 303
+    assert recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "done"}).status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, cid)
+        assert case.status == "done" and case.delivered_at is not None
+        assert db.get(Task, case.task_id).status == "done"
+    assert "Interne Anliegen" in admin.get("/tasks").text
+    assert 'href="/anliegen/neu"' in admin.get("/tasks").text
+
+
+def test_admin_can_explicitly_migrate_open_orders_to_new_recipient():
+    _enabled()
+    old_owner = _user("anliegen-old-owner@example.org")
+    new_owner = _user("anliegen-new-owner@example.org")
+    _user("anliegen-reporter-migrate@example.org")
+    cat = _cat("office_supply")
+    admin = login(*ADMIN)
+    csrf = csrf_of(admin.get("/anliegen/kategorien").text)
+    first = admin.post(f"/anliegen/kategorien/{cat}", data={
+        "csrf": csrf, "title": "Büromaterial", "routing": "person",
+        "assignee_id": old_owner, "enabled": "1",
+    })
+    assert first.status_code == 303
+    _, cid = _post_case("anliegen-reporter-migrate@example.org", cat)
+    change = admin.post(f"/anliegen/kategorien/{cat}", data={
+        "csrf": csrf, "title": "Büromaterial", "routing": "person",
+        "assignee_id": new_owner, "enabled": "1", "apply_open": "1",
+    })
+    assert change.status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, cid)
+        assert case.assignee_id == new_owner
+        assert db.get(Task, case.task_id).assignee_id == new_owner
+    assigned = login("anliegen-new-owner@example.org", "test-anliegen-pass")
+    assert assigned.get(f"/anliegen/{cid}").status_code == 200
+    old = login("anliegen-old-owner@example.org", "test-anliegen-pass")
+    assert old.get(f"/anliegen/{cid}").status_code == 404
+
+
+def test_platform_feedback_category_and_non_order_status_restrictions():
+    _enabled()
+    _user("anliegen-software@example.org")
+    cat = _cat("platform_feedback")
+    sender, cid = _post_case(
+        "anliegen-software@example.org", cat,
+        "TAKT Suche verbessern", "Die Suche in der TAKT-Plattform soll schneller werden.")
+    assert "TAKT verbessern" in sender.get("/anliegen/neu").text
+    csrf = csrf_of(sender.get(f"/anliegen/{cid}").text)
+    response = sender.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "ordered"})
+    assert response.status_code in (403, 422)
