@@ -4,6 +4,7 @@ All model calls run on the backend. This module is intentionally isolated from
 the existing Jitsi/Prosody meeting chat.
 """
 import base64
+import asyncio
 import io
 import json
 from urllib.parse import urlsplit
@@ -184,6 +185,35 @@ def admin_ai_knowledge_save(request: Request, doc_id: int = Form(0), title: str 
     doc.updated_at = utcnow()
     db.commit()
     flash(request, "Interner Wissenseintrag gespeichert.")
+    return redirect("/admin/ai#knowledge")
+
+
+@app.post("/admin/ai/knowledge/upload", dependencies=[Depends(check_csrf)])
+async def admin_ai_knowledge_upload(request: Request, file: UploadFile = File(...),
+                                    title: str = Form(""), enabled: str = Form(""),
+                                    user: User = Depends(admin_user),
+                                    db: Session = Depends(get_db)):
+    """Create an opt-in knowledge entry from a local office document.
+
+    Originals are not stored in a public web directory or exposed to the LLM.
+    """
+    from . import law_io
+    filename = file.filename or ""
+    if not filename.lower().endswith((".pdf", ".docx", ".txt", ".md")):
+        raise HTTPException(400, "Nur PDF, DOCX, TXT und Markdown werden unterstützt.")
+    raw = await file.read(5 * 1024 * 1024 + 1)
+    if not raw or len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Die Datei ist leer oder größer als 5 MB.")
+    try:
+        body = await asyncio.to_thread(law_io.to_markdown, filename, raw)
+    except law_io.LawImportError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not body.strip() or len(body) > 80_000:
+        raise HTTPException(400, "Der erkannte Dokumenttext ist leer oder zu lang.")
+    label = title.strip()[:200] or filename.rsplit("/", 1)[-1][:200]
+    db.add(AIKnowledge(title=label, body_md=body, enabled=enabled == "1"))
+    db.commit()
+    flash(request, "Dokument als interner Wissenseintrag eingelesen. Das Original wird nicht gespeichert.")
     return redirect("/admin/ai#knowledge")
 
 
