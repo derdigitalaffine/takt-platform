@@ -147,3 +147,10 @@ body:has([data-ai-workspace]) { overflow: hidden; }
   body:has([data-ai-workspace]) { overflow: auto; }
   .ai-chat-layout { min-height: 260px; }
 }
+
+/* Temporary-chat controls remain compact even on smaller viewports. */
+.ai-temporary-provider { width: min(17rem, 60vw); max-width: 100%; }
+.ai-chat-composer[ data-ai-temporary="1" ] .ai-chat-compose-main { margin-top: .25rem; }
+@media (max-width: 575.98px) {
+  .ai-temporary-provider { width: 100%; }
+}
