@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Anliegen – Prozessregeln{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/anliegen-processes.css">{% endblock %}
+{% block content %}
+<div class="anliegen-process-admin container-fluid px-0">
+  {% call m.page_head('Prozessanbindung', 'Prozesse für interne Anliegen gezielt freigeben und organisationsbezogen steuern.') %}
+  <a class="btn btn-outline-secondary btn-sm" href="/anliegen/kategorien"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Kategorien</a>
+  <a class="btn btn-outline-primary btn-sm" href="/anliegen/prozessfreigaben"><i class="fa-solid fa-stamp me-1" aria-hidden="true"></i>Ausstehende Freigaben</a>
+  {% endcall %}
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-xl-5">
+      <section class="card h-100 ap-surface">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="fa-solid fa-shield-halved text-primary" aria-hidden="true"></i>
+            <h2 class="h6 mb-0">Zentrale Freigabe</h2>
+            <span class="badge ms-auto {{'text-bg-success' if enabled else 'text-bg-secondary'}}">{{'Aktiv' if enabled else 'Deaktiviert'}}</span>
+          </div>
+          <p class="small text-secondary">Im Auslieferungszustand abgeschaltet. Bereits bestehende Anliegen und Prozessläufe bleiben unverändert.</p>
+          {% if can_global %}
+          <form method="post" action="/anliegen/prozesse/schalter" class="d-flex align-items-center gap-3 flex-wrap">
+            <input type="hidden" name="csrf" value="{{csrf}}">
+            <label class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" name="enabled" value="1" {% if enabled %}checked{% endif %}>
+              <span class="form-check-label">Integration einschalten</span>
+            </label>
+            <button class="btn btn-sm btn-primary" type="submit">Einstellung speichern</button>
+          </form>
+          {% else %}
+          <p class="small mb-0"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Die übergreifende Aktivierung ist der globalen Administration vorbehalten.</p>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+    <div class="col-12 col-xl-7">
+      <section class="card h-100 ap-surface"><div class="card-body">
+        <h2 class="h6"><i class="fa-solid fa-circle-info text-primary me-2" aria-hidden="true"></i>So funktioniert die Freigabe</h2>
+        <div class="d-flex gap-2 flex-wrap mb-2">
+          <span class="ap-step">1 · Entwurf</span><span class="ap-step">2 · Prüfung</span><span class="ap-step">3 · Freigabe</span><span class="ap-step">4 · Aktiv</span>
+        </div>
+        <p class="small text-secondary mb-0">Vier-Augen-Prinzip bei der Freigabe. Nur veröffentlichte, kompatible Prozessversionen sind auswählbar. Laufende Vorgänge bleiben an ihre ursprüngliche Version gebunden. Vertrauliche Anliegen sind ausgeschlossen.</p>
+      </div></section>
+    </div>
+  </div>
+
+  {% if has_scope and processes and categories %}
+  <details class="card ap-surface mb-4" id="neue-regel">
+    <summary class="card-body d-flex gap-2 align-items-center ap-summary">
+      <i class="fa-solid fa-plus text-primary" aria-hidden="true"></i><strong>Neue Prozesszuordnung entwerfen</strong>
+      <span class="ms-auto text-secondary small">Optional · zunächst inaktiv</span>
+    </summary>
+    <div class="card-body border-top">
+      <form method="post" action="/anliegen/prozesse/neu" class="row g-3">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <div class="col-12 col-lg-4">
+          <label for="ap-cat" class="form-label fw-semibold">Anliegenkategorie</label>
+          <select class="form-select" id="ap-cat" name="category_id" required>
+            {% for cat in categories %}<option value="{{cat.id}}">{{cat.title}}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-lg-4">
+          <label for="ap-proc" class="form-label fw-semibold">Veröffentlichter Prozess</label>
+          <select class="form-select" id="ap-proc" name="process_id" required>
+            {% for proc in processes %}<option value="{{proc.id}}">{{proc.name}}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-lg-4">
+          <label for="ap-org" class="form-label fw-semibold">Geltungsbereich</label>
+          <select class="form-select" id="ap-org" name="org_id" required>
+            {% if can_global %}<option value="0">Organisationsübergreifend</option>{% endif %}
+            {% for org in orgs %}<option value="{{org.id}}">{{org.name}}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-lg-7">
+          <fieldset class="ap-fieldset">
+            <legend>Erlaubte Startarten</legend>
+            <label class="form-check"><input class="form-check-input" name="start_modes" type="checkbox" value="handler" checked> <span class="form-check-label">Durch zuständige Bearbeitende</span></label>
+            <label class="form-check"><input class="form-check-input" name="start_modes" type="checkbox" value="submit"> <span class="form-check-label">Optional beim Einreichen</span></label>
+            {% if can_global %}<label class="form-check"><input class="form-check-input" name="start_modes" type="checkbox" value="auto"> <span class="form-check-label">Automatisch durch Kategorie (nur übergreifend)</span></label>{% endif %}
+          </fieldset>
+        </div>
+        <div class="col-12 col-lg-5">
+          <fieldset class="ap-fieldset">
+            <legend>Sicherheits- und Abschlussregeln</legend>
+            <label class="form-check mb-2"><input class="form-check-input" name="approval_required" value="1" type="checkbox" checked> <span class="form-check-label">Gesonderte Startfreigabe verlangen</span></label>
+            <label for="ap-completion" class="form-label small">Anliegenabschluss</label>
+            <select class="form-select form-select-sm" id="ap-completion" name="completion">
+              <option value="manual">Manuell durch Zuständige</option>
+              <option value="all_success">Wenn alle Prozesse erfolgreich sind</option>
+              <option value="any_success">Wenn mindestens ein Prozess erfolgreich ist</option>
+            </select>
+            <p class="form-text mb-0">Die Status-Aggregation wird mit dem Prozess-Hub ergänzt.</p>
+          </fieldset>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-file-circle-plus me-1" aria-hidden="true"></i>Entwurf anlegen</button>
+        </div>
+      </form>
+    </div>
+  </details>
+  {% else %}
+  <div class="alert alert-light border" role="note">Für neue Regeln benötigst du eine freigegebene Organisation sowie Zugriff auf mindestens einen veröffentlichten Prozess.</div>
+  {% endif %}
+
+  <div class="d-flex justify-content-between align-items-end mb-3">
+    <div><h2 class="h5 mb-1">Prozesszuordnungen</h2><p class="small text-secondary mb-0">Änderungen erfolgen über neue Revisionen; bestehende Prozessläufe bleiben unverändert.</p></div>
+    <span class="badge text-bg-light text-body border">{{rules|length}} Regeln</span>
+  </div>
+  <div class="row g-3">
+    {% for item in rules %}
+    {% set rule = item.rule %}
+    {% set policy = item.policy %}
+    <div class="col-12 col-xl-6" id="rule-{{rule.id}}">
+      <section class="card h-100 ap-surface">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
+            <div class="min-w-0">
+              <span class="small text-secondary">Regel #{{rule.id}} · Revision {{rule.revision}}</span>
+              <h3 class="h6 mb-1">{{item.category.title}}</h3>
+              <p class="small mb-0">{{item.process.name}}</p>
+            </div>
+            <span class="badge {{'text-bg-success' if rule.state == 'active' else 'text-bg-warning' if rule.state == 'review' else 'text-bg-light text-body border'}}">{{{'draft':'Entwurf','review':'Zur Freigabe','active':'Aktiv','retired':'Inaktiv'}.get(rule.state,rule.state)}}</span>
+          </div>
+          <p class="small text-secondary mb-3"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>{{item.org.name if item.org else 'Organisationsübergreifend'}} · {% if rule.process_version_id %}Prozessversion #{{rule.process_version_id}}{% else %}Version bei Aktivierung festgelegt{% endif %}</p>
+          {% if rule.state == 'draft' and item.can_edit %}
+          <form method="post" action="/anliegen/prozesse/{{rule.id}}" class="mb-3">
+            <input type="hidden" name="csrf" value="{{csrf}}">
+            <input type="hidden" name="state_version" value="{{rule.state_version}}">
+            <input type="hidden" name="action" value="update">
+            <fieldset class="ap-fieldset mb-3">
+              <legend>Startberechtigungen</legend>
+              <label class="form-check"><input type="checkbox" class="form-check-input" name="start_modes" value="handler" {% if 'handler' in policy.start_modes %}checked{% endif %}><span class="form-check-label">Bearbeitung</span></label>
+              <label class="form-check"><input type="checkbox" class="form-check-input" name="start_modes" value="submit" {% if 'submit' in policy.start_modes %}checked{% endif %}><span class="form-check-label">Einreichen</span></label>
+              {% if not item.org %}<label class="form-check"><input type="checkbox" class="form-check-input" name="start_modes" value="auto" {% if 'auto' in policy.start_modes %}checked{% endif %}><span class="form-check-label">Kategorieautomatik</span></label>{% endif %}
+            </fieldset>
+            <label class="form-check mb-2"><input type="checkbox" class="form-check-input" name="approval_required" value="1" {% if policy.approval_required %}checked{% endif %}><span class="form-check-label">Startfreigabe erforderlich</span></label>
+            <label class="form-label small" for="completion-{{rule.id}}">Anliegenabschluss</label>
+            <select name="completion" id="completion-{{rule.id}}" class="form-select form-select-sm mb-3">
+              {% for key,label in [('manual','Manuell'),('all_success','Alle Prozesse erfolgreich'),('any_success','Mindestens ein Prozess erfolgreich')] %}
+              <option value="{{key}}" {% if policy.completion == key %}selected{% endif %}>{{label}}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Entwurf speichern</button>
+          </form>
+          {% else %}
+          <div class="d-flex flex-wrap gap-1 mb-3">
+            {% for code,label in [('submit','Einreichen'),('handler','Bearbeitung'),('auto','Automatisch')] %}
+              {% if code in policy.start_modes %}<span class="badge text-bg-light border text-body">{{label}}</span>{% endif %}
+            {% endfor %}
+            {% if policy.approval_required %}<span class="badge text-bg-light border text-body"><i class="fa-solid fa-stamp me-1" aria-hidden="true"></i>Startfreigabe</span>{% endif %}
+          </div>
+          {% endif %}
+          <div class="ap-actions d-flex flex-wrap gap-2">
+            {% if rule.state == 'draft' and item.can_edit %}
+            <form method="post" action="/anliegen/prozesse/{{rule.id}}">
+              <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="state_version" value="{{rule.state_version}}"><input type="hidden" name="action" value="review">
+              <button class="btn btn-sm btn-primary" type="submit">Zur Freigabe vorlegen</button>
+            </form>
+            {% elif rule.state == 'review' and item.can_approve and rule.created_by_id != user.id %}
+            <form method="post" action="/anliegen/prozesse/{{rule.id}}">
+              <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="state_version" value="{{rule.state_version}}"><input type="hidden" name="action" value="approve">
+              <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Regel freigeben</button>
+            </form>
+            {% endif %}
+            {% if rule.state in ('review','active','retired') and item.can_edit %}
+            <form method="post" action="/anliegen/prozesse/{{rule.id}}">
+              <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="state_version" value="{{rule.state_version}}"><input type="hidden" name="action" value="revise">
+              <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fa-solid fa-code-branch me-1" aria-hidden="true"></i>Neue Revision</button>
+            </form>
+            {% endif %}
+            {% if rule.state == 'active' and item.can_approve %}
+            <form method="post" action="/anliegen/prozesse/{{rule.id}}">
+              <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="state_version" value="{{rule.state_version}}"><input type="hidden" name="action" value="retire">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Deaktivieren</button>
+            </form>
+            {% endif %}
+          </div>
+          {% if rule.state == 'review' and rule.created_by_id == user.id %}<p class="form-text mb-0 mt-2">Vier-Augen-Prinzip: Eine andere berechtigte Person muss diese Regel freigeben.</p>{% endif %}
+        </div>
+      </section>
+    </div>
+    {% else %}
+    <div class="col-12"><div class="card ap-surface"><div class="card-body py-4 text-center"><i class="fa-solid fa-diagram-project text-secondary mb-2" aria-hidden="true"></i><p class="mb-0">Noch keine Prozesszuordnungen vorhanden.</p></div></div></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
