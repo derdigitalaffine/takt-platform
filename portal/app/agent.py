@@ -162,10 +162,14 @@ def search_instructions(user, focus=None):
     kinds.extend(tool + "(query)" for tool, module in modules.READ.items() if allowed(user, module))
     from .agent_precision import focused
     kinds = focused(kinds, focus)
+    # The example must never name an unavailable/unfocused tool. This is
+    # essential for small local models with narrow, module-specific schemas.
+    exemplar = kinds[0].split("(", 1)[0] if kinds else ""
+    example = {"searches": [{"tool": exemplar, "query": ""}]} if exemplar else {"searches": []}
     return [
         {"role": "system", "content": (
             "Du bist TAKT Agent. Antworte nur als JSON-Objekt: "
-            '{"searches":[{"tool":"search_tasks","query":"","scope":"assigned","overdue":true}]}. '
+            + json.dumps(example, ensure_ascii=False) + ". "
             "Für allgemeine Fragen, Texte und Wissensfragen plane KEINE Fachsuche; antworte später im message-Feld. Sonst plane 0 bis 6 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
             "bei Aufgaben und Anliegen sind 0 Suchen erlaubt. Für Termine zuerst Kalender suchen; für Kopien Formulare, für DMS-Verschiebungen Akten UND Zielbereiche suchen. "
             "Filter nach Status und Fälligkeit zielgerichtet, aber erfinde keine IDs. "
@@ -570,6 +574,20 @@ def reference_accessible(db, user, source):
         if kind == "person":
             return bool((allowed(user, "tasks") or (allowed(user, "anliegen") and user.can("anliegen_manage")))
                         and (person := db.get(User, rid)) and person.active)
+        if kind == "leave":
+            require(user, "leave")
+            from .leave_models import LeaveRequest
+            from .leave_admin import removed_ids
+            from . import leave
+            row = db.get(LeaveRequest, rid)
+            return bool(
+                row and row.person_id == user.id and
+                leave.can_plan(db, user, user.id) and
+                db.scalar(select(LeaveRequest.id).where(
+                    LeaveRequest.id == rid,
+                    LeaveRequest.id.not_in(removed_ids())
+                )) is not None
+            )
         from . import calendars, forms, ai_dms, dms
         from .calendar_models import Calendar, CalendarEvent
         from .db import Form, Process
@@ -605,16 +623,20 @@ def reference_revision(db, kind, rid):
     """Pin only the metadata exposed by module lookups, never user credentials."""
     import hashlib
     from .calendar_models import Calendar, CalendarEvent
+    from .leave_models import LeaveRequest
     from .db import Form, Process, DmsRecord, DmsArea
     model = {"task": Task, "anliegen": Anliegen, "person": User, "calendar": Calendar,
              "event": CalendarEvent, "form": Form, "process": Process,
-             "dms": DmsRecord, "dms_area": DmsArea, "anliegen_category": AnliegenCategory}.get(kind)
+             "dms": DmsRecord, "dms_area": DmsArea, "anliegen_category": AnliegenCategory,
+             "leave": LeaveRequest}.get(kind)
     row = db.get(model, rid) if model else None
     if row is None:
         return None
     fields = ("title", "name", "status", "version", "updated_at", "owner_id", "assignee_id",
               "reporter_id", "category_id", "calendar_id", "source", "visibility", "org_id",
               "area_id", "internal", "active", "enabled", "archived_at", "deleted_at",
-              "routing", "parent_id", "starts_at", "ends_at")
+              "routing", "parent_id", "starts_at", "ends_at",
+              "starts_on", "ends_on", "person_id", "start_half", "end_half",
+              "approval_step", "cancel_requested")
     values = [kind, rid, *[str(getattr(row, key, None)) for key in fields]]
     return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode()).hexdigest()

@@ -20,6 +20,7 @@ READ = {
     "search_calendars": "calendars", "search_events": "calendars",
     "search_forms": "forms", "search_processes": "processes",
     "search_dms": "dms", "search_dms_areas": "dms",
+    "search_my_leave": "leave",
 }
 WRITE = {
     "create_form": "forms",
@@ -31,6 +32,7 @@ LABELS = {
     "search_calendars": "Kalendern", "search_events": "Terminen",
     "search_forms": "Formularen", "search_processes": "Prozessen",
     "search_dms": "freigegebenen DMS-Wissensakten", "search_dms_areas": "DMS-Zielbereichen",
+    "search_my_leave": "deinen eigenen Urlaubsanträgen",
 }
 KINDS = {"configure_anliegen_category": "anliegen_category", "create_event": "calendar", "copy_form": "form", "move_dms": "dms"}
 MODELS = {"configure_anliegen_category": AnliegenCategory, "create_event": Calendar, "copy_form": Form, "move_dms": DmsRecord}
@@ -45,6 +47,8 @@ def enabled(user, module):
         return "forms" in mods and user.can("forms")
     if module == "calendars":
         return "calendars" in mods
+    if module == "leave":
+        return "calendars" in mods and user.active
     if module == "dms":
         # Record ACLs and knowledge opt-in are checked with the live DB below.
         return "dms" in mods and user.can("ai_knowledge")
@@ -96,6 +100,31 @@ def search(db, user, spec):
         rows = db.scalars(select(Process).where(Process.name.ilike(pattern, escape="\\")).order_by(Process.id).limit(20))
         return [dict(type="process", id=r.id, title=r.name, published=bool(r.current),
                      url=f"/processes/{r.id}") for r in rows]
+    if tool == "search_my_leave":
+        # Own leave requests only. Even administrators must explicitly use
+        # the native HR interface for other people's data; no bulk staff lookup.
+        from . import leave
+        from .leave_models import LeaveRequest
+        from .leave_admin import removed_ids
+        if not leave.can_plan(db, user, user.id):
+            return []
+        query = select(LeaveRequest).where(
+            LeaveRequest.person_id == user.id,
+            LeaveRequest.id.not_in(removed_ids()),
+        )
+        state = str(spec.get("status") or "")
+        if state in ("planned", "requested", "binding", "rejected", "cancelled"):
+            query = query.where(LeaveRequest.status == state)
+        rows = db.scalars(query.order_by(LeaveRequest.starts_on.desc(), LeaveRequest.id.desc()).limit(20))
+        return [
+            {"type": "leave", "id": row.id,
+             "title": f"Dein Urlaub: {row.starts_on} bis {row.ends_on}",
+             "starts_on": row.starts_on, "ends_on": row.ends_on,
+             "status": row.status,
+             "cancel_requested": bool(row.cancel_requested),
+             "url": f"/urlaub/vorgang/{row.id}"}
+            for row in rows
+        ]
     if not ai_dms.available(db, user):
         return []
     if tool == "search_dms_areas":
