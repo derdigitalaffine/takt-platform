@@ -202,6 +202,8 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
         except process_engine.ProcessEngineError:
             steps = []
         cards.append(dict(run=run, process=proc, rule=rule,
+                          can_view_details=(service.can_handle(user, case)
+                                            and user.can("anliegen_process_work")),
                           can_approve=(process_enabled
                             and process_config.can_approve_run(db, user, case)
                             and run.requested_by_id != user.id),
