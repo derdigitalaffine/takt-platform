@@ -199,6 +199,7 @@ def categories_anliegen(request: Request, user: User = Depends(admin_user),
 def category_settings(request: Request, category_id: int,
                       title: str = Form(...), routing: str = Form(...),
                       assignee_id: int = Form(0), enabled: str = Form(""),
+                      apply_open: str = Form(""),
                       user: User = Depends(admin_user), db: Session = Depends(get_db)):
     _module()
     cat = service.category(db, category_id)
@@ -218,12 +219,13 @@ def category_settings(request: Request, category_id: int,
     cat.enabled = enabled == "1"
     db.flush()
     updated = service.reroute_unassigned(db, cat, user)
+    migrated = service.reassign_open(db, cat, user) if apply_open == "1" else 0
     db.commit()
     db.refresh(cat)
     rule = (f"Fester Empfänger: {cat.assignee.name}" if cat.routing == "person" and cat.assignee
             else "Leitung der primären Organisation" if cat.routing == "lead"
             else "Noch keine Person hinterlegt")
-    flash(request, f"Routingregel gespeichert ({rule}). {updated} bisher unzugewiesene Anliegen neu verteilt.")
+    flash(request, f"Routingregel gespeichert ({rule}). {updated} offene Anliegen neu zugewiesen, {migrated} aktive Zuständigkeiten ausdrücklich geändert.")
     return redirect(f"/anliegen/kategorien#cat-{category_id}")
 
 
