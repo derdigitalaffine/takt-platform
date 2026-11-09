@@ -92,7 +92,7 @@ def collect(db, user, modules, *, now=None):
                 waiting.append(item)
     # Anliegen that are not represented by a native task remain actionable.
     # Avoid duplicate entries when an Anliegen already has a linked native task.
-    if 'anliegen' in modules and (user.can('anliegen_submit') or user.can('anliegen_manage')):
+    if 'anliegen' in modules:
         from sqlalchemy import select
         from .anliegen_models import Anliegen
         from . import anliegen as intake
