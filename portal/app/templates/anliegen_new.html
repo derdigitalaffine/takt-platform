@@ -1,34 +1,168 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Anliegen einreichen{% endblock %}
+{% block title %}Internes Anliegen einreichen{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/anliegen-form.css">{% endblock %}
+
 {% block content %}
-{{m.page_head('Neues internes Anliegen', 'Wählen Sie die passende Kategorie. TAKT ermittelt die zuständige Person anhand der administrativen Regeln.')}}
-<div class="row g-3"><div class="col-12 col-xl-8">
-<div class="card"><div class="card-body">
-<form method="post" action="/anliegen/neu" id="anliegen-create">
-  <input type="hidden" name="csrf" value="{{csrf}}">
-  <label class="form-label" for="anliegen-category">Art des Anliegens</label>
-  <select class="form-select mb-3" name="category_id" id="anliegen-category" required>
-    {% for cat in categories %}<option value="{{cat.id}}" data-confidential="{{'1' if cat.confidential else '0'}}">{{cat.title}}</option>{% endfor %}
-  </select>
-  <div class="alert alert-light border small mb-3" id="anliegen-recipient-preview" role="status" aria-live="polite">Zuständigkeit wird geprüft …</div>
-  <div class="alert alert-warning small" id="anliegen-secret" hidden><i class="fa-solid fa-lock me-1"></i>Vertrauliche Beschwerden werden ausschließlich für Sie und die eindeutig zuständige Leitung angezeigt. Sie werden nicht als allgemeine Aufgabe erstellt. KI-Entwürfe sind in dieser Kategorie aus Datenschutzgründen deaktiviert.</div>
-  <label class="form-label" for="anliegen-title">Kurzer Titel</label>
-  <input id="anliegen-title" name="title" class="form-control mb-3" minlength="3" maxlength="200" placeholder="Worum geht es?" required>
-  <label class="form-label" for="anliegen-description">Beschreibung</label>
-  <textarea id="anliegen-description" name="description" class="form-control mb-2" rows="7" minlength="5" maxlength="10000" placeholder="Beschreiben Sie den Bedarf oder Mangel möglichst konkret." required></textarea>
-  <p class="form-text">Die ausgewählte Kategorie bestimmt die Weiterleitung. Die Empfängerprüfung erfolgt vor der Einreichung. Bitte keine unnötigen personenbezogenen oder besonders schutzwürdigen Angaben eintragen.</p>
-  {% if ai_available %}
-  <button id="anliegen-ai" class="btn btn-outline-primary mb-3" type="button" data-action="/anliegen/ki-entwurf"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Mit KI strukturieren</button>
-  <p class="small text-secondary">Nur nach Ihrem Klick wird die bisherige Beschreibung an den konfigurierten KI-Provider übermittelt. Der Vorschlag wird nicht automatisch eingereicht oder zugewiesen.</p>
-  <div class="small mb-3" role="status" aria-live="polite" id="anliegen-ai-status"></div>
-  {% endif %}
-  <div class="d-flex flex-wrap gap-2"><button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane me-1"></i>Verbindlich einreichen</button><a href="/anliegen" class="btn btn-outline-secondary">Abbrechen</a></div>
+{% call m.page_head('Neues internes Anliegen', 'Beschreiben Sie Ihr Anliegen in eigenen Worten. Auf Wunsch hilft die KI beim Formulieren – Sie entscheiden, was am Ende eingereicht wird.') %}
+  <a href="/anliegen" class="btn btn-outline-secondary">
+    <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zur Übersicht
+  </a>
+{% endcall %}
+
+<form method="post" action="/anliegen/neu" id="anliegen-create" class="anliegen-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <div class="anliegen-form-progress" aria-label="Ablauf">
+    <span><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Beschreiben</span>
+    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+    <span><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Optional mit KI aufbereiten</span>
+    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+    <span><i class="fa-solid fa-list-check" aria-hidden="true"></i> Prüfen &amp; einreichen</span>
+  </div>
+
+  <div class="row g-4 align-items-start">
+    <div class="col-12 col-xl-7">
+      <section class="card anliegen-composer" aria-labelledby="anliegen-compose-title">
+        <div class="card-body p-3 p-md-4">
+          <div class="anliegen-section-kicker"><span class="anliegen-step">01</span> Ihr Anliegen</div>
+          <h2 id="anliegen-compose-title" class="anliegen-section-title">Was möchten Sie mitteilen?</h2>
+          <p class="text-secondary mb-4">Schreiben Sie einfach drauflos. Stichpunkte reichen völlig aus – wichtig ist, dass wir verstehen, worum es geht.</p>
+
+          <label class="form-label fw-semibold" for="anliegen-description">
+            Beschreibung <span class="text-danger" aria-label="Pflichtfeld">*</span>
+          </label>
+          <textarea id="anliegen-description" name="description" class="form-control anliegen-main-input"
+                    rows="12" minlength="5" maxlength="10000"
+                    aria-describedby="anliegen-description-help anliegen-character-count"
+                    placeholder="Zum Beispiel: Im Büro im 2. Obergeschoss ist der Bürostuhl defekt. Die Rückenlehne lässt sich nicht mehr feststellen. Wir benötigen einen Ersatz …"
+                    required></textarea>
+          <div class="d-flex justify-content-between align-items-start gap-2 mt-2">
+            <div id="anliegen-description-help" class="small text-secondary">
+              Geben Sie hier Ihren ursprünglichen Text ein. Er bleibt erhalten, auch wenn die KI einen Vorschlag erstellt.
+            </div>
+            <output id="anliegen-character-count" for="anliegen-description"
+                    class="small text-secondary text-nowrap" aria-live="off">0 / 10.000</output>
+          </div>
+
+          <div class="anliegen-ai-box mt-4" aria-labelledby="anliegen-ai-heading">
+            <div class="d-flex gap-3 align-items-start">
+              <span class="anliegen-ai-symbol"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span>
+              <div class="flex-grow-1">
+                <div id="anliegen-ai-heading" class="fw-semibold">Aus Ihrem Text einen guten Vorgang machen</div>
+                <p class="small text-secondary mt-1 mb-3">
+                  Die KI kann einen passenden Titel, eine Kategorie und eine klarere Beschreibung vorschlagen.
+                  Sie können anschließend rechts alles verändern.
+                </p>
+                {% if ai_available %}
+                <button id="anliegen-ai" class="btn btn-primary anliegen-ai-button" type="button"
+                        data-action="/anliegen/ki-entwurf" aria-describedby="anliegen-ai-privacy">
+                  <i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>
+                  <span data-ai-button-label>Mit KI aufbereiten</span>
+                </button>
+                {% else %}
+                <span class="small text-secondary"><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Die manuelle Erfassung ist jederzeit möglich.</span>
+                {% endif %}
+                <div id="anliegen-ai-privacy" class="form-text mt-2">
+                  {% if ai_available %}
+                  Ihr Text wird nur nach einem Klick an den freigegebenen KI-Provider übermittelt.
+                  Vertrauliche Beschwerden sind von der KI-Verarbeitung ausgeschlossen.
+                  {% else %}
+                  Die KI-Unterstützung ist derzeit nicht freigeschaltet. Sie können alle Angaben selbst bearbeiten.
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% if ai_available %}
+            <div id="anliegen-ai-status" class="anliegen-ai-status small mt-3" role="status"
+                 aria-live="polite" aria-atomic="true" hidden></div>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
+      <div class="anliegen-help-note mt-3" role="note">
+        <i class="fa-solid fa-shield-halved mt-1" aria-hidden="true"></i>
+        <div>
+          <strong>Vertraulichkeit</strong>
+          <span>Bitte geben Sie nur die für die Bearbeitung notwendigen Informationen an.
+            Für Beschwerden gelten strengere Zugriffsrechte; sie werden nicht als allgemeine Aufgabe angelegt.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-5">
+      <section class="card anliegen-review" aria-labelledby="anliegen-review-title">
+        <div class="card-body p-3 p-md-4">
+          <div class="anliegen-section-kicker"><span class="anliegen-step">02</span> Angaben prüfen</div>
+          <h2 id="anliegen-review-title" class="anliegen-section-title">So wird es eingereicht</h2>
+          <p class="text-secondary mb-4">Alle Felder bleiben von Hand bearbeitbar. Die KI ersetzt Ihre Entscheidung nicht.</p>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="anliegen-title">
+              Titel <span class="text-danger" aria-label="Pflichtfeld">*</span>
+            </label>
+            <input id="anliegen-title" name="title" type="text" class="form-control"
+                   minlength="3" maxlength="200" placeholder="Kurzer, aussagekräftiger Titel"
+                   autocomplete="off" required>
+            <div class="form-text">Der Titel erscheint später in der Vorgangs- und Aufgabenübersicht.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="anliegen-category">
+              Kategorie <span class="text-danger" aria-label="Pflichtfeld">*</span>
+            </label>
+            <select class="form-select" name="category_id" id="anliegen-category" required>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}" data-confidential="{{ '1' if cat.confidential else '0' }}"
+                      data-description="{{ cat.description }}">{{ cat.title }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text" id="anliegen-category-help">Anhand der Kategorie wird die zuständige Person ermittelt.</div>
+          </div>
+
+          <div class="alert alert-light border small mb-3" id="anliegen-recipient-preview" role="status" aria-live="polite">Zuständigkeit wird geprüft …</div>
+          <div class="alert alert-warning small" id="anliegen-secret" role="note" hidden>
+            <i class="fa-solid fa-lock me-1" aria-hidden="true"></i>
+            <strong>Geschütztes Anliegen:</strong> Vertrauliche Beschwerden sehen nur Sie und die eindeutig
+            zugeordnete Leitung. Für diese Kategorie ist die KI-Schaltfläche deaktiviert.
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+              <label class="form-label fw-semibold mb-0" for="anliegen-final-description">Überarbeitete Beschreibung</label>
+              <button id="anliegen-copy" type="button" class="btn btn-sm btn-link text-decoration-none p-0">
+                <i class="fa-solid fa-copy me-1" aria-hidden="true"></i>Original übernehmen
+              </button>
+            </div>
+            <textarea id="anliegen-final-description" name="description_final" class="form-control anliegen-final-input"
+                      rows="8" maxlength="10000"
+                      aria-describedby="anliegen-final-help"
+                      placeholder="Hier erscheint der KI-Vorschlag. Sie können den Text auch selbst überarbeiten."></textarea>
+            <div class="form-text" id="anliegen-final-help">
+              Optional: Bleibt dieses Feld leer, wird die Beschreibung links unverändert übernommen.
+            </div>
+          </div>
+
+          <div id="anliegen-review-notice" class="anliegen-review-notice small" role="status" aria-live="polite">
+            <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>
+            Noch kein KI-Vorschlag – Sie können Titel und Kategorie auch selbst festlegen.
+          </div>
+        </div>
+
+        <div class="anliegen-review-footer">
+          <div class="small text-secondary mb-3">
+            <i class="fa-solid fa-eye me-1" aria-hidden="true"></i>
+            Bitte prüfen Sie Ihre Angaben. Erst der folgende Klick erstellt das Anliegen.
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg w-100">
+            <i class="fa-solid fa-paper-plane me-2" aria-hidden="true"></i>Anliegen verbindlich einreichen
+          </button>
+          <a href="/anliegen" class="btn btn-link text-secondary w-100 mt-2">Abbrechen und zur Übersicht</a>
+        </div>
+      </section>
+    </div>
+  </div>
 </form>
-</div></div></div>
-<div class="col-12 col-xl-4"><div class="card"><div class="card-body">
-<h2 class="h6"><i class="fa-solid fa-route me-2"></i>So funktioniert es</h2>
-<ol class="small text-secondary ps-3"><li>Kategorie wählen und Anliegen beschreiben.</li><li>TAKT ermittelt die hinterlegte Person oder Organisationsleitung.</li><li>Bei unklarer Zuständigkeit bleibt die Meldung zunächst offen.</li><li>Reguläre Anliegen können mit vorhandenen TAKT-Aufgaben verknüpft werden.</li></ol>
-</div></div></div></div>
 {% endblock %}
 {% block scripts %}<script src="/static/anliegen.js"></script>{% endblock %}
