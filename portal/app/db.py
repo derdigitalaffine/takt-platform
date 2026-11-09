@@ -2959,6 +2959,7 @@ _NEW_COLUMNS = {
     "anliegen_process_rules": {
         "process_version_id": "INTEGER REFERENCES process_versions(id) ON DELETE RESTRICT",
         "created_by_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+        "state_version": "INTEGER NOT NULL DEFAULT 0",
     },
     "anliegen_process_runs": {
         "cursor": "INTEGER NOT NULL DEFAULT 0",
@@ -3120,6 +3121,12 @@ def _migrate() -> None:
         # SQLite UNIQUE over nullable org_id does not deduplicate global rules.
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_anliegen_global_rule_revision "
                           "ON anliegen_process_rules (category_id, process_id, revision) WHERE org_id IS NULL"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_anliegen_active_global_rule "
+                          "ON anliegen_process_rules (category_id, process_id) "
+                          "WHERE state = 'active' AND org_id IS NULL"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_anliegen_active_scoped_rule "
+                          "ON anliegen_process_rules (category_id, process_id, org_id) "
+                          "WHERE state = 'active' AND org_id IS NOT NULL"))
 
 
 def init_db() -> None:
