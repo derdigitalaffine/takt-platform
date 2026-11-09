@@ -77,7 +77,7 @@
             <legend>Erlaubte Startarten</legend>
             <label class="form-check"><input class="form-check-input" name="start_modes" type="checkbox" value="handler" checked> <span class="form-check-label">Durch zuständige Bearbeitende</span></label>
             <label class="form-check"><input class="form-check-input" name="start_modes" type="checkbox" value="submit"> <span class="form-check-label">Optional beim Einreichen</span></label>
-            {% if can_global %}<label class="form-check"><input class="form-check-input" name="start_modes" type="checkbox" value="auto"> <span class="form-check-label">Automatisch durch Kategorie (nur übergreifend)</span></label>{% endif %}
+            <label class="form-check"><input class="form-check-input" name="start_modes" type="checkbox" value="auto"> <span class="form-check-label">Automatisch durch freigegebene Kategorie</span></label>
           </fieldset>
         </div>
         <div class="col-12 col-lg-5">
@@ -132,7 +132,7 @@
               <legend>Startberechtigungen</legend>
               <label class="form-check"><input type="checkbox" class="form-check-input" name="start_modes" value="handler" {% if 'handler' in policy.start_modes %}checked{% endif %}><span class="form-check-label">Bearbeitung</span></label>
               <label class="form-check"><input type="checkbox" class="form-check-input" name="start_modes" value="submit" {% if 'submit' in policy.start_modes %}checked{% endif %}><span class="form-check-label">Einreichen</span></label>
-              {% if not item.org %}<label class="form-check"><input type="checkbox" class="form-check-input" name="start_modes" value="auto" {% if 'auto' in policy.start_modes %}checked{% endif %}><span class="form-check-label">Kategorieautomatik</span></label>{% endif %}
+              <label class="form-check"><input type="checkbox" class="form-check-input" name="start_modes" value="auto" {% if 'auto' in policy.start_modes %}checked{% endif %}><span class="form-check-label">Kategorieautomatik</span></label>
             </fieldset>
             <label class="form-check mb-2"><input type="checkbox" class="form-check-input" name="approval_required" value="1" {% if policy.approval_required %}checked{% endif %}><span class="form-check-label">Startfreigabe erforderlich</span></label>
             <label class="form-label small" for="completion-{{rule.id}}">Anliegenabschluss</label>
