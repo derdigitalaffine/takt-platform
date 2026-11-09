@@ -382,7 +382,8 @@ async def ai_send_message(
     if use_knowledge == "1":
         semantic = await ai_vector.retrieve(db, user, message)
         urls = {entry["url"] for entry in sources}
-        sources = (sources + [entry for entry in semantic if entry["url"] not in urls])[:5]
+        # Reserve room for semantic hits without sacrificing high-ranked lexical evidence.
+        sources = (sources[:3] + [entry for entry in semantic if entry["url"] not in urls][:2])[:5]
     history = list(db.scalars(select(AIMessage)
                               .where(AIMessage.conversation_id == convo.id)
                               .order_by(AIMessage.id.desc()).limit(14)))
@@ -459,7 +460,8 @@ async def ai_message_updates(
     if use_knowledge == "1":
         semantic = await ai_vector.retrieve(db, user, message)
         urls = {entry["url"] for entry in sources}
-        sources = (sources + [entry for entry in semantic if entry["url"] not in urls])[:5]
+        # Reserve room for semantic hits without sacrificing high-ranked lexical evidence.
+        sources = (sources[:3] + [entry for entry in semantic if entry["url"] not in urls][:2])[:5]
     history = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == chat_id)
                               .order_by(AIMessage.id.desc()).limit(14)))
     history.reverse()
