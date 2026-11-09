@@ -230,10 +230,15 @@ def request_start(db: Session, case: Anliegen, rule: AnliegenProcessRule, actor:
     if origin == "submit":
         if case.reporter_id != actor.id or not actor.can("anliegen_submit"):
             raise ProcessAccessDenied("Keine Berechtigung zum Prozessstart beim Einreichen.")
-    elif origin in ("handler", "auto"):
+    elif origin == "handler":
         _require_handler(actor, case)
-        if origin == "auto" and not actor.can("anliegen_manage"):
-            raise ProcessAccessDenied("Automatische Starts benötigen eine freigegebene Verwaltungsidentität.")
+    elif origin == "auto":
+        # A rule's explicitly authorized approver is its scoped automation
+        # principal. No global Anliegen management right is implied.
+        from . import anliegen_process_config
+        if (actor.id != rule.approved_by_id
+                or not anliegen_process_config.can_approve_config(db, actor, rule.org_id)):
+            raise ProcessAccessDenied("Keine freigegebene Identität für den automatischen Start.")
     else:
         raise ProcessAccessDenied("Startart nicht freigegeben.")
     existing = db.scalar(select(AnliegenProcessRun).where(
