@@ -61,6 +61,18 @@ with tempfile.TemporaryDirectory(prefix='takt-navigation-') as root:
                 p.goto(BASE+'/module')
                 for width,theme in [(1440,'light'),(768,'dark'),(360,'dark')]:
                     p.set_viewport_size({'width':width,'height':900});p.emulate_media(color_scheme=theme)
+                    # The global TAKT header is intentionally slim on desktop and mobile.
+                    navbar = p.locator(".app-navbar")
+                    head_height = navbar.bounding_box()["height"]
+                    assert 42 <= head_height <= 56, (width, head_height)
+                    assert navbar.locator(".navbar-brand").is_visible()
+                    assert navbar.get_by_role("button", name="Farbschema").is_visible()
+                    assert navbar.locator('[aria-label^="Benutzermenü für"]').is_visible()
+                    if width >= 992:
+                        sidebar_top = p.locator(".app-sidebar").evaluate(
+                            "el => parseFloat(getComputedStyle(el).top)"
+                        )
+                        assert head_height <= sidebar_top <= head_height + 16, (head_height, sidebar_top)
                     assert p.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
                     assert p.locator('.module-hub-card-open').first.bounding_box()['height'] >= 40
                     p.locator('.module-hub-card-open').first.focus()
