@@ -117,6 +117,10 @@ def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
     dms_candidates.sort(key=lambda item: (
         item.id not in (allowed_dms | dms_excluded), -item.id))
     dms_candidates = dms_candidates[:120]
+    effective_dms = {item.id for item in dms_candidates
+                     if ai_source_policy.dms_included(db, item, cfg=cfg)}
+    blocked_dms_areas = {item.id for item in dms_candidates
+                         if ai_source_policy.area_excluded(db, item.area_id, dms_excluded_areas)}
     dms_areas = list(db.scalars(select(DmsArea).order_by(DmsArea.code, DmsArea.name)))
     dms_eligible_count = db.scalar(select(func.count(DmsRecord.id)).where(
         DmsRecord.kind == "manuell", DmsRecord.archived_at.is_(None),
@@ -132,6 +136,10 @@ def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
                   cfg=cfg, docs=docs, laws=laws, allowed_laws=allowed,
                   law_excluded=law_excluded, dms_excluded=dms_excluded,
                   dms_excluded_areas=dms_excluded_areas, dms_areas=dms_areas,
+                  effective_dms=effective_dms, blocked_dms_areas=blocked_dms_areas,
+                  law_effective_count=(len(laws) - len(law_excluded & {law.id for law in laws})
+                         if cfg.get("ai_laws_include_all") == "1"
+                         else len(allowed & {law.id for law in laws})),
                   dms_eligible_count=dms_eligible_count, dms_q=dms_q,
                   dms_candidates=dms_candidates, allowed_dms=allowed_dms,
                   vector_count=index_health["vectors"], vector_jobs=index_health["jobs"],
