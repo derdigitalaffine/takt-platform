@@ -18,6 +18,9 @@
           </select>
           <button class="btn btn-primary w-100" type="submit" {% if not providers %}disabled{% endif %}><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neuer Chat</button>
         </form>
+        <a href="/ki/temporary" class="btn btn-sm w-100 mb-2 {{ 'btn-outline-primary active' if temporary else 'btn-outline-secondary' }}" {% if temporary %}aria-current="page"{% endif %}>
+          <i class="fa-solid fa-user-shield me-1" aria-hidden="true"></i>Temporärer Chat
+        </a>
         {% if not providers %}
         <div class="alert alert-warning small">Noch kein aktiver KI-Provider eingerichtet. {% if user.is_admin %}<a href="/admin/ai">KI konfigurieren</a>{% endif %}</div>
         {% endif %}
@@ -35,7 +38,16 @@
       {% if current %}
       <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
         <strong class="text-truncate ai-chat-heading" data-ai-chat-title>{{ current.title }}</strong>
-        <div class="d-flex gap-2 flex-wrap">
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          {% if temporary %}
+          <span class="small text-secondary"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Nicht im Verlauf gespeichert</span>
+          <label class="visually-hidden" for="ai-temporary-model">Modell für temporären Chat</label>
+          <select class="form-select form-select-sm ai-temporary-provider" id="ai-temporary-model" name="provider_id" form="ai-temporary-composer" {% if not providers %}disabled{% endif %}>
+            {% for provider in providers %}
+            <option value="{{ provider.id }}" {% if provider.id == current.provider_id %}selected{% endif %}>{{ provider.name }} · {{ provider.model_id }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
           <a class="btn btn-sm btn-outline-secondary" href="/ki/{{ current.id }}/export" aria-label="Chat exportieren" title="Chat exportieren"><i class="fa-solid fa-file-export" aria-hidden="true"></i></a>
           <details class="ai-chat-management">
             <summary class="btn btn-sm btn-outline-secondary" aria-label="Chat verwalten" title="Chat verwalten"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></summary>
@@ -62,6 +74,7 @@
               <button class="btn btn-sm btn-outline-danger" type="submit">Unterhaltung löschen</button>
             </form>
           </details>
+          {% endif %}
         </div>
       </div>
       <div class="ai-chat-history-wrap">
@@ -98,8 +111,11 @@
         </div>
         <button class="btn btn-sm btn-outline-secondary ai-jump-to-latest" type="button" data-ai-jump hidden><i class="fa-solid fa-arrow-down me-1" aria-hidden="true"></i>Zur neuesten Nachricht</button>
       </div>
-        <form class="ai-chat-composer" method="post" action="/ki/{{ current.id }}/message" data-ai-chat-form data-stream-action="/ki/{{ current.id }}/message/updates" data-ai-fork-action="/ki/{{ current.id }}/fork" data-ai-has-messages="{{ '1' if chat_messages else '0' }}" enctype="multipart/form-data">
+        <form class="ai-chat-composer" method="post" action="{{ '/ki/temporary/message' if temporary else '/ki/' ~ current.id ~ '/message' }}" data-ai-chat-form data-stream-action="{{ '/ki/temporary/updates' if temporary else '/ki/' ~ current.id ~ '/message/updates' }}" {% if not temporary %}data-ai-fork-action="/ki/{{ current.id }}/fork"{% endif %} data-ai-temporary="{{ '1' if temporary else '0' }}" data-ai-has-messages="{{ '1' if temporary or chat_messages else '0' }}" {% if temporary %}id="ai-temporary-composer"{% endif %} enctype="multipart/form-data">
           <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if temporary %}
+          <p class="small text-secondary mb-2" role="note"><i class="fa-solid fa-clock-rotate-left me-1" aria-hidden="true"></i>Nur während diese Seite geöffnet ist. Beim Neuladen ist der Gesprächsverlauf verloren. Keine Anhänge oder Wissensrecherche. Der ausgewählte KI-Provider verarbeitet die Nachricht weiterhin.</p>
+          {% endif %}
           <div class="ai-chat-compose-main">
             <label class="visually-hidden" for="ai-prompt">Ihre Nachricht</label>
             <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Nachricht an TAKT-KI …" required></textarea>
