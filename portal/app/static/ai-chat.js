@@ -12,6 +12,15 @@
   var submit = form.querySelector('[data-ai-send]');
   var stop = form.querySelector('[data-ai-stop]');
   var controller = null;
+  var startedAt = 0;
+  var ticker = null;
+  var baseStatus = "";
+
+  function updateStatus() {
+    if (!controller) return;
+    var seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    status.textContent = (baseStatus || "KI arbeitet …") + " (" + seconds + " s)";
+  }
 
   function eventFrame(frame) {
     var kind = 'message', payload = '';
@@ -30,7 +39,10 @@
     controller = new AbortController();
     panel.hidden = false;
     output.textContent = '';
-    status.textContent = 'Verbindung zum KI-Modell wird aufgebaut …';
+    startedAt = Date.now();
+    baseStatus = 'Verbindung zum KI-Modell wird aufgebaut …';
+    updateStatus();
+    ticker = window.setInterval(updateStatus, 1000);
     hint.textContent = '';
     submit.disabled = true;
     stop.disabled = false;
@@ -54,7 +66,8 @@
       while (true) {
         var step = await reader.read();
         if (step.done) break;
-        buffer += decoder.decode(step.value, {stream: true}).replace(/\r\n/g, '\n');
+        buffer += decoder.decode(step.value, {stream: true});
+        buffer = buffer.replace(/\r\n/g, '\n');
         if (buffer.length > 160000) throw new Error('Die Antwort überschreitet die Größe des Chatfensters.');
         var end;
         while ((end = buffer.indexOf('\n\n')) !== -1) {
@@ -62,16 +75,22 @@
           buffer = buffer.slice(end + 2);
           if (!eventData) continue;
           if (eventData.kind === 'status') {
-            status.textContent = String(eventData.value.message || 'Die KI arbeitet …');
+            baseStatus = String(eventData.value.message || 'Die KI arbeitet …');
+            updateStatus();
           } else if (eventData.kind === 'delta') {
             // Never use innerHTML for model content.
             output.textContent += String(eventData.value.text || '');
-            status.textContent = 'Antwort wird empfangen …';
+            baseStatus = 'Antwort wird empfangen …';
+            updateStatus();
+          } else if (eventData.kind === 'heartbeat') {
+            baseStatus = 'Die KI arbeitet weiter …';
+            updateStatus();
           } else if (eventData.kind === 'error') {
             serverError = String(eventData.value.message || 'Die Anfrage ist fehlgeschlagen.');
           } else if (eventData.kind === 'done') {
             finished = true;
-            status.textContent = 'Antwort vollständig gespeichert.';
+            baseStatus = 'Antwort vollständig gespeichert.';
+            updateStatus();
           }
         }
       }
@@ -88,6 +107,7 @@
         hint.textContent = error instanceof Error ? error.message : 'Unbekannter Fehler.';
       }
     } finally {
+      if (ticker !== null) { window.clearInterval(ticker); ticker = null; }
       controller = null;
       submit.disabled = false;
       stop.disabled = true;
