@@ -490,3 +490,73 @@ def test_intake_javascript_does_not_auto_submit_and_rejects_stale_drafts():
     assert "editVersion !== initialVersion" in script
     assert "details.open = true" in script
     assert "form.submit(" not in script
+
+
+def test_new_category_tags_and_it_procurement_are_available_to_admins_only():
+    from app import anliegen as service
+    _enabled()
+    sender_id = _user("anliegen-new-category@example.org")
+    admin = login(*ADMIN)
+    employee = login("anliegen-new-category@example.org", "test-anliegen-pass")
+    token = csrf_of(employee.get("/").text)
+    assert employee.get("/anliegen/kategorien").status_code == 403
+    assert employee.post("/anliegen/kategorien/neu", data={
+        "csrf": token, "title": "Fuhrpark", "tags": "fahrzeug"}).status_code == 403
+    cat_admin = admin.get("/anliegen/kategorien")
+    assert cat_admin.status_code == 200
+    assert "Neue Kategorie anlegen" in cat_admin.text
+    response = admin.post("/anliegen/kategorien/neu", data={
+        "csrf": csrf_of(cat_admin.text), "title": "Fuhrpark & Mobilität",
+        "description": "Dienstfahrzeuge und Ladeinfrastruktur",
+        "tags": "Auto, Fahrzeug; auto, Ladeinfrastruktur",
+        "routing": "person", "assignee_id": str(sender_id), "enabled": "1",
+    })
+    assert response.status_code == 303
+    cat_id = int(response.headers["location"].split("cat-")[-1])
+    with SessionLocal() as db:
+        cat = db.get(AnliegenCategory, cat_id)
+        assert cat.key.startswith("custom_") and cat.enabled
+        assert cat.tags == "auto,fahrzeug,ladeinfrastruktur"
+        assert cat.description == "Dienstfahrzeuge und Ladeinfrastruktur"
+    assert "Fuhrpark &amp; Mobilität" in employee.get("/anliegen/neu").text
+    assert employee.post(f"/anliegen/kategorien/{cat_id}", data={
+        "csrf": token, "title": "Manipuliert", "routing": "person"}).status_code == 403
+    update = admin.post(f"/anliegen/kategorien/{cat_id}", data={
+        "csrf": csrf_of(admin.get("/anliegen/kategorien").text),
+        "title": "Fuhrpark", "description": "Fuhrparkmanagement",
+        "tags": "dienstwagen, E-Auto", "routing": "person",
+        "assignee_id": str(sender_id), "enabled": "1",
+    })
+    assert update.status_code == 303
+    with SessionLocal() as db:
+        cat = db.get(AnliegenCategory, cat_id)
+        assert (cat.title, cat.tags) == ("Fuhrpark", "dienstwagen,e-auto")
+        it = db.scalar(select(AnliegenCategory).where(
+            AnliegenCategory.key == "it_procurement"))
+        assert it is not None and it.title == "IT-Beschaffung"
+        assert "hardware" in it.tags
+        assert "ordered" in service.next_states(type("Case", (), {
+            "status": "open", "category": it})())
+    # Ensure badly formatted tags cannot be used to poison the category prompt.
+    rejected = admin.post(f"/anliegen/kategorien/{cat_id}", data={
+        "csrf": csrf_of(admin.get("/anliegen/kategorien").text),
+        "title": "Fuhrpark", "tags": "<script>alert(1)</script>",
+        "routing": "person", "enabled": "1",
+    })
+    assert rejected.status_code == 422
+
+
+def test_revoked_anliegen_permissions_block_direct_case_access():
+    _enabled()
+    sender = _user("anliegen-revoked@example.org", permissions="anliegen_submit")
+    cat_id = _cat("other")
+    _, case_id = _post_case("anliegen-revoked@example.org", cat_id)
+    with SessionLocal() as db:
+        row = db.get(User, sender)
+        row.permissions = ""
+        db.commit()
+    revoked = login("anliegen-revoked@example.org", "test-anliegen-pass")
+    assert revoked.get("/anliegen").status_code == 403
+    assert revoked.get(f"/anliegen/{case_id}").status_code == 403
+    assert revoked.post(f"/anliegen/{case_id}/status", data={
+        "csrf": csrf_of(revoked.get("/").text), "status": "done"}).status_code == 403
