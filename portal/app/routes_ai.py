@@ -294,7 +294,8 @@ async def _web_sources(db, user, question: str, selected: str, request: Request)
 def _source_meta(sources: list[dict]) -> str:
     return json.dumps([
         {"title": item["title"], "url": item["url"],
-         **({"kind": item["kind"]} if item.get("kind") in ("web", "dms") else {})}
+         **({"kind": item["kind"]} if item.get("kind") in ("web", "dms") else {}),
+         **({"revision": item["revision"]} if item.get("revision") else {})
         for item in sources
     ], ensure_ascii=False)
 
