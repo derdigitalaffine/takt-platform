@@ -101,12 +101,13 @@ def anliegen_recipient_preview(category_id: int, user: User = Depends(current_us
 @app.post("/anliegen/neu", dependencies=[Depends(check_csrf)])
 def create_anliegen(request: Request, category_id: int = Form(...),
                    title: str = Form(...), description: str = Form(...),
+                   description_final: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _submit(user)
     rate_limit(request, "anliegen-submit", limit=12, window=3600, key=str(user.id))
     cat = service.category(db, category_id, enabled=True)
-    case = service.create(db, user, cat, title, description)
+    case = service.create(db, user, cat, title, description_final.strip() or description)
     db.commit()
     flash(request, "Anliegen ANL-%06d eingereicht. %s" % (
         case.id, "Zuständigkeit noch nicht eindeutig konfiguriert." if not case.assignee_id
