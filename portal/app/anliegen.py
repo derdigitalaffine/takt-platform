@@ -15,11 +15,69 @@ DEFAULT_CATEGORIES = (
     ("platform_feedback", "TAKT verbessern", "Fehler, Bedienbarkeit, fehlende Funktionen und Verbesserungsvorschläge zur TAKT-Plattform", "fa-wand-magic-sparkles", "person", False),
     ("other", "Sonstiges Anliegen", "Andere interne Anliegen", "fa-inbox", "person", False),
 )
-STATUSES = {"unassigned": "Zuständigkeit offen", "open": "Offen",
-            "in_progress": "In Bearbeitung", "done": "Erledigt", "closed": "Geschlossen"}
-NEXT = {"unassigned": {"open", "closed"}, "open": {"in_progress", "done", "closed"},
-        "in_progress": {"open", "done", "closed"}, "done": {"in_progress", "closed"},
-        "closed": set()}
+ORDER_KEYS = frozenset({"office_supply", "office_furniture"})
+STATUSES = {
+    "unassigned": "Zuständigkeit offen",
+    "open": "Offen",
+    "in_progress": "In Bearbeitung",
+    "waiting": "Warten auf Rückmeldung",
+    "ordered": "Beim Lieferanten bestellt",
+    "partially_delivered": "Teilweise geliefert",
+    "delivered": "Geliefert",
+    "done": "Erledigt",
+    "cancelled": "Abgebrochen",
+    "closed": "Geschlossen",
+}
+NEXT = {
+    "unassigned": {"open", "closed"},
+    "open": {"in_progress", "waiting", "done", "cancelled", "closed", "ordered"},
+    "in_progress": {"open", "waiting", "ordered", "done", "cancelled", "closed"},
+    "waiting": {"open", "in_progress", "ordered", "done", "cancelled", "closed"},
+    "ordered": {"partially_delivered", "delivered", "waiting", "cancelled"},
+    "partially_delivered": {"ordered", "delivered", "waiting", "cancelled"},
+    "delivered": {"done", "closed", "in_progress"},
+    "done": {"in_progress", "closed"},
+    "cancelled": {"open", "closed"},
+    "closed": set(),
+}
+ORDER_STATES = {"ordered", "partially_delivered", "delivered"}
+
+
+def next_states(case):
+    options = NEXT.get(case.status, set())
+    if case.category.key not in ORDER_KEYS:
+        options = options - ORDER_STATES
+    return options
+
+
+def update_status(db, case, actor, new_status, *, supplier="", order_reference="",
+                  expected_delivery_at=None):
+    """Centralize transition checks and native task synchronization."""
+    if new_status not in next_states(case) or (new_status != "closed" and not case.assignee_id):
+        raise HTTPException(422, "Dieser Statuswechsel ist nicht zulässig.")
+    if new_status in ORDER_STATES and case.category.key not in ORDER_KEYS:
+        raise HTTPException(422, "Lieferstatus nur für Bestellungen verfügbar.")
+    if new_status == "ordered":
+        case.supplier = supplier.strip()[:160] or case.supplier
+        case.order_reference = order_reference.strip()[:120] or case.order_reference
+        if expected_delivery_at is not None:
+            case.expected_delivery_at = expected_delivery_at
+        case.ordered_at = case.ordered_at or utcnow()
+    if new_status == "delivered":
+        case.delivered_at = utcnow()
+    case.status = new_status
+    record(db, case, actor, "status", f"Status: {STATUSES[new_status]}")
+    if case.task_id:
+        from .task_models import Task
+        from . import tasks
+        task = db.get(Task, case.task_id)
+        if task:
+            task.status = ("done" if new_status in ("done", "closed", "delivered")
+                           else "open" if new_status == "open"
+                           else "in_progress")
+            tasks.audit(db, task, actor, "status",
+                        f"Status des Anliegens: {STATUSES[new_status]}")
+    return case
 
 
 def seed(db):
