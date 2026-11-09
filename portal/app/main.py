@@ -2112,6 +2112,7 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
                 per_page: int = 25, user: User = Depends(users_manager), db: Session = Depends(get_db)):
     """Server-filtered directory: render a bounded page instead of every user/editor."""
     from . import absence, organization
+    from sqlalchemy import or_
     q = " ".join(q.strip().split())[:160]
     status = status if status in {"all", "active", "blocked", "invited", "mfa"} else "all"
     role = role if role in {"all", "admin", "member"} else "all"
@@ -2177,6 +2178,7 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
 def admin_group_editor(request: Request, gid: int, user: User = Depends(users_manager),
                        db: Session = Depends(get_db)):
     """Load a single group editor only on demand; the list never renders N x users."""
+    from . import organization
     from .organization import protected_group
     group = db.get(Group, gid) if gid else None
     if gid and group is None:
