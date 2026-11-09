@@ -216,7 +216,9 @@ def ai_chat(request: Request, chat: int | None = None, user: User = Depends(chat
     providers = list(db.scalars(select(AIProvider).where(AIProvider.active.is_(True))
                                 .order_by(AIProvider.name)))
     return render(request, "ai_chat.html", user, chats=conversations, current=selected,
-                  chat_messages=selected.messages if selected else [], providers=providers,
+                  chat_messages=[{"role": row.role, "content": row.content,
+                                  "model": row.model_id, "sources": json.loads(row.sources_json or "[]")}
+                                 for row in selected.messages] if selected else [], providers=providers,
                   knowledge_available=(get_settings(db).get("ai_knowledge_enabled") == "1"
                                        and user.can("ai_knowledge")),
                   vision_available=user.can("ai_vision"))
