@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Neues internes Anliegen{% endblock %}
+{% block content %}
+{% call m.page_head('Anliegen erfassen', 'Ihre Meldung wird nach einer hinterlegten Zuständigkeitsregel als native TAKT-Aufgabe weitergeleitet.') %}
+<a class="btn btn-outline-secondary" href="/anliegen"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zur Übersicht</a>
+{% endcall %}
+{% if error %}<div class="alert alert-warning" role="alert"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ error }}</div>{% endif %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header"><i class="fa-solid fa-pen-to-square me-2" aria-hidden="true"></i>Manuell erfassen oder KI-Entwurf prüfen</div>
+      <div class="card-body">
+        <form method="post" action="/anliegen/neu" id="concern-create">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="mb-3">
+            <label for="concern-cat" class="form-label fw-semibold">Kategorie</label>
+            <select name="category_id" id="concern-cat" class="form-select" required>
+              <option value="" disabled {% if not data.category_id %}selected{% endif %}>Bitte auswählen</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}" {% if data.category_id|string == cat.id|string %}selected{% endif %}>{{ cat.title }}{% if cat.confidential or cat.kind == 'complaint' %} · vertraulich{% endif %}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Die Kategorie bestimmt, welche Person die Bearbeitung erhält. Bei Beschwerden gilt immer die zuständige Leitung.</div>
+          </div>
+          <div class="mb-3">
+            <label for="concern-title" class="form-label fw-semibold">Kurzer Titel</label>
+            <input id="concern-title" name="title" class="form-control" value="{{ data.title or '' }}"
+                   minlength="5" maxlength="240" placeholder="z. B. Zwei defekte Bürostühle im Sachgebiet" required>
+          </div>
+          <div class="mb-3">
+            <label for="concern-body" class="form-label fw-semibold">Beschreibung</label>
+            <textarea id="concern-body" name="description" class="form-control" rows="8" minlength="10" maxlength="12000"
+                      placeholder="Was wird benötigt, was ist passiert, an welchem Ort und wie dringend ist es?" required>{{ data.description or '' }}</textarea>
+            <div class="form-text">Beschreiben Sie den Sachverhalt sachlich. Bei Beschwerden können personenbezogene Angaben vertraulich sein.</div>
+          </div>
+          {% if data.title %}
+          <div class="alert alert-info py-2"><i class="fa-solid fa-circle-info me-2" aria-hidden="true"></i>Bitte den vorgeschlagenen Text und die Kategorie vor dem Einreichen prüfen und bei Bedarf ändern.</div>
+          {% endif %}
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span class="small text-secondary"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>Eine Aufgabe entsteht erst durch das Absenden dieses Formulars.</span>
+            <button class="btn btn-primary" type="submit" {% if not categories %}disabled{% endif %}><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Verbindlich einreichen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="fa-solid fa-brain me-2" aria-hidden="true"></i>KI-Formulierungshilfe</div>
+      <div class="card-body">
+        {% if ai_allowed %}
+        <p class="small text-secondary">Beschreiben Sie Ihr Anliegen frei. Die KI kann einen Titel, eine sachliche Zusammenfassung und die passende Kategorie vorschlagen. Die Zuständigkeit entscheidet weiterhin allein TAKT.</p>
+        <form method="post" action="/anliegen/ki-entwurf">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="form-label" for="ai-concern-input">Was möchten Sie melden?</label>
+          <textarea class="form-control mb-3" id="ai-concern-input" name="description" rows="6" minlength="10" maxlength="8000" required
+                    placeholder="Bitte ohne unnötige personenbezogene Daten beschreiben …">{{ data.description or '' }}</textarea>
+          <label class="form-check small mb-3">
+            <input class="form-check-input" type="checkbox" name="consent" value="1" required>
+            <span class="form-check-label">Ich möchte den eingegebenen Text zur Formulierung an den eingerichteten KI-Provider übermitteln. Bei sensiblen Beschwerden nutze ich gegebenenfalls die manuelle Erfassung.</span>
+          </label>
+          <button class="btn btn-outline-primary w-100" type="submit"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Unverbindlichen Entwurf erstellen</button>
+        </form>
+        {% else %}
+        <p class="small text-secondary">Die KI-Formulierungshilfe ist optional. Sie wird sichtbar, wenn der KI-Chat aktiviert, ein Provider eingerichtet und Ihr Benutzerkonto berechtigt ist.</p>
+        {% endif %}
+        <hr>
+        <h2 class="h6">So funktioniert die Weiterleitung</h2>
+        <ol class="small text-secondary ps-3 mb-0">
+          <li>Sie wählen die Kategorie und beschreiben das Anliegen.</li>
+          <li>TAKT ermittelt den hinterlegten Empfänger oder die eindeutige vorgesetzte Person.</li>
+          <li>Eine vorhandene TAKT-Aufgabe wird verknüpft und der Bearbeitungsstand angezeigt.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
