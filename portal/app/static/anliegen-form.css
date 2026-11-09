@@ -1,0 +1,48 @@
+/* Interne Anliegen – description-first form. Uses TAKT/Bootstrap theme tokens. */
+.anliegen-form { --anliegen-radius: 1rem; }
+.anliegen-form-progress { display:flex; align-items:center; flex-wrap:wrap; gap:.65rem; margin:0 0 1.35rem; color:var(--bs-secondary-color); font-size:.82rem; font-weight:600; }
+.anliegen-form-progress > span { display:inline-flex; align-items:center; gap:.4rem; padding:.4rem .75rem; border-radius:999px; background:var(--bs-tertiary-bg); }
+.anliegen-form-progress > span:first-child { background:var(--bs-primary-bg-subtle); color:var(--bs-primary-text-emphasis); }
+.anliegen-form-progress > i { opacity:.5; font-size:.6rem; }
+.anliegen-form .card { border:1px solid var(--bs-border-color); border-radius:var(--anliegen-radius); box-shadow:0 .3rem 1.4rem rgba(0,0,0,.035); }
+.anliegen-composer { background:linear-gradient(155deg,var(--bs-primary-bg-subtle),var(--bs-body-bg) 32%); }
+.anliegen-review { overflow:hidden; }
+.anliegen-section-kicker { display:inline-flex; align-items:center; gap:.55rem; color:var(--bs-secondary-color); font-size:.76rem; font-weight:700; letter-spacing:.055em; text-transform:uppercase; margin-bottom:.6rem; }
+.anliegen-step { display:inline-grid; place-items:center; width:1.85rem; height:1.85rem; border-radius:.6rem; color:var(--bs-primary); background:var(--bs-primary-bg-subtle); font-size:.78rem; font-weight:750; font-variant-numeric:tabular-nums; letter-spacing:0; }
+.anliegen-section-title { font-size:clamp(1.2rem,2vw,1.55rem); font-weight:720; line-height:1.25; letter-spacing:-.018em; margin:0 0 .4rem; }
+.anliegen-form .form-label { color:var(--bs-body-color); }
+.anliegen-form textarea { resize:vertical; line-height:1.6; }
+.anliegen-form .form-control, .anliegen-form .form-select { border-radius:.65rem; border-color:var(--bs-border-color); transition:border-color .15s ease,box-shadow .15s ease; }
+.anliegen-form .form-control:focus, .anliegen-form .form-select:focus { border-color:var(--bs-primary); box-shadow:0 0 0 .2rem rgba(var(--bs-primary-rgb),.12); }
+.anliegen-main-input { min-height:19rem; font-size:1.03rem; padding:1.1rem 1.15rem; background:var(--bs-body-bg); }
+.anliegen-main-input::placeholder { color:var(--bs-secondary-color); opacity:.75; }
+.anliegen-final-input { min-height:10rem; padding:.85rem 1rem; }
+.anliegen-ai-box { border:1px solid var(--bs-primary-border-subtle); background:var(--bs-primary-bg-subtle); border-radius:.85rem; padding:1.15rem; }
+.anliegen-ai-symbol { display:grid; place-items:center; background:var(--bs-body-bg); color:var(--bs-primary); width:2.65rem; height:2.65rem; border-radius:.8rem; font-size:1.1rem; flex:none; box-shadow:0 1px 4px rgba(0,0,0,.04); }
+.anliegen-ai-button { font-weight:650; padding:.65rem 1.05rem; border-radius:.65rem; }
+.anliegen-ai-button[disabled] { cursor:not-allowed; }
+.anliegen-ai-status { padding:.65rem .8rem; border-radius:.55rem; background:var(--bs-body-bg); border:1px solid var(--bs-border-color); color:var(--bs-secondary-color); }
+.anliegen-ai-status[data-state="success"] { color:var(--bs-success-text-emphasis); border-color:var(--bs-success-border-subtle); background:var(--bs-success-bg-subtle); }
+.anliegen-ai-status[data-state="error"] { color:var(--bs-danger-text-emphasis); border-color:var(--bs-danger-border-subtle); background:var(--bs-danger-bg-subtle); }
+.anliegen-help-note { display:flex; align-items:flex-start; gap:.8rem; font-size:.8rem; color:var(--bs-secondary-color); padding:.2rem .45rem; }
+.anliegen-help-note > i { color:var(--bs-primary); }
+.anliegen-help-note strong { display:block; color:var(--bs-body-color); margin-bottom:.15rem; }
+.anliegen-help-note span { display:block; line-height:1.5; }
+.anliegen-review-notice { display:flex; align-items:flex-start; gap:.3rem; padding:.8rem .9rem; background:var(--bs-tertiary-bg); border-radius:.65rem; color:var(--bs-secondary-color); line-height:1.4; }
+.anliegen-review-notice[data-state="ready"] { background:var(--bs-success-bg-subtle); color:var(--bs-success-text-emphasis); }
+.anliegen-review-notice[data-state="changed"] { background:var(--bs-warning-bg-subtle); color:var(--bs-warning-text-emphasis); }
+.anliegen-review-footer { border-top:1px solid var(--bs-border-color); background:var(--bs-tertiary-bg); padding:1.1rem 1.4rem 1.2rem; }
+.anliegen-review-footer .btn-lg { font-weight:650; border-radius:.7rem; padding:.8rem 1rem; }
+.anliegen-form [hidden] { display:none !important; }
+@media (min-width:1200px) { .anliegen-review { position:sticky; top:5rem; } }
+@media (max-width:575.98px) {
+  .anliegen-form-progress { gap:.4rem; font-size:.73rem; }
+  .anliegen-form-progress > span { padding:.35rem .5rem; }
+  .anliegen-main-input { min-height:16rem; font-size:1rem; }
+  .anliegen-ai-box { padding:.9rem; }
+  .anliegen-ai-symbol { width:2.25rem; height:2.25rem; font-size:.95rem; }
+  .anliegen-review-footer { padding:1rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .anliegen-form .form-control,.anliegen-form .form-select { transition:none; }
+}
