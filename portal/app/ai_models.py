@@ -3,7 +3,7 @@
 No credentials or user prompts are stored in plaintext settings or logs.
 Tables are additive and registered during init_db().
 """
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base, utcnow
@@ -93,3 +93,24 @@ class AIKnowledgeVector(Base):
     chunk_text: Mapped[str] = mapped_column(Text)
     vector_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
+
+
+class AIIndexJob(Base):
+    """Durable indexing work; each curated document has at most one queued job.
+
+    A lease makes interrupted jobs retryable after a worker restart. No source
+    contents, prompts, or provider response text are persisted here.
+    """
+    __tablename__ = "ai_index_jobs"
+    __table_args__ = (UniqueConstraint("knowledge_id", name="uq_ai_index_doc"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    knowledge_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_knowledge.id", ondelete="CASCADE"), index=True)
+    model_id: Mapped[str] = mapped_column(String(200), default="")
+    desired_hash: Mapped[str] = mapped_column(String(64), default="")
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[object] = mapped_column(DateTime, nullable=True)
+    lease_until: Mapped[object] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
