@@ -193,14 +193,12 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
             from .routes_ai import _model_history
             rows = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == convo.id).order_by(AIMessage.id.desc()).limit(10)))
             context = _model_history(db, user, list(reversed(rows)))
-        from . import ai_knowledge, ai_vector, ai_dms
-        from .routes_ai import _web_sources, _source_meta
-        sources = ai_knowledge.retrieve(db, user, prompt) if use_knowledge == "1" else []
-        if use_knowledge == "1":
-            semantic = await ai_vector.retrieve(db, user, prompt)
-            dms_hits = ai_dms.retrieve(db, user, prompt)
-            urls = {s["url"] for s in sources}
-            sources = (sources[:3] + [s for s in semantic[:2] + dms_hits[:2] if s["url"] not in urls][:2])[:5]
+        from . import ai_knowledge
+        from .routes_ai import _web_sources, _source_meta, _internal_ai_sources
+        # All TAKT chat paths share the same live-ACL RAG adapters, including
+        # paragraph embeddings and historical legal versions.
+        sources = (await _internal_ai_sources(db, user, prompt)
+                   if use_knowledge == "1" else [])
         sources += await _web_sources(db, user, prompt, use_web, request)
         from .agent_precision import focus_modules
         focus = focus_modules(prompt)
@@ -292,7 +290,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
         "open_url": agent_drafts.url(stored) if nonce else "",
         "html": _ai_markdown(plan["message"]),
         "message": plan["message"],
-        "sources": [dict(title=s["title"], url=s["url"]) for s in sources],
+        "sources": [dict(title=s["title"], url=s["url"], kind=s.get("kind", "")) for s in sources],
         "steps": steps,
         "results": findings,
         "proposals": agent.preview(db, plan["actions"]),
