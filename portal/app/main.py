@@ -2285,6 +2285,12 @@ def _release_owned(db: Session, target: User) -> None:
     """Kurzlinks und Formulare einer gelöschten Person bleiben erhalten und gehen an die löschende Verwaltung
     bzw. werden herrenlos (Admins sehen sie weiter)."""
     from .db import BookingPage, Form as FormModel, Poll, ShortLink
+    from .concern_models import Concern
+    if db.scalar(select(Concern.id).where(
+        (Concern.reporter_id == target.id) | (Concern.assignee_id == target.id)
+    ).limit(1)):
+        raise HTTPException(409, "Dieses Konto ist noch mit internen Anliegen verknüpft. "
+                                    "Bitte die Vorgänge vor einer Kontolöschung abschließen oder gesondert archivieren.")
     for page in db.scalars(select(BookingPage).where(BookingPage.owner_id == target.id)):
         page.owner_id = None
     for poll in db.scalars(select(Poll).where(Poll.owner_id == target.id)):
