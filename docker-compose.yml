@@ -186,6 +186,31 @@ services:
     networks:
       rag_private:
 
+  # Opt-in per COMPOSE_PROFILES=searxng (scripts/setup.sh).
+  # Kein Host-Port: Nur das Portal spricht SearXNG über search_private an.
+  # Separates Egress-Netz für die externen Suchmaschinen (internal-Netze allein
+  # würden SearXNG den nötigen Internetzugriff sperren).
+  searxng:
+    image: ghcr.io/searxng/searxng:${SEARXNG_IMAGE_VERSION:-2026.11.5-3e95f6cd2}
+    profiles: ["searxng"]
+    restart: ${RESTART_POLICY:-unless-stopped}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Offizielles Image läuft ohne root. Keine Schreibversuche im config-Volume.
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-}
+      - SEARXNG_PORT=8080
+      - FORCE_OWNERSHIP=false
+    expose:
+      - "8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_cache:/var/cache/searxng
+    networks:
+      search_private:
+      search_egress:
   portal:
     build: ./portal
     image: ${PORTAL_IMAGE:-jitsi-speechmind-portal:local}
@@ -218,6 +243,8 @@ services:
       - CADDY_CONF_DIR=/caddyconf
       - PORTAL_ROOMS_FILE=/portal-rooms/rooms.json
       - PORTAL_CHAT_DIR=/portal-chat
+      # Nur dieser Schalter autorisiert die Verwendung des lokalen Suchdiensts.
+      - TAKT_SEARXNG_ENABLED=${SEARXNG_ENABLED:-0}
     volumes:
       - ${CONFIG}/portal:/data
       # Proxy-Steuerung aus der Admin-Oberfläche: Konfiguration schreiben, Root-Zertifikat lesen
@@ -230,8 +257,15 @@ services:
     networks:
       meet.jitsi:
       rag_private:
+      search_private:
 
 networks:
   meet.jitsi:
   rag_private:
     internal: true
+  search_private:
+    internal: true
+  search_egress:
+
+volumes:
+  searxng_cache:

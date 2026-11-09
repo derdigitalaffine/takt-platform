@@ -4,12 +4,98 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if [ -f .env ] && [ "${1:-}" != "--force" ]; then
-  echo ".env existiert bereits. Mit '--force' überschreiben."
-  exit 1
-fi
+# Mit denselben Optionen sowohl bei Neuinstallation als auch später aufrufbar.
+SEARXNG_MODE=ask
+FORCE=0
+for arg in "$@"; do
+  case "$arg" in
+    --enable-searxng) SEARXNG_MODE=enable ;;
+    --disable-searxng) SEARXNG_MODE=disable ;;
+    --force) FORCE=1 ;;
+    -h|--help)
+      echo "Verwendung: ./scripts/setup.sh [--enable-searxng|--disable-searxng] [--force]"
+      echo "Bei vorhandener .env werden ohne --force ausschließlich SearXNG-Optionen verwaltet."
+      exit 0 ;;
+    *) echo "Unbekannte Option: $arg" >&2; exit 2 ;;
+  esac
+done
 
 gen() { openssl rand -hex 24; }
+
+# .env niemals als Shellcode ausführen (untrusted Werte, mögliche Leerzeichen).
+env_get() {
+  [ -f .env ] || return 0
+  sed -n "s/^$1=//p" .env | tail -n 1
+}
+
+env_set() {
+  local key="$1" value="$2" temp
+  temp="$(mktemp)"
+  awk -v key="$key" -v value="$value" '
+    index($0, key "=") == 1 {
+      if (!found) { print key "=" value; found=1 }
+      next
+    }
+    { print }
+    END { if (!found) print key "=" value }
+  ' .env > "$temp"
+  cat "$temp" > .env
+  rm -f "$temp"
+  chmod 600 .env
+}
+
+configure_searxng() {
+  local current choice answer profiles item joined
+  local -a parts retained
+  current="$(env_get SEARXNG_ENABLED)"
+  choice="$SEARXNG_MODE"
+  if [ "$choice" = ask ]; then
+    if [ ! -t 0 ]; then
+      echo "SearXNG unverändert (nicht interaktiver Aufruf; --enable-searxng / --disable-searxng verwenden)."
+      return
+    fi
+    if [ "$current" = 1 ]; then
+      read -r -p "Optionale, lokale SearXNG-Websuche aktiv lassen? [J/n]: " answer
+      case "${answer,,}" in n|nein|no) choice=disable ;; *) choice=enable ;; esac
+    else
+      read -r -p "Kostenlose lokale SearXNG-Websuche installieren? [j/N]: " answer
+      case "${answer,,}" in j|ja|y|yes) choice=enable ;; *) choice=disable ;; esac
+    fi
+  fi
+
+  profiles="$(env_get COMPOSE_PROFILES)"
+  IFS=',' read -r -a parts <<< "$profiles"
+  retained=()
+  for item in "${parts[@]}"; do
+    item="${item//[[:space:]]/}"
+    [ -z "$item" ] || [ "$item" = searxng ] || retained+=("$item")
+  done
+
+  if [ "$choice" = enable ]; then
+    retained+=(searxng)
+    # Secret bei Re-Konfiguration nie rotieren: sonst ändern sich die Einstellungen.
+    if [ -z "$(env_get SEARXNG_SECRET)" ]; then
+      env_set SEARXNG_SECRET "$(gen)"
+    fi
+    env_set SEARXNG_ENABLED 1
+    echo "SearXNG aktiviert. Weiterhin gilt: KI-Websuche im Portal administrativ freigeben."
+  else
+    env_set SEARXNG_ENABLED 0
+    echo "SearXNG deaktiviert. Bestehende Daten und andere Compose-Profile bleiben erhalten."
+  fi
+  joined="$(IFS=,; echo "${retained[*]}")"
+  env_set COMPOSE_PROFILES "$joined"
+}
+
+if [ -f .env ] && [ "$FORCE" -eq 0 ]; then
+  echo "== TAKT-Setup: vorhandene Installation =="
+  echo "Domains, Admin-Zugang und alle bestehenden Secrets bleiben unverändert."
+  configure_searxng
+  echo
+  echo "Änderungen übernehmen: docker compose up -d --build"
+  echo "Beim Deaktivieren ggf. zuvor: docker compose --profile searxng stop searxng"
+  exit 0
+fi
 
 ask() {
   local prompt="$1" default="${2:-}" answer
@@ -34,9 +120,7 @@ ADMIN_PASSWORD=$(gen | cut -c1-20)
 cp .env.example .env
 
 set_var() {
-  local key="$1" value="$2"
-  # Trennzeichen | , weil Werte Punkte und Slashes enthalten können
-  sed -i.bak "s|^${key}=.*|${key}=${value}|" .env
+  env_set "$1" "$2"
 }
 
 set_var MEET_DOMAIN "$MEET_DOMAIN"
@@ -52,8 +136,10 @@ for key in JWT_APP_SECRET JICOFO_AUTH_PASSWORD JVB_AUTH_PASSWORD JIGASI_XMPP_PAS
            PORTAL_SECRET_KEY; do
   set_var "$key" "$(gen)"
 done
-rm -f .env.bak
 chmod 600 .env
+
+# Optionale Komponente erst nach dem Speichern aller Installations-Secrets.
+configure_searxng
 
 mkdir -p data/{web/crontabs,transcripts,prosody/config,prosody/prosody-plugins-custom,jicofo,jvb,jibri,recordings,portal,caddy/data,caddy/config,caddy/conf,portal-rooms,portal-chat}
 chmod +x jibri/finalize.sh

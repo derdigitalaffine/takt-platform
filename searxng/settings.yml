@@ -1,0 +1,23 @@
+# TAKT-internes SearXNG: Keine öffentlichen Ports; API nur über Docker erreichbar.
+# Eine geheime server.secret_key wird per SEARXNG_SECRET aus .env übergeben.
+use_default_settings: true
+
+general:
+  instance_name: "TAKT Websuche"
+  debug: false
+
+search:
+  safe_search: 2
+  default_lang: "de-DE"
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "ultrasecretkey"
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false
+  public_instance: false
+  image_proxy: false

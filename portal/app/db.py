@@ -2777,6 +2777,7 @@ DEFAULT_SETTINGS = {
     "ai_dms_excluded_ids": "[]",
     "ai_dms_excluded_areas": "[]",
     "ai_web_enabled": "0",
+    "ai_web_provider": "auto",  # local SearXNG when deployed, otherwise Brave
     "ai_web_key_enc": "",
     "ai_vector_enabled": "0",
     "ai_vector_auto_index": "0",

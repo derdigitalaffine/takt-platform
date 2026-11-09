@@ -270,6 +270,8 @@ cd jitsii-speechmind
 
 Beantworten Sie die Fragen (Domains, E-Mail für Zertifikate, öffentliche IP, Admin-E-Mail). **Am Ende zeigt er das Startpasswort des Admins. Notieren Sie es jetzt**, es wird nicht wieder angezeigt.
 
+**Optionale KI-Websuche:** Im Setup lässt sich die kostenfreie, selbst gehostete SearXNG-Suche zuschalten (standardmäßig aus). Bei vorhandener Installation jederzeit ohne Überschreiben der .env wieder aufrufbar: `./scripts/setup.sh --enable-searxng` oder `./scripts/setup.sh --disable-searxng`; anschließend `docker compose up -d --build` ausführen. Der Administrator muss die Websuche außerdem unter **Admin → KI** für berechtigte Benutzer freigeben. Details: [SearXNG einrichten](docs/SEARXNG.md).
+
 **4. Starten:**
 
 ```bash

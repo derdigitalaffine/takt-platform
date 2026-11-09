@@ -112,17 +112,33 @@
 
 <section id="web-search" class="mt-4">
   <details class="card">
-    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-globe me-2" aria-hidden="true"></i>Optionale Websuche (Brave Search API) {% if cfg.ai_web_enabled == '1' %}· aktiv{% else %}· aus{% endif %}</summary>
+    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-globe me-2" aria-hidden="true"></i>Optionale KI-Websuche {% if cfg.ai_web_enabled == '1' %}· aktiv{% else %}· aus{% endif %}</summary>
     <div class="card-body">
-      <p>Die öffentliche Websuche ist unabhängig vom internen TAKT-Wissen. Sie wird nur für Benutzer mit dem Recht <strong>KI-Websuche</strong> angeboten und nur nach aktivem Einschalten für die jeweilige Nachricht ausgeführt.</p>
-      <p class="text-secondary small">Dabei wird ausschließlich die aktuelle Frage an die Brave Search API übertragen – keine Chat-Historie, internen Quellen oder Systemprompts. Ergebnisse sind untrusted Fremdinhalte und ersetzen keine Rechtsprüfung.</p>
+      <p class="mb-2">TAKT kann über <strong>SearXNG (lokal, ohne Such-API-Gebühr)</strong> oder die bestehende <strong>Brave Search API</strong> recherchieren. Benutzer benötigen weiterhin das Recht <strong>KI-Websuche</strong> und müssen die Suche für jede Nachricht ausdrücklich einschalten.</p>
+      <p class="text-secondary small">Nur die aktuelle Frage wird an die gewählte Suchmaschine übertragen – keine Chat-Historie, internen Dokumente oder Systemprompts. Bei SearXNG werden die Anfragen an externe Suchmaschinen weitergereicht. Quellen sind untrusted und ersetzen keine Rechtsprüfung.</p>
+      {% if searxng_installed %}
+      <div class="alert alert-success py-2 small" role="status"><i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>SearXNG ist in der Serverkonfiguration aktiviert. Verfügbarkeit hängt vom laufenden Container und dessen Suchmaschinen ab.</div>
+      {% else %}
+      <div class="alert alert-secondary py-2 small"><i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>SearXNG ist nicht installiert/aktiviert. Einmalig oder nachträglich am Server mit <code>./scripts/setup.sh --enable-searxng</code> aktivieren und <code>docker compose up -d --build</code> ausführen.</div>
+      {% endif %}
       <form method="post" action="/admin/ai/web/settings" class="row g-3 align-items-end">
         <input type="hidden" name="csrf" value="{{ csrf }}">
-        <div class="col-md-6"><label class="form-label" for="ai-web-key">Brave Search API-Schlüssel</label>
-          <input type="password" id="ai-web-key" name="api_key" class="form-control" autocomplete="new-password" maxlength="500" placeholder="{{ masked_web_key or 'API-Schlüssel sicher hinterlegen' }}">
-          <div class="form-text">Schlüssel wird verschlüsselt gespeichert; leer lassen, um ihn beizubehalten.</div></div>
         <div class="col-md-6">
-          <label class="form-check mb-3"><input type="checkbox" class="form-check-input" name="enabled" value="1" {% if cfg.ai_web_enabled == '1' %}checked{% endif %}> <span class="form-check-label">Websuche freigeben</span></label>
+          <label class="form-label" for="ai-web-provider">Suchanbieter</label>
+          <select class="form-select" id="ai-web-provider" name="provider">
+            <option value="auto" {% if cfg.ai_web_provider == 'auto' %}selected{% endif %}>Automatisch (SearXNG bevorzugt, sonst Brave)</option>
+            <option value="searxng" {% if cfg.ai_web_provider == 'searxng' %}selected{% endif %}>Nur SearXNG (keine Brave-Weiterleitung)</option>
+            <option value="brave" {% if cfg.ai_web_provider == 'brave' %}selected{% endif %}>Nur Brave Search API</option>
+          </select>
+          <div class="form-text">Kein stiller Anbieterwechsel bei Ausfällen. SearXNG wird nur verwendet, wenn es über das Setup aktiviert wurde.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="ai-web-key">Brave API-Schlüssel (optional)</label>
+          <input type="password" id="ai-web-key" name="api_key" class="form-control" autocomplete="new-password" maxlength="500" placeholder="{{ masked_web_key or 'Nur für Brave erforderlich' }}">
+          <div class="form-text">Wird verschlüsselt gespeichert. Für SearXNG ist kein API-Schlüssel notwendig.</div>
+        </div>
+        <div class="col-12 d-flex flex-wrap align-items-center gap-3">
+          <label class="form-check mb-0"><input type="checkbox" class="form-check-input" name="enabled" value="1" {% if cfg.ai_web_enabled == '1' %}checked{% endif %}> <span class="form-check-label">KI-Websuche für berechtigte Benutzer freigeben</span></label>
           <button class="btn btn-primary" type="submit">Websuche speichern</button>
         </div>
       </form>

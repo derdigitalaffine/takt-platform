@@ -204,7 +204,8 @@ def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
                   dms_candidates=dms_candidates, allowed_dms=allowed_dms,
                   vector_count=index_health["vectors"], vector_jobs=index_health["jobs"],
                   index_health=index_health,
-                  masked_web_key=mask_secret(decrypt(cfg.get('ai_web_key_enc', ''))))
+                  masked_web_key=mask_secret(decrypt(cfg.get('ai_web_key_enc', ''))),
+                  searxng_installed=ai_web.searxng_installed())
 
 
 @app.get("/admin/ai/index/status")
@@ -421,17 +422,28 @@ async def admin_ai_qdrant_rebuild(
 @app.post("/admin/ai/web/settings", dependencies=[Depends(check_csrf)])
 def admin_ai_web_settings(
     request: Request, enabled: str = Form(""), api_key: str = Form(""),
+    provider: str = Form("auto"),
     user: User = Depends(admin_user), db: Session = Depends(get_db),
 ):
+    if provider not in ("auto", "searxng", "brave"):
+        raise HTTPException(400, "Unbekannter Websuche-Anbieter.")
     cfg = get_settings(db)
     key_enc = cfg.get("ai_web_key_enc", "")
     if api_key.strip():
         if len(api_key.strip()) > 500:
             raise HTTPException(400, "Der Websuche-API-Schlüssel ist zu lang.")
         key_enc = encrypt(api_key.strip())
+    candidate = {**cfg, "ai_web_provider": provider, "ai_web_key_enc": key_enc}
+    if enabled == "1" and not ai_web.selected_provider(
+        candidate, brave_key_configured=bool(decrypt(key_enc))
+    ):
+        raise HTTPException(
+            400, "Für SearXNG zuerst ./scripts/setup.sh --enable-searxng "
+                 "ausführen, für Brave einen API-Schlüssel hinterlegen."
+        )
+    if api_key.strip():
         set_setting(db, "ai_web_key_enc", key_enc)
-    if enabled == "1" and not decrypt(key_enc):
-        raise HTTPException(400, "Zum Aktivieren der Websuche ist ein API-Schlüssel erforderlich.")
+    set_setting(db, "ai_web_provider", provider)
     set_setting(db, "ai_web_enabled", "1" if enabled == "1" else "0")
     db.commit()
     flash(request, "Websuche gespeichert. Benutzer benötigen zusätzlich das Recht KI-Websuche.")
