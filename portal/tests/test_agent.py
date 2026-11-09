@@ -88,7 +88,7 @@ def test_agent_requires_ai_module_and_is_global():
     _enable()
     c = login(*ADMIN)
     assert 'data-takt-agent' in c.get("/").text
-    assert 'data-takt-agent' in c.get("/forms").text
+    assert 'data-takt-agent' in c.get("/tasks").text
     settings(module_ai="0")
     assert 'data-takt-agent' not in c.get("/").text
     assert c.post("/agent/plan", data={"csrf": csrf_of(c.get("/").text),
