@@ -209,7 +209,8 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
                                        and user.can("anliegen_process_start")),
                           tasks=[dict(task=task, step=steps[task.step_index]
                                        if 0 <= task.step_index < len(steps) else {},
-                                      can_act=(process_enabled and service.can_handle(user, case)
+                                      can_act=(process_enabled and user.can("anliegen_process_work")
+                                               and service.can_handle(user, case)
                                                and run.state == "running" and task.state == "open"
                                                and (task.assignee_id in acting_users
                                                     or (task.group_id is not None
