@@ -27,7 +27,7 @@
         <dl class="mb-0">
           <dt>Kategorie</dt><dd>{{ item.category.title }}</dd>
           <dt>Gemeldet von</dt><dd>{{ item.reporter.name }}</dd>
-          <dt>Zuständig</dt><dd>{{ item.assignee.name }}</dd>
+          <dt>Zuständig</dt><dd>{{ item.task.assignee.name if item.task and item.task.assignee else 'Nicht zugewiesen' }}</dd>
           <dt>Erfasst am</dt><dd>{{ item.created_at|local('%d.%m.%Y %H:%M') }}</dd>
           <dt>Status der Aufgabe</dt><dd><span class="badge text-bg-secondary">{{ statuses.get(item.task.status, item.task.status) if item.task else 'Keine Aufgabe' }}</span></dd>
           {% if item.task_id %}<dt>Aufgabennummer</dt><dd>#{{ item.task_id }}</dd>{% endif %}
