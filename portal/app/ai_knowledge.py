@@ -165,8 +165,14 @@ def sources_accessible(db, user, sources: list[dict]) -> bool:
             if not isinstance(path, str) or not re.fullmatch(r"/dms/r/[0-9]+", path):
                 return False
             from . import ai_dms
-            if not ai_dms.authorized(db, user, int(path.rsplit("/", 1)[-1])):
+            record_id = int(path.rsplit("/", 1)[-1])
+            if not ai_dms.authorized(db, user, record_id):
                 return False
+            if source.get("revision"):
+                from .db import DmsRecord
+                record = db.get(DmsRecord, record_id)
+                if record is None or source["revision"] != ai_dms.dms_revision(record):
+                    return False
             continue
         if not isinstance(path, str) or not path.startswith("/") or path.startswith("//"):
             return False
