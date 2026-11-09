@@ -10,8 +10,8 @@ from .ai_models import AIProvider
 from .concern_models import Concern, ConcernCategory, KINDS, ROUTES
 from .db import User
 from .main import (
-    app, admin_user, check_csrf, current_user, enabled_modules, flash,
-    get_db, rate_limit, redirect, render,
+    app, check_csrf, current_user, enabled_modules, flash,
+    get_db, rate_limit, redirect, render, require,
 )
 
 
@@ -40,6 +40,9 @@ def _new_page(request, user, db, *, data=None, error="", status_code=200):
                                   and bool(db.scalar(select(AIProvider.id).where(AIProvider.active.is_(True))))))
     response.status_code = status_code
     return response
+
+
+concern_manager = require("concerns_manage")
 
 
 @app.get("/anliegen")
@@ -155,7 +158,7 @@ def concern_detail(request: Request, concern_id: int, user: User = Depends(curre
 
 
 @app.get("/admin/anliegen")
-def concern_admin(request: Request, user: User = Depends(admin_user),
+def concern_admin(request: Request, user: User = Depends(concern_manager),
                   db: Session = Depends(get_db)):
     _check_task_module()
     categories = list(db.scalars(select(ConcernCategory).order_by(
@@ -171,7 +174,7 @@ def concern_admin_save(
     kind: str = Form("other"), routing: str = Form("person"),
     responsible_id: int = Form(0), description: str = Form(""),
     confidential: str = Form(""), active: str = Form(""),
-    user: User = Depends(admin_user), db: Session = Depends(get_db),
+    user: User = Depends(concern_manager), db: Session = Depends(get_db),
 ):
     _check_task_module()
     title = title.strip()
