@@ -117,3 +117,45 @@ def context_text(sources: list[dict]) -> str:
         f"[Quelle {idx}] {item['title']}\nPfad: {item['url']}\nAuszug:\n{item['text']}"
         for idx, item in enumerate(sources, 1)
     )
+
+
+
+def sources_accessible(db, user, sources: list[dict]) -> bool:
+    """Re-check original source ACL when reopening/exporting a historical answer."""
+    if not sources:
+        return True
+    cfg = get_settings(db)
+    if cfg.get("ai_knowledge_enabled") != "1" or not user.can("ai_knowledge"):
+        return False
+    for source in sources:
+        path = source.get("url", "")
+        if not isinstance(path, str) or not path.startswith("/"):
+            return False
+        if path.startswith("/ki/wissen/"):
+            try:
+                doc_id = int(path.rsplit("/", 1)[-1])
+            except ValueError:
+                return False
+            doc = db.get(AIKnowledge, doc_id)
+            if doc is None or not doc.enabled:
+                return False
+        elif path.startswith("/recht/"):
+            if cfg.get("module_laws", "1") != "1":
+                return False
+            parts = path.strip("/").split("/")
+            law = db.scalar(select(LawText).where(LawText.slug == parts[1])) if len(parts) > 1 else None
+            if law is None or not law.published or db.get(AILawSource, law.id) is None:
+                return False
+            if len(parts) >= 4 and parts[2] == "fassung":
+                from .db import LawVersion
+                try:
+                    version = db.get(LawVersion, int(parts[3]))
+                except ValueError:
+                    return False
+                if version is None or version.law_id != law.id or not version.public:
+                    return False
+                if version.internal and not user.can("laws"):
+                    return False
+        else:
+            return False
+    return True
