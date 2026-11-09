@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Wissensmanagement{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/knowledge.css">{% endblock %}
+{% block content %}
+<div class="knowledge-ui">
+  <header class="knowledge-head">
+    <div><span class="knowledge-eyebrow"><i class="fa-solid fa-layer-group me-1"></i> ORGANISATIONSWISSEN</span><h1>Wissen</h1><p>Prozesse, Erfahrungen und Arbeitswissen sicher finden und gemeinsam dokumentieren.</p></div>
+    {% if can_create %}<a class="btn btn-primary" href="#space-new"><i class="fa-solid fa-plus me-2"></i>Wissensraum anlegen</a>{% endif %}
+  </header>
+  <form role="search" action="/wissen" method="get" class="knowledge-search">
+    <label for="wissen-search" class="visually-hidden">Wissensartikel durchsuchen</label>
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input id="wissen-search" type="search" name="q" value="{{q}}" placeholder="Wissen, Prozesse oder Zuständigkeiten suchen …" maxlength="120">
+    <button class="btn btn-primary" type="submit">Suchen</button>
+  </form>
+  <div class="knowledge-section-title"><h2>Deine Wissensräume</h2><span class="text-secondary small">{{spaces|length}} sichtbar</span></div>
+  <div class="knowledge-grid">
+  {% for space in spaces %}
+    <a class="knowledge-tile" href="/wissen/raum/{{space.id}}">
+      <span class="knowledge-tile-icon"><i class="fa-solid fa-book-bookmark" aria-hidden="true"></i></span>
+      <strong>{{space.title}}</strong>
+      <span>{{space.description or 'Wissensbereich öffnen'}}</span>
+      <i class="fa-solid fa-arrow-up-right-from-square knowledge-tile-arrow" aria-hidden="true"></i>
+    </a>
+  {% else %}
+    <div class="knowledge-empty">Noch keine für dich freigegebenen Wissensräume. Berechtigte Personen können neue Bereiche anlegen.</div>
+  {% endfor %}
+  </div>
+  <div class="knowledge-section-title"><h2>{{'Suchergebnisse' if q else 'Aktuelle Wissensbeiträge'}}</h2><span class="text-secondary small">{{articles|length}} angezeigt</span></div>
+  <div class="knowledge-list">
+  {% for item,space in articles %}
+    <a href="/wissen/artikel/{{item.id}}" class="knowledge-list-row"><span class="knowledge-small-icon"><i class="fa-solid {{'fa-diagram-project' if item.kind=='process' else 'fa-file-lines'}}"></i></span><span class="knowledge-list-copy"><strong>{{item.title}}</strong><small>{{space.title}} · {{kinds[item.kind]}}</small></span><span class="knowledge-status knowledge-status-{{item.status}}">{{statuses[item.status]}}</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+  {% else %}
+    <p class="knowledge-empty">{{'Keine berechtigten Treffer für diese Suche.' if q else 'Noch keine verfügbaren Wissensartikel.'}}</p>
+  {% endfor %}
+  </div>
+  {% if can_create %}
+  <details class="knowledge-form-card mt-4" id="space-new">
+    <summary>Neuen Wissensraum anlegen</summary>
+    <form class="row g-3 pt-3" method="post" action="/wissen/raum/neu">
+      <input type="hidden" name="csrf" value="{{csrf}}">
+      <div class="col-md-7"><label class="form-label" for="ks-title">Name</label><input class="form-control" id="ks-title" name="title" maxlength="200" required></div>
+      <div class="col-md-5"><label class="form-label" for="ks-org">Organisationseinheit</label><select class="form-select" id="ks-org" name="org_id">{% if user.is_admin %}<option value="0">Ohne Organisation – nur explizite Rechte</option>{% endif %}{% for o in orgs %}<option value="{{o.id}}">{{o.name}}</option>{% endfor %}</select></div>
+      <div class="col-12"><label class="form-label" for="ks-desc">Beschreibung</label><textarea class="form-control" id="ks-desc" name="description" rows="2" maxlength="60000"></textarea></div>
+      <div><button class="btn btn-primary" type="submit">Wissensraum erstellen</button></div>
+    </form>
+  </details>{% endif %}
+  <p class="knowledge-footnote"><i class="fa-solid fa-shield-halved me-1"></i>Es erscheinen ausschließlich Inhalte, für die du aktuell berechtigt bist. Die KI-Verarbeitung ist gesondert zu aktivieren.</p>
+</div>
+{% endblock %}
