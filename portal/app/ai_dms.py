@@ -8,12 +8,13 @@ Safety boundaries:
 - Before every retrieval and again on history/export, recompute the user's
   current inherited DMS-area read permissions. An index is never an ACL.
 """
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from . import dms
 from .ai_models import AIDmsSource
 from .db import DmsRecord, get_settings
 from .ai_knowledge import terms, _score, revision
+from . import ai_source_policy
 
 
 def dms_revision(record: DmsRecord) -> str:
@@ -50,10 +51,8 @@ def authorized(db, user, record_id: int) -> bool:
     """Fail closed on any revocation, deletion, archive, move or module switch."""
     if not available(db, user):
         return False
-    if db.get(AIDmsSource, record_id) is None:
-        return False
     record = db.get(DmsRecord, record_id)
-    if not eligible(record):
+    if not ai_source_policy.dms_included(db, record):
         return False
     return dms.levels(db, user).get(record.area_id, 0) >= dms.READ
 
@@ -67,15 +66,29 @@ def retrieve(db, user, question: str, limit: int = 2) -> list[dict]:
     permitted = dms.levels(db, user)
     if not permitted:
         return []
-    rows = db.scalars(
-        select(DmsRecord).join(AIDmsSource, AIDmsSource.record_id == DmsRecord.id)
-        .where(DmsRecord.area_id.in_(list(permitted)), DmsRecord.kind == "manuell",
-               DmsRecord.archived_at.is_(None))
-        .order_by(DmsRecord.id).limit(400)
+    readable_areas = [area_id for area_id, level in permitted.items() if level >= dms.READ]
+    if not readable_areas:
+        return []
+    query = select(DmsRecord).where(
+        DmsRecord.area_id.in_(readable_areas),
+        DmsRecord.kind == "manuell",
+        DmsRecord.archived_at.is_(None),
+        DmsRecord.response_id.is_(None),
+        DmsRecord.person_id.is_(None),
+        DmsRecord.booking_id.is_(None),
+        or_(*[
+            or_(DmsRecord.title.ilike(f"%{word}%"),
+                DmsRecord.note.ilike(f"%{word}%"))
+            for word in words
+        ]),
     )
+    cfg = get_settings(db)
+    if cfg.get("ai_dms_include_all") != "1":
+        query = query.join(AIDmsSource, AIDmsSource.record_id == DmsRecord.id)
+    rows = db.scalars(query.order_by(DmsRecord.id.desc()).limit(1500))
     found = []
     for record in rows:
-        if not eligible(record):
+        if not ai_source_policy.dms_included(db, record, cfg=cfg):
             continue
         score = _score(record.title or "", record.note or "", words)
         if score:
