@@ -17,7 +17,7 @@ _QUESTION = re.compile(
 _DOMAIN = re.compile(
     r"\b(?:aufgab\w*|todo\w*|anliegen|mängel|mangel|beschaffung|"
     r"büromaterial|büromöbel|bestellung\w*|formular\w*|"
-    r"kalender\w*|termin\w*|besprechung\w*|akte\w*|"
+    r"kalender\w*|termin\w*|urlaub\w*|besprechung\w*|akte\w*|"
     r"dms|vorgang\w*|prozess\w*|status|priorität|"
     r"zuständigkeit\w*|kolleg\w*)\b",
     re.I,
@@ -53,6 +53,7 @@ _NAV_MODULES = (
     ("tasks", re.compile(r"\b(?:aufgaben|todo\w*)\b", re.I), "/aufgaben", "Aufgaben"),
     ("anliegen", re.compile(r"\b(?:anliegen|beschaffung\w*|bestellungen)\b", re.I), "/anliegen", "Interne Anliegen"),
     ("calendars", re.compile(r"\b(?:kalender|termine)\b", re.I), "/kalender?ansicht=termine", "Kalender"),
+    ("leave", re.compile(r"\b(?:urlaub\w*|ferienantrag)\b", re.I), "/urlaub/mein-urlaub", "Mein Urlaub"),
     ("forms", re.compile(r"\b(?:formular\w*)\b", re.I), "/forms", "Formulare"),
     ("dms", re.compile(r"\b(?:dms|dokumentenablage|akten)\b", re.I), "/dms", "Ablage"),
     ("processes", re.compile(r"\b(?:prozesse|prozessverwaltung)\b", re.I), "/processes", "Prozesse"),
