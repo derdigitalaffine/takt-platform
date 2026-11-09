@@ -97,8 +97,8 @@ def allowed(db, device, user, cid, write=False):
     return (
         cal
         if scope
-        and (cal.source != "birthdays" or birthdays.external_allowed(db, user, "caldav"))
         and cal
+        and (cal.source != "birthdays" or birthdays.external_allowed(db, user, "caldav"))
         and (not write or scope.can_write)
         and calendars.access(db, user, cal, write)
         else None
