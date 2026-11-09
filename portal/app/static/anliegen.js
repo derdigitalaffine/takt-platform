@@ -10,6 +10,29 @@
   var ai = document.getElementById('anliegen-ai');
   var status = document.getElementById('anliegen-ai-status');
   var busy = false;
+  var preview = document.getElementById('anliegen-recipient-preview');
+  var previewSeq = 0;
+  async function previewRecipient() {
+    if (!preview || !category.value) return;
+    var seq = ++previewSeq;
+    preview.textContent = 'Zuständigkeit wird geprüft …';
+    try {
+      var response = await fetch('/anliegen/empfaenger-vorschau?category_id=' +
+        encodeURIComponent(category.value), {credentials:'same-origin', cache:'no-store'});
+      if (!response.ok) throw new Error('Empfängerprüfung fehlgeschlagen');
+      var data = await response.json();
+      if (seq !== previewSeq) return;
+      preview.classList.toggle('alert-success', !!data.ready);
+      preview.classList.toggle('alert-warning', !data.ready);
+      preview.textContent = data.ready ?
+        'Wird weitergeleitet an: ' + data.recipient + ' (' + data.message + ')' :
+        'Weiterleitung zunächst offen: ' + data.message;
+    } catch (_err) {
+      if (seq === previewSeq) {
+        preview.textContent = 'Die Zuständigkeit kann gerade nicht geprüft werden. Die Meldung kann weiterhin eingereicht werden.';
+      }
+    }
+  }
   function confidential() {
     var selected = category.selectedOptions[0];
     return !!(selected && selected.dataset.confidential === '1');
@@ -19,8 +42,9 @@
     if (ai) ai.disabled = confidential() || busy;
     if (status && confidential()) status.textContent = '';
   }
-  category.addEventListener('change', refresh);
+  category.addEventListener('change', function () { refresh(); previewRecipient(); });
   refresh();
+  previewRecipient();
   if (!ai || !window.fetch) return;
   ai.addEventListener('click', async function () {
     if (busy || confidential()) return;
@@ -47,6 +71,7 @@
       var suggested = category.querySelector('option[value="' + String(draft.category_id).replace(/[^0-9]/g, '') + '"]');
       if (suggested && suggested.dataset.confidential !== '1') category.value = suggested.value;
       status.textContent = 'Entwurf übernommen. Bitte prüfen und erst danach einreichen.';
+      previewRecipient();
       title.focus();
     } catch (error) {
       status.textContent = error instanceof Error ? error.message : 'Die KI-Hilfe ist nicht verfügbar.';
