@@ -419,3 +419,65 @@ a.task-stat:hover {
   .task-stat { padding: .8rem; min-height: 6rem; }
   .task-page .task-capture .card-body { padding: 1rem; }
 }
+
+
+/* Compact task workspace heading: actions and work are more important than decoration. */
+.task-page .task-hero-compact {
+  display: block;
+  padding: .5rem 0 1.15rem;
+  margin-bottom: .9rem;
+  border: 0;
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  isolation: auto;
+}
+.task-page .task-hero-compact::after { display: none; }
+.task-page .task-hero-compact .ds-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .75rem 1.25rem;
+}
+.task-page .task-hero-compact .ds-page-title { flex: 1 1 17rem; }
+.task-page .task-hero-compact .ds-page-title h1 {
+  font-size: clamp(1.4rem,2vw,1.85rem);
+  line-height: 1.2;
+  letter-spacing: -.035em;
+  margin: 0 0 .25rem;
+  font-weight: 740;
+}
+.task-page .task-hero-compact .ds-page-title h1::after { display: none; }
+.task-page .task-hero-compact .ds-page-title p {
+  max-width: 58ch;
+  font-size: .87rem;
+  line-height: 1.45;
+}
+.task-page .task-hero-compact .ds-page-actions {
+  width: auto;
+  margin: 0;
+  justify-content: flex-end;
+  flex: 0 1 auto;
+  gap: .45rem;
+}
+.task-page .task-hero-compact .ds-page-actions :is(.btn,summary) {
+  min-height: 2.35rem;
+  padding: .45rem .7rem;
+  font-size: .82rem;
+}
+.task-page .task-summary {
+  margin-top: .25rem;
+  margin-bottom: clamp(1.1rem,2vw,1.75rem);
+}
+.task-page .task-stat {
+  min-height: 5.4rem;
+  padding: .8rem .95rem;
+}
+.task-page .task-stat-copy strong { font-size: clamp(1.4rem,2.2vw,1.9rem); }
+@media (max-width: 767.98px) {
+  .task-page .task-hero-compact { padding: .2rem 0 .9rem; }
+  .task-page .task-hero-compact .ds-page-actions { width: 100%; justify-content: flex-start; }
+  .task-page .task-hero-compact .ds-page-actions > .btn-primary { flex: 0 1 auto; }
+}
