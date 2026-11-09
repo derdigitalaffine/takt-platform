@@ -14,6 +14,7 @@
   </div>
   <div class="workspace-head-actions admin-welcome-actions">
     {% if user.can('users') %}<a class="btn btn-outline-secondary" href="/admin/users"><i class="fa-solid fa-users me-1" aria-hidden="true"></i>Benutzer &amp; Gruppen</a>{% endif %}
+    {% if selected and selected.parent_id is none and caps.settings %}<a class="btn btn-outline-secondary" href="/kalender/geburtstage/einstellungen"><i class="fa-solid fa-cake-candles me-1" aria-hidden="true"></i>Geburtstage</a>{% endif %}
     {% if user.can('orgs') %}<a class="btn btn-primary" href="/admin/organization?new=1{{'&unit=' ~ selected.id if selected else ''}}#org-new"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Einheit anlegen</a>{% endif %}
   </div>
 </header>
