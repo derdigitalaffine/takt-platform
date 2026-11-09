@@ -21,7 +21,7 @@ from sqlalchemy import select, delete, func, or_
 from sqlalchemy.orm import Session
 
 from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector, AIDmsSource
-from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms, ai_qdrant, ai_source_policy, ai_index_status
+from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms, ai_qdrant, ai_source_policy, ai_index_status, ai_law_vector, ai_law_vector_jobs
 from .db import LawText, User, DmsRecord, DmsArea, SessionLocal, get_settings, set_setting, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
                    flash, get_db, rate_limit, redirect, render, require)
@@ -563,6 +563,45 @@ def admin_ai_knowledge_delete(request: Request, doc_id: int, user: User = Depend
     return redirect("/admin/ai#knowledge")
 
 
+@app.post("/admin/ai/laws/index/refresh", dependencies=[Depends(check_csrf)])
+def admin_ai_law_index_refresh(
+    request: Request, user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    rate_limit(request, "ai-law-reindex", limit=4, window=300, key=str(user.id))
+    if not ai_law_vector_jobs.active(db):
+        raise HTTPException(
+            400, "Zuerst Embeddings und die automatische Indexierung aktivieren."
+        )
+    queue = ai_law_vector_jobs.reconcile(db)
+    flash(request, "Rechtsquellen abgeglichen: "
+          f"{queue['pending']} wartend, {queue['running']} laufend, "
+          f"{queue['failed']} fehlgeschlagen. Der Hintergrunddienst übernimmt die Embeddings.")
+    return redirect("/admin/ai#laws")
+
+
+@app.post("/admin/ai/laws/index/retry", dependencies=[Depends(check_csrf)])
+def admin_ai_law_index_retry(
+    request: Request, user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    rate_limit(request, "ai-law-retry", limit=3, window=300, key=str(user.id))
+    if not ai_law_vector_jobs.active(db):
+        raise HTTPException(400, "Automatische Rechtstextindexierung ist nicht aktiviert.")
+    ai_law_vector_jobs.reconcile(db)
+    from .ai_models import AILawIndexJob
+    failed = list(db.scalars(select(AILawIndexJob).where(
+        AILawIndexJob.status == "failed").limit(100)))
+    for job in failed:
+        job.status = "pending"
+        job.attempts = 0
+        job.next_attempt_at = utcnow()
+        job.lease_until = None
+    db.commit()
+    flash(request, f"{len(failed)} fehlgeschlagene Rechtstextaufträge erneut eingeplant.")
+    return redirect("/admin/ai#laws")
+
+
 @app.post("/admin/ai/laws/mode", dependencies=[Depends(check_csrf)])
 def admin_ai_laws_mode(
     request: Request, include_all: str = Form(""),
@@ -902,6 +941,30 @@ def _image_data(data: bytes) -> str:
 
 
 @app.post("/agent/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
+async def _internal_ai_sources(db: Session, user: User, message: str) -> list[dict]:
+    """Blend lexical, paragraph-semantic and curated semantic evidence.
+
+    Reserve space for legal passages even when question vocabulary does not
+    overlap the law. Every adapter performs its own live source ACL check.
+    """
+    lexical = ai_knowledge.retrieve(db, user, message, limit=8)
+    law_semantic = await ai_law_vector.retrieve(db, user, message, limit=3)
+    curated_semantic = await ai_vector.retrieve(db, user, message)
+    dms_sources = ai_dms.retrieve(db, user, message)
+    ordered = (lexical[:2] + law_semantic[:2] + curated_semantic[:1] +
+               dms_sources[:1] + lexical[2:] + law_semantic[2:] +
+               curated_semantic[1:] + dms_sources[1:])
+    result, seen = [], set()
+    for item in ordered:
+        if item["url"] in seen:
+            continue
+        seen.add(item["url"])
+        result.append(item)
+        if len(result) == 6:
+            break
+    return result
+
+
 @app.post("/ki/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
 async def ai_send_message(
     request: Request, chat_id: int, message: str = Form(""), use_knowledge: str = Form(""),
@@ -923,14 +986,7 @@ async def ai_send_message(
         if not provider.image_key_enc:
             raise HTTPException(400, "Für dieses Modell wurde kein Bildanalyse-Schlüssel eingerichtet.")
 
-    sources = (ai_knowledge.retrieve(db, user, message) if use_knowledge == "1" else [])
-    if use_knowledge == "1":
-        semantic = await ai_vector.retrieve(db, user, message)
-        urls = {entry["url"] for entry in sources}
-        # Reserve room for semantic hits without sacrificing high-ranked lexical evidence.
-        dms_hits = ai_dms.retrieve(db, user, message)
-        additional = semantic[:1] + dms_hits[:1] + semantic[1:2] + dms_hits[1:2]
-        sources = (sources[:3] + [entry for entry in additional if entry["url"] not in urls][:2])[:5]
+    sources = await _internal_ai_sources(db, user, message) if use_knowledge == "1" else []
     sources += await _web_sources(db, user, message, use_web, request)
     history = list(db.scalars(select(AIMessage)
                               .where(AIMessage.conversation_id == convo.id)
@@ -1005,14 +1061,7 @@ async def ai_message_updates(
         image_url = _image_data(await image.read(_MAX_IMAGE + 1))
         if not provider.image_key_enc:
             raise HTTPException(400, "Für dieses Modell wurde kein Bildanalyse-Schlüssel eingerichtet.")
-    sources = ai_knowledge.retrieve(db, user, message) if use_knowledge == "1" else []
-    if use_knowledge == "1":
-        semantic = await ai_vector.retrieve(db, user, message)
-        urls = {entry["url"] for entry in sources}
-        # Reserve room for semantic hits without sacrificing high-ranked lexical evidence.
-        dms_hits = ai_dms.retrieve(db, user, message)
-        additional = semantic[:1] + dms_hits[:1] + semantic[1:2] + dms_hits[1:2]
-        sources = (sources[:3] + [entry for entry in additional if entry["url"] not in urls][:2])[:5]
+    sources = await _internal_ai_sources(db, user, message) if use_knowledge == "1" else []
     sources += await _web_sources(db, user, message, use_web, request)
     history = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == chat_id)
                               .order_by(AIMessage.id.desc()).limit(14)))

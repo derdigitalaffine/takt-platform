@@ -64,6 +64,40 @@
         if (lastCheck) lastCheck.textContent = 'Stand ' + new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
         var refreshError = document.querySelector('[data-ai-index-refresh-error]');
         if (refreshError) refreshError.textContent = '';
+        var law = data.law_embedding;
+        if (law && typeof law === 'object') {
+          var lawFields = {
+            '[data-ai-law-index-percent]': (law.percent || 0) + ' %',
+            '[data-ai-law-index-chunks-ready]': law.ready_chunks,
+            '[data-ai-law-index-chunks-total]': law.total_chunks,
+            '[data-ai-law-index-ready]': law.ready,
+            '[data-ai-law-index-total]': law.total,
+            '[data-ai-law-index-pending]': law.jobs && law.jobs.pending,
+            '[data-ai-law-index-running]': law.jobs && law.jobs.running,
+            '[data-ai-law-index-failed]': law.jobs && law.jobs.failed
+          };
+          Object.keys(lawFields).forEach(function (selector) {
+            var element = document.querySelector(selector);
+            if (element && lawFields[selector] !== undefined) {
+              element.textContent = String(lawFields[selector]);
+            }
+          });
+          var percent = Math.max(0, Math.min(100, Math.round(Number(law.percent) || 0)));
+          var lawBar = document.querySelector('[data-ai-law-index-progressbar]');
+          var lawFill = document.querySelector('[data-ai-law-index-fill]');
+          if (lawBar) lawBar.setAttribute('aria-valuenow', String(percent));
+          if (lawFill) lawFill.style.width = percent + '%';
+          var updated = document.querySelector('[data-ai-law-index-updated]');
+          if (updated) updated.textContent = 'Zuletzt aktualisiert: ' +
+            new Date().toLocaleTimeString('de-DE');
+          var lawError = document.querySelector('[data-ai-law-index-error]');
+          if (lawError) lawError.textContent = '';
+          document.querySelectorAll('[data-ai-law-source-progress]').forEach(function (element) {
+            var item = law.laws && law.laws[element.getAttribute('data-ai-law-source-progress')];
+            element.textContent = item ? Math.max(0, Math.min(100,
+              Math.round(Number(item.percent) || 0))) + ' % indiziert' : 'Noch nicht indiziert';
+          });
+        }
         if (data.documents && typeof data.documents === 'object') {
           document.querySelectorAll('[data-ai-index-doc]').forEach(function (el) {
             var value = data.documents[el.getAttribute('data-ai-index-doc')];
@@ -86,6 +120,8 @@
         if (button) button.title = 'Status aktuell nicht abrufbar';
         var refreshError = document.querySelector('[data-ai-index-refresh-error]');
         if (refreshError) refreshError.textContent = 'Status derzeit nicht abrufbar. Die letzten bekannten Zahlen bleiben sichtbar.';
+        var lawError = document.querySelector('[data-ai-law-index-error]');
+        if (lawError) lawError.textContent = 'Rechtstext-Fortschritt momentan nicht abrufbar.';
       })
       .finally(function () {
         loading = false;
