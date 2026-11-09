@@ -34,7 +34,8 @@ def list_anliegen(request: Request, scope: str = "assigned", category_id: int = 
                  status: str = "all", q: str = "",
                  user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
+    # Case-by-case ownership is enforced by service.visible_query; recipients
+    # do not need a separate submit permission to see assigned cases.
     from sqlalchemy import func
     scope = scope if scope in {"assigned", "reported", "all", "orders"} else "assigned"
     if status != "all" and status not in service.STATUSES:
@@ -110,7 +111,6 @@ def create_anliegen(request: Request, category_id: int = Form(...),
 def detail_anliegen(request: Request, case_id: int, user: User = Depends(current_user),
                    db: Session = Depends(get_db)):
     _module()
-    _read(user)
     case = service.get(db, user, case_id)
     events = list(db.scalars(select(AnliegenEvent).where(AnliegenEvent.anliegen_id == case.id)
                              .order_by(AnliegenEvent.id)))
@@ -157,11 +157,17 @@ def assign_anliegen(request: Request, case_id: int, assignee_id: int = Form(...)
     service.record(db, case, user, "assignment", "Zuständigkeit zugewiesen.")
     if case.task_id:
         from .task_models import Task
+        from . import tasks
         task = db.get(Task, case.task_id)
         if task:
             task.assignee_id = assignee.id
+            tasks.audit(db, task, user, "assigned", "Empfänger aus internen Anliegen aktualisiert.")
+            if assignee.id != user.id:
+                tasks.ping(db, task, [assignee.id], "Ein internes Anliegen wurde Ihnen zugewiesen")
     else:
         service.task_for(db, case)
+    from .main import _badge_cache
+    _badge_cache.clear()
     db.commit()
     flash(request, "Zuständigkeit aktualisiert.")
     return redirect(f"/anliegen/{case.id}")
