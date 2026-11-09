@@ -606,4 +606,24 @@
   .planning-workspace .calendar-mode-choice { flex: 1 1 8.8rem; min-height: 2.8rem; }
 }
 
+/* Constrain FullCalendar's wide day-header tables to the calendar surface on phones.
+   The calendar itself may scroll horizontally; the whole TAKT page must not. */
+@media (max-width: 575.98px) {
+  .planning-workspace .calendar-workspace .planning-stage {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .planning-workspace #shared-calendar {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .planning-workspace .calendar-mode-choice > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 .planning-workspace .calendar-year-information[hidden] { display: none !important; }

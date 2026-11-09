@@ -294,7 +294,7 @@ async def dav(request: Request, path: str = "", db: Session = Depends(get_db)):
         raise HTTPException(404)
     if method in ("GET", "HEAD"):
         content, tag = (
-            objects[name] if name else (calendars.export(db, user, cal), None)
+            objects[name] if name else (calendars.export(db, user, cal, channel="caldav"), None)
         )
         if tag and request.headers.get("if-none-match") == tag:
             return Response(

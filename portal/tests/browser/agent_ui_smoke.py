@@ -40,7 +40,14 @@ def exercise(page):
     form.locator('[name="title"]').fill('Von mir geprüfte Projektbesprechung')
     page.screenshot(path=str(OUTPUT / 'agent-desktop-native.png'), full_page=True)
     page.set_viewport_size(dict(width=390, height=844))
-    assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+    if not page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'):
+        overflow = page.evaluate("""() => [...document.querySelectorAll('body *')]
+            .filter(el => el.getBoundingClientRect().right > window.innerWidth + 1)
+            .slice(0, 12).map(el => ({
+                tag: el.tagName, id: el.id, className: String(el.className).slice(0, 100),
+                right: Math.round(el.getBoundingClientRect().right)
+            }))""")
+        raise AssertionError(f"Mobile calendar/agent overflow: {overflow}")
     page.screenshot(path=str(OUTPUT / 'agent-mobile-native.png'), full_page=True)
     page.get_by_role('button', name='Vorschlag prüfen', exact=True).click()
     expect(page.locator('[data-agent-final-preview]')).to_contain_text('Von mir geprüfte Projektbesprechung')

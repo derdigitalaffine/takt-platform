@@ -28,6 +28,16 @@ async def json_payload(request):
 
 
 def access(db, user, calendar, write=False):
+    if calendar.source == "birthdays":
+        from . import birthdays
+        # A birthday projection is always private and per-account; normal
+        # calendar publication/ACL grants must never elevate its visibility.
+        return bool(
+            not write and user and user.active and calendar.owner_id == user.id
+            and calendar.visibility == "private"
+            and (birthdays.external_allowed(db, user, "caldav")
+                 or birthdays.external_allowed(db, user, "ics"))
+        )
     if write and calendar.source != "free":
         return False
     if user and user.active and (user.is_admin or user.id == calendar.owner_id):
@@ -238,7 +248,7 @@ def save_event(db, actor, calendar, data, row=None, *, raw_ical=None, device_id=
     return row
 
 
-def export(db, actor, calendar, events=None):
+def export(db, actor, calendar, events=None, channel="ics"):
     if not access(db, actor, calendar):
         raise HTTPException(403)
     if calendar.source != "free":
@@ -246,7 +256,7 @@ def export(db, actor, calendar, events=None):
 
         a = datetime(1970, 1, 1, tzinfo=timezone.utc)
         b = datetime(2200, 12, 31, tzinfo=timezone.utc)
-        return to_ics(project(db, actor, calendar.source, a, b), calendar.title)
+        return to_ics(project(db, actor, calendar.source, a, b, channel=channel), calendar.title)
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",

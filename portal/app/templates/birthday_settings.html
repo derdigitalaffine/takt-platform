@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Geburtstage konfigurieren{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/birthdays.css">{% endblock %}
+{% block content %}
+<div class="birthday-app">
+  <header class="birthday-heading">
+    <div class="birthday-heading-copy">
+      <span class="birthday-eyebrow">Organisationseinstellungen</span>
+      <h1>Geburtstagskalender</h1>
+      <p>Regeln für jede berechtigte Organisation separat festlegen. Eine persönliche Freigabe ist immer erforderlich.</p>
+    </div>
+    <a href="/kalender/geburtstage" class="btn btn-sm btn-outline-secondary">Zur Geburtstagsübersicht</a>
+  </header>
+  <div class="row g-3">
+    {% for unit in organizations %}
+    <div class="col-12 col-xxl-6">
+      <form method="post" action="/kalender/geburtstage/einstellungen" class="birthday-panel birthday-settings-form h-100">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <input type="hidden" name="org_id" value="{{unit.id}}">
+        <div class="birthday-panel-header"><h2><i class="fa-solid fa-building me-2" aria-hidden="true"></i>{{unit.name}}</h2></div>
+        <div class="p-3">
+          <label for="birthday-scope-{{unit.id}}" class="form-label fw-semibold">Wer kann freigegebene Geburtstage sehen?</label>
+          <select name="scope" class="form-select" id="birthday-scope-{{unit.id}}">
+            <option value="unit" {{'selected' if unit.config.scope=='unit'}}>Nur Personen in derselben Organisationseinheit (Standard)</option>
+            <option value="branch" {{'selected' if unit.config.scope=='branch'}}>Auch direkt zugeordnete über- und untergeordnete Einheiten</option>
+            <option value="root" {{'selected' if unit.config.scope=='root'}}>Alle zugeordneten Personen innerhalb dieser Organisation</option>
+          </select>
+          <p class="form-text">Keine öffentliche Liste. Organisationszuordnungen und persönliche Freigaben werden bei jedem Abruf neu geprüft.</p>
+          <label for="birthday-leap-{{unit.id}}" class="form-label fw-semibold mt-2">29. Februar in Nicht-Schaltjahren</label>
+          <select name="leap" class="form-select" id="birthday-leap-{{unit.id}}">
+            <option value="feb28" {{'selected' if unit.config.leap=='feb28'}}>Am 28. Februar anzeigen (Standard)</option>
+            <option value="mar1" {{'selected' if unit.config.leap=='mar1'}}>Am 1. März anzeigen</option>
+          </select>
+          <div class="birthday-external mt-3">
+            <h3 class="h6">Externe Kalender</h3>
+            <div class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" name="caldav" id="birthday-dav-{{unit.id}}" value="1" {{'checked' if unit.config.caldav}}>
+              <label for="birthday-dav-{{unit.id}}" class="form-check-label">Private CalDAV-Geräte zulassen</label>
+            </div>
+            <div class="form-check form-switch mt-2">
+              <input type="checkbox" class="form-check-input" name="ics" id="birthday-ics-{{unit.id}}" value="1" {{'checked' if unit.config.ics}}>
+              <label for="birthday-ics-{{unit.id}}" class="form-check-label">Widerrufbare private ICS-Abonnements zulassen</label>
+            </div>
+            <p class="form-text mb-0">Externe Geräte können heruntergeladene Einträge zwischenspeichern. Das Zurückziehen einer Freigabe verhindert neue Abrufe, löscht aber keine bereits synchronisierten Kopien.</p>
+          </div>
+          <button type="submit" class="btn btn-primary mt-3"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Einstellungen speichern</button>
+        </div>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -65,6 +65,33 @@
   </section></div>
 </div>
 
+{% if birthday_available %}
+<section class="card mb-4" aria-labelledby="dash-birthday-title" style="border-radius:14px">
+  <div class="card-header d-flex flex-wrap align-items-center gap-2">
+    <i class="fa-solid fa-cake-candles text-secondary" aria-hidden="true"></i>
+    <h2 class="h6 mb-0 flex-grow-1" id="dash-birthday-title">Nächste Geburtstage</h2>
+    <a class="small" href="/kalender/geburtstage">Geburtstagskalender <i class="fa-solid fa-arrow-right ms-1" aria-hidden="true"></i></a>
+  </div>
+  <div class="card-body py-2">
+    {% if birthday_next %}
+    <div class="row g-2">
+      {% for item in birthday_next[:3] %}
+      <div class="col-12 col-md-4">
+        <div class="d-flex gap-2 align-items-center p-2">
+          <span class="rounded-3 bg-body-tertiary p-2 text-nowrap small fw-semibold">{{item.start[8:10]}}.{{item.start[5:7]}}.</span>
+          <div class="overflow-hidden"><div class="small fw-semibold text-truncate">{{item.title}}</div>
+            <div class="text-secondary" style="font-size:.76rem">{{'Heute' if item.days==0 else ('Morgen' if item.days==1 else 'In ' ~ item.days ~ ' Tagen')}}</div>
+          </div>
+        </div>
+      </div>{% endfor %}
+    </div>
+    {% else %}
+    <p class="text-secondary small my-2">Keine freigegebenen Geburtstage sichtbar.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
 {% if top.actions %}
 <section class="dash-alert-strip mb-4" aria-labelledby="dash-alert-title">
   <div class="dash-section-heading"><div><span class="dash-overline">Nicht verpassen</span><h2 id="dash-alert-title">Weitere Hinweise</h2></div></div>

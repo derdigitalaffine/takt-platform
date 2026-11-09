@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Profil{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/birthdays.css">{% endblock %}
 {% block content %}
 {% call m.page_head('Profil', user.email ~ (' – Administrator:in' if user.is_admin else '')) %}
   <a class="btn btn-outline-primary" href="/profile/security"><i class="fa-solid fa-shield-halved me-1"></i>Sicherheit &amp; Zwei-Faktor</a>
@@ -17,6 +18,37 @@
   {% if profile_error %}<div class="alert alert-danger" role="alert">{{ profile_error }}</div>{% endif %}
   <form method="post" action="/profile/details">
     <input type="hidden" name="csrf" value="{{ csrf }}">
+    <section class="birthday-profile-card mb-3" id="birthday" aria-labelledby="birthday-profile-heading">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div><span class="birthday-eyebrow"><i class="fa-solid fa-cake-candles" aria-hidden="true"></i> Freiwillig &amp; privat</span>
+          <h3 class="h5 mb-1" id="birthday-profile-heading">Geburtstag &amp; Sichtbarkeit</h3>
+          <p class="small text-secondary mb-0">Das Datum wird verschlüsselt gespeichert. Nur Sie bestimmen, ob Kolleginnen und Kollegen Ihren Geburtstag sehen.</p>
+        </div>
+        <a class="btn btn-sm btn-outline-secondary" href="/kalender/geburtstage">Geburtstagskalender öffnen</a>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-md-5"><label for="profile-birthdate" class="form-label fw-semibold">Mein Geburtsdatum</label>
+          <input class="form-control" type="date" id="profile-birthdate" name="birthdate" value="{{details.get('birthdate','')}}" autocomplete="bday">
+        </div>
+        <div class="col-12 col-md-7"><label for="profile-birthday-visibility" class="form-label fw-semibold">Was dürfen Kolleginnen und Kollegen sehen?</label>
+          <select class="form-select" id="profile-birthday-visibility" name="birthday_visibility">
+            <option value="hidden" {{'selected' if details.get('birthday_visibility','hidden')=='hidden'}}>Nicht im Kalender anzeigen (Standard)</option>
+            <option value="date" {{'selected' if details.get('birthday_visibility')=='date'}}>Geburtstag anzeigen – ohne Alter</option>
+            <option value="age" {{'selected' if details.get('birthday_visibility')=='age'}}>Geburtstag mit erreichtem Alter anzeigen</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <div class="birthday-profile-preview" aria-live="polite">
+            <i class="fa-regular fa-eye me-2" aria-hidden="true"></i><strong>Vorschau:</strong>
+            <span id="birthday-preview-text">Ihre Freigabe wird hier vor dem Speichern angezeigt.</span>
+          </div>
+          <p class="form-text mt-2">Zusätzlich gelten die Sichtbarkeitsregeln Ihrer Organisation. Diese Einstellung ist unabhängig von der Formularvorbelegung und kann jederzeit widerrufen werden.</p>
+          {% if details.get('birthday_visibility','hidden')!='hidden' %}
+          <button class="btn btn-sm btn-outline-danger" type="submit" formaction="/profile/birthday/hide" formmethod="post"><i class="fa-solid fa-eye-slash me-1" aria-hidden="true"></i>Freigabe sofort widerrufen</button>
+          {% endif %}
+        </div>
+      </div>
+    </section>
     <div class="card mb-3"><div class="card-body">
       <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="profile-prefill" name="prefill_enabled" value="1" {% if details.get('prefill_enabled') %}checked{% endif %}>
       <label class="form-check-label fw-semibold" for="profile-prefill">Meine freiwilligen Angaben für meine Formulare vorbelegen</label></div>
@@ -28,9 +60,11 @@
         <summary class="card-header fw-semibold">{{ group }} <span class="fw-normal text-secondary small">· {{ fields|selectattr('0', 'in', details)|list|length }} Angaben</span></summary>
         <div class="card-body"><div class="row g-3">
           {% for key, label, kind, limit, autocomplete in fields %}
+          {% if key != 'birthdate' %}
           <div class="col-12 col-sm-6"><label class="form-label" for="profile-{{ key }}">{{ label }}</label>
             <input class="form-control" id="profile-{{ key }}" name="{{ key }}" type="{{ kind }}" value="{{ details.get(key, '') }}" maxlength="{{ limit }}" autocomplete="{{ autocomplete or 'off' }}" {% if key.endswith('_country') %}placeholder="DE"{% elif key == 'zoneinfo' %}placeholder="Europe/Berlin"{% elif key == 'locale' %}placeholder="de-DE"{% endif %}>
           </div>
+          {% endif %}
           {% endfor %}
         </div></div>
       </details></div>
@@ -88,3 +122,4 @@
   <div class="col-12"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Profil speichern</button></div>
 </form>
 {% endblock %}
+{% block scripts %}<script src="/static/birthday-profile.js" defer></script>{% endblock %}

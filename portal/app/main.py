@@ -1104,7 +1104,13 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     user = current_user(request, db)
     modules = enabled_modules()
     top, cache = home.overview(db, user, modules)
-    return render(request, "home.html", user, tiles=home.tiles(db, user, modules, nav_ctx(request, user), cache),
+    from . import birthdays, calendar_sources
+    birthday_available = calendar_sources.enabled(db, "birthdays")
+    birthday_next = (
+        birthdays.upcoming(db, user, today=to_local(utcnow()).date())
+        if birthday_available else []
+    )
+    return render(request, "home.html", user, birthday_available=birthday_available, birthday_next=birthday_next, tiles=home.tiles(db, user, modules, nav_ctx(request, user), cache),
                   top=top, quick=home.quick_actions(user, modules), now=utcnow())
 
 
@@ -1821,6 +1827,7 @@ async def profile_details(request: Request, user: User = Depends(current_user), 
         # Only known, voluntary inputs are redisplayed. Never echo credentials or tokens.
         details = {k: str(raw.get(k) or '')[:field[3]] for k, field in profiles.FIELDS.items()}
         details['prefill_enabled'] = raw.get('prefill_enabled') == '1'
+        details['birthday_visibility'] = raw.get('birthday_visibility', 'hidden')
         response = _profile_page(request, user, db, details, str(exc))
         response.status_code = 422
         return response
@@ -1828,6 +1835,18 @@ async def profile_details(request: Request, user: User = Depends(current_user), 
     db.commit()
     flash(request, "Freiwillige Profilangaben gespeichert.")
     return redirect("/profile#details")
+
+
+@app.post("/profile/birthday/hide", dependencies=[Depends(check_csrf)])
+def profile_birthday_hide(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Immediate voluntary withdrawal, independent of form prefill consent."""
+    from . import profiles
+    values = profiles.read(user)
+    values["birthday_visibility"] = "hidden"
+    db.get(User, user.id).profile_data_enc = profiles.store(values)
+    db.commit()
+    flash(request, "Ihre Geburtstagsfreigabe wurde widerrufen.")
+    return redirect("/profile#birthday")
 
 
 @app.post("/profile/details/clear", dependencies=[Depends(check_csrf)])
@@ -3057,6 +3076,7 @@ from . import routes_organization  # noqa: E402,F401
 from . import routes_leave  # noqa: E402,F401
 
 from . import routes_calendars  # noqa: E402,F401
+from . import routes_birthdays  # noqa: E402,F401
 
 from . import routes_calendar_devices  # noqa: E402,F401
 

@@ -5,6 +5,15 @@ from pathlib import Path
 import httpx
 from playwright.sync_api import sync_playwright, expect
 
+def assert_page_fits(page):
+    # Avoid Playwright wait_for_function: its internal eval violates strict CSP.
+    for _ in range(30):
+        if page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"):
+            return
+        page.wait_for_timeout(100)
+    raise AssertionError("Mobile calendar page overflows viewport")
+
+
 base = "http://127.0.0.1:8769"
 with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
     env = {
@@ -175,9 +184,7 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 p.locator("#leave-open-editor").click()
                 p.get_by_role("button", name="Bearbeitung schließen").click()
                 expect(p.locator("#leave-side-panel")).to_be_hidden()
-                p.wait_for_function(
-                    "document.documentElement.scrollWidth<=innerWidth+1"
-                )
+                assert_page_fits(p)
                 p.screenshot(
                     path="/tmp/takt-leave-mobile.png",
                     full_page=True,
@@ -203,7 +210,7 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 holidays.click()
                 expect(holidays).to_have_attribute("aria-pressed", "true")
                 p.set_viewport_size({"width": 390, "height": 844})
-                p.wait_for_function("document.documentElement.scrollWidth<=innerWidth+1")
+                assert_page_fits(p)
                 p.set_viewport_size({"width": 1440, "height": 1000})
                 p.locator('form[action="/kalender/jahresplanung"] button').click()
                 expect(p.get_by_text("Gemeinsamer Jahresplan: Jahresplanung")).to_be_visible()
