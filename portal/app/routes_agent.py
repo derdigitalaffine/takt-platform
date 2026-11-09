@@ -29,6 +29,8 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     prompt = prompt.strip()
     if not 3 <= len(prompt) <= 3000:
         raise HTTPException(422, "Bitte eine Anweisung mit 3 bis 3.000 Zeichen eingeben.")
+    if agent.sensitive_request(prompt):
+        raise HTTPException(422, "Vertrauliche Beschwerden bitte ausschließlich über das geschützte Anliegenformular manuell erfassen.")
     rate_limit(request, "takt-agent-plan", limit=15, window=3600, key=str(user.id))
     provider = db.scalar(select(AIProvider).where(AIProvider.active.is_(True)).order_by(AIProvider.id))
     if not provider:
@@ -70,6 +72,17 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
         "proposals": agent.preview(db, plan["actions"]),
         "plan_id": nonce,
     })
+
+
+@app.post("/agent/cancel", dependencies=[Depends(check_csrf)])
+def takt_agent_cancel(request: Request, plan_id: str = Form(...),
+                      user: User = Depends(current_user)):
+    _access(user)
+    plan = stash_get(request, "takt-agent-plan", pop=True)
+    if (not plan or not plan_id or not secrets.compare_digest(plan_id, plan.get("nonce", ""))
+            or plan.get("user_id") != user.id):
+        raise HTTPException(409, "Dieser Vorschlag ist nicht mehr gültig.")
+    return _response({"cancelled": True})
 
 
 @app.post("/agent/execute", dependencies=[Depends(check_csrf)])
