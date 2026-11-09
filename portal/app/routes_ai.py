@@ -9,7 +9,7 @@ import io
 import json
 import time
 from markdown_it import MarkdownIt
-from markupsafe import Markup
+from markupsafe import Markup, escape
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -32,6 +32,8 @@ _MAX_PROMPT = 8000
 # Markdown is rendered server-side with raw HTML and linkification disabled.
 # This is the only HTML accepted by the streaming chat frontend.
 _AI_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "maxNesting": 20}).enable(["table", "strikethrough"])
+# Avoid automatic network requests to images embedded in model-generated Markdown.
+_AI_MARKDOWN.renderer.rules["image"] = lambda tokens, idx, options, env: str(escape(tokens[idx].content))
 
 
 def _ai_markdown(text: str) -> str:
