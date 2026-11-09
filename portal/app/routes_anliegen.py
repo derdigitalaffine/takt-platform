@@ -31,7 +31,7 @@ def _read(user):
 
 
 @app.get("/anliegen")
-def list_anliegen(request: Request, view: str = "mine", category_id: int = 0,
+def list_anliegen(request: Request, view: str = "reported", category_id: int = 0,
                  status: str = "", q: str = "",
                  user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
@@ -53,6 +53,7 @@ def list_anliegen(request: Request, view: str = "mine", category_id: int = 0,
         raise HTTPException(403)
     elif view == "orders":
         query = query.join(AnliegenCategory).where(
+            Anliegen.assignee_id == user.id,
             AnliegenCategory.key.in_(service.ORDER_KEYS))
     if category_id:
         query = query.where(Anliegen.category_id == category_id)
@@ -66,7 +67,17 @@ def list_anliegen(request: Request, view: str = "mine", category_id: int = 0,
                 Anliegen.description.ilike(phrase, escape="\\")))
     cases = list(db.scalars(query.order_by(Anliegen.updated_at.desc(), Anliegen.id.desc()).limit(250)))
     categories = list(db.scalars(select(AnliegenCategory).order_by(AnliegenCategory.position)))
+    assigned_count = db.scalar(select(func.count(Anliegen.id)).where(
+        Anliegen.assignee_id == user.id)) or 0
+    reported_count = db.scalar(select(func.count(Anliegen.id)).where(
+        Anliegen.reporter_id == user.id)) or 0
+    orders_count = db.scalar(select(func.count(Anliegen.id)).join(
+        AnliegenCategory, Anliegen.category_id == AnliegenCategory.id).where(
+        Anliegen.assignee_id == user.id,
+        AnliegenCategory.key.in_(service.ORDER_KEYS))) or 0
     return render(request, "anliegen_list.html", user, cases=cases,
+                  assigned_count=assigned_count, reported_count=reported_count,
+                  orders_count=orders_count, processing_view=view != "reported",
                   statuses=service.STATUSES, next_states=service.next_states,
                   categories=categories, order_keys=service.ORDER_KEYS,
                   view=view, selected_category=category_id,
@@ -99,7 +110,7 @@ def anliegen_recipient_preview(category_id: int, user: User = Depends(current_us
 
 @app.post("/anliegen/neu", dependencies=[Depends(check_csrf)])
 def create_anliegen(request: Request, category_id: int = Form(...),
-                   title: str = Form(...), description: str = Form(...),
+                   title: str = Form(...), description: str = Form(""),
                    description_final: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
