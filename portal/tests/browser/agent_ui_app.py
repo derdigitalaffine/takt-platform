@@ -48,7 +48,10 @@ async def complete(provider, messages, **kwargs):
     with SessionLocal() as db:
         case = db.scalar(select(Anliegen).where(Anliegen.title == 'Browser Anliegen'))
         task = db.scalar(select(Task).where(Task.title == 'Browser Aufgabe'))
-        if prompt.startswith('Internes Anliegen'):
+        if 'Geburtstag' in prompt or prompt == 'ja':
+            searches = []
+            actions = [dict(tool='create_form', title='Geburtstage der Belegschaft', fields=[dict(type='short', title='Name', required=True), dict(type='date', title='Geburtstag', required=False)])]
+        elif prompt.startswith('Internes Anliegen'):
             searches = []
             actions = [dict(tool='create_anliegen', category_id=cat_id, title='Browser Anliegen', description='Zwei Bürostühle für Raum 1 prüfen')]
         elif prompt.startswith('Anliegen bearbeiten'):

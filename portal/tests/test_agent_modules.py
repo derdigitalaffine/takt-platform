@@ -214,7 +214,7 @@ def test_calendar_only_account_context_reset_and_failed_replacement(monkeypatch)
     fake(monkeypatch, [dict(tool="search_calendars", query="Agent")], [new_event(cid)])
     initial, csrf = plan(c)
     assert initial.status_code == 200
-    rejected, _ = plan(c, "ab")
+    rejected, _ = plan(c, " ")
     assert rejected.status_code == 422
     assert execute(c, initial, csrf).status_code == 409
 

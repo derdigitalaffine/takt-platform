@@ -232,8 +232,12 @@
     scrollToLatest();
     try {
       const response = await fetch('/agent/plan', {method: 'POST', body,
-        credentials: 'same-origin', cache: 'no-store', signal: controller.signal});
-      const data = await response.json();
+        credentials: 'same-origin', cache: 'no-store', signal: controller.signal, headers: {'Accept': 'application/json'}});
+      const raw = await response.text();
+      let data;
+      try { data = JSON.parse(raw); } catch (_) {
+        throw new Error(response.redirected ? 'Sitzung abgelaufen. Bitte erneut anmelden.' : 'Der Server hat keine gültige Agentenantwort geliefert (HTTP ' + response.status + '). Bitte erneut versuchen.');
+      }
       if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Der Agent konnte den Auftrag nicht verarbeiten.');
       prompt.value = '';
       assistantBubble.content.textContent = data.message || '';
@@ -255,7 +259,8 @@
       updateTitle(question); scrollToLatest();
       if (data.open_url && /^\/(?:aufgaben|anliegen|forms|dms|kalender)(?:[/?#]|$)/.test(data.open_url)
           && !data.open_url.includes('\\')) {
-        window.location.assign(data.open_url);
+        if (window.self !== window.top && window.frameElement?.hasAttribute('data-agent-frame')) window.parent.location.assign(data.open_url);
+        else window.location.assign(data.open_url);
       }
     } catch (error) {
       progress.textContent = error.name === 'AbortError' ? 'Planung abgebrochen. Es wurde nichts gespeichert.' : error.message;

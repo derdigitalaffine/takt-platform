@@ -22,6 +22,7 @@
     const tool = data.tool, id = data.id;
     const selectors = {
       configure_anliegen_category: `form[action="/anliegen/kategorien/${id}"]`,
+      create_form: 'form[action="/forms"]',
       create_task: 'form[data-task-create]', create_anliegen: '#anliegen-create',
       assign_task: `form[action="/aufgaben/${id}/bearbeiten"]`,
       set_task_priority: `form[action="/aufgaben/${id}/bearbeiten"]`,
@@ -46,6 +47,7 @@
     const fields = {...data.fields};
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
+      create_form: ['title'],
       create_task: ['title', 'description', 'priority', 'assignee_id'],
       create_anliegen: ['title', 'description_final', 'category_id'],
       assign_task: ['assignee_id'], set_task_priority: ['priority'], set_task_status: [],
