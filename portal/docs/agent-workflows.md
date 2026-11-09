@@ -1,4 +1,22 @@
-# TAKT Agent: zentraler KI-Arbeitsplatz und ausgefüllte Fachvorschläge
+# Hotfix: rechte Agentenspalte und zuverlässige Formularvorschläge
+
+Der globale Einstieg ist ein fester Button außerhalb des Headers. Er öffnet denselben
+zentralen Agenten rechts; der Agent erscheint nicht mehr in der Menü-Navigation.
+Auf schmalen Geräten füllt die Spalte den Bildschirm. Die Einbettung ist ausschließlich
+innerhalb derselben Herkunft für `/agent` und den kompatiblen `/ki`-Einstieg erlaubt;
+alle anderen bisherigen Framing-Grenzen bleiben bestehen. Fachvorschläge wechseln
+in den Hauptbereich, nicht in eine verschachtelte Fachmaske.
+
+Agenten-JSON-Endpunkte liefern auch bei `Accept: */*` strukturierte Fehler. Der Client
+fordert JSON an und zeigt bei unerwartetem HTML eine verständliche Statusmeldung.
+Kurze Nachrichten wie „ja“ sind gültige Gesprächsfortsetzungen und ersetzen keine
+verbindliche Schreibbestätigung. `create_form` erzeugt nach Fachmaskenvorschau und
+expliziter Bestätigung einen internen, geschlossenen Formularentwurf mit konkreten
+Fragen. Kein öffentlicher Link, keine Einsendung und kein Antragsprozess entstehen.
+Die freigegebenen einfachen Fragetypen werden mit dem vorhandenen Baukasten
+normalisiert; komplexere Fragen können anschließend dort ergänzt werden.
+
+## Weiterhin geltende Fachregeln
 
 `/agent` ist der maßgebliche LLM-Chat. Navigation, Modulkarte und globaler Einstieg
 führen dorthin. `/ki` und die bisherigen Chat-Endpunkte bleiben kompatible Aliase

@@ -150,7 +150,7 @@ def _json(reply):
     return parsed
 
 
-def search_instructions(user):
+def search_instructions(user, focus=None):
     kinds = []
     if allowed(user, "tasks"):
         kinds.extend(["search_tasks(query,scope=all|assigned|created,status?,overdue?)",
@@ -160,6 +160,8 @@ def search_instructions(user):
         if user.can("anliegen_manage") and not allowed(user, "tasks"):
             kinds.append("search_people(query) für Zuständigkeitsänderungen")
     kinds.extend(tool + "(query)" for tool, module in modules.READ.items() if allowed(user, module))
+    from .agent_precision import focused
+    kinds = focused(kinds, focus)
     return [
         {"role": "system", "content": (
             "Du bist TAKT Agent. Antworte nur als JSON-Objekt: "
@@ -197,7 +199,7 @@ def parse_searches(reply, user):
     return valid
 
 
-def plan_instructions(user, prompt, findings, categories, requester_id):
+def plan_instructions(user, prompt, findings, categories, requester_id, focus=None):
     capabilities = []
     if allowed(user, "tasks"):
         capabilities.extend([
@@ -211,12 +213,14 @@ def plan_instructions(user, prompt, findings, categories, requester_id):
         capabilities.extend(["set_anliegen_status(id,status,supplier?,order_reference?,expected_delivery=YYYY-MM-DD?): Bestell- und Lieferstatus nur gemäß next_states", "assign_anliegen(id,assignee_id)"])
     capabilities.extend(signature for tool, signature in {
         "create_event": "create_event(id=calendar_id,title,description,location,start,end): nur Einzeltermine mit ISO-Zeitzone, keine Einladungen oder Ressourcenbuchungen",
+        "create_form": "create_form(title,fields=[{type:short|long|date|time|number|yesno,title,required:true|false}]): neuen internen geschlossenen Formularentwurf MIT konkreten Fragen anlegen, keine zusätzliche Vorab-Erlaubnis erfragen; Publikation bleibt manuell",
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
         "move_dms": "move_dms(id,area_id): freigegebene manuelle Wissensakte in berechtigten Zielbereich verschieben",
     }.items() if allowed(user, modules.WRITE[tool]))
     if allowed(user, "anliegen") and user.is_admin:
         capabilities.append("configure_anliegen_category(id,title,routing=person|lead,assignee_id?,enabled=true|false,apply_open=false): nur nicht-vertrauliche Kategorien, bestehende Zuständigkeiten ausschließlich bei explizitem Auftrag migrieren")
-    from .agent_precision import context as precision_context
+    from .agent_precision import context as precision_context, focused
+    capabilities = focused(capabilities, focus)
     precision = precision_context(prompt, categories)
     system = (
         "Du bist TAKT Agent, der zentrale LLM-Chat und Bedienassistent von TAKT. Beantworte allgemeine Fragen, verfasse Texte und nutze freigegebene Wissensbelege. Für konkrete Bedienwünsche plane sparsame Fachschritte. Das message-Feld enthält die vollständige deutsche Antwort (auch Markdown möglich), eine konkrete Rückfrage oder den erklärten Plan. Allgemeine Antworten brauchen keine actions. Behaupte niemals, schon etwas gespeichert zu haben. Schreibvorschläge öffnen eine ausgefüllte Fachmaske und müssen dort geprüft und bestätigt werden. "
@@ -261,6 +265,9 @@ def normalize_plan(reply, user, findings, categories, db):
             raise ValueError("Nicht unterstützte KI-Aktion.")
         if tool in modules.WRITE:
             action = modules.normalize(db, user, raw, findings)
+            if tool == "create_form":
+                proposals.append(action)
+                continue
             key = (modules.KINDS[tool], action["id"])
             if key in seen:
                 raise ValueError("Mehrere Änderungen am selben Vorgang sind nicht zulässig.")

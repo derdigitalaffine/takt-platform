@@ -36,3 +36,16 @@ def test_precision_hints_use_live_category_ids_and_no_duplicate_task():
     assert intake_category('Bitte Toner bestellen', cats)['id'] == 914
     assert intake_category('Toner und Bürostühle bestellen', cats) is None
     assert 'niemals zusätzlich' in context('Bitte Toner bestellen', cats)
+
+
+def test_small_model_contract_only_includes_relevant_module_tools():
+    from app.agent_precision import focus_modules
+    with SessionLocal() as db:
+        actor = db.scalar(select(User).where(User.email == ADMIN[0]))
+        focus = focus_modules('Erstelle eine Aufgabe mit Checkliste')
+        message = agent.plan_instructions(actor, 'Aufgabe', [], [], actor.id, focus=focus)[0]['content']
+        assert 'create_task(' in message
+        assert 'copy_form(' not in message and 'move_dms(' not in message
+        search = agent.search_instructions(actor, focus=focus)[0]['content']
+        assert 'search_tasks(' in search and 'search_forms(' not in search
+        assert focus_modules('ja') is None

@@ -1,4 +1,7 @@
-<a href="/agent" class="btn btn-sm btn-outline-primary takt-agent-launch" data-takt-agent
-   aria-label="TAKT Agent öffnen" title="Zentralen TAKT-Agenten öffnen">
-  <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">TAKT Agent</span>
-</a>
+<div data-takt-agent data-agent-dock>
+  <button type="button" class="btn btn-primary agent-dock-launch" data-agent-open aria-controls="agent-dock-panel" aria-expanded="false"><i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>TAKT Agent</button>
+  <section id="agent-dock-panel" class="agent-dock-panel" role="dialog" aria-modal="false" aria-labelledby="agent-dock-title" hidden>
+    <div class="agent-dock-head"><strong id="agent-dock-title">TAKT Agent</strong><button type="button" class="btn-close" data-agent-close aria-label="TAKT Agent schließen"></button></div>
+    <iframe data-agent-frame title="TAKT Agent – Chat und Bedienunterstützung" src="about:blank"></iframe>
+  </section>
+</div>

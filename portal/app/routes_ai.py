@@ -656,7 +656,7 @@ def ai_chat(request: Request, chat: int | None = None, user: User = Depends(chat
     conversations = list(db.scalars(select(AIConversation)
                                     .where(AIConversation.owner_id == user.id)
                                     .order_by(AIConversation.updated_at.desc()).limit(100)))
-    selected = _conversation(db, chat, user) if chat else None
+    selected = _conversation(db, chat, user) if chat else (conversations[0] if conversations and request.query_params.get("panel") == "1" else None)
     providers = list(db.scalars(select(AIProvider).where(AIProvider.active.is_(True))
                                 .order_by(AIProvider.name)))
     return render(request, "ai_chat.html", user, chats=conversations, current=selected,

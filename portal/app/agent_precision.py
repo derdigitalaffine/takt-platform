@@ -30,3 +30,30 @@ def context(prompt, categories):
         text += ('Für die eindeutige Anliegenart passt die tatsächlich freigegebene Kategorie '
                  + str(cat['id']) + ' (' + cat['key'] + '). Eine Beschaffungsanfrage ist keine bereits ausgelöste Lieferantenbestellung. ')
     return text
+
+
+def focus_modules(prompt):
+    """Reduce the schema shown to a small model; this is never an authorization check."""
+    patterns = {
+        'tasks': r'aufgabe|checkliste|fällig|priorit',
+        'anliegen': r'anliegen|mangel|mängel|büromaterial|büromöbel|bürost[üu]hl|druckerpapier|kopierpapier|toner|störung|defekt',
+        'forms': r'formular', 'calendars': r'kalender|termin',
+        'dms': r'\bdms\b|wissensakte', 'processes': r'prozess',
+    }
+    return {key for key, pattern in patterns.items() if re.search(pattern, prompt, re.I)} or None
+
+
+def tool_module(tool):
+    from . import agent_modules
+    if tool in agent_modules.READ:
+        return agent_modules.READ[tool]
+    if tool in agent_modules.WRITE:
+        return agent_modules.WRITE[tool]
+    return 'anliegen' if 'anliegen' in tool else 'tasks'
+
+
+def focused(signatures, focus):
+    if not focus:
+        return signatures
+    return [s for s in signatures if tool_module(s.split('(', 1)[0]) in focus or
+            (s.startswith('search_people(') and focus & {'tasks', 'anliegen'})]

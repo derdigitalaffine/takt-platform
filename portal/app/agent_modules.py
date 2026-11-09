@@ -22,6 +22,7 @@ READ = {
     "search_dms": "dms", "search_dms_areas": "dms",
 }
 WRITE = {
+    "create_form": "forms",
     "configure_anliegen_category": "anliegen",
     "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
 }
@@ -141,6 +142,9 @@ def target(db, user, action):
 
 def normalize(db, user, raw, findings):
     tool = raw["tool"]
+    if tool == "create_form":
+        from .agent_forms import normalize as normalize_form
+        return normalize_form(user, raw)
     if tool == "configure_anliegen_category":
         from .agent import require
         require(user, "anliegen")
@@ -184,6 +188,9 @@ def normalize(db, user, raw, findings):
 
 
 def preview(db, action):
+    if action["tool"] == "create_form":
+        from .agent_forms import preview as preview_form
+        return preview_form(action)
     if action["tool"] == "configure_anliegen_category":
         return agent_anliegen.preview(db, action)
     row = db.get(MODELS[action["tool"]], action["id"])
@@ -198,6 +205,9 @@ def preview(db, action):
 
 
 def execute(db, user, action):
+    if action["tool"] == "create_form":
+        from .agent_forms import execute as create_form
+        return create_form(db, user, action)
     if action["tool"] == "configure_anliegen_category":
         from .agent import require
         require(user, "anliegen")

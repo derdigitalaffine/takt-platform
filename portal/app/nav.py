@@ -312,7 +312,7 @@ def build(c: Ctx) -> dict:
     """Menü für die Vorlage: Favoriten, sichtbare Gruppen (nur mit Einträgen), Zahl ausgeblendeter Gruppen."""
     p = prefs(c.user)
     fav = set(p["fav"])
-    items = sorted(visible(c), key=lambda it: next((n for n, f in enumerate(FAMILIES) if it.id in f), len(FAMILIES)))
+    items = sorted((it for it in visible(c) if it.id != "ai"), key=lambda it: next((n for n, f in enumerate(FAMILIES) if it.id in f), len(FAMILIES)))
     entries = {it.id: _entry(it, c, fav) for it in items}
     # Bei mehreren passenden Einträgen nur den genauesten markieren (z. B. /forms/inbox nicht auch /forms)
     hits = [e for e in entries.values() if e["active"]]

@@ -25,7 +25,7 @@ def _member(email: str, permissions: str) -> None:
 def _shortcut_before_groups(html: str) -> bool:
     # The top-level link must remain visible even when the Wissen group was hidden or collapsed.
     before_groups = html.split('data-group="fav"', 1)[0]
-    return 'href="/agent"' in before_groups
+    return 'data-agent-dock' in html
 
 
 def test_ki_chat_is_visible_as_primary_link_when_module_is_enabled():

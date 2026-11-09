@@ -98,6 +98,33 @@ def exercise(page):
     expect(page.locator('.alert').filter(has_text='Abwesenheit aus der aktiven Planung gelöscht')).to_be_visible()
     page.goto(BASE + '/urlaub/planer?unit=' + unit_id)
     expect(page.get_by_role('link', name='Urlaubsabwesenheit löschen', exact=True)).to_have_count(0)
+    page.set_viewport_size(dict(width=1440, height=1000))
+    page.goto(BASE + '/')
+    expect(page.locator('#sidebar a[href="/agent"]')).to_have_count(0)
+    page.get_by_role('button', name='TAKT Agent', exact=True).click()
+    expect(page.locator('#agent-dock-panel')).to_be_visible()
+    chat = page.frame_locator('[data-agent-frame]')
+    chat.locator('.ai-chat-conversations > summary').click()
+    chat.get_by_role('button', name='Neuer Chat', exact=True).click()
+    expect(chat.locator('[name="chat_id"]')).not_to_have_value('1')
+    chat.locator('#ai-prompt').fill('Erstelle mir ein Formular mit dem ich die Geburtstage der Belegschaft abfragen kann')
+    assert page.locator('#agent-dock-panel').bounding_box()['x'] > 700
+    page.screenshot(path=str(OUTPUT / 'agent-dock-desktop.png'), full_page=True)
+    page.set_viewport_size(dict(width=390, height=844))
+    page.screenshot(path=str(OUTPUT / 'agent-dock-mobile.png'), full_page=True)
+    chat.get_by_role('button', name='Nachricht senden', exact=True).click()
+    try:
+        expect(page).to_have_url(re.compile(r'/forms\?agent_plan='))
+    except Exception:
+        print('Dock errors:', errors, flush=True)
+        print('Dock chat:', chat.locator('body').inner_text(), flush=True)
+        raise
+    expect(page.locator('[data-agent-draft]')).to_contain_text('Geburtstag')
+    expect(page.locator('form[action="/agent/draft/review"] [name="title"]')).to_have_value('Geburtstage der Belegschaft')
+    page.get_by_role('button', name='Vorschlag prüfen', exact=True).click()
+    expect(page.locator('[data-agent-final-preview]')).to_contain_text('Geburtstag')
+    page.get_by_role('button', name='Diesen Schritt verbindlich speichern', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/forms/[0-9]+$'))
     assert not errors, errors
 
 

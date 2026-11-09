@@ -32,6 +32,10 @@ def test_today_quick_actions_and_new_tiles():
     assert "Handlungsbedarf" in html and 'id="dash-today"' in html
     assert '/static/home-modern.css' in html
     assert 'class="dashboard-page"' in html and 'id="dash-title"' in html
+    assert 'class="workspace-head" aria-labelledby="dash-title"' in html
+    assert '/static/workspace-heading.css' in html
+    assert 'class="dash-intro"' not in html
+    assert html.index('</header>') < html.index('class="dash-intro-metrics"')
     assert 'class="dash-intro-metrics"' in html
     assert 'dash-metric' in html and 'dash-section-heading' in html
     assert 'dash-feature-card dash-needs-card' in html and 'dash-feature-card dash-agenda-card' in html

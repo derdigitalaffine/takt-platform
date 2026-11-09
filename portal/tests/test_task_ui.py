@@ -25,6 +25,9 @@ def test_workplace_keeps_a_single_primary_action_and_quick_capture(db,task_peopl
     assert 'id="capture-text"' in html and 'Aufgabe erfassen' in html
     assert 'nav nav-tabs task-perspectives' in html
     assert 'task-hero task-hero-compact' in html
+    assert 'task-hero task-hero-compact workspace-head' in html
+    assert '/static/workspace-heading.css' in html
+    assert '<span class="workspace-head-mark">' in html
     assert 'task-hero-art' not in html and 'task-hero-quickstats' not in html
     assert 'task-hero-eyebrow' not in html
     assert 'task-workspace-create' in html and 'task-workspace-list' in html

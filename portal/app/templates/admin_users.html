@@ -1,14 +1,16 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Benutzer & Gruppen{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/permission-editor.css"><link rel="stylesheet" href="/static/admin-workspace.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/permission-editor.css"><link rel="stylesheet" href="/static/admin-workspace.css"><link rel="stylesheet" href="/static/workspace-heading.css">{% endblock %}
 {% block content %}
 <div class="admin-workspace admin-users-workspace">
-  <header class="admin-welcome">
-    <div><span class="admin-eyebrow"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i> Administration · Zugänge</span>
-      <h1>Benutzer &amp; Gruppen</h1>
-      <p>Konten suchen, Zugänge verwalten, Teams zuordnen und Einladungen versenden.</p></div>
-    <div class="admin-welcome-actions">
+  <header class="workspace-head" aria-labelledby="admin-users-page-title">
+    <div class="workspace-head-main">
+      <span class="workspace-head-mark"><i class="fa-solid fa-users-gear" aria-hidden="true"></i></span>
+      <div class="workspace-head-copy"><h1 id="admin-users-page-title">Benutzer &amp; Gruppen</h1>
+        <p>Konten, Zugriffsrechte und Teams zentral verwalten.</p></div>
+    </div>
+    <div class="workspace-head-actions admin-welcome-actions">
       <a href="/admin/organization" class="btn btn-outline-secondary"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Organisation</a>
       <a href="#einladen" class="btn btn-primary"><i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i>Personen einladen</a>
     </div>

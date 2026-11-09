@@ -17,6 +17,8 @@ def destination(action):
     tool = action["tool"]
     if tool == "configure_anliegen_category":
         return "/anliegen/kategorien"
+    if tool == "create_form":
+        return "/forms"
     if tool == "create_task":
         return "/aufgaben/neu"
     if tool == "create_anliegen":
@@ -52,6 +54,10 @@ def load(request, user, nonce, step):
 
 
 def validate(db, user, action):
+    if action["tool"] == "create_form":
+        from .agent_forms import normalize
+        normalize(user, action)
+        return
     if action["tool"] in agent.modules.WRITE:
         row = agent.modules.target(db, user, action)
         current = agent.modules.version(row)
@@ -101,6 +107,7 @@ def edited(db, user, original, data):
     raw = dict(original)
     tool = raw["tool"]
     allowed = {
+        "create_form": ("title",),
         "create_task": ("title", "description", "priority", "assignee_id", "due_date", "due_time", "starts_at", "tags", "checklist"),
         "create_anliegen": ("title", "description", "category_id"),
         "assign_task": ("assignee_id",), "set_task_priority": ("priority",),

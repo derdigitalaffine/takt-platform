@@ -2,22 +2,24 @@
 {% import "_macros.html" as m with context %}
 {% from '_work_list.html' import work_list %}
 {% block title %}Übersicht{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/home-modern.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home-modern.css"><link rel="stylesheet" href="/static/workspace-heading.css">{% endblock %}
 {% block content %}
 <div class="dashboard-page">
-<header class="dash-intro" aria-labelledby="dash-title">
-  <div class="dash-intro-main">
-    <div class="dash-eyebrow"><span class="dash-signal" aria-hidden="true"></span> Mein Arbeitsplatz</div>
-    <h1 id="dash-title">Guten {{ 'Morgen' if (now | local('%H') | int) < 11 else ('Tag' if (now | local('%H') | int) < 18 else 'Abend') }}, {{ user.name.split(' ')[0] }}<span class="dash-title-dot" aria-hidden="true">.</span></h1>
-    <p class="dash-intro-description">Alles Wichtige für Ihren Tag – direkt griffbereit.</p>
-    <p class="dash-intro-date"><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>{{ now | local('%A, %d.%m.%Y') | replace('Monday', 'Montag') | replace('Tuesday', 'Dienstag') | replace('Wednesday', 'Mittwoch') | replace('Thursday', 'Donnerstag') | replace('Friday', 'Freitag') | replace('Saturday', 'Samstag') | replace('Sunday', 'Sonntag') }}</p>
-    <div class="dash-intro-actions">
-      {% if top.work.available %}<a href="/tasks" class="btn btn-primary"><i class="fa-solid fa-list-check me-2" aria-hidden="true"></i>Meine Aufgaben</a>{% endif %}
-      <a href="/module" class="btn btn-outline-secondary"><i class="fa-solid fa-grip me-2" aria-hidden="true"></i>Modulkatalog öffnen</a>
-      <button class="btn btn-outline-secondary" type="button" id="dash-edit" aria-pressed="false"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Anpassen</button>
+<header class="workspace-head" aria-labelledby="dash-title">
+  <div class="workspace-head-main">
+    <span class="workspace-head-mark"><i class="fa-solid fa-house" aria-hidden="true"></i></span>
+    <div class="workspace-head-copy">
+      <h1 id="dash-title">Meine Übersicht</h1>
+      <p>Guten {{ 'Morgen' if (now | local('%H') | int) < 11 else ('Tag' if (now | local('%H') | int) < 18 else 'Abend') }}, {{ user.name.split(' ')[0] }} · {{ now | local('%A, %d.%m.%Y') | replace('Monday', 'Montag') | replace('Tuesday', 'Dienstag') | replace('Wednesday', 'Mittwoch') | replace('Thursday', 'Donnerstag') | replace('Friday', 'Freitag') | replace('Saturday', 'Samstag') | replace('Sunday', 'Sonntag') }}</p>
     </div>
   </div>
-  <div class="dash-intro-metrics" aria-label="Auf einen Blick">
+  <div class="workspace-head-actions">
+    {% if top.work.available %}<a href="/tasks" class="btn btn-primary"><i class="fa-solid fa-list-check me-2" aria-hidden="true"></i>Meine Aufgaben</a>{% endif %}
+    <a href="/module" class="btn btn-outline-secondary"><i class="fa-solid fa-grip me-2" aria-hidden="true"></i>Modulkatalog öffnen</a>
+    <button class="btn btn-outline-secondary" type="button" id="dash-edit" aria-pressed="false"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Anpassen</button>
+  </div>
+</header>
+<div class="dash-intro-metrics" aria-label="Auf einen Blick">
     {% if top.work.available %}
     <a href="/tasks" class="dash-metric">
       <span class="dash-metric-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
@@ -38,7 +40,7 @@
       <strong>{{ top.agenda|length }}</strong><span>heute geplant</span>
     </a>
   </div>
-</header>
+
 {% if quick %}
 <nav class="dash-quick d-flex flex-wrap gap-2 mb-3" aria-label="Schnellaktionen">
   {% for href, icon, label in quick %}<a class="btn btn-sm btn-outline-primary" href="{{ href }}"><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a>{% endfor %}
