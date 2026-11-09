@@ -67,12 +67,12 @@ _ACTION_VERB = re.compile(
     r"ändere|änder|bearbeite|aktualisiere|verschiebe|kopiere|dupliziere|"
     r"weise|zuweisen|zuordnen|setze|markiere|erledige|lösche|lösch|"
     r"suche|finde|öffne|zeige|navigiere|bring|leite|plane|buche|"
-    r"starte|beende|schließe|sende)\b", re.I)
+    r"starte|beende|schließe|sende|erfasse|erzeuge|konfiguriere|gehe|nimm|anzeigen)\b", re.I)
 _ACTION_OBJECT = re.compile(
     r"\b(?:aufgab\w*|anliegen|formular\w*|kalender|termin\w*|"
     r"prozess\w*|akten|akte|dms|büromaterial|büromöbel|"
     r"bestellung\w*|status|zuständigkeit|priorität|"
-    r"organisation\w*|bereich\w*)\b", re.I)
+    r"organisation\w*|bereich\w*|kategorie\w*|mitglieder|profil)\b", re.I)
 _ACTION_REQUEST = re.compile(
     r"\b(?:bitte|kannst du|könntest du|würdest du|ich möchte|ich will|"
     r"ich brauche|wir brauchen|hilf mir|mach|machst du)\b", re.I)
