@@ -3054,6 +3054,9 @@ def _migrate() -> None:
             for name, ddl in columns.items():
                 if name not in existing:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+            if table == "anliegen_categories" and "procurement" not in existing:
+                conn.execute(text("UPDATE anliegen_categories SET procurement = 1 "
+                                  "WHERE key IN ('office_supply', 'office_furniture')"))
             if table in {"polls", "votes", "live_polls"} and "used_at" not in existing:
                 related = {"polls": "EXISTS (SELECT 1 FROM poll_participants WHERE poll_id = polls.id) OR EXISTS (SELECT 1 FROM poll_shares WHERE poll_id = polls.id)",
                            "votes": "EXISTS (SELECT 1 FROM vote_voters WHERE vote_id = votes.id) OR EXISTS (SELECT 1 FROM vote_shares WHERE vote_id = votes.id) OR EXISTS (SELECT 1 FROM vote_ballots WHERE vote_id = votes.id) OR EXISTS (SELECT 1 FROM seminar_activities WHERE kind = 'vote' AND object_id = votes.id)",
