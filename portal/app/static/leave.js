@@ -280,17 +280,26 @@ window.taktInitLeave = async () => {
       }
     });
   }
+  const ready = send("/urlaub/data?unit=" + encodeURIComponent(el.dataset.unit));
+  // Edit buttons can be clicked before the calendar feed has arrived.
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-leave-edit]");
+    if (!button || !el.isConnected) return;
+    event.preventDefault();
+    try {
+      const data = await ready;
+      if (lifecycle.signal.aborted || !button.isConnected) return;
+      const row = data.requests.find((r) => String(r.id) === button.dataset.leaveEdit);
+      if (!row) throw Error("Der Urlaubseintrag ist nicht mehr verfügbar. Bitte neu laden.");
+      edit(row);
+    } catch (error) { report(error); }
+  }, { signal: lifecycle.signal });
   try {
-    const data = await send(
-      "/urlaub/data?unit=" + encodeURIComponent(el.dataset.unit),
-    );
+    const data = await ready;
     if (lifecycle.signal.aborted || !el.isConnected) return;
     requests = data.requests;
     people = data.people;
-    for (const button of document.querySelectorAll("[data-leave-edit]"))
-      button.addEventListener("click", () =>
-        edit(requests.find((r) => String(r.id) === button.dataset.leaveEdit)),
-      );
+
     for (const button of document.querySelectorAll("[data-leave-copy]"))
       button.addEventListener("click", async () => {
         const row = requests.find(
