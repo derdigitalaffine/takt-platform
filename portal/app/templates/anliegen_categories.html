@@ -1,38 +1,84 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Anliegen – Kategorien{% endblock %}
+{% block title %}Anliegen – Zuständigkeiten{% endblock %}
 {% block content %}
-{{m.page_head('Anliegen: Kategorien & Zuständigkeiten', 'Regeln für die automatische Weiterleitung. Unklare Zuständigkeiten führen nie zu einer stillen Falschzuweisung.')}}
-<p><a href="/anliegen"><i class="fa-solid fa-arrow-left me-1"></i>Zur Anliegenübersicht</a></p>
-<div class="alert alert-info"><strong>Vertrauliche Beschwerden:</strong> Die Weiterleitung an die Leitung der primären Organisation ist fest geschützt. Ist kein eindeutiger Empfänger hinterlegt, wird kein Fall an andere Benutzer offengelegt.</div>
+{{ m.page_head('Kategorien & Zuständigkeiten', 'Einfach nachvollziehen, wer was erhält und welche Meldungen noch auf Bearbeitung warten.') }}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <a href="/anliegen" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zum Anliegen-Eingang</a>
+  <span class="small text-secondary">Die Regeln gelten sofort für neue Meldungen. Noch nicht zugewiesene Fälle werden automatisch geprüft.</span>
+</div>
+<div class="alert alert-info" role="note">
+  <i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>
+  <strong>Datenschutz:</strong> Vertrauliche Beschwerden gehen ausschließlich an eine eindeutig zuständige Organisationsleitung. Sie können nicht pauschal umverteilt werden.
+</div>
 <div class="row g-3">
 {% for cat in categories %}
-<div class="col-12 col-xl-6" id="cat-{{cat.id}}"><div class="card h-100"><div class="card-header d-flex gap-2 align-items-center"><i class="fa-solid {{cat.icon}}"></i><strong>{{cat.title}}</strong>{% if cat.confidential %}<span class="badge text-bg-warning ms-auto">Vertraulich</span>{% endif %}</div>
-<div class="card-body"><p class="small text-secondary">{{cat.description}}</p><form method="post" action="/anliegen/kategorien/{{cat.id}}">
-<input type="hidden" name="csrf" value="{{csrf}}">
-<label class="form-label" for="cat-title-{{cat.id}}">Bezeichnung</label><input class="form-control mb-3" id="cat-title-{{cat.id}}" name="title" value="{{cat.title}}" minlength="3" maxlength="120" required>
-<label class="form-label" for="cat-route-{{cat.id}}">Weiterleitung</label>
-<select name="routing" class="form-select mb-3" id="cat-route-{{cat.id}}">
-<option value="person" {% if cat.routing=='person' %}selected{% endif %} {% if cat.confidential %}disabled{% endif %}>Feste verantwortliche Person</option>
-<option value="lead" {% if cat.routing=='lead' %}selected{% endif %}>Leitung der primären Organisation</option>
-</select>
-<label class="form-label" for="cat-person-{{cat.id}}">Feste Person (bei entsprechender Regel)</label>
-<select name="assignee_id" class="form-select mb-3" id="cat-person-{{cat.id}}" {% if cat.confidential %}disabled{% endif %}>
-<option value="0">Noch nicht festgelegt</option>
-{% for person in users %}<option value="{{person.id}}" {% if person.id==cat.assignee_id %}selected{% endif %}>{{person.name}}</option>{% endfor %}
-</select>
-<div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="cat-enable-{{cat.id}}" value="1" name="enabled" {% if cat.enabled %}checked{% endif %}><label class="form-check-label" for="cat-enable-{{cat.id}}">Kategorie aktiv</label></div>
-{% if cat.routing == 'person' and cat.assignee %}
-<div class="alert alert-success py-2 small"><i class="fa-solid fa-circle-check me-1"></i>Aktuell gespeichert: <strong>{{cat.assignee.name}}</strong></div>
-{% elif cat.routing == 'person' %}
-<div class="alert alert-warning py-2 small">Noch kein aktiver Empfänger hinterlegt. Neue Anliegen bleiben ohne Zuweisung.</div>
-{% else %}
-<div class="alert alert-info py-2 small">Empfänger wird anhand der Leitung der primären Organisation des Meldenden ermittelt. Dazu muss eine eindeutige TAKT-Organisationsrolle hinterlegt sein.</div>
-{% endif %}
-{% if not cat.confidential %}
-<div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="cat-apply-{{cat.id}}" value="1" name="apply_open"><label class="form-check-label" for="cat-apply-{{cat.id}}">Neue Zuständigkeit auch für bereits zugewiesene, noch nicht abgeschlossene Anliegen dieser Kategorie übernehmen</label><p class="form-text">Nur bei bewusster Auswahl. Bereits abgeschlossene und vertrauliche Vorgänge bleiben unverändert.</p></div>
-{% endif %}
-<button type="submit" class="btn btn-primary">Regel speichern</button></form></div></div></div>
+  {% set workload = counts.get(cat.id, (0, 0)) %}
+  <div class="col-12 col-xl-6" id="cat-{{ cat.id }}">
+    <div class="card h-100">
+      <div class="card-header d-flex gap-2 flex-wrap align-items-center">
+        <i class="fa-solid {{ cat.icon }} text-primary" aria-hidden="true"></i>
+        <strong>{{ cat.title }}</strong>
+        {% if cat.confidential %}<span class="badge text-bg-warning ms-auto"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Vertraulich</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <p class="small text-secondary">{{ cat.description }}</p>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <span class="badge text-bg-light border text-body">{{ workload[0] or 0 }} aktive Vorgänge</span>
+          {% if workload[1] %}<span class="badge text-bg-warning">{{ workload[1] }} noch ohne Empfänger</span>{% endif %}
+          {% if cat.routing == 'person' and cat.assignee and cat.assignee.active %}
+          <span class="badge text-bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Gespeichert: {{ cat.assignee.name }}</span>
+          {% elif cat.routing == 'person' %}
+          <span class="badge text-bg-secondary">Kein aktiver Empfänger hinterlegt</span>
+          {% else %}<span class="badge text-bg-light border text-body">Ziel: Organisationsleitung des Meldenden</span>{% endif %}
+        </div>
+        <form method="post" action="/anliegen/kategorien/{{ cat.id }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="cat-title-{{ cat.id }}">Bezeichnung</label>
+            <input class="form-control" id="cat-title-{{ cat.id }}" name="title"
+                   value="{{ cat.title }}" minlength="3" maxlength="120" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="cat-route-{{ cat.id }}">Empfänger bestimmen über</label>
+            <select name="routing" class="form-select" id="cat-route-{{ cat.id }}">
+              <option value="person" {% if cat.routing == 'person' %}selected{% endif %} {% if cat.confidential %}disabled{% endif %}>Eine feste Person</option>
+              <option value="lead" {% if cat.routing == 'lead' %}selected{% endif %}>Leitung der primären Organisation</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="cat-person-{{ cat.id }}">Fester Ansprechpartner</label>
+            <select name="assignee_id" class="form-select" id="cat-person-{{ cat.id }}" {% if cat.confidential %}disabled{% endif %}>
+              <option value="0">– noch nicht eingerichtet –</option>
+              {% for person in users %}<option value="{{ person.id }}" {% if person.id == cat.assignee_id %}selected{% endif %}>{{ person.name }}</option>{% endfor %}
+            </select>
+            <div class="form-text">Wird nur bei „Eine feste Person“ berücksichtigt. Die Person muss aktiv sein. Leitungsrollen werden aus TAKT übernommen.</div>
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="cat-enable-{{ cat.id }}"
+                   name="enabled" value="1" {% if cat.enabled %}checked{% endif %}>
+            <label class="form-check-label" for="cat-enable-{{ cat.id }}">Kategorie für neue Anliegen anbieten</label>
+          </div>
+          {% if not cat.confidential %}
+          <div class="border rounded p-3 mb-3 bg-body-tertiary">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="cat-reassign-{{ cat.id }}"
+                     name="apply_open" value="1">
+              <label class="form-check-label fw-semibold" for="cat-reassign-{{ cat.id }}">
+                Bereits verteilte, noch offene Vorgänge zusätzlich neu zuweisen
+              </label>
+            </div>
+            <div class="small text-secondary mt-2">
+              Ohne Häkchen bleiben übernommene Fälle beim bisherigen Verantwortlichen.
+              Die nachträgliche Umverteilung wird protokolliert und neue Empfänger werden benachrichtigt.
+            </div>
+          </div>
+          {% endif %}
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Regel speichern</button>
+        </form>
+      </div>
+    </div>
+  </div>
 {% endfor %}
 </div>
 {% endblock %}

@@ -46,7 +46,7 @@ def _groups(db):
 @app.get("/tasks")
 def tasks_page(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     mods = enabled_modules()
-    if not mods & {"applications", "resources", "circulations", "tasks"}:
+    if not mods & {"applications", "resources", "circulations", "tasks", "anliegen"}:
         raise HTTPException(404, "Kein Aufgabenmodul ist eingeschaltet.")
     from . import task_overview, tasks as native
     from urllib.parse import urlencode
@@ -76,7 +76,7 @@ def tasks_page(request: Request, user: User = Depends(current_user), db: Session
     back = task_url()
     for key in ('ready', 'pool', 'waiting'):
         for item in view[key]:
-            if item['source'] == 'native':
+            if item['source'] in ('native', 'anliegen') and item.get('native_id'):
                 item['href'] += '?' + urlencode({'back': back})
     import calendar as cal
     from datetime import date, timedelta
@@ -116,7 +116,9 @@ def tasks_page(request: Request, user: User = Depends(current_user), db: Session
     capture = getattr(request.state, 'task_capture', {})
     response = render(request, "tasks.html", user, work=view, apps_on="applications" in mods,
                   circulations_on="circulations" in mods, resources_on="resources" in mods,
-                  native_on='tasks' in mods, may_create=native.may_create(user), priorities=native.PRIORITIES,
+                  native_on='tasks' in mods, may_create=native.may_create(user),
+                  anliegen_on=('anliegen' in mods),
+                  priorities=native.PRIORITIES,
                   statuses=native.STATUSES, mode=mode, task_url=task_url, back=back, calendar_days=calendar_days, undated=calendar.get('',[]), period=period, period_label=period_label,
                   previous=previous.isoformat(), following=following.isoformat(), planning_items=planning_items,
                   timeline=timeline, timeline_start=timeline_start, timeline_end=timeline_end, capture=capture, people=native.users(db) if capture else [])

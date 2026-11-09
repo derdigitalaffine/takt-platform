@@ -3,14 +3,14 @@ from datetime import datetime
 from .db import utcnow, to_local
 
 SCOPES = {'all': 'Alle', 'personal': 'Persönlich', 'proxy': 'Vertretung', 'group': 'Gruppenaufgaben'}
-SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben', 'leave': 'Urlaubsplanung'}
+SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben', 'leave': 'Urlaubsplanung', 'anliegen': 'Interne Anliegen'}
 
 
 def collect(db, user, modules, *, now=None):
     from . import workflow, circulations, resources
     now = now or utcnow()
     ready, pool, waiting, delegated, history, managed, archive = [], [], [], [], [], [], []
-    source_modules = {'application': 'applications', 'circulation': 'circulations', 'resource': 'resources', 'native': 'tasks', 'leave': 'calendars'}
+    source_modules = {'application': 'applications', 'circulation': 'circulations', 'resource': 'resources', 'native': 'tasks', 'leave': 'calendars', 'anliegen': 'anliegen'}
     sources = {key: label for key, label in SOURCES.items() if key == 'all' or source_modules.get(key) in modules}
 
     resource_scopes = {}
@@ -61,7 +61,7 @@ def collect(db, user, modules, *, now=None):
                 detail += ' · ' + ('noch nicht geöffnet' if not task.seen_at else 'geöffnet')
             if blocked:
                 detail += ' · wartet auf Vorgänger'
-            item = entry('native', task.title, f'/aufgaben/{task.id}', 'Freigabe prüfen' if review else 'Öffnen', task.due_at,
+            item = entry('anliegen' if task.source_type == 'anliegen' else 'native', task.title, f'/aufgaben/{task.id}', 'Freigabe prüfen' if review else 'Öffnen', task.due_at,
                          detail=detail, native_id=task.id, status=task.status, priority=task.priority, tags=task.tags,
                          assignee=task.responsible_name, updated_at=task.updated_at, seen_at=task.seen_at,
                          starts_at=task.starts_at, blocked=blocked, version=task.version, may_work=native.may_work(user,task), may_plan=native.may_edit(user,task),
@@ -90,6 +90,24 @@ def collect(db, user, modules, *, now=None):
             elif own or task.creator_id == user.id or not native.manager(user):
                 item['late'] = False
                 waiting.append(item)
+    # Anliegen that are not represented by a native task remain actionable.
+    # Avoid duplicate entries when an Anliegen already has a linked native task.
+    if 'anliegen' in modules:
+        from sqlalchemy import select
+        from .anliegen_models import Anliegen
+        from . import anliegen as intake
+        for case in db.scalars(intake.visible_query(user).where(
+            Anliegen.assignee_id == user.id,
+            Anliegen.status.not_in(('done', 'closed')),
+        ).order_by(Anliegen.updated_at.desc()).limit(250)):
+            if case.task_id and 'tasks' in modules:
+                continue
+            info = intake.STATUSES.get(case.status, 'Offen') + ' · ' + case.category.title
+            item = entry('anliegen', case.display_title, f'/anliegen/{case.id}',
+                         'Bearbeiten', detail=info,
+                         icon='fa-lock' if case.confidential else 'fa-inbox',
+                         status=case.status, priority='normal')
+            (waiting if case.status == 'unassigned' else ready).append(item)
     if 'applications' in modules:
         for task in workflow.my_tasks(db, user):
             response = task.response
@@ -126,7 +144,7 @@ def collect(db, user, modules, *, now=None):
     def order(item): return (not item['late'], item['due'] or datetime.max, item['source'], item['title'], item['href'])
     for items in (ready, pool, waiting, delegated, history, managed, archive): items.sort(key=order)
     return dict(ready=ready, pool=pool, waiting=waiting, delegated=delegated, history=history, managed=managed, archive=archive, sources=sources, count=len(ready), overdue=sum(t['late'] for t in ready),
-                group_count=len(pool), waiting_count=len(waiting), now=now, available=bool(modules & {'applications', 'resources', 'circulations', 'tasks'}))
+                group_count=len(pool), waiting_count=len(waiting), now=now, available=bool(modules & {'applications', 'resources', 'circulations', 'tasks', 'anliegen'}))
 
 
 PERSPECTIVES = {'all': 'Jetzt bearbeiten', 'today': 'Heute', 'upcoming': 'Demnächst', 'overdue': 'Überfällig',
