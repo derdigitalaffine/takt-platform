@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}KI-Verwaltung<script src="/static/ai-admin-knowledge.js" defer></script>
-{% endblock %}
+{% block title %}KI-Verwaltung{% endblock %}
 {% block content %}
 {{ m.page_head('KI & Sprachmodelle', 'OpenAI-kompatible Provider serverseitig verwalten. Zugangsdaten werden verschlüsselt gespeichert und nicht an Browser oder Fachmodule weitergereicht.') }}
 
@@ -89,6 +88,28 @@
   </div>
 </div>
 
+<section id="ai-diagnostics" class="mt-4">
+  <div class="card">
+    <div class="card-header"><i class="fa-solid fa-vial me-2" aria-hidden="true"></i><strong>KI-Sprachmodell direkt testen</strong></div>
+    <div class="card-body">
+      <p class="small text-secondary">Der Test sendet die Frage direkt an den ausgewählten Provider. Keine Chatnachricht wird gespeichert. Keine vertraulichen Daten eingeben.</p>
+      <form method="post" action="/admin/ai/diagnostics/llm" data-ai-diagnostic="llm" class="row g-2 align-items-end">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="col-md-4"><label class="form-label" for="ai-diagnostic-provider">Aktives KI-Modell</label>
+          <select class="form-select" id="ai-diagnostic-provider" name="provider_id" required>
+            <option value="">Modell wählen</option>
+            {% for provider in providers if provider.active %}<option value="{{ provider.id }}">{{ provider.name }} ({{ provider.model_id }})</option>{% endfor %}
+          </select></div>
+        <div class="col-md-6"><label class="form-label" for="ai-diagnostic-prompt">Eigene Testfrage</label>
+          <input class="form-control" id="ai-diagnostic-prompt" name="prompt" maxlength="1200" required autocomplete="off" value="Antworte in einem Satz: Wozu dient ein Rathaus?"></div>
+        <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">LLM testen</button></div>
+      </form>
+      <div class="small mt-3" data-ai-diagnostic-result="llm" role="status" aria-live="polite" aria-atomic="true">Noch kein Test ausgeführt.</div>
+      <p class="form-text mb-0">Ergebnis: tatsächliche Modellantwort, verwendetes Modell und Antwortzeit. Die bisherigen Testschaltflächen oben bleiben erhalten.</p>
+    </div>
+  </div>
+</section>
+
 <section id="web-search" class="mt-4">
   <details class="card">
     <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-globe me-2" aria-hidden="true"></i>Optionale Websuche (Brave Search API) {% if cfg.ai_web_enabled == '1' %}· aktiv{% else %}· aus{% endif %}</summary>
@@ -128,6 +149,17 @@
       <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-index-refresh><i class="fa-solid fa-rotate me-1" aria-hidden="true"></i>Status aktualisieren</button>
     </div>
     <div class="card-body">
+      <div class="mb-3" data-ai-index-progress>
+        <div class="d-flex align-items-center justify-content-between mb-1 gap-2">
+          <strong class="small">Embedding-Fortschritt</strong>
+          <span class="fw-semibold small" data-ai-index-percent>{{ index_health.percent }} %</span>
+        </div>
+        <div class="progress" role="progressbar" aria-label="Embedding-Fortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ index_health.percent }}" data-ai-index-progressbar style="height:.85rem">
+          <div class="progress-bar" data-ai-index-progress-fill style="width:{{ index_health.percent }}%"></div>
+        </div>
+        <p class="small text-secondary mt-1 mb-0"><span data-ai-index-chunks-ready>{{ index_health.chunks_ready }}</span> von <span data-ai-index-chunks-total>{{ index_health.chunks_total }}</span> erforderlichen Textabschnitten eingebettet · automatische Prüfung alle 20 Sekunden. <span data-ai-index-last-check>Stand beim Laden der Seite</span></p>
+        <div class="small text-danger mt-1" data-ai-index-refresh-error role="status" aria-live="polite"></div>
+      </div>
       <div class="row g-3">
         <div class="col-sm-4"><div class="small text-secondary">Eigene Wissenseinträge indiziert</div>
           <div class="h4 mb-0"><span data-ai-index-ready>{{ index_health.ready }}</span> / <span data-ai-index-total>{{ index_health.total }}</span></div>
@@ -171,6 +203,18 @@
         <button type="submit" class="btn btn-sm btn-outline-warning"><i class="fa-solid fa-rotate-right me-1" aria-hidden="true"></i>Fehlgeschlagene Aufträge jetzt erneut einreihen</button>
       </form>{% endif %}
       {% endif %}
+      <form method="post" action="/admin/ai/diagnostics/embedding" data-ai-diagnostic="embedding" class="row g-2 align-items-end my-3">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="col-md-5"><label for="ai-embedding-test-provider" class="form-label small">Embedding-Provider testen</label>
+          <select id="ai-embedding-test-provider" name="provider_id" class="form-select form-select-sm" required>
+            <option value="">Provider wählen</option>
+            {% for provider in providers if provider.active %}<option value="{{ provider.id }}" {% if cfg.ai_vector_provider_id == provider.id|string %}selected{% endif %}>{{ provider.name }}</option>{% endfor %}
+          </select></div>
+        <div class="col-md-5"><label for="ai-embedding-test-model" class="form-label small">Embedding-Modell-ID</label>
+          <input id="ai-embedding-test-model" name="model_id" class="form-control form-control-sm" maxlength="200" value="{{ cfg.ai_vector_model_id }}" placeholder="text-embedding-3-small" required></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-outline-primary w-100" type="submit">Embeddings testen</button></div>
+        <div class="col-12 small" data-ai-diagnostic-result="embedding" role="status" aria-live="polite" aria-atomic="true">Noch nicht getestet.</div>
+      </form>
       <p class="form-text mb-0">Bei aktivierter Automatik prüft der TAKT-Hintergrunddienst etwa alle fünf Minuten auf neue und geänderte freigegebene Einträge, verarbeitet maximal zwei je Durchlauf und wiederholt fehlgeschlagene Jobs mit Wartezeit. Berechtigungsentzug wirkt sofort. Ein manueller Neuaufbau ist weiterhin möglich.</p>
     </div>
   </details>
@@ -228,7 +272,7 @@
       <div class="card h-100"><div class="card-header">Vorhandenes Wissen</div><div class="card-body">
         {% for doc in docs %}
         <details class="border-bottom pb-2 mb-2" id="knowledge-{{ doc.id }}">
-          <summary class="fw-semibold">{{ doc.title }} <span class="badge text-bg-{{ 'success' if doc.enabled else 'secondary' }}">{{ 'Freigegeben' if doc.enabled else 'Inaktiv' }}</span> <span class="badge text-bg-{{ index_health.documents[doc.id|string].color }} ms-1" data-ai-index-doc="{{ doc.id }}">{{ index_health.documents[doc.id|string].label }}</span></summary>
+          <summary class="fw-semibold">{{ doc.title }} <span class="badge text-bg-{{ 'success' if doc.enabled else 'secondary' }}">{{ 'Freigegeben' if doc.enabled else 'Inaktiv' }}</span> <span class="badge text-bg-{{ index_health.documents[doc.id|string].color }} ms-1" data-ai-index-doc="{{ doc.id }}">{{ index_health.documents[doc.id|string].label }}</span> <small class="text-secondary ms-1" data-ai-index-doc-progress="{{ doc.id }}">{{ index_health.documents[doc.id|string].percent }} %</small></summary>
           <form method="post" action="/admin/ai/knowledge" class="pt-3">
             <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="doc_id" value="{{ doc.id }}">
             <label class="form-label" for="ai-kt-{{ doc.id }}">Titel</label>
@@ -370,3 +414,4 @@
   </details>
 </section>
 {% endblock %}
+{% block scripts %}<script src="/static/ai-admin-knowledge.js" defer></script>{% endblock %}
