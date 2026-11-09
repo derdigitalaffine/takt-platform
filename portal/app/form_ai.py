@@ -49,7 +49,7 @@ def messages(prompt: str, *, form_title: str, form_description: str,
         "Antworte ausschließlich mit einem JSON-Objekt, ohne Markdown: "
         "{\"title\":\"Formulartitel\",\"description\":\"Einleitung\",\"items\":[{\"id\":\"feld1\",\"type\":\"short\","
         "\"title\":\"...\",\"description\":\"...\",\"required\":true}],\"notes\":[\"Hinweis zur Prüfung\"]}. "
-        "Erzeuge 3 bis maximal 100 sinnvolle Bausteine mit stabilen, eindeutigen alphanumerischen IDs "
+        "Erzeuge in der Regel 5 bis 25, höchstens 35 sinnvolle Bausteine mit stabilen, eindeutigen alphanumerischen IDs "
         "(max. 40 Zeichen), sinnvollen Fragetiteln und knappen Hilfetexten. "
         "Nutze nur die folgenden technisch unterstützten Eigenschaften; keine erfundenen Felder, "
         "Integrationen, Backend-Aktionen, Genehmigungsabläufe oder Datenquellen. "
@@ -94,7 +94,7 @@ def parse_result(reply: str, current: list[dict], mode: str, allowed_block_ids: 
     mapping = {}
     new = []
     for obj in proposed:
-        if not isinstance(obj, dict) or obj.get("type") not in fm.TYPES or obj.get("type") in fm.HIDDEN_TYPES:
+        if not isinstance(obj, dict) or obj.get("type") not in fm.TYPES or (obj.get("type") in fm.HIDDEN_TYPES and obj.get("type") != "block"):
             raise ValueError("Ein vorgeschlagener Feldtyp wird in diesem Baukasten nicht unterstützt.")
         if obj["type"] == "block" and (type(obj.get("block_id")) is not int or obj["block_id"] not in allowed_block_ids):
             raise ValueError("Ein vorgeschlagener Datenblock ist nicht verfügbar.")
@@ -126,6 +126,18 @@ def parse_result(reply: str, current: list[dict], mode: str, allowed_block_ids: 
     combined = fm.clean_schema(baseline + new)
     if len(combined) != len(baseline) + len(new):
         raise ValueError("Der Vorschlag enthält einen nicht unterstützten Baustein.")
+    # Validierung der Abhängigkeiten: Sichtbarkeits- und Pflichtregeln dürfen nur auf
+    # vorangehende Fragen zeigen, nie auf sich selbst oder zukünftige Felder.
+    available = set()
+    for item in combined:
+        for key in ("show_if", "required_if"):
+            if item.get(key) and any(rule.get("q") not in available for rule in item[key]["rules"]):
+                raise ValueError("Der KI-Vorschlag verweist in einer Bedingung auf ein späteres oder unbekanntes Feld.")
+        if fm.TYPES[item["type"]][2]:
+            available.add(item["id"])
+        elif item["type"] == "block":
+            for child in fm.block_items(item["block_id"]):
+                available.add(item["id"] + "_" + str(child.get("id", "")))
     errors = fm.form_validation.schema_errors(combined)
     if errors:
         raise ValueError("Der KI-Vorschlag enthält widersprüchliche Feldregeln. Bitte den Auftrag präzisieren.")
