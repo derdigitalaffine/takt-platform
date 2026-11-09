@@ -162,8 +162,7 @@ def test_confidential_complaint_goes_only_to_explicit_org_lead_without_native_ta
     manager_id = _user("anliegen-global-manager@example.org", "anliegen_submit,anliegen_manage,tasks_manage")
     manager = login("anliegen-global-manager@example.org", "test-anliegen-pass")
     assert manager.get(f"/anliegen/{cid}").status_code == 404
-    # The complaint category remains selectable for everyone; only this specific
-    # confidential case and its narrative must be invisible to the global manager.
+    # Category names are public choices; protect the specific case and its contents.
     overview = manager.get("/anliegen").text
     assert f"/anliegen/{cid}" not in overview
     assert "Ich benötige ein vertrauliches Gespräch." not in overview
@@ -337,3 +336,42 @@ def test_platform_feedback_category_and_non_order_status_restrictions():
     response = sender.post(f"/anliegen/{cid}/status", data={
         "csrf": csrf, "status": "ordered"})
     assert response.status_code in (403, 422)
+
+
+
+def test_description_first_form_keeps_original_and_persists_user_reviewed_text():
+    """The prominent raw description stays untouched until the user confirms."""
+    _enabled()
+    _user("anliegen-review-editor@example.org")
+    category = _cat("platform_feedback")
+    c = login("anliegen-review-editor@example.org", "test-anliegen-pass")
+    page = c.get("/anliegen/neu")
+    assert page.status_code == 200
+    assert 'id="anliegen-description"' in page.text
+    assert 'id="anliegen-ai"' in page.text or "manuelle Erfassung" in page.text
+    assert 'name="description_final"' in page.text
+    assert 'id="anliegen-recipient-preview"' in page.text
+    assert '/static/anliegen-form.css' in page.text
+    csrf = csrf_of(page.text)
+    created = c.post("/anliegen/neu", data={
+        "csrf": csrf, "category_id": category,
+        "title": "TAKT-Filter optimieren",
+        "description": "Rohtext des Meldenden bleibt unangetastet.",
+        "description_final": "In der TAKT-Aufgabenliste soll die Filterauswahl beim Zurücknavigieren erhalten bleiben.",
+    })
+    assert created.status_code == 303
+    case_id = int(created.headers["location"].split("/")[-1])
+    with SessionLocal() as db:
+        case = db.get(Anliegen, case_id)
+        assert case.description.startswith("In der TAKT-Aufgabenliste")
+        assert "Rohtext" not in case.description
+
+
+def test_description_first_javascript_does_not_submit_ai_result():
+    from pathlib import Path
+    asset = (Path(__file__).resolve().parents[1] / "app" / "static" / "anliegen.js").read_text()
+    assert "new AbortController()" in asset
+    assert "finalDescription.value = proposal.description" in asset
+    assert "previewRecipient()" in asset
+    assert "form.submit(" not in asset
+    assert "Originaltext" in asset or "Originalbeschreibung" in asset

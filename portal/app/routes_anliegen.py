@@ -5,7 +5,7 @@ from datetime import datetime
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, Integer
 from sqlalchemy.orm import Session
 
 from .anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
@@ -35,7 +35,6 @@ def list_anliegen(request: Request, view: str = "mine", category_id: int = 0,
                  status: str = "", q: str = "",
                  user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
     if view not in ("mine", "assigned", "reported", "unassigned", "all", "orders"):
         raise HTTPException(422, "Unbekannte Ansicht.")
     if status and status not in service.STATUSES:
@@ -101,12 +100,13 @@ def anliegen_recipient_preview(category_id: int, user: User = Depends(current_us
 @app.post("/anliegen/neu", dependencies=[Depends(check_csrf)])
 def create_anliegen(request: Request, category_id: int = Form(...),
                    title: str = Form(...), description: str = Form(...),
+                   description_final: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _submit(user)
     rate_limit(request, "anliegen-submit", limit=12, window=3600, key=str(user.id))
     cat = service.category(db, category_id, enabled=True)
-    case = service.create(db, user, cat, title, description)
+    case = service.create(db, user, cat, title, description_final.strip() or description)
     db.commit()
     flash(request, "Anliegen ANL-%06d eingereicht. %s" % (
         case.id, "Zuständigkeit noch nicht eindeutig konfiguriert." if not case.assignee_id
@@ -118,7 +118,6 @@ def create_anliegen(request: Request, category_id: int = Form(...),
 def detail_anliegen(request: Request, case_id: int, user: User = Depends(current_user),
                    db: Session = Depends(get_db)):
     _module()
-    _read(user)
     case = service.get(db, user, case_id)
     events = list(db.scalars(select(AnliegenEvent).where(AnliegenEvent.anliegen_id == case.id)
                              .order_by(AnliegenEvent.id)))
@@ -138,7 +137,6 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
                    expected_delivery: str = Form(""), back: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
     case = service.get(db, user, case_id)
     if not service.can_handle(user, case):
         raise HTTPException(403)
@@ -162,7 +160,6 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
 def assign_anliegen(request: Request, case_id: int, assignee_id: int = Form(...),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
     case = service.get(db, user, case_id)
     if case.confidential or not user.can("anliegen_manage"):
         raise HTTPException(403, "Vertrauliche Beschwerden dürfen nicht allgemein zugewiesen werden.")
@@ -192,7 +189,18 @@ def categories_anliegen(request: Request, user: User = Depends(admin_user),
     categories = list(db.scalars(select(AnliegenCategory).order_by(
         AnliegenCategory.position, AnliegenCategory.title)))
     users = list(db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)))
-    return render(request, "anliegen_categories.html", user, categories=categories, users=users)
+    from sqlalchemy import func
+    counts = {
+        cid: (total, unresolved or 0)
+        for cid, total, unresolved in db.execute(
+            select(Anliegen.category_id, func.count(Anliegen.id),
+                   func.sum(func.cast(Anliegen.assignee_id.is_(None), Integer)))
+            .where(Anliegen.status.not_in(("done", "closed", "cancelled")))
+            .group_by(Anliegen.category_id)
+        )
+    }
+    return render(request, "anliegen_categories.html", user,
+                  categories=categories, users=users, counts=counts)
 
 
 @app.post("/anliegen/kategorien/{category_id:int}", dependencies=[Depends(check_csrf)])
