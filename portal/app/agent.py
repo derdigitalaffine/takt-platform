@@ -21,6 +21,12 @@ WRITE_TOOLS = {
     "set_task_status", "assign_anliegen", "set_anliegen_status",
 }
 MAX_ACTIONS = 4
+SENSITIVE_REQUEST = re.compile(r"\b(?:vertraulich\w*|beschwerd\w*|mobbing|belästigung|whistleblow\w*)\b", re.I)
+
+
+def sensitive_request(prompt):
+    """Do not send obvious confidential complaints to an external LLM."""
+    return bool(SENSITIVE_REQUEST.search(prompt))
 
 
 def allowed(user, module):
