@@ -111,6 +111,17 @@
           <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="enabled" value="1" id="ai-doc-enable" checked><label class="form-check-label" for="ai-doc-enable">Für KI freigeben</label></div>
           <button class="btn btn-primary" type="submit">Wissen hinzufügen</button>
         </form>
+        <hr class="my-4">
+        <form method="post" action="/admin/ai/knowledge/upload" enctype="multipart/form-data">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label for="ai-import-file" class="form-label">Dokument als Wissen importieren</label>
+          <input type="file" class="form-control mb-2" id="ai-import-file" name="file" accept=".pdf,.docx,.txt,.md" required>
+          <label for="ai-import-title" class="form-label">Optionaler Dokumenttitel</label>
+          <input type="text" class="form-control mb-2" id="ai-import-title" name="title" maxlength="200">
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="enabled" value="1" id="ai-import-enable"><label class="form-check-label" for="ai-import-enable">Nach Import für KI freigeben</label></div>
+          <div class="form-text mb-2">PDF, DOCX, TXT oder Markdown bis 5 MB. Nur Textebene; gescannte PDFs benötigen vorher OCR. Der extrahierte Text wird gespeichert, nicht die Originaldatei.</div>
+          <button class="btn btn-outline-primary" type="submit">Importieren</button>
+        </form>
       </div></div>
     </div>
     <div class="col-lg-6">
