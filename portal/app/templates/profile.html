@@ -64,6 +64,7 @@
           <div class="col-12 col-sm-6"><label class="form-label" for="profile-{{ key }}">{{ label }}</label>
             <input class="form-control" id="profile-{{ key }}" name="{{ key }}" type="{{ kind }}" value="{{ details.get(key, '') }}" maxlength="{{ limit }}" autocomplete="{{ autocomplete or 'off' }}" {% if key.endswith('_country') %}placeholder="DE"{% elif key == 'zoneinfo' %}placeholder="Europe/Berlin"{% elif key == 'locale' %}placeholder="de-DE"{% endif %}>
           </div>
+          {% endif %}
           {% endfor %}
         </div></div>
       </details></div>
