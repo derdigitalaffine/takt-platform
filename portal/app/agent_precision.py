@@ -57,3 +57,48 @@ def focused(signatures, focus):
         return signatures
     return [s for s in signatures if tool_module(s.split('(', 1)[0]) in focus or
             (s.startswith('search_people(') and focus & {'tasks', 'anliegen'})]
+
+
+# Tool invocation is opt-in by user intent, NOT the default for every message.
+# Deliberately conservative: an unsure classification must get a normal chat
+# reply, not a fabricated plan or a false claim that something was changed.
+_ACTION_VERB = re.compile(
+    r"\b(?:erstelle|erstell|anlegen|lege|füge|hinzufügen|trage|eintragen|"
+    r"ändere|änder|bearbeite|aktualisiere|verschiebe|kopiere|dupliziere|"
+    r"weise|zuweisen|zuordnen|setze|markiere|erledige|lösche|lösch|"
+    r"suche|finde|öffne|zeige|navigiere|bring|leite|plane|buche|"
+    r"starte|beende|schließe|sende)\b", re.I)
+_ACTION_OBJECT = re.compile(
+    r"\b(?:aufgab\w*|anliegen|formular\w*|kalender|termin\w*|"
+    r"prozess\w*|akten|akte|dms|büromaterial|büromöbel|"
+    r"bestellung\w*|status|zuständigkeit|priorität|"
+    r"organisation\w*|bereich\w*)\b", re.I)
+_ACTION_REQUEST = re.compile(
+    r"\b(?:bitte|kannst du|könntest du|würdest du|ich möchte|ich will|"
+    r"ich brauche|wir brauchen|hilf mir|mach|machst du)\b", re.I)
+_EXPLANATION = re.compile(
+    r"^\\s*(?:was|wer|wie|warum|wieso|weshalb|woher|wofür|"
+    r"bedeutet|erkläre|erklär|definiere|beschreibe|"
+    r"ist|sind|kann man|darf man)\b", re.I)
+
+
+def needs_tools(prompt: str) -> bool:
+    """Only deliberate TAKT operations/searches enter the JSON tool planner.
+
+    Generic knowledge questions (including a question about a TAKT module)
+    use conversational LLM completion. No AI guess may grant write access.
+    """
+    value = (prompt or "").strip()
+    if not value:
+        return False
+    if _EXPLANATION.search(value):
+        return False
+    if _ACTION_VERB.search(value) and _ACTION_OBJECT.search(value):
+        return True
+    # "Meine offenen Aufgaben" and similar scoped in-app lookups.
+    if _ACTION_OBJECT.search(value) and re.search(
+        r"\b(?:meine|meinen|mir zugewiesen|bei mir|offene|überfällige)\b",
+        value, re.I
+    ) and not value.endswith("?"):
+        return True
+    return False
