@@ -212,3 +212,106 @@ def test_agent_csrf_and_non_ai_permissions(monkeypatch):
         db.commit()
     token = csrf_of(c.get("/").text)
     assert c.post("/agent/plan", data={"csrf": token, "prompt": "Bitte Aufgaben anzeigen"}).status_code == 403
+
+
+def test_plain_questions_are_answered_without_any_tool_plan(monkeypatch):
+    from app import agent_intent
+    from app.ai_models import AIConversation, AIMessage
+
+    assert agent_intent.classify("Was ist heilifenosmchel?") == "chat"
+    assert agent_intent.classify("Was ist ?") == "chat"
+    assert agent_intent.classify("Wie funktioniert ein Rathaus?") == "chat"
+    assert agent_intent.classify("Schreibe mir einen kurzen Text über TAKT") == "chat"
+    assert agent_intent.classify("Lege die Aufgabe PoC Prüfung starten an") == "operate"
+    assert agent_intent.classify("Zeige meine Aufgaben") == "operate"
+    assert agent_intent.classify("Öffne die Aufgaben") == "navigate"
+
+    _enable()
+    captured = []
+
+    async def fake_complete(provider, messages, **kwargs):
+        captured.append(messages)
+        return "Diesen Begriff kenne ich nicht. Kannst du mir mehr Kontext geben?"
+
+    monkeypatch.setattr(ai_provider, "complete", fake_complete)
+    c = login(*ADMIN)
+    csrf = csrf_of(c.get("/").text)
+    created = c.post("/agent/new", data={"csrf": csrf})
+    assert created.status_code == 303
+    chat_id = int(created.headers["location"].split("=")[1])
+    for prompt in ("was ist heilifenosmchel?", "was ist ?"):
+        response = c.post("/agent/plan", data={"csrf": csrf, "prompt": prompt, "chat_id": chat_id})
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["mode"] == "chat"
+        assert payload["proposals"] == []
+        assert payload["open_url"] == ""
+        assert "Diesen Begriff kenne ich nicht" in payload["message"]
+        assert payload["plan_id"] == ""
+    # One ordinary LLM call per question, never a search or JSON tool prompt.
+    assert len(captured) == 2
+    assert all("Antworte NICHT als JSON" in call[0]["content"] for call in captured)
+    with SessionLocal() as db:
+        messages = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == chat_id)))
+        assert len(messages) == 4
+        assert all(msg.role in {"user", "assistant"} for msg in messages)
+        assert db.get(AIConversation, chat_id) is not None
+
+
+def test_navigation_returns_a_link_without_llm_or_auto_redirect(monkeypatch):
+    from pathlib import Path
+
+    _enable()
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("Pure navigation should not contact an LLM")
+    monkeypatch.setattr(ai_provider, "complete", forbidden)
+    c = login(*ADMIN)
+    response, _ = _plan(c, "Öffne die Aufgaben")
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["mode"] == "navigate"
+    assert data["open_url"] == "/aufgaben"
+    assert "/aufgaben" in data["html"]
+    assert "führen" in data["message"]
+    assert data["proposals"] == []
+
+    js = (Path(__file__).resolve().parents[1] / "app" / "static" / "ai-chat.js").read_text()
+    assert "window.location.assign(data.open_url)" not in js
+    assert "window.parent.location.assign(data.open_url)" not in js
+    assert "link.href = data.open_url" in js
+
+
+def test_malformed_small_model_plan_has_safe_friendly_fallback(monkeypatch):
+    _enable()
+    calls = []
+
+    async def fake_complete(provider, messages, **kwargs):
+        calls.append(messages)
+        return "Ich kann den Auftrag nicht als JSON formatieren."
+    monkeypatch.setattr(ai_provider, "complete", fake_complete)
+    c = login(*ADMIN)
+    response, _ = _plan(c, "Lege eine neue Aufgabe Inventur in TAKT an")
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["mode"] == "operate"
+    assert data["proposals"] == []
+    assert data["plan_id"] == ""
+    assert "keinen sicheren TAKT-Vorschlag" in data["message"]
+    assert len(calls) == 2
+    with SessionLocal() as db:
+        assert db.scalar(select(Task).where(Task.title == "Inventur")) is None
+
+
+def test_chat_design_has_typing_and_adjustable_font_size():
+    from pathlib import Path
+
+    folder = Path(__file__).resolve().parents[1] / "app"
+    template = (folder / "templates" / "ai_chat.html").read_text()
+    js = (folder / "static" / "ai-chat.js").read_text()
+    css = (folder / "static" / "ai-chat.css").read_text()
+    pref = (folder / "static" / "ai-chat-preferences.js").read_text()
+    assert 'data-ai-font-size' in template
+    assert 'takt-ai-reading-size' in pref
+    assert 'data-ai-progress-label' in js and 'ai-typing-dots' in js
+    assert 'ai-typing-bounce' in css and 'prefers-reduced-motion' in css
+    assert "Du' if item.role" in template
