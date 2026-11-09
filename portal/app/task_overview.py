@@ -40,14 +40,14 @@ def collect(db, user, modules, *, now=None):
                     due=due, scope=scope, detail=detail, icon=icon, late=bool(due and due < now), **extra)
 
     if 'calendars' in modules:
-        from sqlalchemy import select
+        from sqlalchemy import select, or_
         from .leave_extensions import LeaveInbox
         from .leave_admin import removed_ids
         # Administrative deletions are audit notifications, not pending work.
         # Keep their receipt in the personal leave inbox, not in the task queue.
         notices = select(LeaveInbox).where(
             LeaveInbox.user_id == user.id, LeaveInbox.read.is_(False),
-            LeaveInbox.request_id.not_in(removed_ids()),
+            or_(LeaveInbox.request_id.is_(None), LeaveInbox.request_id.not_in(removed_ids())),
             ~LeaveInbox.title.like('Urlaubsabwesenheit administrativ gelöscht%'),
         ).order_by(LeaveInbox.id.desc()).limit(200)
         for notice in db.scalars(notices):
