@@ -2932,6 +2932,7 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "ai_providers": {"stream_enabled": "BOOLEAN NOT NULL DEFAULT 0"},
     "leave_policies": {"holiday_state": "VARCHAR(8) NOT NULL DEFAULT 'inherit'",
                        "external_attestation": "BOOLEAN NOT NULL DEFAULT 0"},
     "task_board_cards": {"shareable": "BOOLEAN NOT NULL DEFAULT 0"},

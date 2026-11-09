@@ -19,6 +19,7 @@ class AIProvider(Base):
     text_key_enc: Mapped[str] = mapped_column(Text, default="")
     image_key_enc: Mapped[str] = mapped_column(Text, default="")
     active: Mapped[bool] = mapped_column(Boolean, default=False)
+    stream_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     allow_private: Mapped[bool] = mapped_column(Boolean, default=False)
     timeout_seconds: Mapped[int] = mapped_column(Integer, default=180)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)

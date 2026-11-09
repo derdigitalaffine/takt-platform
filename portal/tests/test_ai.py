@@ -274,3 +274,102 @@ def test_admin_imports_internal_markdown_document():
     with SessionLocal() as db:
         doc = db.scalar(select(AIKnowledge).where(AIKnowledge.title == "Interne Testanweisung"))
         assert doc and "Nur Demo-Inhalt" in doc.body_md and doc.enabled
+
+
+
+def test_provider_can_enable_streaming_without_changing_legacy_default():
+    _enable()
+    c = login(*ADMIN)
+    csrf = csrf_of(c.get("/admin/ai").text)
+    response = c.post("/admin/ai/provider", data={
+        "csrf": csrf, "name": "SSE Testprovider", "base_url": "https://llm.example.org/api",
+        "model_id": "sse-model", "text_key": "fake-test-credential", "active": "1",
+        "stream_enabled": "1",
+    })
+    assert response.status_code == 303
+    with SessionLocal() as db:
+        provider = db.scalar(select(AIProvider).where(AIProvider.name == "SSE Testprovider"))
+        assert provider and provider.stream_enabled
+
+
+def test_sse_endpoint_sends_incremental_chunks_and_persists_complete_answer(monkeypatch):
+    _enable()
+    _user("ai-stream-test@example.org")
+    provider_id = _provider()
+    with SessionLocal() as db:
+        db.get(AIProvider, provider_id).stream_enabled = True
+        db.commit()
+
+    async def fake_stream(provider, messages, *, image=False, max_tokens=1024):
+        assert provider.stream_enabled
+        assert messages[-1]["content"] == "Bitte live."
+        yield "Hallo"
+        yield " in Echtzeit!"
+
+    monkeypatch.setattr(ai_provider, "stream_completion", fake_stream)
+    c = login("ai-stream-test@example.org", "passwort-123")
+    csrf = csrf_of(c.get("/ki").text)
+    created = c.post("/ki/new", data={"csrf": csrf, "provider_id": provider_id})
+    cid = int(created.headers["location"].split("=")[1])
+    resp = c.post(f"/ki/{cid}/message/updates", data={"csrf": csrf, "message": "Bitte live."})
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers["content-type"]
+    assert "event: status" in resp.text
+    assert 'event: delta\ndata: {"text": "Hallo"}' in resp.text
+    assert 'event: delta\ndata: {"text": " in Echtzeit!"}' in resp.text
+    assert "event: done" in resp.text
+    with SessionLocal() as db:
+        msgs = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == cid)
+                               .order_by(AIMessage.id)))
+        assert [m.role for m in msgs] == ["user", "assistant"]
+        assert msgs[1].content == "Hallo in Echtzeit!"
+
+
+def test_sse_endpoint_json_fallback_keeps_browser_async(monkeypatch):
+    _enable()
+    _user("ai-json-fallback@example.org")
+    provider_id = _provider()
+    with SessionLocal() as db:
+        db.get(AIProvider, provider_id).stream_enabled = False
+        db.commit()
+
+    async def fake_complete(provider, messages, *, image=False, max_tokens=1024):
+        assert messages[-1]["role"] == "user"
+        return "Fertige JSON-Antwort"
+
+    monkeypatch.setattr(ai_provider, "complete", fake_complete)
+    c = login("ai-json-fallback@example.org", "passwort-123")
+    csrf = csrf_of(c.get("/ki").text)
+    cid = int(c.post("/ki/new", data={"csrf": csrf, "provider_id": provider_id})
+              .headers["location"].split("=")[1])
+    resp = c.post(f"/ki/{cid}/message/updates", data={"csrf": csrf, "message": "Test."})
+    assert resp.status_code == 200
+    assert "event: status" in resp.text
+    assert "Modell verarbeitet die Anfrage" in resp.text
+    assert "Fertige JSON-Antwort" in resp.text
+    assert "event: done" in resp.text
+
+
+def test_sse_does_not_persist_failed_partial_response(monkeypatch):
+    _enable()
+    _user("ai-stream-error@example.org")
+    pid = _provider()
+    with SessionLocal() as db:
+        db.get(AIProvider, pid).stream_enabled = True
+        db.commit()
+
+    async def interrupted(provider, messages, *, image=False, max_tokens=1024):
+        yield "Teilantwort"
+        raise ai_provider.AIProviderError("Sicherer Testfehler")
+
+    monkeypatch.setattr(ai_provider, "stream_completion", interrupted)
+    c = login("ai-stream-error@example.org", "passwort-123")
+    csrf = csrf_of(c.get("/ki").text)
+    cid = int(c.post("/ki/new", data={"csrf": csrf, "provider_id": pid})
+              .headers["location"].split("=")[1])
+    resp = c.post(f"/ki/{cid}/message/updates", data={"csrf": csrf, "message": "Test"})
+    assert "event: error" in resp.text
+    assert "event: done" not in resp.text
+    with SessionLocal() as db:
+        assert not db.scalar(select(AIMessage.id).where(
+            AIMessage.conversation_id == cid, AIMessage.role == "assistant"))
