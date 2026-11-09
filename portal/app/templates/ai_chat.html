@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}KI-Chat{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/ai-chat.css">{% endblock %}
 {% block content %}
 {{ m.page_head('KI-Chat', 'Persönlicher, geschützter KI-Arbeitsplatz mit optionaler Recherche in freigegebenem TAKT-Wissen.') }}
 
-<div class="row g-3">
-  <aside class="col-12 col-xl-3" aria-label="Persönliche KI-Unterhaltungen">
+<div class="row g-3 ai-chat-layout">
+  <aside class="col-12 col-xl-3 ai-chat-sidebar" aria-label="Persönliche KI-Unterhaltungen">
     <div class="card">
       <div class="card-header">Unterhaltungen</div>
       <div class="card-body">
@@ -30,10 +31,10 @@
   </aside>
 
   <section class="col-12 col-xl-9" aria-label="KI-Unterhaltung">
-    <div class="card">
+    <div class="card ai-chat-panel">
       {% if current %}
       <div class="card-header d-flex justify-content-between align-items-center gap-2 flex-wrap">
-        <strong>{{ current.title }}</strong>
+        <strong data-ai-chat-title>{{ current.title }}</strong>
         <div class="d-flex gap-2 flex-wrap">
           <a class="btn btn-sm btn-outline-secondary" href="/ki/{{ current.id }}/export"><i class="fa-solid fa-file-export me-1" aria-hidden="true"></i>Export</a>
           <details>
@@ -50,33 +51,38 @@
           </details>
         </div>
       </div>
-      <div class="card-body">
-        <ol class="list-unstyled mb-4" aria-label="Chatnachrichten">
+      <div class="ai-chat-history-wrap">
+        <div class="card-body ai-chat-history" data-ai-scroll-area>
+        <ol class="ai-message-list list-unstyled mb-0" data-ai-messages aria-label="Chatnachrichten" role="log" aria-live="off">
           {% for item in chat_messages %}
-          <li class="mb-3 {{ 'ms-md-5' if item.role == 'user' else 'me-md-5' }}">
-            <div class="border rounded p-3 {{ 'bg-body-tertiary' if item.role == 'user' else '' }}">
-              <div class="small fw-semibold mb-2"><i class="fa-solid {{ 'fa-user' if item.role == 'user' else 'fa-brain' }} me-1" aria-hidden="true"></i>{{ 'Sie' if item.role == 'user' else 'KI-Assistent' }}</div>
-              <div class="text-break" style="white-space:pre-wrap">{{ item.content }}</div>
+          <li class="ai-message {{ 'ai-message--user' if item.role == 'user' else 'ai-message--assistant' }}" data-ai-message>
+            <div class="ai-message-avatar" aria-hidden="true"><i class="fa-solid {{ 'fa-user' if item.role == 'user' else 'fa-brain' }}"></i></div>
+            <div class="ai-message-bubble">
+              <div class="ai-message-label">{{ 'Sie' if item.role == 'user' else 'KI-Assistent' }}</div>
+              <div class="ai-message-text text-break" data-ai-message-text>{{ item.content }}</div>
               {% if item.sources %}
-              <div class="border-top mt-3 pt-2">
+              <div class="ai-message-sources">
                 <strong class="small">Verwendete interne Quellen</strong>
                 <ul class="small mb-0">
                   {% for source in item.sources %}<li><a href="{{ source.url }}">{{ source.title }}</a></li>{% endfor %}
                 </ul>
               </div>
               {% endif %}
-              {% if item.model %}<div class="small text-secondary mt-2">Modell: {{ item.model }}</div>{% endif %}
+              {% if item.model %}<div class="ai-message-model">Modell: {{ item.model }}</div>{% endif %}
             </div>
           </li>
           {% else %}
-          <li class="text-secondary">Schreiben Sie Ihre erste Nachricht. Auf Wunsch können freigegebene interne Wissensquellen herangezogen werden.</li>
+          <li class="ai-chat-empty" data-ai-empty><i class="fa-regular fa-comments fa-2x mb-3" aria-hidden="true"></i><p class="mb-1 fw-semibold">Was möchten Sie wissen?</p><p class="small mb-0">Schreiben Sie Ihre erste Nachricht. Freigegebene interne Wissensquellen können Sie bei Bedarf einbeziehen.</p></li>
           {% endfor %}
         </ol>
-        <form method="post" action="/ki/{{ current.id }}/message" data-ai-chat-form data-stream-action="/ki/{{ current.id }}/message/updates" enctype="multipart/form-data">
+        </div>
+        <button class="btn btn-sm btn-outline-secondary ai-jump-to-latest" type="button" data-ai-jump hidden><i class="fa-solid fa-arrow-down me-1" aria-hidden="true"></i>Zur neuesten Nachricht</button>
+      </div>
+        <form class="ai-chat-composer" method="post" action="/ki/{{ current.id }}/message" data-ai-chat-form data-stream-action="/ki/{{ current.id }}/message/updates" data-ai-has-messages="{{ '1' if chat_messages else '0' }}" enctype="multipart/form-data">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <div class="mb-2">
             <label class="form-label" for="ai-prompt">Ihre Nachricht</label>
-            <textarea class="form-control" id="ai-prompt" name="message" rows="4" maxlength="8000" placeholder="Wie kann ich Ihnen helfen?" required></textarea>
+            <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="3" maxlength="8000" placeholder="Wie kann ich Ihnen helfen?" required></textarea>
           </div>
           {% if knowledge_available %}
           <div class="form-check mb-2">
@@ -91,18 +97,14 @@
             <div class="form-text">Das Bild wird nur für diese Anfrage übertragen und nicht im Chatverlauf gespeichert.</div>
           </div>
           {% endif %}
-          <div class="ai-chat-live mb-3" data-ai-live hidden aria-label="Aktuelle KI-Antwort">
-            <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-              <span class="small fw-semibold"><i class="fa-solid fa-brain me-1" aria-hidden="true"></i>KI-Assistent antwortet</span>
-              <button type="button" class="btn btn-sm btn-outline-secondary" data-ai-stop>Abbrechen</button>
+          <div class="ai-composer-footer">
+            <span class="small text-secondary ai-chat-status" data-ai-status role="status" aria-live="polite"></span>
+            <div class="d-flex gap-2 justify-content-end">
+              <button type="button" class="btn btn-outline-secondary" data-ai-stop hidden disabled><i class="fa-solid fa-stop me-1" aria-hidden="true"></i>Stoppen</button>
+              <button type="submit" class="btn btn-primary" data-ai-send {% if not providers %}disabled{% endif %}><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Senden</button>
             </div>
-            <div class="small text-secondary mb-2" data-ai-status role="status" aria-live="polite">Verbindung wird aufgebaut …</div>
-            <div class="ai-chat-live-text text-break" style="white-space:pre-wrap" data-ai-output aria-live="off"></div>
           </div>
-          <div class="d-flex align-items-center gap-3 flex-wrap">
-            <button type="submit" class="btn btn-primary" data-ai-send {% if not providers %}disabled{% endif %}><i class="fa-solid fa-paper-plane me-1" aria-hidden="true"></i>Nachricht senden</button>
-            <span class="small text-secondary" data-ai-hint role="status" aria-live="polite"></span>
-          </div>
+          <div class="small text-danger mt-2" data-ai-hint role="status" aria-live="polite"></div>
         </form>
       </div>
       {% else %}
