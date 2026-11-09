@@ -115,14 +115,20 @@
       list.className = 'small mb-0';
       data.sources.forEach(function (source) {
         if (!source || typeof source.url !== 'string' || typeof source.title !== 'string') return;
-        if (!source.url.startsWith('/') || source.url.startsWith('//')) return;
         var url;
         try { url = new URL(source.url, window.location.origin); }
         catch (error) { return; }
-        if (url.origin !== window.location.origin) return;
+        var external = source.kind === 'web';
+        if (external) {
+          // URLs are already checked by the backend; keep browser defence-in-depth.
+          if (url.protocol !== 'https:' || url.username || url.password ||
+              url.hostname === 'localhost' || url.hostname.endsWith('.localhost')) return;
+        } else if (!source.url.startsWith('/') || source.url.startsWith('//') ||
+                   url.origin !== window.location.origin) return;
         var item = document.createElement('li');
         var link = document.createElement('a');
-        link.href = url.pathname + url.search + url.hash;
+        link.href = external ? url.href : url.pathname + url.search + url.hash;
+        if (external) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
         link.textContent = source.title;
         item.appendChild(link);
         list.appendChild(item);

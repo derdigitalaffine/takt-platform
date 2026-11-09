@@ -129,6 +129,7 @@ PERMISSIONS = {
     "ai_chat": ("KI-Chat verwenden", "fa-brain", "Persönliche KI-Unterhaltungen mit freigegebenen Sprachmodellen"),
     "ai_knowledge": ("KI-Wissensrecherche", "fa-book-open", "Freigegebene interne Wissensbestände bei KI-Fragen verwenden"),
     "ai_vision": ("KI-Bildanalyse", "fa-image", "Eigene Bilder an freigegebene multimodale Modelle übermitteln"),
+    "ai_web": ("KI-Websuche", "fa-globe", "Öffentliche Webquellen auf ausdrücklichen Wunsch recherchieren"),
     "maps": ("Karten", "fa-map-location-dot", "Im Kartenbrowser eigene WMS/WFS-Layer hinzufügen, Karten speichern und teilen"),
     "payments": ("Zahlungen", "fa-euro-sign", "Zahlungsübersicht und Export, Zahlungen als bezahlt markieren, erstatten und stornieren"),
     "resources": ("Ressourcen", "fa-building", "Bürgerhäuser, Räume, Grillplätze, Geräte anlegen, Buchungen bearbeiten, Belegungskalender teilen"),
@@ -2770,6 +2771,8 @@ DEFAULT_SETTINGS = {
     "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
     "ai_knowledge_enabled": "0",
+    "ai_web_enabled": "0",
+    "ai_web_key_enc": "",
     "ai_vector_enabled": "0",
     "ai_vector_provider_id": "0",
     "ai_vector_model_id": "",
