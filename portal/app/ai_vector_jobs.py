@@ -95,7 +95,8 @@ def reconcile(db) -> dict[str, int]:
                 job.attempts = 0
                 job.next_attempt_at = None
                 job.lease_until = None
-            elif job.model_id != model_id or job.desired_hash != fingerprint:
+            elif (job.model_id != model_id or job.desired_hash != fingerprint
+                  or job.status == "done"):
                 job.model_id, job.desired_hash = model_id, fingerprint
                 job.status = "pending"
                 job.attempts = 0
