@@ -335,7 +335,12 @@ def start_auto(db: Session, case: Anliegen, actor: User) -> list[AnliegenProcess
     started = []
     if case.confidential:
         return started
+    used = set(db.scalars(select(AnliegenProcessRule.process_id).join(
+        AnliegenProcessRun, AnliegenProcessRun.rule_id == AnliegenProcessRule.id
+    ).where(AnliegenProcessRun.anliegen_id == case.id)))
     for rule in applicable(db, case.category_id, case.org_id, origin="auto"):
+        if rule.process_id in used:
+            continue  # Explicitly selected process wins over category automation.
         service_actor = db.get(User, rule.approved_by_id)
         if not service_actor or not service_actor.active:
             cases.record(db, case, actor, "process", "Automatischer Start: freigebende Person nicht verfügbar.")
@@ -345,6 +350,7 @@ def start_auto(db: Session, case: Anliegen, actor: User) -> list[AnliegenProcess
                 run = launch(db, case, rule.id, service_actor, origin="auto",
                              token=f"{case.id:016x}{rule.id:016x}")
             started.append(run)
+            used.add(rule.process_id)
         except HTTPException:
             cases.record(db, case, actor, "process", "Automatischer Prozessstart nicht möglich.")
     return started
