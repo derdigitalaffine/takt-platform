@@ -349,7 +349,7 @@ def preview(db, actions):
             elif tool == "set_task_priority":
                 label += " → Priorität " + ts.PRIORITIES[action["priority"]]
             elif tool == "set_task_status":
-                label += " → " + ("Zur Freigabe einreichen" if action["status"] == "done" and row.requires_review else ts.STATUSES[action["status"]]
+                label += " → " + ("Zur Freigabe einreichen" if action["status"] == "done" and row.requires_review else ts.STATUSES[action["status"]])
             else:
                 label += " → " + issues.STATUSES[action["status"]]
         descriptions.append(label)
