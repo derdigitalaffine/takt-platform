@@ -13,9 +13,12 @@ def test_agent_errors_are_json_even_with_default_fetch_accept(monkeypatch):
         return 'Kein JSON vom Modell'
     monkeypatch.setattr(ai_provider, 'complete', invalid)
     result = c.post('/agent/plan', data=dict(csrf=csrf, prompt='Erstelle ein Formular'), headers={'Accept': '*/*'})
-    assert result.status_code == 422
+    # Invalid model JSON must not create a tool plan or produce a cryptic error.
+    assert result.status_code == 200
     assert result.headers['content-type'].startswith('application/json')
-    assert 'Arbeitsplan' in result.json()['detail']
+    assert result.json()['proposals'] == []
+    assert result.json()['plan_id'] == ''
+    assert 'keinen sicheren TAKT-Vorschlag' in result.json()['message']
     assert result.headers['cache-control'] == 'no-store'
     assert c.post('/agent/plan', data=dict(prompt='ja')).status_code == 400
     expired = client().post('/agent/plan', data=dict(prompt='ja'))
