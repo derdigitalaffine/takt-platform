@@ -55,6 +55,8 @@ def test_agent_header_launcher_uses_compact_button_not_floating_overlay():
     settings(module_ai="1")
     html = login("admin@example.org", "admin-passwort-123").get("/").text
     assert 'class="agent-header-control"' in html
+    assert html.count('data-agent-dock') == 1
+    assert html.count('id="agent-dock-panel"') == 1
     assert 'class="btn btn-link agent-dock-launch"' in html
     assert 'aria-controls="agent-dock-panel"' in html
     assert 'aria-expanded="false"' in html
