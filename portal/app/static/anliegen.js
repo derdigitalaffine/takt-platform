@@ -20,6 +20,7 @@
   var controller = null;
   var busy = false;
   var generated = false;
+  var inputRevision = 0;
   var preview = document.getElementById('anliegen-recipient-preview');
   var previewSeq = 0;
   async function previewRecipient() {
@@ -74,12 +75,14 @@
   }
 
   function manualChange() {
+    inputRevision += 1;
     if (generated) {
       setReview('Sie bearbeiten den Vorschlag selbst. Nur Ihre geprüften Angaben werden eingereicht.', 'changed');
     }
   }
 
   description.addEventListener('input', function () {
+    inputRevision += 1;
     if (counter) counter.textContent = description.value.length.toLocaleString('de-DE') + ' / 10.000';
   });
   title.addEventListener('input', manualChange);
@@ -110,6 +113,8 @@
   aiButton.addEventListener('click', async function () {
     if (busy || confidential()) return;
     var raw = description.value.trim();
+    var selectedCategory = category.value;
+    var revision = inputRevision;
     if (raw.length < 8) {
       setStatus('Bitte beschreiben Sie Ihr Anliegen zunächst mit mindestens 8 Zeichen.', 'error');
       description.focus();
@@ -155,7 +160,8 @@
 
       // Do not overwrite fields if the user edited the original during inference
       // or switched to a confidential category.
-      if (controller.signal.aborted || confidential() || description.value.trim() !== raw) {
+      if (controller.signal.aborted || confidential() || category.value !== selectedCategory ||
+          description.value.trim() !== raw || inputRevision !== revision) {
         setStatus('Die ursprüngliche Beschreibung oder Kategorie wurde geändert. Der alte KI-Vorschlag wurde nicht übernommen.', 'error');
         return;
       }
