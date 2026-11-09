@@ -30,7 +30,7 @@
       <tr>
         <td><a class="fw-semibold" href="/anliegen/{{ item.id }}">{{ item.reference }}</a>
             <div class="small text-secondary">{{ item.created_at|local('%d.%m.%Y') }}</div></td>
-        <td><a href="/anliegen/{{ item.id }}">{{ item.title }}</a>
+        <td><a href="/anliegen/{{ item.id }}">{{ item.display_title }}</a>
             {% if item.confidential %}<div class="small text-secondary"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Vertraulich</div>{% endif %}</td>
         <td>{{ item.category.title }}</td>
         <td>{{ item.task.assignee.name if item.task and item.task.assignee else 'Nicht zugewiesen' }}</td>
