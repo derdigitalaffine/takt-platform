@@ -47,6 +47,17 @@ with tempfile.TemporaryDirectory(prefix='takt-navigation-') as root:
                 expect(p.locator('#app-nav a[href="/meetings/plan"]')).to_be_visible()
                 p.locator('#app-nav a[href="/meetings/plan"]').click()
                 expect(p.get_by_label('Ende',exact=True)).to_be_visible()
+                p.goto(BASE+'/')
+                # This fixture has the KI module disabled; the shortcut must be hidden.
+                # test_ai_ui_hotfix verifies the enabled/authorized counterpart.
+                expect(p.locator('#app-nav > li.nav-item > a[href="/ki"]')).to_have_count(0)
+                task = p.locator('#app-nav [data-nav-id="tasks"] > a.nav-link').first
+                expect(task).to_be_visible()
+                before = task.evaluate('el => ({height: el.getBoundingClientRect().height, lines: getComputedStyle(el.querySelector(".nav-label")).whiteSpace})')
+                task.hover()
+                p.wait_for_timeout(200)
+                after = task.evaluate('el => ({height: el.getBoundingClientRect().height, lines: getComputedStyle(el.querySelector(".nav-label")).whiteSpace})')
+                assert before == after and after['lines'] == 'nowrap', (before, after)
                 p.goto(BASE+'/module')
                 for width,theme in [(1440,'light'),(768,'dark'),(360,'dark')]:
                     p.set_viewport_size({'width':width,'height':900});p.emulate_media(color_scheme=theme)
