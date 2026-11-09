@@ -94,6 +94,32 @@
     return {item: item, bubble: bubble, content: content};
   }
 
+  // Source IDs are only supplied after a message is persisted on the server.
+  // The server rechecks ownership and current source permissions on every fork.
+  function addForkAction(bubble, id) {
+    if (!Number.isSafeInteger(id) || id <= 0 || !form.dataset.aiForkAction) return;
+    var forkForm = document.createElement('form');
+    forkForm.method = 'post';
+    forkForm.action = form.dataset.aiForkAction;
+    forkForm.className = 'ai-fork-action mt-2';
+    var csrfSource = form.querySelector('input[name="csrf"]');
+    if (!csrfSource) return;
+    [['csrf', csrfSource.value], ['message_id', String(id)]].forEach(function (field) {
+      var hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = field[0];
+      hidden.value = field[1];
+      forkForm.appendChild(hidden);
+    });
+    var button = document.createElement('button');
+    button.type = 'submit';
+    button.className = 'btn btn-sm btn-link text-secondary px-1 py-0';
+    button.title = 'Neuen, unabhängigen Chat ab hier erstellen';
+    button.textContent = 'Ab hier verzweigen';
+    forkForm.appendChild(button);
+    bubble.appendChild(forkForm);
+  }
+
   function progressText(bubble) {
     var progress = document.createElement('div');
     progress.className = 'ai-message-progress';
@@ -301,6 +327,10 @@
       }
       progress.remove();
       addAnswerMetadata(assistantBubble.bubble, doneData);
+      if (doneData) {
+        addForkAction(userBubble.bubble, doneData.user_message_id);
+        addForkAction(assistantBubble.bubble, doneData.assistant_message_id);
+      }
       // The server has persisted the user message and the complete answer.
       status.textContent = 'Antwort gespeichert.';
       hint.textContent = '';
