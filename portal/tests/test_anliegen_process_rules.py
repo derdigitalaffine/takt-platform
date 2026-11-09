@@ -283,6 +283,11 @@ def test_rule_lifecycle_http_and_pinned_version(bundle):
         first = db.scalar(select(AnliegenProcessTask).where(
             AnliegenProcessTask.run_id == run.id))
         assert first and first.assignee_id == bundle["handler_id"]
+    reporter_view = reporter.get(f"/anliegen/{cid}")
+    assert reporter_view.status_code == 200
+    assert "Interner Bearbeitungsprozess" in reporter_view.text
+    assert "Beschaffung prüfen" not in reporter_view.text
+    assert "Monitorfreigabe Test" not in reporter_view.text
     handler = _client(bundle, "handler")
     page = handler.get(f"/anliegen/{cid}")
     assert page.status_code == 200 and "Beschaffung prüfen" in page.text
