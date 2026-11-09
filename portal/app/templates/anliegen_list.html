@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Interne Anliegen{% endblock %}
+{% block content %}
+{% call m.page_head('Interne Anliegen', 'Mängel, Beschaffung, Wünsche und vertrauliche Beschwerden strukturiert einreichen und verfolgen.') %}
+<a href="/anliegen/neu" class="btn btn-primary"><i class="fa-solid fa-plus me-1"></i>Anliegen einreichen</a>
+{% endcall %}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <span class="text-secondary small">{{ cases|length }} für Sie sichtbare Anliegen</span>
+  {% if user.is_admin %}<a class="btn btn-sm btn-outline-secondary ms-auto" href="/anliegen/kategorien"><i class="fa-solid fa-sliders me-1"></i>Kategorien &amp; Zuständigkeiten</a>{% endif %}
+</div>
+<div class="card"><div class="card-body p-0">
+  {% if cases %}<div class="table-responsive"><table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Nummer</th><th>Anliegen</th><th>Kategorie</th><th>Zuständig</th><th>Status</th><th>Aktualisiert</th></tr></thead>
+    <tbody>{% for case in cases %}<tr>
+      <td class="text-nowrap small">ANL-{{ '%06d'|format(case.id) }}</td>
+      <td><a class="fw-semibold text-decoration-none" href="/anliegen/{{ case.id }}">{{ case.title }}</a>{% if case.confidential %}<span class="badge text-bg-secondary ms-2"><i class="fa-solid fa-lock me-1"></i>Vertraulich</span>{% endif %}</td>
+      <td><i class="fa-solid {{case.category.icon}} me-1 text-secondary"></i>{{case.category.title}}</td>
+      <td>{{case.assignee.name if case.assignee else 'Noch nicht zugewiesen'}}</td>
+      <td><span class="badge text-bg-{{ 'success' if case.status in ('done','closed') else ('warning' if case.status=='unassigned' else 'primary') }}">{{statuses[case.status]}}</span></td>
+      <td class="small text-secondary text-nowrap">{{case.updated_at|local('%d.%m.%Y')}}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>{% else %}
+  <div class="text-center py-5"><i class="fa-solid fa-inbox fa-2x text-secondary mb-3"></i><h2 class="h5">Noch keine Anliegen</h2><p class="text-secondary">Erfassen Sie Ihr erstes Anliegen, der Empfänger wird über die Kategorie ermittelt.</p><a href="/anliegen/neu" class="btn btn-primary">Anliegen einreichen</a></div>
+  {% endif %}
+</div></div>
+{% endblock %}
