@@ -32,6 +32,7 @@
   <style>{{ ui.css | safe }}</style>
   {% block head %}{% endblock %}
   <link rel="stylesheet" href="/static/navigation.css">
+  {% if user %}<link rel="stylesheet" href="/static/nav-modern.css">{% endif %}
 </head>
 <body>
 {% import "_macros.html" as m with context %}
@@ -110,6 +111,7 @@
           <strong id="sidebar-title">Menü</strong>
           <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Schließen"></button>
         </div>
+        <div class="app-sidebar-heading"><span class="eyebrow">Mein Arbeitsplatz</span><strong>Navigation</strong><small>Alle wichtigen Bereiche auf einen Blick</small></div>
         <noscript><p class="p-2"><a href="/module">Module und Funktionen suchen</a></p></noscript><div class="app-nav-tools">
           <div class="app-nav-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             <input type="search" id="nav-search" placeholder="Suchen …" aria-label="Menü durchsuchen (Taste / oder Strg+K)" autocomplete="off" spellcheck="false"><kbd class="d-none d-lg-inline">/</kbd></div>
