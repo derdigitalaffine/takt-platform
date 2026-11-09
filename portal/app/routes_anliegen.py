@@ -4,7 +4,7 @@ import re
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import select, Integer
 from sqlalchemy.orm import Session
 
 from .anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
@@ -169,13 +169,22 @@ def categories_anliegen(request: Request, user: User = Depends(admin_user),
     categories = list(db.scalars(select(AnliegenCategory).order_by(
         AnliegenCategory.position, AnliegenCategory.title)))
     users = list(db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)))
-    return render(request, "anliegen_categories.html", user, categories=categories, users=users)
+    from sqlalchemy import func
+    counts = {cid: (total, unresolved) for cid, total, unresolved in db.execute(
+        select(Anliegen.category_id, func.count(Anliegen.id),
+               func.sum(func.cast(Anliegen.assignee_id.is_(None), Integer)))
+        .where(Anliegen.status.not_in(("done", "closed")))
+        .group_by(Anliegen.category_id)
+    )}
+    return render(request, "anliegen_categories.html", user,
+                  categories=categories, users=users, counts=counts)
 
 
 @app.post("/anliegen/kategorien/{category_id:int}", dependencies=[Depends(check_csrf)])
 def category_settings(request: Request, category_id: int,
                       title: str = Form(...), routing: str = Form(...),
                       assignee_id: int = Form(0), enabled: str = Form(""),
+                      procurement: str = Form(""),
                       user: User = Depends(admin_user), db: Session = Depends(get_db)):
     _module()
     cat = service.category(db, category_id)
@@ -192,9 +201,30 @@ def category_settings(request: Request, category_id: int,
     cat.title = title.strip()
     cat.routing = routing
     cat.assignee_id = assignee_id if routing == "person" and assignee_id else None
+    cat.procurement = procurement == "1" and not cat.confidential
     cat.enabled = enabled == "1"
+    # A saved routing rule resolves previously unassigned non-sensitive cases now.
+    stats = service.reconcile_category(db, cat, user) if cat.enabled and not cat.confidential else {"assigned": 0}
     db.commit()
-    flash(request, "Routingregel gespeichert. Bestehende Anliegen bleiben bei ihren Zuständigen.")
+    flash(request, f"Routingregel gespeichert. {stats['assigned']} bisher unzugewiesene Anliegen übernommen. Bereits zugewiesene Fälle bleiben unverändert.")
+    return redirect("/anliegen/kategorien")
+
+
+@app.post("/anliegen/kategorien/{category_id:int}/neuverteilen",
+          dependencies=[Depends(check_csrf)])
+def category_reconcile(request: Request, category_id: int, mode: str = Form("unassigned"),
+                       user: User = Depends(admin_user), db: Session = Depends(get_db)):
+    _module()
+    cat = service.category(db, category_id)
+    if not cat.enabled or cat.confidential:
+        raise HTTPException(403, "Diese Kategorie kann nicht pauschal neu verteilt werden.")
+    if mode not in ("unassigned", "all_open"):
+        raise HTTPException(422)
+    result = service.reconcile_category(db, cat, user, reassign=mode == "all_open")
+    db.commit()
+    flash(request, f"{result['assigned']} offene Fälle zugewiesen, "
+                   f"{result['transferred']} aktiv übergeben, "
+                   f"{result['unresolved']} Fälle weiterhin ohne eindeutigen Empfänger.")
     return redirect("/anliegen/kategorien")
 
 
