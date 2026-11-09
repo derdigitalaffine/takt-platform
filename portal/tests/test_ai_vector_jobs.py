@@ -155,3 +155,19 @@ def test_qdrant_auto_sync_requires_explicit_opt_in(monkeypatch):
     settings(ai_qdrant_auto_sync="1")
     assert asyncio.run(ai_vector_jobs.sync_qdrant_if_needed()) == 2
     assert calls == [True]
+
+
+def test_reconcile_repairs_completed_job_with_missing_index():
+    _setup()
+    with SessionLocal() as db:
+        doc = AIKnowledge(title="Index nach Restore", body_md="Neuer Wiederherstellungsstand",
+                          enabled=True)
+        db.add(doc)
+        db.flush()
+        db.add(AIIndexJob(knowledge_id=doc.id, model_id="queue-test-model",
+                          desired_hash=ai_vector.source_hash(doc.body_md),
+                          status="done", attempts=0))
+        db.commit()
+        ai_vector_jobs.reconcile(db)
+        job = db.scalar(select(AIIndexJob).where(AIIndexJob.knowledge_id == doc.id))
+        assert job.status == "pending"
