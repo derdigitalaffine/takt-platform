@@ -103,6 +103,8 @@ class User(Base):
 PERMISSIONS = {
     "calendars": ("Kalender anlegen und teilen", "fa-calendar-days", "Eigene und berechtigte Organisationskalender anlegen und teilen; keine fremden Kalender verwalten"),
     "calendar_publish": ("Kalender veröffentlichen", "fa-globe", "Eigene Kalender intern oder öffentlich veröffentlichen"),
+    "anliegen_submit": ("Interne Anliegen einreichen", "fa-inbox", "Interne Wünsche, Mängel, Beschwerden und Bestellungen melden"),
+    "anliegen_manage": ("Interne Anliegen verwalten", "fa-user-gear", "Nicht vertrauliche Anliegen verwalten und Zuständigkeiten konfigurieren"),
     "tasks": ("Aufgaben erstellen", "fa-list-check", "Eigene Aufgaben erfassen, zuweisen und bearbeiten"),
     "tasks_manage": ("Aufgaben verwalten", "fa-user-gear", "Alle nativen Aufgaben sehen und verwalten"),
     "seminars": ("Seminare planen", "fa-chalkboard-user", "Seminare und Lehrgänge mit Terminen, Einladungen und Unterlagen planen"),
@@ -2765,6 +2767,7 @@ def seed_orgs(db) -> None:
 
 
 DEFAULT_SETTINGS = {
+    "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
     "ai_knowledge_enabled": "0",
     "ai_retention_days": "90",
@@ -3080,6 +3083,7 @@ def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
+    from . import anliegen_models  # noqa: F401 – register additive internal request tables
     Base.metadata.create_all(engine)
     _migrate()
     with SessionLocal() as db:
@@ -3090,6 +3094,8 @@ def init_db() -> None:
         seed_orgs(db)
         from .organization import seed as seed_organization
         seed_organization(db)
+        from .anliegen import seed as seed_anliegen
+        seed_anliegen(db)
         seed_map_layers(db)
         seed_form_blocks(db)
         if db.get(Setting, "migrated_app_create") is None:
