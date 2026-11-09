@@ -170,7 +170,7 @@ def test_derived_agent_answer_keeps_module_source_revision(monkeypatch):
     cid = int(created.headers["location"].split("chat=")[1])
     try:
         fake(monkeypatch, [dict(tool="search_tasks", query="Abgeleitete Information")], [])
-        assert c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="Zeige die Abgeleitete Information")).status_code == 200
+        assert c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="Zeige die Aufgabe Abgeleitete Information")).status_code == 200
         fake(monkeypatch, [], [])
         assert c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="Fasse die vorherige Antwort zusammen")).status_code == 200
         with SessionLocal() as db:
