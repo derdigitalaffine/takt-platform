@@ -117,7 +117,7 @@ def tasks_page(request: Request, user: User = Depends(current_user), db: Session
     response = render(request, "tasks.html", user, work=view, apps_on="applications" in mods,
                   circulations_on="circulations" in mods, resources_on="resources" in mods,
                   native_on='tasks' in mods, may_create=native.may_create(user),
-                  anliegen_on=('anliegen' in mods and user.can('anliegen_submit')),
+                  anliegen_on=('anliegen' in mods),
                   priorities=native.PRIORITIES,
                   statuses=native.STATUSES, mode=mode, task_url=task_url, back=back, calendar_days=calendar_days, undated=calendar.get('',[]), period=period, period_label=period_label,
                   previous=previous.isoformat(), following=following.isoformat(), planning_items=planning_items,
