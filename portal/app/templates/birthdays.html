@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Geburtstage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/birthdays.css">{% endblock %}
+{% block content %}
+<div class="birthday-app">
+  <header class="birthday-heading">
+    <div class="birthday-heading-copy">
+      <span class="birthday-eyebrow"><i class="fa-solid fa-cake-candles" aria-hidden="true"></i> Zusammen im Team</span>
+      <h1>Geburtstage</h1>
+      <p>Ein Blick auf die nächsten Geburtstage – ausschließlich von Kolleginnen und Kollegen, die ihre Angaben freigegeben haben.</p>
+    </div>
+    <div class="birthday-actions">
+      <a class="btn btn-outline-secondary btn-sm" href="/kalender"><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>Kalender</a>
+      <a class="btn btn-outline-primary btn-sm" href="/profile#birthday"><i class="fa-regular fa-user me-1" aria-hidden="true"></i>Meinen Geburtstag einstellen</a>
+      {% if can_configure %}<a class="btn btn-link btn-sm" href="/kalender/geburtstage/einstellungen"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Organisationseinstellungen</a>{% endif %}
+    </div>
+  </header>
+  <div class="row g-3">
+    <section class="col-12 col-xl-8" aria-labelledby="birthday-calendar-heading">
+      <div class="birthday-panel h-100">
+        <div class="birthday-panel-header">
+          <h2 id="birthday-calendar-heading"><i class="fa-regular fa-calendar-days me-2" aria-hidden="true"></i>Kalenderansicht</h2>
+          <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="/kalender/geburtstage?year={{year-1}}" {% if year <= 1970 %}aria-disabled="true" tabindex="-1"{% endif %}>Vorjahr</a>
+            <span class="birthday-year">{{year}}</span>
+            <a class="btn btn-sm btn-outline-secondary" href="/kalender/geburtstage?year={{year+1}}" {% if year >= 2200 %}aria-disabled="true" tabindex="-1"{% endif %}>Folgejahr</a>
+          </div>
+        </div>
+        <div id="birthday-calendar" data-birthday-year="{{year}}" data-birthday-today="{{today.isoformat()}}" aria-label="Freigegebene Geburtstage als Kalender"></div>
+        <noscript><p class="text-secondary">Die interaktive Monatsansicht benötigt JavaScript. Die kommenden Geburtstage stehen rechts beziehungsweise unten.</p></noscript>
+      </div>
+    </section>
+    <aside class="col-12 col-xl-4" aria-labelledby="birthday-next-heading">
+      <div class="birthday-panel">
+        <div class="birthday-panel-header"><h2 id="birthday-next-heading">Als Nächstes</h2><span class="birthday-muted">Die nächsten Geburtstage</span></div>
+        {% if upcoming %}
+        <ol class="birthday-next-list">
+          {% for item in upcoming %}
+          <li>
+            <span class="birthday-date"><strong>{{item.start[8:10]}}</strong><small>{{item.start[5:7]}}.{{item.start[:4]}}</small></span>
+            <div><strong>{{item.title}}</strong><small>{{'Heute' if item.days == 0 else ('Morgen' if item.days == 1 else 'In ' ~ item.days ~ ' Tagen')}}</small></div>
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <div class="birthday-empty"><i class="fa-solid fa-cake-candles" aria-hidden="true"></i><p>Aktuell sind keine freigegebenen Geburtstage sichtbar.</p></div>
+        {% endif %}
+        <div class="birthday-panel-footer"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Die Anzeige berücksichtigt Ihre Organisationsrechte und die Freigaben der jeweiligen Personen.</div>
+      </div>
+      <p class="birthday-profile-link mt-3">Ihr Geburtstag fehlt? <a href="/profile#birthday">Sichtbarkeit im eigenen Profil festlegen</a>.</p>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/vendor/fullcalendar/index.global.min.js"></script>
+<script src="/static/vendor/fullcalendar/de.global.min.js"></script>
+<script src="/static/birthdays.js"></script>
+{% endblock %}
