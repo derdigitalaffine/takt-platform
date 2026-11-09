@@ -243,6 +243,7 @@ def feed_page(
             .order_by(CalendarFeed.id.desc())
         )
     )
+    from . import birthdays
     return render(
         request,
         "calendar_feeds.html",
@@ -251,7 +252,9 @@ def feed_page(
         calendars=[
             c
             for c in db.scalars(select(Calendar).order_by(Calendar.title))
-            if calendars.access(db, user, c)
+            if calendars.access(db, user, c) and (
+                c.source != "birthdays" or birthdays.external_allowed(db, user, "ics")
+            )
         ],
     )
 
@@ -270,7 +273,8 @@ async def feed_create(
     except (TypeError, ValueError):
         raise HTTPException(422)
     cal = db.get(Calendar, cid)
-    if not cal or not calendars.access(db, user, cal):
+    from . import birthdays
+    if not cal or not calendars.access(db, user, cal) or (cal.source == "birthdays" and not birthdays.external_allowed(db, user, "ics")):
         raise HTTPException(403)
     name = str(data.get("name", "")).strip()
     if not name or len(name) > 100:
@@ -323,7 +327,8 @@ def feed_read(token: str, db: Session = Depends(get_db)):
         raise HTTPException(404)
     user = db.get(User, feed.user_id)
     cal = db.get(Calendar, feed.calendar_id)
-    if not user or not user.active or not cal or not calendars.access(db, user, cal):
+    from . import birthdays
+    if not user or not user.active or not cal or not calendars.access(db, user, cal) or (cal.source == "birthdays" and not birthdays.external_allowed(db, user, "ics")):
         raise HTTPException(404)
     return Response(
         calendars.export(db, user, cal),
