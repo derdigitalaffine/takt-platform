@@ -46,7 +46,7 @@
     const fields = {...data.fields};
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
-      create_task: ['title', 'description', 'priority', 'assignee_id'],
+      create_task: ['title', 'description', 'priority', 'assignee_id', 'due_date', 'due_time', 'starts_at', 'tags', 'checklist'],
       create_anliegen: ['title', 'description_final', 'category_id'],
       assign_task: ['assignee_id'], set_task_priority: ['priority'], set_task_status: [],
       assign_anliegen: ['assignee_id'],
