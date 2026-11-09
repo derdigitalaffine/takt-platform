@@ -58,7 +58,7 @@ def exercise(page):
     page.set_viewport_size({'width':1440,'height':1000})
     page.goto(BASE+'/tasks?view=list')
     expect(page.get_by_role('heading',name='Meine Aufgaben',exact=True)).to_be_visible()
-    expect(page.locator('.task-page > header.workspace-head')).to_be_visible()
+    expect(page.locator('.task-page > .workspace-head')).to_be_visible()
     assert page.locator('.workspace-head').evaluate("el => getComputedStyle(el).backgroundImage === 'none'")
     assert page.locator('.workspace-head').bounding_box()['height'] < 185
 
