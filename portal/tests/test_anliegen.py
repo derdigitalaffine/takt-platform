@@ -24,7 +24,7 @@ def _isolate_anliegen_tests():
         original = {key: settings_before[key]
                     for key in ("module_anliegen", "module_tasks", "module_ai")}
         original_categories = {
-            cat.id: (cat.title, cat.routing, cat.assignee_id, cat.enabled)
+            cat.id: (cat.title, cat.routing, cat.assignee_id, cat.enabled, cat.description, cat.tags)
             for cat in db.scalars(select(AnliegenCategory))
         }
         existing_cases = set(db.scalars(select(Anliegen.id)))
@@ -47,7 +47,11 @@ def _isolate_anliegen_tests():
         for category_id, values in original_categories.items():
             cat = db.get(AnliegenCategory, category_id)
             if cat:
-                cat.title, cat.routing, cat.assignee_id, cat.enabled = values
+                (cat.title, cat.routing, cat.assignee_id, cat.enabled,
+                 cat.description, cat.tags) = values
+        for cat in list(db.scalars(select(AnliegenCategory))):
+            if cat.id not in original_categories:
+                db.delete(cat)
         for org in list(db.scalars(select(Organization))):
             if org.id not in existing_orgs and org.name == "Anliegen Testorganisation":
                 db.execute(delete(OrgRoleGrant).where(OrgRoleGrant.org_id == org.id))
