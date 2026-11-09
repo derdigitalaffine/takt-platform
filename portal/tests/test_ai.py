@@ -158,6 +158,16 @@ def test_only_opted_in_published_laws_enter_chat_context(monkeypatch):
     prompt = json.dumps(received["messages"], ensure_ascii=False)
     assert "§ 3" in prompt and "15 Euro" in prompt
     assert "/recht/ai-test-gebuehrensatzung" in c.get(f"/ki?chat={chat_id}").text
+    # Unpublishing a source in the AI registry must also protect stored answers.
+    with SessionLocal() as db:
+        link = db.scalar(select(AILawSource).join(LawText).where(
+            LawText.slug == "ai-test-gebuehrensatzung"))
+        db.delete(link)
+        db.commit()
+    assert "Antwort aufgrund geänderter Wissensrechte ausgeblendet" in c.get(
+        f"/ki?chat={chat_id}").text
+    assert "Antwort aufgrund geänderter Wissensrechte ausgeblendet" in c.get(
+        f"/ki/{chat_id}/export").text
 
 
 def test_no_knowledge_permission_leaks_into_context(monkeypatch):
