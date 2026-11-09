@@ -198,30 +198,19 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    cap_add:
-      - CHOWN
-    # Der offizielle Entrypoint erwartet ein beschreibbares Konfigurationsverzeichnis.
-    # Beim Start aktualisieren wir nur die dedizierte settings.yml aus dem
-    # eingecheckten Template; die Konfiguration selbst bleibt im Docker-Volume.
-    entrypoint:
-      - /bin/sh
-      - -ec
-      - |
-        cp /tmp/takt-settings.yml /etc/searxng/settings.yml
-        exec /usr/local/searxng/entrypoint.sh
+    # Offizielles Image läuft ohne root. Keine Schreibversuche im config-Volume.
     environment:
       - SEARXNG_SECRET=${SEARXNG_SECRET:-}
       - SEARXNG_PORT=8080
+      - FORCE_OWNERSHIP=false
     expose:
       - "8080"
     volumes:
-      - searxng_config:/etc/searxng
-      - ./searxng/settings.yml:/tmp/takt-settings.yml:ro
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
       - searxng_cache:/var/cache/searxng
     networks:
       search_private:
       search_egress:
-
   portal:
     build: ./portal
     image: ${PORTAL_IMAGE:-jitsi-speechmind-portal:local}
@@ -279,5 +268,4 @@ networks:
   search_egress:
 
 volumes:
-  searxng_config:
   searxng_cache:
