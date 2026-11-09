@@ -151,7 +151,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     has_work_context = any(agent_intent.classify(text) == "operate"
                            for text in prior[-2:])
     intent = agent_intent.classify(prompt, has_work_context=has_work_context)
-    if agent.sensitive_request(prompt) and intent == "operate":
+    if agent.sensitive_request(prompt):
         # Protected manual handoff: this branch precedes every provider/history call.
         agent.require(user, "anliegen")
         if not user.can("anliegen_submit"):
