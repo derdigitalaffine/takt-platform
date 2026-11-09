@@ -106,6 +106,7 @@ PERMISSIONS = {
     "anliegen_submit": ("Interne Anliegen einreichen", "fa-inbox", "Interne Wünsche, Mängel, Beschwerden und Bestellungen melden"),
     "anliegen_manage": ("Interne Anliegen verwalten", "fa-user-gear", "Nicht vertrauliche Anliegen verwalten und Zuständigkeiten konfigurieren"),
     "anliegen_process_start": ("Anliegenprozesse starten", "fa-play", "Freigegebene Prozessstarts in eigenen oder zugewiesenen Anliegen auswählen"),
+    "anliegen_process_work": ("Anliegenprozesse bearbeiten", "fa-list-check", "Zugewiesene Schritte interner Prozesse mit Fallberechtigung bearbeiten"),
     "anliegen_process_configure": ("Anliegenprozesse konfigurieren", "fa-diagram-project", "Prozessregeln innerhalb zugewiesener Organisationseinheiten entwerfen"),
     "anliegen_process_approve": ("Anliegenprozesse freigeben", "fa-stamp", "Konfigurationen und Starts im berechtigten Organisationsumfang prüfen und genehmigen"),
     "tasks": ("Aufgaben erstellen", "fa-list-check", "Eigene Aufgaben erfassen, zuweisen und bearbeiten"),
