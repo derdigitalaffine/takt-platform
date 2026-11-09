@@ -104,7 +104,7 @@ def exercise(page):
     page.get_by_role('button', name='TAKT Agent', exact=True).click()
     expect(page.locator('#agent-dock-panel')).to_be_visible()
     chat = page.frame_locator('[data-agent-frame]')
-    chat.get_by_role('button', name='Neuer Chat', exact=True).click()
+    chat.locator('.agent-embedded-tools').get_by_role('button', name='Neuer Chat', exact=True).click()
     expect(chat.locator('[name="chat_id"]')).not_to_have_value('1')
     chat.locator('#ai-prompt').fill('Erstelle mir ein Formular mit dem ich die Geburtstage der Belegschaft abfragen kann')
     frame = next(f for f in page.frames if '/agent?chat=' in f.url)
