@@ -315,3 +315,30 @@ def reassign_open(db, cat, actor):
             task_for(db, case)
         count += 1
     return count
+
+
+def sync_from_native_task(db, task, actor, *, assignment=False, status=False):
+    """Maintain the single linked Anliegen when a native task is edited directly.
+
+    Confidential concerns have no native task. Do not override procurement
+    fulfillment states merely because someone begins work on the task.
+    """
+    if task.source_type != "anliegen":
+        return
+    case = db.scalar(select(Anliegen).where(Anliegen.task_id == task.id))
+    if case is None or case.confidential:
+        return
+    if assignment and task.assignee_id and task.assignee_id != case.assignee_id:
+        case.assignee_id = task.assignee_id
+        record(db, case, actor, "assignment", "Zuständigkeit über die verknüpfte Aufgabe geändert.")
+    if status:
+        target = {"done": "done", "cancelled": "cancelled",
+                  "in_progress": "in_progress", "open": "open"}.get(task.status)
+        if target is None:
+            return
+        if case.status in ORDER_STATES and target in {"open", "in_progress"}:
+            return  # Delivery state has more meaning than task activity.
+        if case.status != target and target in next_states(case):
+            case.status = target
+            record(db, case, actor, "status",
+                   f"Aus verknüpfter Aufgabe übernommen: {STATUSES[target]}")
