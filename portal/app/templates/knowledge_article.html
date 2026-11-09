@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{item.title}} · Wissen{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/knowledge.css">{% endblock %}
+{% block content %}
+<div class="knowledge-ui">
+  <nav class="knowledge-breadcrumb" aria-label="Pfad"><a href="/wissen">Wissen</a><i class="fa-solid fa-chevron-right"></i><a href="/wissen/raum/{{space.id}}">{{space.title}}</a><i class="fa-solid fa-chevron-right"></i><span>{{item.title}}</span></nav>
+  <header class="knowledge-head">
+    <div><span class="knowledge-eyebrow">{{kinds[item.kind]}} · Fassung {{item.version}}</span><h1>{{item.title}}</h1><p><span class="knowledge-status knowledge-status-{{item.status}}">{{statuses[item.status]}}</span> <span class="ms-2 small">Zugriff: {{'Einzeln eingeschränkt' if item.scope=='restricted' else 'Vom Wissensraum geerbt'}}</span></p></div>
+    {% if item.status=='draft' and can_edit %}<a class="btn btn-outline-primary" href="#wissen-editor"><i class="fa-solid fa-pen me-2"></i>Bearbeiten</a>{% endif %}
+  </header>
+  <article class="knowledge-article-body">{{item.body_md|richtext if item.body_md else 'Noch kein Inhalt erfasst.'}}</article>
+  {% if item.status=='draft' and can_edit %}
+    <details class="knowledge-form-card mt-4" id="wissen-editor"><summary>Entwurf bearbeiten</summary>
+      <form action="/wissen/artikel/{{item.id}}/save" method="post" class="row g-3 pt-3">
+        <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}">
+        <div class="col-md-8"><label class="form-label" for="edit-title">Titel</label><input id="edit-title" name="title" maxlength="200" class="form-control" required value="{{item.title}}"></div>
+        <div class="col-md-4"><label class="form-label" for="edit-kind">Art</label><select id="edit-kind" name="kind" class="form-select">{% for key,label in kinds.items() %}<option value="{{key}}" {{'selected' if item.kind==key}}>{{label}}</option>{% endfor %}</select></div>
+        <div class="col-12"><label class="form-label" for="edit-body">Inhalt</label><textarea id="edit-body" name="body_md" maxlength="60000" rows="12" class="form-control">{{item.body_md}}</textarea><p class="form-text">Text wird sicher formatiert angezeigt. KI ist nicht erforderlich.</p></div>
+        <div><button class="btn btn-primary" type="submit">Neue Fassung speichern</button></div>
+      </form>
+    </details>
+  {% endif %}
+  <div class="knowledge-status-actions">
+    {% if item.status=='draft' and can_edit %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="review"><button class="btn btn-outline-primary">Zur Prüfung einreichen</button></form>{% endif %}
+    {% if item.status=='review' and can_edit %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="draft"><button class="btn btn-outline-secondary">Zur Überarbeitung zurückgeben</button></form>{% endif %}
+    {% if item.status=='review' and can_publish and item.owner_id != user.id %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="published"><button class="btn btn-primary">Fachlich freigeben</button></form>{% endif %}
+  </div>
+  <details class="knowledge-form-card mt-4"><summary>Versionsverlauf</summary>
+    <ol class="knowledge-revisions mt-3">{% for rev in history %}<li><strong>Fassung {{rev.version}}</strong> · {{statuses[rev.status]}} · {{rev.created_at|local}}</li>{% else %}<li>Keine Fassungen</li>{% endfor %}</ol>
+  </details>
+  {% if can_manage %}
+    <details class="knowledge-form-card mt-3"><summary>Artikelrechte verwalten</summary>
+      <form class="row g-2 mt-3" action="/wissen/artikel/{{item.id}}/schutz" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><div class="col-sm-8"><label for="edit-scope" class="form-label">Rechte übernehmen oder auf direkte Freigaben begrenzen</label><select id="edit-scope" class="form-select" name="scope"><option value="inherit" {{'selected' if item.scope=='inherit'}}>Rechte des Wissensraums übernehmen</option><option value="restricted" {{'selected' if item.scope=='restricted'}}>Nur direkt berechtigte Personen</option></select></div><div class="col-sm-4 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Schutz speichern</button></div></form>
+      {% for g in grants %}<div class="knowledge-grant">{{g.principal_kind}} #{{g.principal_id}} · {{g.capability}} · {{g.effect}}</div>{% endfor %}
+      <form class="row g-2 mt-3" action="/wissen/article/{{item.id}}/rechte" method="post"><input type="hidden" name="csrf" value="{{csrf}}">
+        <div class="col-sm-3"><label class="form-label">Empfängertyp</label><select name="principal_kind" class="form-select"><option value="user">Person</option><option value="group">Gruppe</option><option value="org">Organisation</option></select></div>
+        <div class="col-sm-2"><label class="form-label">ID</label><input type="number" min="1" name="principal_id" class="form-control" required></div>
+        <div class="col-sm-3"><label class="form-label">Recht</label><select name="capability" class="form-select"><option value="read">Lesen</option><option value="edit">Bearbeiten</option><option value="publish">Veröffentlichen</option><option value="manage">Verwalten</option><option value="ai">KI-Freigabe</option></select></div>
+        <div class="col-sm-2"><label class="form-label">Regel</label><select name="effect" class="form-select"><option value="allow">Erlauben</option><option value="deny">Sperren</option><option value="remove">Entfernen</option></select></div>
+        <div class="col-sm-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Speichern</button></div>
+        <label class="col-12 small"><input type="checkbox" class="form-check-input" name="include_children" value="1"> Auch Untereinheiten (nur Organisation)</label>
+      </form>
+    </details>
+  {% endif %}
+  <p class="knowledge-footnote"><i class="fa-solid fa-shield-halved me-1"></i>Die fachliche Freigabe ist von einer KI-Freigabe getrennt. Ungeprüfte Inhalte werden nicht öffentlich bereitgestellt.</p>
+</div>
+{% endblock %}

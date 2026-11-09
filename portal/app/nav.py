@@ -135,6 +135,8 @@ ITEMS: list[Item] = [
     Item("shortlinks", "comm", "/shortlinks", "fa-link", "Kurzlinks & QR-Codes",
          lambda c: "shortlinks" in c.modules and c.can("shortlinks"), _pre("/shortlinks")),
     # Wissen & Ablage
+    Item("knowledge", "know", "/wissen", "fa-book-open", "Wissensmanagement",
+         lambda c: "knowledge" in c.modules and c.can("knowledge_read"), _pre("/wissen")),
     Item("dms", "know", "/dms", "fa-box-archive", "Ablage: Recherche",
          lambda c: "dms" in c.modules and (c.admin or c.can("dms_admin") or c.dms_nav),
          lambda p: p == "/dms" or p.startswith(("/dms/r/", "/dms/new"))),
@@ -195,7 +197,7 @@ FAMILIES = [
     ("meetings", "meeting_plan"), ("seminars",),
     ("resources", "res_planner", "res_bookings"), ("bookings",),
     ("forms", "inbox", "blocks", "locations"), ("app_inbox",), ("processes",),
-    ("ai",), ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"),
+    ("knowledge",), ("ai",), ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"),
     ("absences",), ("krank_me", "krank_mine", "krank_staff"),
 ]
 CONTEXTS = [family for family in FAMILIES if len(family) > 1 and family[0] not in {"surveys", "resources"}]
@@ -209,6 +211,7 @@ ADMIN_SECTIONS = {
 }
 DESCRIPTIONS = {
     "anliegen": ("Interne Mängel, Beschaffungen, Wünsche und vertrauliche Beschwerden erfassen und an zuständige Personen leiten.", "Anliegen einreichen · Bearbeitungsstand verfolgen", "Anliegen Mangel Bestellung Beschwerde Büromaterial Möbel"),
+    "knowledge": ("Organisationswissen, Arbeitsanleitungen und Prozesse strukturiert dokumentieren, sicher teilen und ohne KI durchsuchen.", "Wissensräume öffnen · Prozesse und Beiträge finden", "Wissen Wissensmanagement Prozess Organisationsatlas Dokumentation FAQ Anleitung"),
     "ai": ("Der zentrale KI-Arbeitsplatz: Fragen beantworten, freigegebenes Wissen nutzen und vorausgefüllte Fachvorschläge prüfen.", "TAKT Agent öffnen · Wissen und Fachabläufe", "KI LLM AI Chat Gemma Wissen"),
     "tasks": ("Sehen Sie, was Sie als Nächstes erledigen können. Eigene Aufgaben und Aufgaben aus Ihren Fachbereichen an einem Ort.", "Aufgaben bearbeiten · Zuständigkeiten prüfen", "Aufgaben Arbeitsplatz"),
     "kanban": ("Organisieren Sie gemeinsame Arbeit in übersichtlichen Spalten. Verknüpfte Aufgaben und Umfragen zeigen ihren aktuellen Status.", "Boards öffnen · Arbeit organisieren", "Board Projekt"),

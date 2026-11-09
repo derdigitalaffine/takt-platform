@@ -126,6 +126,11 @@ PERMISSIONS = {
     "processes": ("Prozesse", "fa-diagram-project", "Bearbeitungsprozesse für Online-Anträge im Prozesseditor gestalten und veröffentlichen"),
     "app_create": ("Online-Anträge einrichten", "fa-file-signature", "Formulare zu Online-Anträgen machen (Aktenzeichen, Frist, Zuständigkeit) und wieder zurückstellen"),
     "maps_admin": ("Kartenlayer & Geocoding", "fa-layer-group", "Kartenlayer, Kartenstandard und die Adresssuche (Nominatim) einrichten"),
+    "knowledge_read": ("Wissen lesen", "fa-book-open", "Berechtigte interne Wissensräume und freigegebene Beiträge lesen"),
+    "knowledge_edit": ("Wissen bearbeiten", "fa-pen", "In berechtigten Bereichen Wissensentwürfe erstellen und bearbeiten"),
+    "knowledge_publish": ("Wissen fachlich freigeben", "fa-clipboard-check", "Zur Prüfung eingereichte Beiträge nach Vier-Augen-Prinzip freigeben"),
+    "knowledge_manage": ("Wissensräume verwalten", "fa-layer-group", "Eigene Organisations-Wissensräume anlegen; Berechtigungsverwaltung ist vorerst Admins vorbehalten"),
+    "knowledge_ai": ("Wissen für KI freigeben", "fa-brain", "Zusätzliches, noch nicht aktives Recht für spätere RAG-Verarbeitung mit Quell-ACL"),
     "ai_chat": ("TAKT Agent verwenden", "fa-wand-magic-sparkles", "Zentraler KI-Chat und geprüfte Fachvorschläge mit freigegebenen Sprachmodellen"),
     "ai_knowledge": ("KI-Wissensrecherche", "fa-book-open", "Freigegebene interne Wissensbestände bei KI-Fragen verwenden"),
     "ai_vision": ("KI-Bildanalyse", "fa-image", "Eigene Bilder an freigegebene multimodale Modelle übermitteln"),
@@ -2770,6 +2775,7 @@ def seed_orgs(db) -> None:
 DEFAULT_SETTINGS = {
     "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
+    "module_knowledge": "0",  # Organizational knowledge: disabled until explicitly activated.
     "ai_knowledge_enabled": "0",
     "ai_laws_include_all": "0",
     "ai_laws_excluded_ids": "[]",
@@ -3116,6 +3122,7 @@ def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
+    from . import knowledge_models  # noqa: F401 – register additive knowledge tables
     from . import anliegen_models  # noqa: F401 – register additive internal request tables
     from . import anliegen_process_models  # noqa: F401 – register opt-in process binding tables
     Base.metadata.create_all(engine)

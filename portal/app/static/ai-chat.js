@@ -493,6 +493,8 @@
     }
   });
 
+  form.dataset.aiReady = '1';
+
   stop.addEventListener('click', function () {
     if (controller) controller.abort();
   });

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{space.title}} · Wissen{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/knowledge.css">{% endblock %}
+{% block content %}
+<div class="knowledge-ui">
+  <nav class="knowledge-breadcrumb" aria-label="Pfad"><a href="/wissen">Wissen</a><i class="fa-solid fa-chevron-right"></i><span>{{space.title}}</span></nav>
+  <header class="knowledge-head"><div><span class="knowledge-eyebrow">WISSENSRAUM</span><h1>{{space.title}}</h1><p>{{space.description or 'Dokumentationen und Anleitungen in diesem Wissensraum.'}}</p></div>{% if can_edit %}<a class="btn btn-primary" href="#article-new"><i class="fa-solid fa-plus me-2"></i>Neuer Beitrag</a>{% endif %}</header>
+  <div class="knowledge-section-title"><h2>Beiträge</h2><span class="text-secondary small">{{entries|length}} sichtbar</span></div>
+  <div class="knowledge-list">
+  {% for item in entries %}
+    <a href="/wissen/artikel/{{item.id}}" class="knowledge-list-row"><span class="knowledge-small-icon"><i class="fa-solid {{'fa-diagram-project' if item.kind=='process' else 'fa-file-lines'}}"></i></span><span class="knowledge-list-copy"><strong>{{item.title}}</strong><small>{{kinds[item.kind]}} · Fassung {{item.version}}</small></span><span class="knowledge-status knowledge-status-{{item.status}}">{{statuses[item.status]}}</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+  {% else %}<p class="knowledge-empty">Noch keine für dich verfügbaren Beiträge.</p>{% endfor %}
+  </div>
+  {% if can_edit %}<details id="article-new" class="knowledge-form-card mt-4">
+    <summary>Wissensbeitrag erstellen</summary>
+    <form action="/wissen/raum/{{space.id}}/artikel" method="post" class="row g-3 pt-3">
+      <input type="hidden" name="csrf" value="{{csrf}}">
+      <div class="col-md-7"><label class="form-label" for="ka-title">Titel</label><input id="ka-title" name="title" class="form-control" required maxlength="200"></div>
+      <div class="col-md-5"><label class="form-label" for="ka-kind">Art</label><select id="ka-kind" name="kind" class="form-select">{% for kind,label in kinds.items() %}<option value="{{kind}}">{{label}}</option>{% endfor %}</select></div>
+      <div class="col-12"><label for="ka-body" class="form-label">Wissen / Schritte (Markdown möglich)</label><textarea id="ka-body" name="body_md" class="form-control" rows="8" maxlength="60000"></textarea></div>
+      <div><button type="submit" class="btn btn-primary">Entwurf erstellen</button></div>
+    </form>
+  </details>{% endif %}
+  {% if can_manage %}
+    <details class="knowledge-form-card mt-4"><summary>Berechtigungen des Wissensraums</summary>
+      <p class="text-secondary small mt-3">Erlauben oder verweigern – Verweigern hat Vorrang. Personen-, Gruppen- und Organisations-IDs stammen aus der bestehenden Verwaltung.</p>
+      {% for g in grants %}<div class="knowledge-grant">{{g.principal_kind}} #{{g.principal_id}} · {{g.capability}} · {{g.effect}}</div>{% endfor %}
+      <form class="row g-2 mt-2" action="/wissen/space/{{space.id}}/rechte" method="post">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <div class="col-sm-3"><label class="form-label">Empfängertyp</label><select name="principal_kind" class="form-select"><option value="user">Person</option><option value="group">Gruppe</option><option value="org">Organisation</option></select></div>
+        <div class="col-sm-2"><label class="form-label">ID</label><input type="number" min="1" name="principal_id" required class="form-control"></div>
+        <div class="col-sm-3"><label class="form-label">Recht</label><select name="capability" class="form-select"><option value="read">Lesen</option><option value="edit">Bearbeiten</option><option value="publish">Veröffentlichen</option><option value="manage">Verwalten</option><option value="ai">KI-Freigabe</option></select></div>
+        <div class="col-sm-2"><label class="form-label">Regel</label><select name="effect" class="form-select"><option value="allow">Erlauben</option><option value="deny">Sperren</option><option value="remove">Entfernen</option></select></div>
+        <div class="col-sm-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Speichern</button></div>
+        <label class="col-12 small"><input type="checkbox" class="form-check-input" name="include_children" value="1"> Auch Untereinheiten (nur Organisation)</label>
+      </form>
+    </details>
+  {% endif %}
+</div>
+{% endblock %}
