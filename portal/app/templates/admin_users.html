@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Benutzer{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/ui-density.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/permission-editor.css">{% endblock %}
+
 {% block content %}
 {{ m.page_head('Benutzer & Gruppen', 'Neue Personen werden per E-Mail eingeladen und legen ihr Passwort selbst fest. Je Person schalten Sie frei, welche Bereiche sie nutzen darf. Gruppen erleichtern das Einladen zu Formularen. Gäste brauchen kein Konto.') }}
 
@@ -120,7 +121,11 @@
     <td><div class="d-flex align-items-center gap-2"><span class="avatar">{{ m.initials(u.name) }}</span><span class="fw-semibold">{{ u.name }}</span></div></td>
     <td>{{ u.email }}{% for role in org_user_roles.get(u.id,[]) if role.role in ('Leitung','Stellvertretende Leitung') %}<span class="badge {{'text-bg-primary' if role.role=='Leitung' else 'text-bg-info'}} ms-1" title="{{role.org}} · {{'einschließlich Untereinheiten' if role.children else 'nur diese Einheit'}}">{{role.role}}</span>{% endfor %}{% for item in org_directory.get(u.id,[]) %}<div class="small"><a href="/admin/organization?unit={{item.id}}&amp;person={{u.id}}">{{item.name}}</a>{{' · Hauptzuordnung' if item.primary else ' · zusätzlich'}}</div>{% endfor %}</td>
     <td>{% if u.is_admin %}<span class="badge text-bg-primary"><i class="fa-solid fa-user-shield me-1"></i>Admin</span>
-        {% else %}{% for key, p in permissions.items() if key in u.perms %}<span class="badge text-bg-light border me-1" title="{{ p[2] }}"><i class="fa-solid {{ p[1] }} me-1"></i>{{ p[0] }}</span>{% else %}<span class="text-secondary small">keine</span>{% endfor %}{% endif %}{% if org_user_roles.get(u.id) %}<details class="small mt-2"><summary>Bereichsrollen ({{org_user_roles[u.id]|length}})</summary><ul class="mt-1 mb-0">{% for item in org_user_roles[u.id] %}<li><a href="/admin/organization?unit={{item.org_id}}&amp;person={{u.id}}#org-roles">{{item.role}} · {{item.org}}</a> · {{item.source}}{{' · mit Untereinheiten' if item.children}}</li>{% endfor %}</ul></details>{% endif %}</td>
+        {% else %}<span class="badge text-bg-light border">{{ u.perms|length }} {{ 'Recht' if u.perms|length == 1 else 'Rechte' }}</span>
+        {% if u.perms %}<details class="perm-inline-details d-inline-block ms-1"><summary class="small">Anzeigen</summary>
+        <div class="d-flex flex-wrap gap-1 mt-2">{% for key, p in permissions.items() if key in u.perms %}
+        <span class="badge text-bg-light border" title="{{ p[2] }}"><i class="fa-solid {{ p[1] }} me-1" aria-hidden="true"></i>{{ p[0] }}</span>{% endfor %}</div>
+        </details>{% endif %}{% endif %}{% if org_user_roles.get(u.id) %}<details class="small mt-2"><summary>Bereichsrollen ({{org_user_roles[u.id]|length}})</summary><ul class="mt-1 mb-0">{% for item in org_user_roles[u.id] %}<li><a href="/admin/organization?unit={{item.org_id}}&amp;person={{u.id}}#org-roles">{{item.role}} · {{item.org}}</a> · {{item.source}}{{' · mit Untereinheiten' if item.children}}</li>{% endfor %}</ul></details>{% endif %}</td>
     <td>{% for g in u.groups %}<span class="badge text-bg-secondary me-1">{{ g.name }}</span>{% endfor %}</td>
     <td>{% if u.totp_enabled or u.mfa_email %}<i class="fa-solid fa-shield-halved text-success me-1" title="Zwei-Faktor eingerichtet"></i>{% endif %}{% if u.id in away %}<span class="badge text-bg-secondary me-1" title="{{ away_label(away[u.id]) }}"><i class="fa-solid fa-plane-departure me-1"></i>{{ away_label(away[u.id]) }}</span>{% endif %}{% if not u.active %}<span class="badge text-bg-danger">gesperrt</span>{% elif not u.password_set %}<span class="badge text-bg-warning">eingeladen</span>{% else %}<span class="badge text-bg-success">aktiv</span>{% endif %}</td>
     <td data-order="{{ u.created_at.isoformat() }}">{{ u.created_at | local('%d.%m.%Y') }}</td>
@@ -147,7 +152,7 @@
 </div></div>
 
 {% for u in users if manageable_users[u.id] %}
-<div class="modal fade" id="edit-{{ u.id }}" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content">
+<div class="modal fade" id="edit-{{ u.id }}" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
   <form method="post" action="/admin/users/{{ u.id }}">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="edit">
     <div class="modal-header"><h2 class="modal-title h5">{{ u.email }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
@@ -222,4 +227,4 @@
 {{ group_modal('group-new', '/admin/groups') }}
 {% for g in groups %}{{ group_modal('group-' ~ g.id, '/admin/groups/' ~ g.id, g) }}{% endfor %}
 {% endblock %}
-{% block scripts %}<script src="/static/organization-person.js" defer></script><script src="/static/ui-preferences.js" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/organization-person.js" defer></script><script src="/static/ui-preferences.js" defer></script><script src="/static/permission-editor.js" defer></script>{% endblock %}
