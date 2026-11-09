@@ -2935,6 +2935,7 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "anliegen": {"title_enc": "TEXT", "description_enc": "TEXT"},
     "ai_providers": {"stream_enabled": "BOOLEAN NOT NULL DEFAULT 0"},
     "leave_policies": {"holiday_state": "VARCHAR(8) NOT NULL DEFAULT 'inherit'",
                        "external_attestation": "BOOLEAN NOT NULL DEFAULT 0"},
@@ -3094,7 +3095,8 @@ def init_db() -> None:
         seed_orgs(db)
         from .organization import seed as seed_organization
         seed_organization(db)
-        from .anliegen import seed as seed_anliegen
+        from .anliegen import seed as seed_anliegen, migrate_confidential_payload
+        migrate_confidential_payload(db)
         seed_anliegen(db)
         seed_map_layers(db)
         seed_form_blocks(db)
