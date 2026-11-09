@@ -33,9 +33,9 @@
         <td><a href="/anliegen/{{ item.id }}">{{ item.title }}</a>
             {% if item.confidential %}<div class="small text-secondary"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Vertraulich</div>{% endif %}</td>
         <td>{{ item.category.title }}</td>
-        <td>{{ item.assignee.name }}</td>
+        <td>{{ item.task.assignee.name if item.task and item.task.assignee else 'Nicht zugewiesen' }}</td>
         <td><span class="badge text-bg-secondary">{{ statuses.get(item.task.status, item.task.status) if item.task else 'Nicht zugewiesen' }}</span></td>
-        <td class="small text-secondary">{% if item.reporter_id == user.id %}Gemeldet{% elif item.assignee_id == user.id %}Bearbeitung{% else %}Verwaltung{% endif %}</td>
+        <td class="small text-secondary">{% if item.reporter_id == user.id %}Gemeldet{% elif item.task and item.task.assignee_id == user.id %}Bearbeitung{% else %}Verwaltung{% endif %}</td>
       </tr>
       {% endfor %}
       </tbody>
