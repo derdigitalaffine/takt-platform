@@ -156,7 +156,7 @@
   <form class="modal-content" method="post" action="/admin/users/{{ u.id }}">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="edit">
     <div class="modal-header"><h2 class="modal-title h5">{{ u.email }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
-    <div class="modal-body row g-3">
+    <div class="modal-body"><div class="row g-3">
       <div class="col-md-6"><label class="form-label" for="en-{{ u.id }}">Name</label>
         <input class="form-control" id="en-{{ u.id }}" name="name" value="{{ u.name }}" maxlength="200" required></div>
       <div class="col-md-6"><label class="form-label" for="eg-{{ u.id }}">Gruppen</label>
@@ -167,7 +167,7 @@
       <div class="col-12"><div class="form-label">Globale Portalrechte</div>
         {% if u.is_admin %}<div class="alert alert-info py-2 mb-2 small">Administrator:innen dürfen immer alles. Die Schalter gelten erst, wenn das Admin-Recht entzogen wird.</div>{% endif %}
         {{ m.perm_switches('e' ~ u.id, u.perms) }}</div>
-    </div>
+    </div></div>
     <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
       <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button></div>
   </form>
