@@ -91,6 +91,8 @@ async def reindex_document(db, doc_id: int) -> int:
             knowledge_id=doc.id, chunk_no=index, model_id=model_id,
             source_hash=original_hash, chunk_text=passage,
             vector_json=json.dumps(vector), created_at=utcnow()))
+    from . import ai_qdrant
+    ai_qdrant.invalidate(db)
     db.commit()
     return len(passages)
 
@@ -130,6 +132,18 @@ async def retrieve(db, user, question: str, *, limit: int = 3) -> list[dict]:
         if score > 0.12:
             hits.append((score, row, doc))
     hits.sort(key=lambda item: item[0], reverse=True)
+    # Optional Qdrant is only a ranking accelerator; never a source of
+    # credentials, text or authorization. All its point IDs must resolve to
+    # source-hash-checked current SQLite rows.
+    from . import ai_qdrant
+    if ai_qdrant.active(db):
+        scores = await ai_qdrant.query(db, model_id, query_vector)
+        by_id = {row.id: (score, row, doc) for score, row, doc in hits}
+        remote_order = [by_id[point_id] for point_id, _remote_score in scores
+                        if point_id in by_id]
+        if remote_order:
+            selected = {row.id for _score, row, _doc in remote_order}
+            hits = remote_order + [entry for entry in hits if entry[1].id not in selected]
     result, used = [], set()
     for score, row, doc in hits:
         if doc.id in used:

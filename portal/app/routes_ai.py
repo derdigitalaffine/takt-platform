@@ -21,7 +21,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
 from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector, AIDmsSource
-from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms
+from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms, ai_qdrant
 from .db import LawText, User, DmsRecord, SessionLocal, get_settings, set_setting, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
                    flash, get_db, rate_limit, redirect, render, require)
@@ -213,6 +213,7 @@ def admin_ai_vector_settings(
     set_setting(db, "ai_vector_auto_index", "1" if enabled == "1" and auto_index == "1" else "0")
     set_setting(db, "ai_vector_provider_id", str(provider_id) if enabled == "1" else "0")
     set_setting(db, "ai_vector_model_id", model_id[:200] if enabled == "1" else "")
+    ai_qdrant.invalidate(db)
     db.commit()
     flash(request, "Vektor-RAG-Konfiguration gespeichert. Bestehende Einträge bei Modellwechsel neu indizieren.")
     return redirect("/admin/ai#knowledge")
@@ -229,6 +230,33 @@ async def admin_ai_vector_reindex(
     except ai_provider.AIProviderError as exc:
         flash(request, str(exc), "error")
     return redirect(f"/admin/ai#knowledge-{doc_id}")
+
+
+@app.post("/admin/ai/qdrant/settings", dependencies=[Depends(check_csrf)])
+def admin_ai_qdrant_settings(
+    request: Request, enabled: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    if enabled == "1" and ai_vector._settings(db) is None:
+        raise HTTPException(400, "Zuerst semantische Vektorsuche und Embedding-Modell aktivieren.")
+    set_setting(db, "ai_qdrant_enabled", "1" if enabled == "1" else "0")
+    db.commit()
+    flash(request, "Qdrant-Cache aktualisiert. Freigabe und Synchronisierung sind getrennt.")
+    return redirect("/admin/ai#knowledge")
+
+
+@app.post("/admin/ai/qdrant/rebuild", dependencies=[Depends(check_csrf)])
+async def admin_ai_qdrant_rebuild(
+    request: Request, user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    rate_limit(request, "ai-qdrant-rebuild", limit=3, window=300, key=str(user.id))
+    try:
+        count = await ai_qdrant.rebuild(db)
+        flash(request, f"Qdrant-Cache mit {count} aktuellen Vektoren neu aufgebaut.")
+    except ai_qdrant.QdrantError as exc:
+        flash(request, str(exc), "error")
+    return redirect("/admin/ai#knowledge")
 
 
 @app.post("/admin/ai/web/settings", dependencies=[Depends(check_csrf)])
@@ -312,6 +340,7 @@ def admin_ai_knowledge_save(request: Request, doc_id: int = Form(0), title: str 
     doc.enabled = enabled == "1"
     doc.updated_at = utcnow()
     ai_vector_jobs.enqueue_document(db, doc)
+    ai_qdrant.invalidate(db)
     db.commit()
     flash(request, "Interner Wissenseintrag gespeichert.")
     return redirect("/admin/ai#knowledge")
@@ -343,6 +372,7 @@ async def admin_ai_knowledge_upload(request: Request, file: UploadFile = File(..
     doc = AIKnowledge(title=label, body_md=body, enabled=enabled == "1")
     db.add(doc)
     ai_vector_jobs.enqueue_document(db, doc)
+    ai_qdrant.invalidate(db)
     db.commit()
     flash(request, "Dokument als interner Wissenseintrag eingelesen. Das Original wird nicht gespeichert.")
     return redirect("/admin/ai#knowledge")
@@ -356,6 +386,7 @@ def admin_ai_knowledge_delete(request: Request, doc_id: int, user: User = Depend
         raise HTTPException(404)
     db.execute(delete(AIKnowledgeVector).where(AIKnowledgeVector.knowledge_id == doc.id))
     db.delete(doc)
+    ai_qdrant.invalidate(db)
     db.commit()
     flash(request, "Wissenseintrag gelöscht.")
     return redirect("/admin/ai#knowledge")
