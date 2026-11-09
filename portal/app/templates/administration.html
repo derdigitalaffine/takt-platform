@@ -1,7 +1,24 @@
 {% extends "base.html" %}
-{% import "_macros.html" as m with context %}
 {% block title %}Administration{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/admin-workspace.css">{% endblock %}
 {% block content %}
-{% call m.page_head('Administration', 'Verwalten Sie die für Sie freigegebenen Einstellungen und Fachbereiche.') %}{% endcall %}
-<div class="module-catalog">{% for section in sections if section['items'] %}<section class="card card-body"><h2 class="h5">{{section.label}}</h2><ul class="list-group list-group-flush">{% for it in section['items'] %}<li class="list-group-item px-0"><a href="{{it.url}}"><i class="fa-solid {{it.icon}} fa-fw me-2" aria-hidden="true"></i>{{it.label}}</a></li>{% endfor %}</ul></section>{% endfor %}</div>
+<div class="admin-workspace admin-settings-home">
+<header class="admin-welcome">
+  <div><span class="admin-eyebrow"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i> TAKT verwalten</span><h1>Administration</h1><p>Menschen, Organisationsstruktur, Sicherheit und Systemfunktionen – klar nach Bereichen geordnet.</p></div>
+  <div class="admin-welcome-actions"><a class="btn btn-outline-secondary" href="/module"><i class="fa-solid fa-grip me-1" aria-hidden="true"></i>Modulkatalog öffnen</a></div>
+</header>
+<div class="admin-section-heading"><div><span class="admin-eyebrow">Einstellungen &amp; Fachbereiche</span><h2>Verwaltungsbereiche</h2><p>Wählen Sie den Bereich, den Sie konfigurieren möchten. Es erscheinen nur Ihre freigegebenen Funktionen.</p></div></div>
+<div class="admin-settings-grid">
+  {% for section in sections if section['items'] %}
+  <section class="admin-settings-section" aria-label="{{section.label}}">
+    <h2>{{section.label}}</h2>
+    <div class="admin-settings-links">
+      {% for it in section['items'] %}
+        <a class="admin-settings-link" href="{{it.url}}"><span class="admin-settings-icon"><i class="fa-solid {{it.icon}}" aria-hidden="true"></i></span><span>{{it.label}}</span><i class="fa-solid fa-arrow-right admin-settings-arrow" aria-hidden="true"></i></a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+</div>
 {% endblock %}
