@@ -70,7 +70,7 @@ def classify(prompt: str, *, has_work_context: bool = False) -> str:
         return "chat"
     # Explicit native form/task headings in operator workflows are requests
     # to prepare a TAKT action even if the suffix is a terse description.
-    if re.match(r"^(?:internes\\s+anliegen|anliegen\\s+\\w+|aufgabe\\s+\\w+|routing\\s+\\w+)\\s*:", value, re.I):
+    if re.match(r"^(?:internes\s+anliegen|anliegen\s+\w+|aufgabe\s+\w+|routing\s+\w+)\s*:", value, re.I):
         return "operate"
     if _ACTION.search(value) and (_DOMAIN.search(value) or
                                   re.search(r"\b(?:schritte\s+vorbereiten|auftrag)\b", value, re.I)):
