@@ -371,9 +371,7 @@ def test_cross_organization_and_unrelated_users_cannot_configure_or_approve(bund
                                 bundle["process_id"], other_org.id,
                                 _policy("handler"))
         assert "403" in str(exc.value)
-        db.rollback()
-        db.delete(db.get(Organization, other_org.id))
-        db.commit()
+        db.rollback()  # The uncommitted foreign organization was rolled back too.
 
 
 def test_auto_start_is_explicit_and_deduplicated_against_manual(bundle):
@@ -421,13 +419,7 @@ def test_confidential_categories_rejected_even_when_admin(bundle):
             config.create_draft(db, admin, confidential.id,
                                 bundle["process_id"], None, _policy("handler"))
         assert "422" in str(ex.value)
-        db.rollback()
-        with SessionLocal() as cleanup:
-            row = cleanup.scalar(select(AnliegenCategory).where(
-                AnliegenCategory.key == confidential.key))
-            if row:
-                cleanup.delete(row)
-                cleanup.commit()
+        db.rollback()  # The confidential category insert was never committed.
 
 
 def test_csrf_and_switch_admin_only(bundle):
