@@ -140,6 +140,12 @@
           <button type="submit" class="btn btn-outline-primary">Vektorsuche speichern</button>
         </div>
       </form>
+      {% if cfg.ai_vector_auto_index == '1' %}
+      <p class="small mb-2"><strong>Index-Warteschlange:</strong>
+        {{ vector_jobs.pending }} wartend · {{ vector_jobs.running }} in Bearbeitung ·
+        {{ vector_jobs.failed }} vorübergehend fehlgeschlagen · {{ vector_jobs.done }} abgeschlossen.
+        Fehlgeschlagene Aufträge werden automatisch erneut versucht.</p>
+      {% endif %}
       <p class="form-text mb-0">Bei aktivierter Automatik prüft der TAKT-Hintergrunddienst etwa alle fünf Minuten auf neue und geänderte freigegebene Einträge, verarbeitet maximal zwei je Durchlauf und wiederholt fehlgeschlagene Jobs mit Wartezeit. Berechtigungsentzug wirkt sofort. Ein manueller Neuaufbau ist weiterhin möglich.</p>
     </div>
   </details>
