@@ -218,7 +218,8 @@ def ai_chat(request: Request, chat: int | None = None, user: User = Depends(chat
     return render(request, "ai_chat.html", user, chats=conversations, current=selected,
                   chat_messages=selected.messages if selected else [], providers=providers,
                   knowledge_available=(get_settings(db).get("ai_knowledge_enabled") == "1"
-                                       and user.can("ai_knowledge")))
+                                       and user.can("ai_knowledge")),
+                  vision_available=user.can("ai_vision"))
 
 
 @app.post("/ki/new", dependencies=[Depends(check_csrf)])
