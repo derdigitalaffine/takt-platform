@@ -304,6 +304,7 @@
         var link = document.createElement('a');
         link.className = 'btn btn-sm btn-outline-primary ai-agent-navigation-link';
         link.href = data.open_url;
+        link.target = '_top'; // A deliberate click opens the TAKT module outside the dock.
         link.textContent = data.plan_id ? 'Vorschlag im Modul öffnen' : 'TAKT-Modul öffnen';
         navigation.appendChild(lead);
         navigation.appendChild(link);
