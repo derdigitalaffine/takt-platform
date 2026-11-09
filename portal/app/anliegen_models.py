@@ -12,6 +12,7 @@ class AnliegenCategory(Base):
     description: Mapped[str] = mapped_column(String(255), default="")
     icon: Mapped[str] = mapped_column(String(48), default="fa-inbox")
     confidential: Mapped[bool] = mapped_column(Boolean, default=False)
+    procurement: Mapped[bool] = mapped_column(Boolean, default=False)
     routing: Mapped[str] = mapped_column(String(20), default="person")  # person | lead
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -31,6 +32,8 @@ class Anliegen(Base):
     description: Mapped[str] = mapped_column(Text)
     confidential: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(24), default="new")
+    supplier_name: Mapped[str] = mapped_column(String(160), default="")
+    order_reference: Mapped[str] = mapped_column(String(160), default="")
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     category = relationship("AnliegenCategory")
