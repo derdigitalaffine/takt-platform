@@ -86,15 +86,17 @@ def retrieve(db, user, question: str, limit: int = 5) -> list[dict]:
         candidates = select(LawText).where(LawText.published.is_(True))
         if cfg.get("ai_laws_include_all") != "1":
             candidates = candidates.where(LawText.id.in_(select(AILawSource.law_id)))
-        # SQL filtering keeps dynamic all-published collections fast and avoids
-        # silently ignoring later sources because of an arbitrary ID cutoff.
-        candidates = candidates.where(or_(*[
-            or_(LawText.title.ilike(f"%{word}%"),
-                LawText.body_md.ilike(f"%{word}%"),
-                LawText.short_title.ilike(f"%{word}%"))
-            for word in words
-        ])).order_by(LawText.id).limit(1500)
+        # Historical wording may exist only in an older version. Do not
+        # pre-filter by the current body when a validity date was supplied.
         day = requested_day(question)
+        if not day:
+            candidates = candidates.where(or_(*[
+                or_(LawText.title.ilike(f"%{word}%"),
+                    LawText.body_md.ilike(f"%{word}%"),
+                    LawText.short_title.ilike(f"%{word}%"))
+                for word in words
+            ]))
+        candidates = candidates.order_by(LawText.id).limit(1500)
         for law in db.scalars(candidates):
             if law.internal and not user.can("laws"):
                 continue
