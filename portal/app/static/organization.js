@@ -91,6 +91,50 @@
     preview.tabIndex = -1;
     renderPreview();
   }
+  // Large departments remain navigable: keep the first 30 people visible,
+  // search through all records and reveal the next batch on demand. Without JS
+  // every row remains visible and forms keep working unchanged.
+  const memberSearch = document.querySelector("[data-org-member-search]");
+  const memberList = document.querySelector("[data-org-member-list]");
+  const members = [...document.querySelectorAll("[data-org-member-row]")];
+  const memberCounter = document.querySelector("[data-org-member-count]");
+  if (memberSearch && memberList) {
+    let batchSize = 30;
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "btn btn-outline-secondary btn-sm mb-3";
+    more.textContent = "Weitere Personen anzeigen";
+    more.setAttribute("aria-label", "Weitere Personen dieser Organisationseinheit anzeigen");
+    memberList.insertAdjacentElement("afterend", more);
+    const showMembers = () => {
+      const value = memberSearch.value.toLocaleLowerCase().trim();
+      const matches = members.filter(row => (row.dataset.name || "").includes(value));
+      members.forEach(row => { row.hidden = !matches.includes(row) || matches.indexOf(row) >= batchSize; });
+      more.hidden = matches.length <= batchSize;
+      memberCounter.textContent = matches.length + " passende Zuordnungen" +
+        (matches.length > batchSize ? " · " + batchSize + " angezeigt" : "");
+    };
+    memberSearch.addEventListener("input", () => { batchSize = 30; showMembers(); });
+    more.addEventListener("click", () => { batchSize += 30; showMembers(); });
+    showMembers();
+  }
+  const roleSearch = document.querySelector("[data-org-role-search]");
+  const roleEntries = [...document.querySelectorAll("[data-org-role-entry]")];
+  const roleCounter = document.querySelector("[data-org-role-count]");
+  if (roleSearch && roleCounter) {
+    const showRoles = () => {
+      const query = roleSearch.value.toLocaleLowerCase().trim();
+      let matches = 0;
+      roleEntries.forEach(row => {
+        const show = (row.dataset.name || "").includes(query);
+        row.hidden = !show;
+        if (show) matches++;
+      });
+      roleCounter.textContent = matches + " passende Rollenempfänger";
+    };
+    roleSearch.addEventListener("input", showRoles);
+    showRoles();
+  }
   window.addEventListener("hashchange", openHash);
   openHash();
 })();
