@@ -8,7 +8,13 @@ OUTPUT=Path(os.environ.get('SEMINAR_BROWSER_ARTIFACTS','/tmp/takt-seminar-browse
 
 
 def capture(page,name):
-    assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'Horizontal overflow: '+page.url
+    if not page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'):
+        offenders = page.evaluate("""() => [...document.querySelectorAll('body *')]
+          .map(el => { const r = el.getBoundingClientRect(); return {tag:el.tagName, className:String(el.className).slice(0,100), right:Math.round(r.right), width:Math.round(r.width)}; })
+          .filter(x => x.width > 0 && x.right > innerWidth + 1).slice(0,25)""")
+        print('Horizontal overflow diagnostics:', name, page.url, offenders, file=sys.stderr)
+        page.screenshot(path=str(OUTPUT/(name+'-overflow.png')), full_page=True, animations='disabled')
+        raise AssertionError('Horizontal overflow: '+page.url)
     page.screenshot(path=str(OUTPUT/(name+'.png')),full_page=True,animations='disabled')
 
 

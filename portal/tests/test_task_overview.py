@@ -102,7 +102,7 @@ def test_required_dashboard_work_survives_hidden_tiles_and_waiting_is_collapsed(
         assert 'EmployeeWorkFocus' in focus and f'/umlaeufe/{row.id}' in focus
         assert 'BlockedWorkFocus' not in focus
         tasks = c.get('/tasks').text
-        assert '<details class="card mb-3" id="waiting">' in tasks
+        assert '<details class="card task-results mb-3" id="waiting">' in tasks
         assert 'BlockedWorkFocus' in tasks and 'überfällig seit' not in tasks
         assert work.collect(db, actors[1], {'circulations'}, now=now)['overdue'] == 0
     finally:
