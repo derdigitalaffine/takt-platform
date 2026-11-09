@@ -60,10 +60,12 @@ def dms_included(db, record, *, cfg=None) -> bool:
     if not ai_dms.eligible(record):
         return False
     cfg = cfg if cfg is not None else get_settings(db)
+    # Area exceptions apply even to individually approved sources, preventing
+    # an old manual allowlist from overriding a later explicit area block.
+    blocked_areas = read_ids(cfg.get("ai_dms_excluded_areas"))
+    if blocked_areas is None or area_excluded(db, record.area_id, blocked_areas):
+        return False
     if cfg.get("ai_dms_include_all") == "1":
         excluded = read_ids(cfg.get("ai_dms_excluded_ids"))
-        blocked_areas = read_ids(cfg.get("ai_dms_excluded_areas"))
-        return (excluded is not None and blocked_areas is not None
-                and record.id not in excluded
-                and not area_excluded(db, record.area_id, blocked_areas))
+        return excluded is not None and record.id not in excluded
     return db.get(AIDmsSource, record.id) is not None
