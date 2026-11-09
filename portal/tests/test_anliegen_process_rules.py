@@ -57,7 +57,7 @@ def bundle():
         author = user("author", "anliegen_process_configure,processes")
         approver = user("approver", "anliegen_process_approve")
         reporter = user("reporter", "anliegen_submit,anliegen_process_start")
-        handler = user("handler", "anliegen_process_start,anliegen_submit")
+        handler = user("handler", "anliegen_process_start,anliegen_process_work,anliegen_submit")
         stranger = user("stranger", "anliegen_submit,anliegen_process_start")
         db.add_all([
             OrgMembership(user_id=reporter.id, org_id=org.id, is_primary=True),
