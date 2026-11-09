@@ -17,8 +17,12 @@
   const approve = root.querySelector('[data-agent-approve]');
   const reject = root.querySelector('[data-agent-reject]');
   if (![launch, shade, panel, close, messages, form, input, send, status, confirm, proposals, approve, reject].every(Boolean)) return;
+  // The launch button lives in the sticky navbar. Move the overlay layers to
+  // <body> so navbar stacking contexts, transforms and backdrop filters cannot
+  // confine the drawer to the header. All event references remain unchanged.
+  document.body.append(shade, panel);
   const csrf = document.querySelector('meta[name="csrf"]')?.content || '';
-  const reset = root.querySelector('[data-agent-reset]');
+  const reset = panel.querySelector('[data-agent-reset]');
   let pending = '';
   let busy = false;
 
@@ -186,7 +190,7 @@
       }
     }
   });
-  root.querySelectorAll('[data-agent-sample]').forEach(function (button) {
+  panel.querySelectorAll('[data-agent-sample]').forEach(function (button) {
     button.addEventListener('click', function () {
       input.value = button.dataset.agentSample;
       input.focus();
