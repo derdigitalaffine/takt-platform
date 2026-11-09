@@ -193,6 +193,10 @@
       }
       accepted = true;
       updateTitle(question);
+      // The server has saved the question before starting the stream. Clear it now
+      // so a later provider error cannot accidentally resend the same message.
+      prompt.value = '';
+      if (imageInput) imageInput.value = '';
       if (!response.body) throw new Error('Streaming-Antwort wird vom Browser nicht unterstützt.');
 
       var reader = response.body.getReader();
@@ -242,8 +246,6 @@
       progress.remove();
       addAnswerMetadata(assistantBubble.bubble, doneData);
       // The server has persisted the user message and the complete answer.
-      prompt.value = '';
-      if (imageInput) imageInput.value = '';
       status.textContent = 'Antwort gespeichert.';
       hint.textContent = '';
       updateJump();
