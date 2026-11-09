@@ -4,6 +4,8 @@ The worker may be restarted mid-request: expired leases are reclaimed. Source
 hashes and model names are checked against current configuration before work.
 No document content, API secret, or user query enters job state or logs.
 """
+import asyncio
+import logging
 from datetime import timedelta
 
 from sqlalchemy import delete, or_, select, update
@@ -175,3 +177,15 @@ async def tick(doc_id: int | None = None) -> int:
             job.updated_at = utcnow()
             db.commit()
     return done
+
+
+
+async def run_forever() -> None:
+    """Dedicated low-priority loop; never block reminders or recording jobs."""
+    log = logging.getLogger("portal.ai_index")
+    while True:
+        try:
+            await tick()
+        except Exception:  # noqa: BLE001 - never log source text or provider secrets
+            log.warning("RAG-Indexlauf fehlgeschlagen; erneuter Versuch beim nächsten Intervall.")
+        await asyncio.sleep(300)
