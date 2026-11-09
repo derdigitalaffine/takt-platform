@@ -2936,6 +2936,8 @@ DEFAULT_SETTINGS = {
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
     "anliegen": {
+        "title_enc": "TEXT",
+        "description_enc": "TEXT",
         "supplier": "VARCHAR(160) NOT NULL DEFAULT ''",
         "order_reference": "VARCHAR(120) NOT NULL DEFAULT ''",
         "ordered_at": "DATETIME",
@@ -3093,6 +3095,25 @@ def init_db() -> None:
     from . import anliegen_models  # noqa: F401 – register additive internal request tables
     Base.metadata.create_all(engine)
     _migrate()
+    # Idempotently re-encrypt confidential complaints created before this update.
+    # Original sensitive text must never remain in general searchable fields.
+    from .anliegen_models import Anliegen
+    from .security import encrypt
+    with SessionLocal() as migration_db:
+        changed = False
+        for case in migration_db.scalars(select(Anliegen).where(Anliegen.confidential.is_(True))):
+            if not case.title_enc:
+                case.title_enc = encrypt(case.title)
+                changed = True
+            if not case.description_enc:
+                case.description_enc = encrypt(case.description)
+                changed = True
+            if case.title != "Vertrauliches Anliegen" or case.description:
+                case.title = "Vertrauliches Anliegen"
+                case.description = ""
+                changed = True
+        if changed:
+            migration_db.commit()
     with SessionLocal() as db:
         for key, value in DEFAULT_SETTINGS.items():
             if db.get(Setting, key) is None:
