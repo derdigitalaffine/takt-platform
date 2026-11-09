@@ -162,10 +162,14 @@ def search_instructions(user, focus=None):
     kinds.extend(tool + "(query)" for tool, module in modules.READ.items() if allowed(user, module))
     from .agent_precision import focused
     kinds = focused(kinds, focus)
+    # The example must never name an unavailable/unfocused tool. This is
+    # essential for small local models with narrow, module-specific schemas.
+    exemplar = kinds[0].split("(", 1)[0] if kinds else ""
+    example = {"searches": [{"tool": exemplar, "query": ""}]} if exemplar else {"searches": []}
     return [
         {"role": "system", "content": (
             "Du bist TAKT Agent. Antworte nur als JSON-Objekt: "
-            '{"searches":[{"tool":"search_tasks","query":"","scope":"assigned","overdue":true}]}. '
+            + json.dumps(example, ensure_ascii=False) + ". "
             "Für allgemeine Fragen, Texte und Wissensfragen plane KEINE Fachsuche; antworte später im message-Feld. Sonst plane 0 bis 6 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
             "bei Aufgaben und Anliegen sind 0 Suchen erlaubt. Für Termine zuerst Kalender suchen; für Kopien Formulare, für DMS-Verschiebungen Akten UND Zielbereiche suchen. "
             "Filter nach Status und Fälligkeit zielgerichtet, aber erfinde keine IDs. "
