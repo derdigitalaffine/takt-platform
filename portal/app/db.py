@@ -2770,6 +2770,9 @@ DEFAULT_SETTINGS = {
     "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
     "ai_knowledge_enabled": "0",
+    "ai_vector_enabled": "0",
+    "ai_vector_provider_id": "0",
+    "ai_vector_model_id": "",
     "ai_retention_days": "90",
     "module_tasks": "0",
     "module_calendars": "0",
