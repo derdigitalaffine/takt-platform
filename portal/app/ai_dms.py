@@ -13,7 +13,13 @@ from sqlalchemy import select
 from . import dms
 from .ai_models import AIDmsSource
 from .db import DmsRecord, get_settings
-from .ai_knowledge import terms, _score
+from .ai_knowledge import terms, _score, revision
+
+
+def dms_revision(record: DmsRecord) -> str:
+    """Pin the precise manual DMS note, title and area as source provenance."""
+    return revision(record.id, record.area_id, record.title, record.note,
+                    record.kind, record.archived_at)
 
 
 def eligible(record: DmsRecord | None) -> bool:
@@ -83,5 +89,5 @@ def retrieve(db, user, question: str, limit: int = 2) -> list[dict]:
         out.append({"title": record.title[:200],
                     "url": f"/dms/r/{record.id}",
                     "text": (record.note or "")[:1800],
-                    "kind": "dms"})
+                    "kind": "dms", "revision": dms_revision(record)})
     return out
