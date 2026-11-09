@@ -25,11 +25,14 @@ def read(user):
         return {}
     if not isinstance(value, dict):
         return {}
-    return {k: v for k, v in value.items() if (k in FIELDS and isinstance(v, str)) or (k == 'prefill_enabled' and isinstance(v, bool))}
+    return {k: v for k, v in value.items() if (k in FIELDS and isinstance(v, str)) or (k == 'prefill_enabled' and isinstance(v, bool)) or (k == 'birthday_visibility' and v in ('hidden', 'date', 'age'))}
 
 
 def clean(raw):
-    values = {'prefill_enabled': raw.get('prefill_enabled') in ('1', True)}
+    mode = raw.get('birthday_visibility', 'hidden')
+    if mode not in ('hidden', 'date', 'age'):
+        raise ValueError('Bitte eine gültige Geburtstagsfreigabe wählen.')
+    values = {'prefill_enabled': raw.get('prefill_enabled') in ('1', True), 'birthday_visibility': mode}
     for key, (_, label, kind, limit, _) in FIELDS.items():
         value = str(raw.get(key) or '').strip()
         if not value:
