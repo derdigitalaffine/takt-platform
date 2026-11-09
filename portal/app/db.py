@@ -105,6 +105,9 @@ PERMISSIONS = {
     "calendar_publish": ("Kalender veröffentlichen", "fa-globe", "Eigene Kalender intern oder öffentlich veröffentlichen"),
     "anliegen_submit": ("Interne Anliegen einreichen", "fa-inbox", "Interne Wünsche, Mängel, Beschwerden und Bestellungen melden"),
     "anliegen_manage": ("Interne Anliegen verwalten", "fa-user-gear", "Nicht vertrauliche Anliegen verwalten und Zuständigkeiten konfigurieren"),
+    "anliegen_process_start": ("Anliegenprozesse starten", "fa-play", "Freigegebene Prozessstarts in eigenen oder zugewiesenen Anliegen auswählen"),
+    "anliegen_process_configure": ("Anliegenprozesse konfigurieren", "fa-diagram-project", "Prozessregeln innerhalb zugewiesener Organisationseinheiten entwerfen"),
+    "anliegen_process_approve": ("Anliegenprozesse freigeben", "fa-stamp", "Konfigurationen und Starts im berechtigten Organisationsumfang prüfen und genehmigen"),
     "tasks": ("Aufgaben erstellen", "fa-list-check", "Eigene Aufgaben erfassen, zuweisen und bearbeiten"),
     "tasks_manage": ("Aufgaben verwalten", "fa-user-gear", "Alle nativen Aufgaben sehen und verwalten"),
     "seminars": ("Seminare planen", "fa-chalkboard-user", "Seminare und Lehrgänge mit Terminen, Einladungen und Unterlagen planen"),
@@ -2953,6 +2956,10 @@ DEFAULT_SETTINGS = {
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
     "anliegen_categories": {"tags": "TEXT NOT NULL DEFAULT ''"},
+    "anliegen_process_rules": {
+        "process_version_id": "INTEGER REFERENCES process_versions(id) ON DELETE RESTRICT",
+        "created_by_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+    },
     "anliegen_process_runs": {
         "cursor": "INTEGER NOT NULL DEFAULT 0",
         "state_version": "INTEGER NOT NULL DEFAULT 0",
@@ -3110,6 +3117,9 @@ def _migrate() -> None:
             conn.execute(text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_form_responses_track_token "
                           "ON form_responses (track_token)"))
+        # SQLite UNIQUE over nullable org_id does not deduplicate global rules.
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_anliegen_global_rule_revision "
+                          "ON anliegen_process_rules (category_id, process_id, revision) WHERE org_id IS NULL"))
 
 
 def init_db() -> None:
