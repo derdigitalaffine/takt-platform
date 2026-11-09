@@ -104,12 +104,14 @@
   async function submit() {
     const text = input.value.trim();
     if (busy || text.length < 3) return;
+    const oldPlan = pending;
     clearProposal();
     bubble(text, 'user');
     input.value = '';
     const progress = bubble('Ich prüfe die verfügbaren Funktionen und suche nach passenden Vorgängen …', 'agent');
     setBusy(true, 'TAKT Agent plant …');
     try {
+      if (oldPlan) await post('/agent/cancel', {plan_id: oldPlan});
       const data = await post('/agent/plan', {prompt: text});
       progress.textContent = data.message || 'Ergebnis';
       if (Array.isArray(data.steps)) data.steps.forEach(function (step) {
@@ -171,9 +173,16 @@
     }
   });
   approve.addEventListener('click', execute);
-  reject.addEventListener('click', function () {
-    if (busy) return;
+  reject.addEventListener('click', async function () {
+    if (busy || !pending) return;
+    const token = pending;
     clearProposal();
-    bubble('Vorschlag verworfen. Es wurde nichts verändert.', 'agent');
+    setBusy(true, 'Vorschlag wird verworfen …');
+    try {
+      await post('/agent/cancel', {plan_id: token});
+      bubble('Vorschlag verworfen. Es wurde nichts verändert.', 'agent');
+    } catch (error) {
+      bubble(error.message || 'Vorschlag lokal verworfen. Laden Sie die Seite neu.', 'error');
+    } finally { setBusy(false); }
   });
 })();
