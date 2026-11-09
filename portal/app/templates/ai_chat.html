@@ -84,8 +84,15 @@
             <label class="visually-hidden" for="ai-prompt">Ihre Nachricht</label>
             <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Nachricht an TAKT-KI …" required></textarea>
           </div>
-          {% if knowledge_available or vision_available %}
+          {% if knowledge_available or vision_available or web_available %}
           <details class="ai-chat-options"><summary><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Weitere Optionen</summary>
+          {% endif %}
+          {% if web_available %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="use_web" value="1" id="ai-use-web">
+            <label class="form-check-label" for="ai-use-web"><i class="fa-solid fa-globe me-1" aria-hidden="true"></i>Aktuelle Websuche für diese Nachricht</label>
+            <div class="form-text">Die aktuelle Frage wird an Brave Search übertragen; keine internen TAKT-Daten oder Chat-Historie.</div>
+          </div>
           {% endif %}
           {% if knowledge_available %}
           <div class="form-check mb-2">
@@ -100,7 +107,7 @@
             <div class="form-text">Bild wird nur für diese Anfrage verarbeitet.</div>
           </div>
           {% endif %}
-          {% if knowledge_available or vision_available %}</details>{% endif %}
+          {% if knowledge_available or vision_available or web_available %}</details>{% endif %}
           <div class="ai-composer-footer">
             <span class="small text-secondary ai-chat-status" data-ai-status role="status" aria-live="polite"></span>
             <div class="d-flex gap-2 justify-content-end">
