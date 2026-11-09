@@ -35,11 +35,11 @@ def normalize_tags(value):
     if len(value) > 1000:
         raise HTTPException(422, "Die Schlagwortliste ist zu lang.")
     result, seen = [], set()
-    for raw in re.split(r"[,;\\n]+", value):
+    for raw in re.split(r"[,;\n]+", value):
         tag = " ".join(raw.strip().lstrip("#").split()).casefold()
         if not tag:
             continue
-        if len(tag) > 40 or not re.fullmatch(r"[\\w][\\w .-]*", tag):
+        if len(tag) > 40 or not re.fullmatch(r"[\w][\w .-]*", tag):
             raise HTTPException(422, "Schlagwörter dürfen höchstens 40 Zeichen und nur Buchstaben, Zahlen, Leerzeichen, Punkte oder Bindestriche enthalten.")
         if tag not in seen:
             seen.add(tag)
