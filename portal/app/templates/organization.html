@@ -3,12 +3,19 @@
 {% import '_selection_picker.html' as sp %}
 {% macro fields(action,oid='') %}<input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{org_version}}"><input type="hidden" name="action" value="{{action}}"><input type="hidden" name="org_id" value="{{oid}}">{% endmacro %}
 {% block title %}Organisation{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/selection-picker.css"><link rel="stylesheet" href="/static/admin-workspace.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/selection-picker.css"><link rel="stylesheet" href="/static/admin-workspace.css"><link rel="stylesheet" href="/static/workspace-heading.css">{% endblock %}
 {% block content %}
 <div class="admin-workspace admin-org-workspace">
-<header class="admin-welcome">
-  <div><span class="admin-eyebrow"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i> Administration · Struktur</span><h1>Organisation verwalten</h1><p>Einheiten, Zuständigkeiten, Mitgliedschaften und Berechtigungen an einem Ort.</p></div>
-  <div class="admin-welcome-actions">{% if user.can('users') %}<a class="btn btn-outline-secondary" href="/admin/users"><i class="fa-solid fa-users me-1" aria-hidden="true"></i>Benutzer &amp; Gruppen</a>{% endif %}{% if user.can('orgs') %}<a class="btn btn-primary" href="/admin/organization?new=1{{'&unit=' ~ selected.id if selected else ''}}#org-new"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Einheit anlegen</a>{% endif %}</div>
+<header class="workspace-head" aria-labelledby="admin-org-page-title">
+  <div class="workspace-head-main">
+    <span class="workspace-head-mark"><i class="fa-solid fa-sitemap" aria-hidden="true"></i></span>
+    <div class="workspace-head-copy"><h1 id="admin-org-page-title">Organisation</h1>
+      <p>Einheiten, Zuordnungen und Bereichsrollen verwalten.</p></div>
+  </div>
+  <div class="workspace-head-actions admin-welcome-actions">
+    {% if user.can('users') %}<a class="btn btn-outline-secondary" href="/admin/users"><i class="fa-solid fa-users me-1" aria-hidden="true"></i>Benutzer &amp; Gruppen</a>{% endif %}
+    {% if user.can('orgs') %}<a class="btn btn-primary" href="/admin/organization?new=1{{'&unit=' ~ selected.id if selected else ''}}#org-new"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Einheit anlegen</a>{% endif %}
+  </div>
 </header>
 <nav class="admin-subnav" aria-label="Organisation verwalten">
   <a href="#org-structure"><i class="fa-solid fa-sitemap" aria-hidden="true"></i>Struktur</a>

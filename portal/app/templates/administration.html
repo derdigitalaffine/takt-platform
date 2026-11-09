@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Administration{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/admin-workspace.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/admin-workspace.css"><link rel="stylesheet" href="/static/workspace-heading.css">{% endblock %}
 {% block content %}
 <div class="admin-workspace admin-settings-home">
-<header class="admin-welcome">
-  <div><span class="admin-eyebrow"><i class="fa-solid fa-gear me-1" aria-hidden="true"></i> TAKT verwalten</span><h1>Administration</h1><p>Menschen, Organisationsstruktur, Sicherheit und Systemfunktionen – klar nach Bereichen geordnet.</p></div>
-  <div class="admin-welcome-actions"><a class="btn btn-outline-secondary" href="/module"><i class="fa-solid fa-grip me-1" aria-hidden="true"></i>Modulkatalog öffnen</a></div>
+<header class="workspace-head" aria-labelledby="admin-page-title">
+  <div class="workspace-head-main">
+    <span class="workspace-head-mark"><i class="fa-solid fa-gear" aria-hidden="true"></i></span>
+    <div class="workspace-head-copy"><h1 id="admin-page-title">Administration</h1>
+      <p>Zugänge, Organisation und Systemeinstellungen – zentral und übersichtlich.</p></div>
+  </div>
+  <div class="workspace-head-actions admin-welcome-actions"><a class="btn btn-outline-secondary" href="/module"><i class="fa-solid fa-grip me-1" aria-hidden="true"></i>Modulkatalog öffnen</a></div>
 </header>
 <div class="admin-section-heading"><div><span class="admin-eyebrow">Einstellungen &amp; Fachbereiche</span><h2>Verwaltungsbereiche</h2><p>Wählen Sie den Bereich, den Sie konfigurieren möchten. Es erscheinen nur Ihre freigegebenen Funktionen.</p></div></div>
 <div class="admin-settings-grid">

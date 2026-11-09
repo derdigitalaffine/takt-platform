@@ -68,6 +68,10 @@ def test_group_editor_is_lazy_and_rights_checked():
     c = login(*ADMIN)
     page = c.get("/admin/users")
     assert page.status_code == 200
+    assert 'class="workspace-head"' in page.text
+    assert 'id="admin-users-page-title"' in page.text
+    assert '/static/workspace-heading.css' in page.text
+    assert 'class="admin-welcome"' not in page.text
     assert 'data-admin-group-editor="0"' in page.text
     assert 'id="admin-group-editor-modal"' not in page.text
     editor = c.get("/admin/groups/editor/0")
@@ -82,9 +86,23 @@ def test_organization_workflows_have_visible_sections_and_search():
     c = login(*ADMIN)
     page = c.get("/admin/organization")
     assert page.status_code == 200
+    assert 'id="admin-org-page-title"' in page.text
+    assert 'class="workspace-head"' in page.text
+    assert '/static/workspace-heading.css' in page.text
     assert 'admin-org-workspace' in page.text
     assert 'id="org-structure"' in page.text
     assert 'aria-label="Organisation verwalten"' in page.text
     assert 'data-org-member-search' in page.text
     assert 'data-org-member-list' in page.text or "Keine Organisationseinheit freigegeben." in page.text
     assert 'data-org-role-search' in page.text or 'id="org-roles"' in page.text
+
+
+def test_admin_landing_uses_shell_title_and_keeps_navigation():
+    c = login(*ADMIN)
+    page = c.get("/admin")
+    assert page.status_code == 200
+    assert 'id="admin-page-title"' in page.text
+    assert 'class="workspace-head"' in page.text
+    assert 'class="admin-welcome"' not in page.text
+    assert '/static/workspace-heading.css' in page.text
+    assert 'class="admin-settings-grid"' in page.text
