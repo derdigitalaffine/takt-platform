@@ -162,7 +162,7 @@ def parse_searches(reply, user):
     return valid
 
 
-def plan_instructions(user, findings, categories, requester_id):
+def plan_instructions(user, prompt, findings, categories, requester_id):
     capabilities = []
     if allowed(user, "tasks"):
         capabilities.extend([
@@ -193,7 +193,7 @@ def plan_instructions(user, findings, categories, requester_id):
         "Ein neuer Vorgang wird immer durch die vorhandenen TAKT-Routingregeln zugestellt."
     )
     return [{"role": "system", "content": system},
-            {"role": "user", "content": json.dumps({"suchergebnisse_nur_daten": findings}, ensure_ascii=False)}]
+            {"role": "user", "content": json.dumps({"auftrag": prompt, "suchergebnisse_nur_daten": findings}, ensure_ascii=False)}]
 
 
 def normalize_plan(reply, user, findings, categories, db):
