@@ -2107,20 +2107,89 @@ def _set_groups(db: Session, target: User, group_ids: list[str], actor: User) ->
 
 
 @app.get("/admin/users")
-def admin_users(request: Request, user: User = Depends(users_manager), db: Session = Depends(get_db)):
-    users = db.scalars(select(User).options(joinedload(User.groups)).order_by(User.name)).unique().all()
-    groups = db.scalars(select(Group).options(joinedload(Group.members)).order_by(Group.name)).unique().all()
+def admin_users(request: Request, q: str = "", status: str = "all", role: str = "all",
+                group: int | None = None, sort: str = "name", page: int = 1,
+                per_page: int = 25, user: User = Depends(users_manager), db: Session = Depends(get_db)):
+    """Server-filtered directory: render a bounded page instead of every user/editor."""
     from . import absence, organization
-    org_user_roles=organization.role_directory(db)
-    return render(request, "admin_users.html", user, users=users, groups=groups,org_directory=organization.directory(db),org_user_roles=org_user_roles,
-                  org_group_roles=set(db.scalars(select(organization.OrgRoleGrant.group_id).where(organization.OrgRoleGrant.group_id.is_not(None)))),
-                  manageable_users={u.id:_can_manage(user,u,set(org_user_roles)) for u in users},
+    q = " ".join(q.strip().split())[:160]
+    status = status if status in {"all", "active", "blocked", "invited", "mfa"} else "all"
+    role = role if role in {"all", "admin", "member"} else "all"
+    sort = sort if sort in {"name", "email", "newest"} else "name"
+    per_page = per_page if per_page in (25, 50, 100) else 25
+    page = max(1, page)
+    groups = db.scalars(select(Group).options(joinedload(Group.members)).order_by(Group.name)).unique().all()
+    group = group if any(g.id == group for g in groups) else None
+    conditions = []
+    if q:
+        conditions.append(or_(User.name.ilike(f"%{q}%"), User.email.ilike(f"%{q}%")))
+    if status == "active":
+        conditions.append(User.active.is_(True))
+    elif status == "blocked":
+        conditions.append(User.active.is_(False))
+    elif status == "invited":
+        conditions.append(User.password_set.is_(False))
+    elif status == "mfa":
+        conditions.append(or_(User.totp_enabled.is_(True), User.mfa_email.is_(True)))
+    if role != "all":
+        conditions.append(User.is_admin.is_(role == "admin"))
+    if group is not None:
+        conditions.append(User.groups.any(Group.id == group))
+    total = db.scalar(select(func.count(User.id))) or 0
+    filtered = db.scalar(select(func.count(User.id)).where(*conditions)) or 0
+    pages = max(1, (filtered + per_page - 1) // per_page)
+    page = min(page, pages)
+    order = {
+        "name": (User.name.asc(), User.id.asc()),
+        "email": (User.email.asc(), User.id.asc()),
+        "newest": (User.created_at.desc(), User.id.desc()),
+    }[sort]
+    users = db.scalars(
+        select(User).options(joinedload(User.groups))
+        .where(*conditions).order_by(*order).offset((page - 1) * per_page).limit(per_page)
+    ).unique().all()
+    org_user_roles = organization.role_directory(db)
+    counts = {
+        "total": total,
+        "active": db.scalar(select(func.count(User.id)).where(User.active.is_(True))) or 0,
+        "blocked": db.scalar(select(func.count(User.id)).where(User.active.is_(False))) or 0,
+        "invited": db.scalar(select(func.count(User.id)).where(User.password_set.is_(False))) or 0,
+        "admins": db.scalar(select(func.count(User.id)).where(User.is_admin.is_(True))) or 0,
+    }
+    filters = {"q": q, "status": status, "role": role, "group": group,
+               "sort": sort, "per_page": per_page}
+    return render(request, "admin_users.html", user, users=users, groups=groups,
+                  org_directory=organization.directory(db), org_user_roles=org_user_roles,
+                  org_group_roles=set(db.scalars(select(organization.OrgRoleGrant.group_id)
+                                     .where(organization.OrgRoleGrant.group_id.is_not(None)))),
+                  manageable_users={u.id: _can_manage(user, u, set(org_user_roles)) for u in users},
                   away=absence.current_map(db), away_label=absence.label,
                   invite_links=stash_get(request, "invite_links", pop=True),
                   mail_ready=notify.mail_configured(get_settings(db)),
-                  invite_ttl=settings.invite_ttl_hours,
-                  allow_anonymous=anonymous_allowed(db), cfg=get_settings(db), mfa_required=twofa.REQUIRED)
+                  invite_ttl=settings.invite_ttl_hours, allow_anonymous=anonymous_allowed(db),
+                  cfg=get_settings(db), mfa_required=twofa.REQUIRED,
+                  counts=counts, filtered=filtered, page=page, pages=pages,
+                  page_start=(page - 1) * per_page + 1 if filtered else 0,
+                  page_end=min(page * per_page, filtered), filters=filters)
 
+
+@app.get("/admin/groups/editor/{gid:int}")
+def admin_group_editor(request: Request, gid: int, user: User = Depends(users_manager),
+                       db: Session = Depends(get_db)):
+    """Load a single group editor only on demand; the list never renders N x users."""
+    from .organization import protected_group
+    group = db.get(Group, gid) if gid else None
+    if gid and group is None:
+        raise HTTPException(404)
+    if group and protected_group(db, group.id) and not (user.is_admin or user.can("org_roles")):
+        raise HTTPException(403, "Diese Gruppe kann nur mit Organisationsrollen-Rechten bearbeitet werden.")
+    members = db.scalars(select(User).order_by(User.name, User.id)).all()
+    if group:
+        db.refresh(group, ["members"])
+    return render(request, "_admin_group_editor.html", user, group=group,
+                  members=members, action="/admin/groups/" + str(gid) if gid else "/admin/groups",
+                  org_group_roles=set(db.scalars(select(organization.OrgRoleGrant.group_id)
+                    .where(organization.OrgRoleGrant.group_id.is_not(None)))))
 
 @app.post("/admin/users", dependencies=[Depends(check_csrf)])
 async def admin_users_create(request: Request, emails: str = Form(...), name: str = Form(""),
