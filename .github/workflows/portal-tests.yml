@@ -69,10 +69,8 @@ jobs:
           done
           test "$ready" -eq 1
           docker compose exec -T searxng /usr/local/searxng/.venv/bin/python -c 'import json,urllib.request; p=json.load(urllib.request.urlopen("http://127.0.0.1:8080/search?q=TAKT&format=json",timeout=25)); assert isinstance(p.get("results"),list)'
-          if docker compose port searxng 8080 | grep -q .; then
-            echo "SearXNG must not publish a host port" >&2
-            exit 1
-          fi
+          # Docker unterscheidet EXPOSE (intern) von PortBindings (Host-Publishing).
+          docker inspect "$(docker compose ps -q searxng)" | python -c 'import json,sys; assert not json.load(sys.stdin)[0]["HostConfig"]["PortBindings"], "SearXNG must not publish a host port"'
       - name: Diagnose failed startup
         if: failure()
         run: docker compose --profile searxng logs --tail=120 searxng
