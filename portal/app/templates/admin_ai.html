@@ -363,7 +363,43 @@
   <details class="card" open>
     <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-scale-balanced me-2" aria-hidden="true"></i>Rechtstexte als KI-Wissen · {{ law_effective_count }} von {{ laws|length }} veröffentlichten Quellen</summary>
     <div class="card-body">
-      <p class="small text-secondary">Automatisch berücksichtigt werden ausschließlich <strong>veröffentlichte</strong> Rechtstexte, einschließlich neuer Veröffentlichungen. Interne Texte bleiben zusätzlich auf Personen mit Rechtsmodul-Berechtigung beschränkt; unveröffentlichte Entwürfe gelangen nie in den KI-Kontext.</p>
+      <p class="small text-secondary">Für den KI-Chat freigegebene veröffentlichte Rechtstexte werden <strong>paragraphenweise semantisch indiziert</strong>, einschließlich öffentlich freigegebener historischer Fassungen. Die bisherige exakte Paragraphensuche bleibt als Ergänzung erhalten. Interne Fassungen bleiben auf entsprechend Berechtigte beschränkt.</p>
+      <div class="border rounded p-3 mb-3" data-ai-law-index aria-label="Rechtstext-Embedding-Fortschritt">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <strong><i class="fa-solid fa-scale-balanced me-1" aria-hidden="true"></i>Rechtstexte: Embedding-Fortschritt</strong>
+          <span class="fw-semibold" data-ai-law-index-percent>{{ index_health.law_embedding.percent }} %</span>
+        </div>
+        <div class="progress mb-2" role="progressbar" data-ai-law-index-progressbar aria-label="Fortschritt der Rechtstext-Embeddings" aria-valuenow="{{ index_health.law_embedding.percent }}" aria-valuemin="0" aria-valuemax="100" style="height:.85rem">
+          <div class="progress-bar" data-ai-law-index-fill style="width:{{ index_health.law_embedding.percent }}%"></div>
+        </div>
+        <div class="small text-secondary">
+          <span data-ai-law-index-chunks-ready>{{ index_health.law_embedding.ready_chunks }}</span> von
+          <span data-ai-law-index-chunks-total>{{ index_health.law_embedding.total_chunks }}</span> Paragraphen-/Textabschnitten aktuell eingebettet;
+          <span data-ai-law-index-ready>{{ index_health.law_embedding.ready }}</span> von
+          <span data-ai-law-index-total>{{ index_health.law_embedding.total }}</span> Fassungen abgeschlossen.
+        </div>
+        <div class="small mt-1">
+          <span data-ai-law-index-pending>{{ index_health.law_embedding.jobs.pending }}</span> wartend ·
+          <span data-ai-law-index-running>{{ index_health.law_embedding.jobs.running }}</span> in Arbeit ·
+          <span data-ai-law-index-failed>{{ index_health.law_embedding.jobs.failed }}</span> fehlgeschlagen.
+          <span class="text-secondary" data-ai-law-index-updated>Automatische Statusprüfung alle 20 Sekunden</span>
+        </div>
+        {% if cfg.ai_vector_enabled != '1' or cfg.ai_vector_auto_index != '1' or cfg.ai_knowledge_enabled != '1' %}
+        <p class="small text-warning-emphasis mt-2 mb-2">Bitte oben die Wissenssuche, semantische Suche und automatische Indizierung aktivieren und ein Embedding-Modell konfigurieren. Ohne diese Einstellungen bleibt die normale Paragraphensuche verfügbar.</p>
+        {% endif %}
+        <div class="d-flex align-items-center flex-wrap gap-2 mt-3">
+          <form method="post" action="/admin/ai/laws/index/refresh" class="m-0">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm" {% if not index_health.law_embedding.enabled %}disabled{% endif %}><i class="fa-solid fa-rotate me-1" aria-hidden="true"></i>Rechtstextindex abgleichen</button>
+          </form>
+          <form method="post" action="/admin/ai/laws/index/retry" class="m-0">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-outline-secondary btn-sm" {% if not index_health.law_embedding.enabled %}disabled{% endif %}>Fehlgeschlagene Aufträge erneut einreihen</button>
+          </form>
+          <span class="small text-secondary">Der getrennte Hintergrunddienst arbeitet in kleinen Paketen. Die Freigaben gelten sofort.</span>
+        </div>
+        <div class="small text-danger mt-2" data-ai-law-index-error role="status" aria-live="polite"></div>
+      </div>
       <form method="post" action="/admin/ai/laws/mode" class="border rounded p-3 mb-3">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label class="form-check form-switch mb-2">
@@ -374,7 +410,7 @@
       </form>
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <div class="small fw-semibold">{% if cfg.ai_laws_include_all == '1' %}Ausnahmen festlegen ({{ law_excluded|length }}){% else %}Einzelauswahl freigeben{% endif %}</div>
-        <span class="badge text-bg-secondary">Paragraphensuche · keine Embeddings</span>
+        <span class="badge text-bg-primary">Semantische Suche + Paragraphensuche</span>
       </div>
       <label class="visually-hidden" for="ai-laws-filter">Rechtstexte filtern</label>
       <input id="ai-laws-filter" type="search" class="form-control form-control-sm mb-2" placeholder="Rechtstexte nach Titel filtern …" data-ai-filter-laws>
@@ -383,7 +419,7 @@
         {% for law in laws %}
         <div class="list-group-item d-flex align-items-center justify-content-between gap-2 flex-wrap" data-ai-law-entry>
           <span class="small"><a href="/recht/{{ law.slug }}">{{ law.title }}</a>{% if law.internal %} <span class="badge text-bg-secondary">Intern</span>{% endif %}
-          {% if law.id in law_excluded %}<span class="badge text-bg-warning ms-1">Ausgenommen</span>{% else %}<span class="badge text-bg-success ms-1">Automatisch einbezogen</span>{% endif %}</span>
+          {% if law.id in law_excluded %}<span class="badge text-bg-warning ms-1">Ausgenommen</span>{% else %}<span class="badge text-bg-success ms-1">Automatisch einbezogen</span>{% endif %} <small class="text-secondary" data-ai-law-source-progress="{{ law.id }}">{% if index_health.law_embedding.laws.get(law.id|string) %}{{ index_health.law_embedding.laws[law.id|string].percent }} % indiziert{% else %}Noch nicht indiziert{% endif %}</small></span>
           <form method="post" action="/admin/ai/laws/{{ law.id }}/source" class="m-0">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             {% if law.id in law_excluded %}
@@ -402,7 +438,7 @@
           {% for law in laws %}
           <div class="col-12 col-lg-6" data-ai-law-entry><label class="form-check border rounded p-2 ps-4 h-100">
             <input class="form-check-input" type="checkbox" name="law" value="{{ law.id }}" {% if law.id in allowed_laws %}checked{% endif %}>
-            <span class="form-check-label">{{ law.title }}{% if law.internal %} <span class="badge text-bg-secondary">Intern</span>{% endif %}</span>
+            <span class="form-check-label">{{ law.title }}{% if law.internal %} <span class="badge text-bg-secondary">Intern</span>{% endif %} <small class="text-secondary" data-ai-law-source-progress="{{ law.id }}">{% if index_health.law_embedding.laws.get(law.id|string) %}{{ index_health.law_embedding.laws[law.id|string].percent }} % indiziert{% else %}Noch nicht indiziert{% endif %}</small></span>
           </label></div>
           {% else %}<p class="text-secondary">Keine veröffentlichten Rechtstexte vorhanden.</p>{% endfor %}
         </div>

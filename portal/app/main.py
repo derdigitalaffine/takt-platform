@@ -103,9 +103,13 @@ async def lifespan(_app: FastAPI):
     # Isolate potentially slow embedding calls from the central reminder worker.
     from . import ai_vector_jobs
     rag_task = asyncio.create_task(ai_vector_jobs.run_forever())
+    # Bounded, independent background processing of legal-text embeddings.
+    from . import ai_law_vector_jobs
+    law_index_task = asyncio.create_task(ai_law_vector_jobs.run_forever())
     try:
         yield
     finally:
+        law_index_task.cancel()
         rag_task.cancel()
         task.cancel()
 

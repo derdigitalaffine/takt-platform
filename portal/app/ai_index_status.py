@@ -5,7 +5,7 @@ providers during page rendering and never expose embeddings or source texts.
 """
 from sqlalchemy import select
 
-from . import ai_vector, ai_vector_jobs, ai_qdrant
+from . import ai_vector, ai_vector_jobs, ai_qdrant, ai_law_vector_jobs
 from .ai_models import AIIndexJob, AIKnowledge, AIKnowledgeVector
 from .db import get_settings
 
@@ -75,6 +75,6 @@ def status(db, docs: list[AIKnowledge] | None = None) -> dict:
         "qdrant": "Aktuell" if ai_qdrant.active(db) else (
             "Neuaufbau nötig" if ai_qdrant.configured(db) else "Aus"),
         "documents": doc_status,
-        "law_embedding": "Nur Textsuche – kein Embedding-Index",
+        "law_embedding": ai_law_vector_jobs.progress(db),
         "dms_embedding": "Nur Textsuche – kein Embedding-Index",
     }

@@ -116,6 +116,49 @@ class AIIndexJob(Base):
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
 
 
+
+class AILawVector(Base):
+    """Per-paragraph law embeddings. version_id=0 denotes the live version.
+
+    Vectors and brief text chunks are caches, NEVER a permission boundary.
+    Every retrieval rechecks law publication, source selection, version and hash.
+    """
+    __tablename__ = "ai_law_vectors"
+    __table_args__ = (UniqueConstraint("law_id", "version_id", "chunk_no",
+                                       name="uq_ai_law_vector_chunk"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    law_id: Mapped[int] = mapped_column(ForeignKey("law_texts.id", ondelete="CASCADE"), index=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    chunk_no: Mapped[int] = mapped_column(Integer)
+    anchor: Mapped[str] = mapped_column(String(120), default="")
+    section_title: Mapped[str] = mapped_column(String(400), default="")
+    model_id: Mapped[str] = mapped_column(String(200))
+    source_hash: Mapped[str] = mapped_column(String(64))
+    chunk_text: Mapped[str] = mapped_column(Text)
+    vector_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
+
+
+class AILawIndexJob(Base):
+    """Durable incremental law-embedding queue for current and public old versions."""
+    __tablename__ = "ai_law_index_jobs"
+    __table_args__ = (UniqueConstraint("law_id", "version_id",
+                                       name="uq_ai_law_index_version"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    law_id: Mapped[int] = mapped_column(ForeignKey("law_texts.id", ondelete="CASCADE"), index=True)
+    version_id: Mapped[int] = mapped_column(Integer, default=0)
+    model_id: Mapped[str] = mapped_column(String(200), default="")
+    desired_hash: Mapped[str] = mapped_column(String(64), default="")
+    expected_chunks: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[object] = mapped_column(DateTime, nullable=True)
+    lease_until: Mapped[object] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
+
+
 class AIDmsSource(Base):
     """Explicit AI-use approval for a DMS manual record; no source text copied.
 
