@@ -24,10 +24,15 @@ def _submit(user):
         raise HTTPException(403, "Keine Berechtigung zum Einreichen interner Anliegen.")
 
 
+def _read(user):
+    if not (user.can("anliegen_submit") or user.can("anliegen_manage")):
+        raise HTTPException(403, "Keine Berechtigung für interne Anliegen.")
+
+
 @app.get("/anliegen")
 def list_anliegen(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _submit(user)
+    _read(user)
     cases = list(db.scalars(service.visible_query(user).order_by(Anliegen.updated_at.desc()).limit(250)))
     return render(request, "anliegen_list.html", user,
                   cases=cases, statuses=service.STATUSES,
@@ -64,7 +69,7 @@ def create_anliegen(request: Request, category_id: int = Form(...),
 def detail_anliegen(request: Request, case_id: int, user: User = Depends(current_user),
                    db: Session = Depends(get_db)):
     _module()
-    _submit(user)
+    _read(user)
     case = service.get(db, user, case_id)
     events = list(db.scalars(select(AnliegenEvent).where(AnliegenEvent.anliegen_id == case.id)
                              .order_by(AnliegenEvent.id)))
@@ -81,7 +86,7 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
 def update_anliegen(request: Request, case_id: int, status: str = Form(...),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _submit(user)
+    _read(user)
     case = service.get(db, user, case_id)
     if not service.can_handle(user, case):
         raise HTTPException(403)
@@ -106,7 +111,7 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
 def assign_anliegen(request: Request, case_id: int, assignee_id: int = Form(...),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _submit(user)
+    _read(user)
     case = service.get(db, user, case_id)
     if case.confidential or not user.can("anliegen_manage"):
         raise HTTPException(403, "Vertrauliche Beschwerden dürfen nicht allgemein zugewiesen werden.")
