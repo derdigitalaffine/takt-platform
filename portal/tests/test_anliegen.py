@@ -1,5 +1,6 @@
 """Internal Anliegen: routing, task linkage, confidentiality and opt-in AI tests."""
-from sqlalchemy import select
+from sqlalchemy import select, delete
+import pytest
 
 from app import ai_provider
 from app.anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
@@ -8,6 +9,40 @@ from app.org_models import OrgMembership, OrgRoleGrant
 from app.security import hash_password
 from app.task_models import Task
 from conftest import login, csrf_of, settings
+
+
+@pytest.fixture(autouse=True)
+def _isolate_internal_request_tests():
+    """No native tasks or feature flags may leak into unrelated test modules."""
+    from app.db import get_settings, set_setting
+    from app import main
+    from app.anliegen_models import AnliegenEvent
+    from app.ai_models import AIProvider
+    with SessionLocal() as db:
+        cfg = get_settings(db)
+        original = {key: cfg[key] for key in ("module_anliegen", "module_tasks", "module_ai")}
+        categories = {
+            c.id: (c.title, c.routing, c.assignee_id, c.enabled)
+            for c in db.scalars(select(AnliegenCategory))
+        }
+    yield
+    with SessionLocal() as db:
+        db.execute(delete(AnliegenEvent))
+        db.execute(delete(Anliegen))
+        db.execute(delete(Task).where(Task.source_type == "anliegen"))
+        for cid, (title, routing, assignee_id, enabled) in categories.items():
+            c = db.get(AnliegenCategory, cid)
+            if c:
+                c.title = title
+                c.routing = routing
+                c.assignee_id = assignee_id
+                c.enabled = enabled
+        db.execute(delete(AIProvider).where(AIProvider.name == "Anliegen AI Fake"))
+        for key, value in original.items():
+            set_setting(db, key, value)
+        db.commit()
+    main._module_cache["at"] = 0.0
+
 
 ADMIN = ("admin@example.org", "admin-passwort-123")
 
