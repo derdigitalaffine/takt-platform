@@ -5,6 +5,7 @@ the existing Jitsi/Prosody meeting chat.
 """
 import base64
 import asyncio
+import contextlib
 import io
 import json
 from types import SimpleNamespace
@@ -26,6 +27,7 @@ from .security import decrypt, encrypt, mask_secret
 chat_user = require("ai_chat")
 _MAX_IMAGE = 4 * 1024 * 1024
 _MAX_PROMPT = 8000
+_AI_HEARTBEAT_SECONDS = 5
 
 
 def _provider(db: Session, provider_id: int, *, active: bool = False) -> AIProvider:
@@ -439,39 +441,85 @@ async def ai_message_updates(
     owner_id = user.id
 
     async def generate():
-        response_parts = []
+        """Drip heartbeat frames while waiting for slow JSON models, and tokens for SSE ones.
+
+        The producer task uses bounded backpressure; disconnect cancels it so no
+        unneeded provider request or partial answer is persisted.
+        """
+        queue = asyncio.Queue(maxsize=32)
+        started = asyncio.get_running_loop().time()
         yield _sse("status", {"message": (
             "Antwort wird live übertragen …" if profile.stream_enabled
             else "Modell verarbeitet die Anfrage …"
         )})
+
+        async def produce():
+            try:
+                if profile.stream_enabled:
+                    async for chunk in ai_provider.stream_completion(
+                        profile, messages, image=bool(image_url)
+                    ):
+                        await queue.put(("delta", chunk))
+                else:
+                    answer = await ai_provider.complete(profile, messages, image=bool(image_url))
+                    await queue.put(("delta", answer))
+                await queue.put(("end", None))
+            except ai_provider.AIProviderError as exc:
+                await queue.put(("error", str(exc)))
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # No exception text from third-party providers reaches the browser.
+                await queue.put(("error", "Die KI-Verarbeitung konnte nicht abgeschlossen werden."))
+
+        producer = asyncio.create_task(produce())
+        response_parts = []
         try:
-            if profile.stream_enabled:
-                async for chunk in ai_provider.stream_completion(profile, messages,
-                                                                image=bool(image_url)):
-                    response_parts.append(chunk)
-                    yield _sse("delta", {"text": chunk})
-            else:
-                full = await ai_provider.complete(profile, messages, image=bool(image_url))
-                response_parts.append(full)
-                yield _sse("delta", {"text": full})
-            answer = "".join(response_parts)
-            if not answer.strip():
-                raise ai_provider.AIProviderError("Der KI-Provider hat keinen Antworttext geliefert.")
-            with SessionLocal() as store:
-                current = store.get(AIConversation, chat_id)
-                if current is None or current.owner_id != owner_id:
-                    raise ai_provider.AIProviderError("Die Unterhaltung wurde inzwischen gelöscht.")
-                store.add(AIMessage(
-                    conversation_id=chat_id, role="assistant", content=answer,
-                    sources_json=json.dumps(links, ensure_ascii=False),
-                    model_id=profile.model_id,
-                ))
-                current.updated_at = utcnow()
-                store.commit()
-            yield _sse("done", {"sources": links, "model": profile.model_id})
-        except ai_provider.AIProviderError as exc:
-            yield _sse("error", {"message": str(exc)})
-        # Client disconnect/abort cancels the coroutine. Do not save incomplete answers.
+            while True:
+                try:
+                    kind, payload = await asyncio.wait_for(
+                        queue.get(), timeout=_AI_HEARTBEAT_SECONDS
+                    )
+                except asyncio.TimeoutError:
+                    yield _sse("heartbeat", {
+                        "elapsed": int(asyncio.get_running_loop().time() - started)
+                    })
+                    continue
+                if kind == "delta":
+                    response_parts.append(payload)
+                    yield _sse("delta", {"text": payload})
+                elif kind == "error":
+                    yield _sse("error", {"message": payload})
+                    return
+                elif kind == "end":
+                    answer = "".join(response_parts)
+                    if not answer.strip():
+                        yield _sse("error", {"message":
+                            "Der KI-Provider hat keinen Antworttext geliefert."})
+                        return
+                    with SessionLocal() as store:
+                        current = store.get(AIConversation, chat_id)
+                        actor = store.get(User, owner_id)
+                        if (current is None or current.owner_id != owner_id or
+                                actor is None or not actor.active or
+                                not actor.can("ai_chat") or "ai" not in enabled_modules()):
+                            yield _sse("error", {"message":
+                                "Die Unterhaltung ist nicht mehr freigegeben."})
+                            return
+                        store.add(AIMessage(
+                            conversation_id=chat_id, role="assistant", content=answer,
+                            sources_json=json.dumps(links, ensure_ascii=False),
+                            model_id=profile.model_id,
+                        ))
+                        current.updated_at = utcnow()
+                        store.commit()
+                    yield _sse("done", {"sources": links, "model": profile.model_id})
+                    return
+        finally:
+            if not producer.done():
+                producer.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await producer
 
     return StreamingResponse(generate(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-store, no-transform",
