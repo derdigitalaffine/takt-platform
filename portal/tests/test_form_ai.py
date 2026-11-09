@@ -110,7 +110,6 @@ def test_ai_draft_endpoint_is_read_only_and_uses_takt_context(monkeypatch):
     assert draft["items"][0]["show_if"]["rules"][0]["q"] == "existing"
     assert draft["items"][1]["geometries"] == ["point"]
     assert draft["mode"] == "append"
-    assert "Takt" not in draft or True  # Vorschläge statt Seitenübergang
     assert captured and "geo" in captured[0][0]["content"]
     assert "vorhandene_elemente" in captured[0][1]["content"]
     with SessionLocal() as db:
