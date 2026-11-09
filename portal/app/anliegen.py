@@ -12,20 +12,47 @@ DEFAULT_CATEGORIES = (
     ("defect", "Mangel melden", "Defekte, Schäden und Störungen", "fa-screwdriver-wrench", "person", False),
     ("complaint", "Vertrauliche Beschwerde", "Vertrauliche Meldung an die zuständige Leitung", "fa-shield-halved", "lead", True),
     ("improvement", "Verbesserungsvorschlag", "Ideen und Verbesserungen des Arbeitsalltags", "fa-lightbulb", "person", False),
+    ("platform_feedback", "TAKT & Software verbessern", "Fehler, Bedienbarkeit und Verbesserungswünsche für TAKT und andere Verwaltungssoftware", "fa-code-branch", "person", False),
     ("other", "Sonstiges Anliegen", "Andere interne Anliegen", "fa-inbox", "person", False),
 )
 STATUSES = {"unassigned": "Zuständigkeit offen", "open": "Offen",
-            "in_progress": "In Bearbeitung", "done": "Erledigt", "closed": "Geschlossen"}
+            "in_progress": "In Bearbeitung", "ordered": "Beim Lieferanten bestellt",
+            "partially_delivered": "Teilgeliefert", "delivered": "Geliefert",
+            "done": "Erledigt", "closed": "Geschlossen"}
 NEXT = {"unassigned": {"open", "closed"}, "open": {"in_progress", "done", "closed"},
         "in_progress": {"open", "done", "closed"}, "done": {"in_progress", "closed"},
         "closed": set()}
+PROCUREMENT_NEXT = {
+    "open": {"in_progress", "ordered", "closed"},
+    "in_progress": {"open", "ordered", "done", "closed"},
+    "ordered": {"partially_delivered", "delivered", "in_progress", "closed"},
+    "partially_delivered": {"delivered", "in_progress", "closed"},
+    "delivered": {"done", "in_progress", "closed"},
+}
+PROCUREMENT_KEYS = {"office_supply", "office_furniture"}
+
+
+def choices(case):
+    """Allowed next statuses for this category, not a global one-size-fits-all list."""
+    if case.category.procurement and not case.confidential:
+        return PROCUREMENT_NEXT.get(case.status, NEXT.get(case.status, set()))
+    return NEXT.get(case.status, set())
+
+
+def task_status(status):
+    """Map supply-chain stages to the supported native task state machine."""
+    if status in ("ordered", "partially_delivered", "delivered"):
+        return "in_progress"
+    if status in ("done", "closed"):
+        return "done"
+    return status
 
 
 def seed(db):
     for position, (key, title, desc, icon, route, secret) in enumerate(DEFAULT_CATEGORIES):
         if not db.scalar(select(AnliegenCategory.id).where(AnliegenCategory.key == key)):
             db.add(AnliegenCategory(key=key, title=title, description=desc, icon=icon,
-                                   routing=route, confidential=secret, enabled=True,
+                                   routing=route, confidential=secret, procurement=key in PROCUREMENT_KEYS, enabled=True,
                                    position=position))
 
 
@@ -67,9 +94,15 @@ def visible_query(user):
 
 
 def primary_org(db, user_id):
-    return db.scalar(select(OrgMembership.org_id).where(
+    primary = db.scalar(select(OrgMembership.org_id).where(
         OrgMembership.user_id == user_id, OrgMembership.is_primary.is_(True)
     ))
+    if primary:
+        return primary
+    # A single membership is unambiguous even where no primary flag was set.
+    memberships = list(db.scalars(select(OrgMembership.org_id).where(
+        OrgMembership.user_id == user_id).limit(2)))
+    return memberships[0] if len(memberships) == 1 else None
 
 
 def supervisor(db, reporter, org_id):
@@ -112,7 +145,8 @@ def recipient(db, reporter, cat, org_id):
     if cat.routing == "lead":
         return supervisor(db, reporter, org_id)
     person = db.get(User, cat.assignee_id) if cat.assignee_id else None
-    return person.id if person and person.active and person.id != reporter.id else None
+    # The material coordinator may raise requests for their own department.
+    return person.id if person and person.active else None
 
 
 def record(db, case, actor, kind, note=""):
@@ -143,6 +177,10 @@ def task_for(db, case):
     case.task_id = task.id
     reporter = db.get(User, case.reporter_id)
     tasks.audit(db, task, reporter, "created", "Aus einem internen Anliegen erstellt.")
+    if case.assignee_id != case.reporter_id:
+        tasks.ping(db, task, [case.assignee_id], "Ein internes Anliegen wurde Ihnen zugewiesen")
+    from .main import _badge_cache
+    _badge_cache.clear()
     return task
 
 
@@ -162,3 +200,81 @@ def create(db, user, cat, title, description):
            "Zuständige Person ermittelt." if assignee_id else "Noch keine eindeutige Zuständigkeit.")
     task_for(db, row)
     return row
+
+
+
+def set_status(db, case, actor, status, *, supplier="", reference=""):
+    """Atomic case/task transition with a single validated policy."""
+    from .task_models import Task
+    from . import tasks
+    if status not in choices(case) or (not case.assignee_id and status != "closed"):
+        raise HTTPException(422, "Dieser Statuswechsel ist nicht zulässig.")
+    if status in {"ordered", "partially_delivered", "delivered"} and not case.category.procurement:
+        raise HTTPException(422, "Bestellstatus sind nur für Beschaffungskategorien verfügbar.")
+    supplier, reference = supplier.strip(), reference.strip()
+    if len(supplier) > 160 or len(reference) > 160:
+        raise HTTPException(422, "Lieferant und Bestellreferenz dürfen je höchstens 160 Zeichen enthalten.")
+    if case.category.procurement:
+        if supplier:
+            case.supplier_name = supplier
+        if reference:
+            case.order_reference = reference
+    case.status = status
+    record(db, case, actor, "status", f"Status: {STATUSES[status]}")
+    if case.task_id:
+        task = db.get(Task, case.task_id)
+        if task:
+            task.status = task_status(status)
+            tasks.audit(db, task, actor, "status", "Liefer-/Bearbeitungsstatus aus internen Anliegen aktualisiert.")
+    from .main import _badge_cache
+    _badge_cache.clear()
+
+
+def reconcile_category(db, cat, actor, *, reassign: bool = False):
+    """Apply current rules to unassigned cases (or explicitly transfer open ones).
+
+    Confidential cases are excluded: retrospective reassignment would disclose
+    private complaints to new staff without an explicit per-case decision.
+    """
+    if cat.confidential:
+        raise HTTPException(403, "Vertrauliche Beschwerden dürfen nicht massenhaft umverteilt werden.")
+    from .task_models import Task
+    from . import tasks
+    from .main import _badge_cache
+    rows = list(db.scalars(select(Anliegen).where(
+        Anliegen.category_id == cat.id, Anliegen.confidential.is_(False),
+        Anliegen.status.not_in(("done", "closed")),
+    ).order_by(Anliegen.id).limit(1000)))
+    counts = {"assigned": 0, "transferred": 0, "unchanged": 0, "unresolved": 0}
+    for case in rows:
+        if case.assignee_id and not reassign:
+            counts["unchanged"] += 1
+            continue
+        reporter = db.get(User, case.reporter_id)
+        if not reporter or not reporter.active:
+            counts["unresolved"] += 1
+            continue
+        target_id = recipient(db, reporter, cat, case.org_id or primary_org(db, reporter.id))
+        if target_id is None:
+            counts["unresolved"] += 1
+            continue
+        if case.assignee_id == target_id:
+            counts["unchanged"] += 1
+            continue
+        old_id = case.assignee_id
+        case.assignee_id = target_id
+        if case.status == "unassigned":
+            case.status = "open"
+        record(db, case, actor, "assignment", "Automatisch anhand der gespeicherten Kategorie-Regel zugewiesen.")
+        if case.task_id:
+            task = db.get(Task, case.task_id)
+            if task:
+                task.assignee_id = target_id
+                tasks.audit(db, task, actor, "assigned", "Zuständigkeit aus internen Anliegen aktualisiert.")
+                if old_id != target_id:
+                    tasks.ping(db, task, [target_id], "Ein internes Anliegen wurde Ihnen neu zugewiesen")
+        else:
+            task_for(db, case)
+        counts["transferred" if old_id else "assigned"] += 1
+    _badge_cache.clear()
+    return counts
