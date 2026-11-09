@@ -191,23 +191,32 @@ services:
   # Separates Egress-Netz für die externen Suchmaschinen (internal-Netze allein
   # würden SearXNG den nötigen Internetzugriff sperren).
   searxng:
-    image: searxng/searxng:${SEARXNG_IMAGE_VERSION:-latest}
+    image: ghcr.io/searxng/searxng:${SEARXNG_IMAGE_VERSION:-2026.11.5-3e95f6cd2}
     profiles: ["searxng"]
     restart: ${RESTART_POLICY:-unless-stopped}
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+    # Der offizielle Entrypoint erwartet ein beschreibbares Konfigurationsverzeichnis.
+    # Beim Start aktualisieren wir nur die dedizierte settings.yml aus dem
+    # eingecheckten Template; die Konfiguration selbst bleibt im Docker-Volume.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        cp /tmp/takt-settings.yml /etc/searxng/settings.yml
+        exec /usr/local/searxng/entrypoint.sh
     environment:
       - SEARXNG_SECRET=${SEARXNG_SECRET:-}
-      - SEARXNG_BIND_ADDRESS=0.0.0.0
       - SEARXNG_PORT=8080
-      - SEARXNG_LIMITER=false
-      - SEARXNG_PUBLIC_INSTANCE=false
     expose:
       - "8080"
     volumes:
-      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - searxng_config:/etc/searxng
+      - ./searxng/settings.yml:/tmp/takt-settings.yml:ro
       - searxng_cache:/var/cache/searxng
     networks:
       search_private:
@@ -270,4 +279,5 @@ networks:
   search_egress:
 
 volumes:
+  searxng_config:
   searxng_cache:
