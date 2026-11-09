@@ -5,7 +5,7 @@
 {% block head %}<link rel="stylesheet" href="/static/tasks.css"><link rel="stylesheet" href="/static/task-modern.css"><link rel="stylesheet" href="/static/workspace-heading.css">{% endblock %}
 {% block content %}<div class="task-page">
 {% set form_url='/aufgaben/neu?back=' ~ (back|urlencode) %}
-<header class="task-hero task-hero-compact workspace-head">
+<div class="task-hero task-hero-compact workspace-head">
   <span class="workspace-head-mark"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span>
   <div class="task-hero-content">
 {% call m.page_header('Meine Aufgaben', 'Aufgaben im Blick behalten, priorisieren und schnell erledigen.', form_url if native_on and may_create and not capture else '', 'Mit Formular anlegen', 'fa-plus') %}
@@ -18,7 +18,7 @@
 {% if apps_on or circulations_on or resources_on or (native_on and user.can('tasks_manage')) %}{% call m.action_menu() %}{% if native_on and user.can('tasks_manage') %}<a class="btn btn-outline-secondary" href="/aufgaben/regeln">Aufgabenregeln</a>{% endif %}{% if apps_on %}<a class="btn btn-outline-secondary" href="/forms/applications">Antragseingang</a>{% endif %}{% if circulations_on %}<a class="btn btn-outline-secondary" href="/umlaeufe?tab=open">Umläufe</a>{% endif %}{% if resources_on %}<a class="btn btn-outline-secondary" href="/resources/bookings">Buchungen</a>{% endif %}{% endcall %}{% endif %}
 {% endcall %}
   </div>
-</header>
+</div>
 <section class="task-summary" aria-label="Aufgabenstatus">
   <div class="task-stat task-stat-primary"><span class="task-stat-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.count}}</strong><span>Jetzt bearbeitbar</span></span></div>
   <a class="task-stat {{'task-stat-alert' if work.overdue else ''}}" href="{{task_url(perspective='overdue')}}"><span class="task-stat-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.overdue}}</strong><span>Überfällig</span></span><i class="fa-solid fa-arrow-up-right-from-square task-stat-arrow" aria-hidden="true"></i></a>
