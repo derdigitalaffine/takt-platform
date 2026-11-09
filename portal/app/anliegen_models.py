@@ -10,6 +10,7 @@ class AnliegenCategory(Base):
     key: Mapped[str] = mapped_column(String(60), unique=True)
     title: Mapped[str] = mapped_column(String(120))
     description: Mapped[str] = mapped_column(String(255), default="")
+    tags: Mapped[str] = mapped_column(Text, default="")  # comma-separated, normalized metadata for search/LLM
     icon: Mapped[str] = mapped_column(String(48), default="fa-inbox")
     confidential: Mapped[bool] = mapped_column(Boolean, default=False)
     routing: Mapped[str] = mapped_column(String(20), default="person")  # person | lead
