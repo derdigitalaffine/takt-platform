@@ -26,8 +26,15 @@ def _submit(user):
         raise HTTPException(403, "Keine Berechtigung zum Einreichen interner Anliegen.")
 
 
-def _read(user):
-    if not (user.can("anliegen_submit") or user.can("anliegen_manage")):
+def _read(user, db):
+    if user.can("anliegen_submit") or user.can("anliegen_manage"):
+        return
+    # Object-level access survives role changes for explicitly assigned
+    # processors and people following requests they already reported.
+    own = db.scalar(select(Anliegen.id).where(
+        or_(Anliegen.reporter_id == user.id, Anliegen.assignee_id == user.id)
+    ).limit(1))
+    if own is None:
         raise HTTPException(403, "Keine Berechtigung für interne Anliegen.")
 
 
@@ -36,7 +43,7 @@ def list_anliegen(request: Request, view: str = "reported", category_id: int = 0
                  status: str = "", q: str = "",
                  user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
+    _read(user, db)
     if view not in ("mine", "assigned", "reported", "unassigned", "all", "orders"):
         raise HTTPException(422, "Unbekannte Ansicht.")
     if status and status not in service.STATUSES:
@@ -147,7 +154,7 @@ def create_anliegen(request: Request, category_id: int = Form(...),
 def detail_anliegen(request: Request, case_id: int, user: User = Depends(current_user),
                    db: Session = Depends(get_db)):
     _module()
-    _read(user)
+    _read(user, db)
     case = service.get(db, user, case_id)
     events = list(db.scalars(select(AnliegenEvent).where(AnliegenEvent.anliegen_id == case.id)
                              .order_by(AnliegenEvent.id)))
@@ -167,7 +174,7 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
                    expected_delivery: str = Form(""), back: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
+    _read(user, db)
     case = service.get(db, user, case_id)
     if not service.can_handle(user, case):
         raise HTTPException(403)
@@ -191,7 +198,7 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
 def assign_anliegen(request: Request, case_id: int, assignee_id: int = Form(...),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
+    _read(user, db)
     case = service.get(db, user, case_id)
     if case.confidential or not user.can("anliegen_manage"):
         raise HTTPException(403, "Vertrauliche Beschwerden dürfen nicht allgemein zugewiesen werden.")
