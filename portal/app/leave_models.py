@@ -106,3 +106,16 @@ class LeaveAbsencePeriod(Base):
     __table_args__ = (
         CheckConstraint("start_half IN ('am','pm') AND end_half IN ('am','pm')"),
     )
+
+
+class LeaveAdminRemoval(Base):
+    """Administrative corrections retain their evidence after the active absence is removed."""
+    __tablename__ = "leave_admin_removals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    request_id: Mapped[int | None] = mapped_column(ForeignKey("leave_requests.id", ondelete="SET NULL"), nullable=True, index=True)
+    absence_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    person_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reason: Mapped[str] = mapped_column(Text)
+    snapshot_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

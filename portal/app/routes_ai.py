@@ -129,6 +129,28 @@ def _model_history(db: Session, user: User, history: list[AIMessage]) -> list[di
     return list(reversed(safe))
 
 
+def _history_sources(db, user, history):
+    """Derived answers retain the source ACL/revision of the history they used."""
+    selected = {(item["role"], item["content"]) for item in _model_history(db, user, history)}
+    sources = []
+    seen = set()
+    for row in history:
+        if row.role != "assistant" or (row.role, row.content) not in selected:
+            continue
+        try:
+            inherited = json.loads(row.sources_json or "[]")
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(inherited, list) or not ai_knowledge.sources_accessible(db, user, inherited):
+            continue
+        for source in inherited:
+            key = json.dumps(source, sort_keys=True, ensure_ascii=False)
+            if key not in seen:
+                seen.add(key)
+                sources.append(source)
+    return sources
+
+
 @app.get("/admin/ai")
 def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
              user: User = Depends(admin_user), db: Session = Depends(get_db)):
@@ -627,6 +649,7 @@ async def admin_ai_laws(request: Request, user: User = Depends(admin_user),
     return redirect("/admin/ai#laws")
 
 
+@app.get("/agent")
 @app.get("/ki")
 def ai_chat(request: Request, chat: int | None = None, user: User = Depends(chat_user),
             db: Session = Depends(get_db)):
@@ -711,12 +734,14 @@ def _temporary_page(request: Request, user: User, db: Session, *,
     return response
 
 
+@app.get("/agent/temporary")
 @app.get("/ki/temporary")
 def ai_temporary_chat(request: Request, user: User = Depends(chat_user),
                       db: Session = Depends(get_db)):
     return _temporary_page(request, user, db)
 
 
+@app.post("/agent/temporary/message", dependencies=[Depends(check_csrf)])
 @app.post("/ki/temporary/message", dependencies=[Depends(check_csrf)])
 async def ai_temporary_message(
     request: Request, message: str = Form(""), provider_id: int = Form(...),
@@ -741,6 +766,7 @@ async def ai_temporary_message(
         ])
 
 
+@app.post("/agent/temporary/updates", dependencies=[Depends(check_csrf)])
 @app.post("/ki/temporary/updates", dependencies=[Depends(check_csrf)])
 async def ai_temporary_updates(
     request: Request, message: str = Form(""), history: str = Form("[]"),
@@ -830,6 +856,7 @@ async def ai_temporary_updates(
                                       "X-Content-Type-Options": "nosniff"})
 
 
+@app.post("/agent/new", dependencies=[Depends(check_csrf)])
 @app.post("/ki/new", dependencies=[Depends(check_csrf)])
 def ai_new_chat(request: Request, provider_id: int = Form(0),
                 user: User = Depends(chat_user), db: Session = Depends(get_db)):
@@ -837,11 +864,14 @@ def ai_new_chat(request: Request, provider_id: int = Form(0),
         select(AIProvider).where(AIProvider.active.is_(True)).order_by(AIProvider.id))
     if provider is None:
         flash(request, "Bitte zuerst einen KI-Provider in der Administration aktivieren.", "error")
-        return redirect("/ki")
+        return redirect("/agent")
+    from .main import stash_get
+    for key in ("takt-agent-plan", "takt-agent-context", "takt-agent-private-intake"):
+        stash_get(request, key, pop=True)
     convo = AIConversation(owner_id=user.id, title="Neue Unterhaltung", provider_id=provider.id)
     db.add(convo)
     db.commit()
-    return redirect(f"/ki?chat={convo.id}")
+    return redirect(f"/agent?chat={convo.id}")
 
 
 def _image_data(data: bytes) -> str:
@@ -871,6 +901,7 @@ def _image_data(data: bytes) -> str:
     return "data:" + mime + ";base64," + base64.b64encode(payload).decode("ascii")
 
 
+@app.post("/agent/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
 @app.post("/ki/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
 async def ai_send_message(
     request: Request, chat_id: int, message: str = Form(""), use_knowledge: str = Form(""),
@@ -936,12 +967,12 @@ async def ai_send_message(
         reply = await ai_provider.complete(provider, messages, image=bool(image_url))
     except ai_provider.AIProviderError as exc:
         flash(request, str(exc), "error")
-        return redirect(f"/ki?chat={convo.id}")
+        return redirect(f"/agent?chat={convo.id}")
     db.add(AIMessage(conversation_id=convo.id, role="assistant", content=reply,
-                     sources_json=_source_meta(sources), model_id=provider.model_id))
+                     sources_json=json.dumps(json.loads(_source_meta(sources)) + _history_sources(db, user, history), ensure_ascii=False), model_id=provider.model_id))
     convo.updated_at = utcnow()
     db.commit()
-    return redirect(f"/ki?chat={convo.id}")
+    return redirect(f"/agent?chat={convo.id}")
 
 
 def _sse(event: str, value: dict) -> str:
@@ -949,6 +980,7 @@ def _sse(event: str, value: dict) -> str:
     return "event: " + event + "\ndata: " + json.dumps(value, ensure_ascii=False) + "\n\n"
 
 
+@app.post("/agent/{chat_id:int}/message/updates", dependencies=[Depends(check_csrf)])
 @app.post("/ki/{chat_id:int}/message/updates", dependencies=[Depends(check_csrf)])
 async def ai_message_updates(
     request: Request, chat_id: int, message: str = Form(""), use_knowledge: str = Form(""),
@@ -1016,7 +1048,7 @@ async def ai_message_updates(
         image_key_enc=provider.image_key_enc,
         stream_enabled=provider.stream_enabled,
     )
-    links = json.loads(_source_meta(sources))
+    links = json.loads(_source_meta(sources)) + _history_sources(db, user, history)
     owner_id = user.id
 
 
@@ -1114,6 +1146,7 @@ async def ai_message_updates(
                                       "X-Content-Type-Options": "nosniff"})
 
 
+@app.post("/agent/{chat_id:int}/model", dependencies=[Depends(check_csrf)])
 @app.post("/ki/{chat_id:int}/model", dependencies=[Depends(check_csrf)])
 def ai_change_chat_model(
     request: Request, chat_id: int, provider_id: int = Form(...),
@@ -1126,9 +1159,10 @@ def ai_change_chat_model(
     convo.updated_at = utcnow()
     db.commit()
     flash(request, "Modell gewechselt. Bestehende Antworten und deren Modellangaben bleiben unverändert.")
-    return redirect(f"/ki?chat={chat_id}")
+    return redirect(f"/agent?chat={chat_id}")
 
 
+@app.post("/agent/{chat_id:int}/fork", dependencies=[Depends(check_csrf)])
 @app.post("/ki/{chat_id:int}/fork", dependencies=[Depends(check_csrf)])
 def ai_fork_chat(
     request: Request, chat_id: int, message_id: int = Form(...),
@@ -1182,9 +1216,10 @@ def ai_fork_chat(
         ))
     db.commit()
     flash(request, f"Neuer, unabhängiger Gesprächszweig mit {len(messages)} Nachrichten erstellt.")
-    return redirect(f"/ki?chat={branch.id}")
+    return redirect(f"/agent?chat={branch.id}")
 
 
+@app.post("/agent/{chat_id:int}/rename", dependencies=[Depends(check_csrf)])
 @app.post("/ki/{chat_id:int}/rename", dependencies=[Depends(check_csrf)])
 def ai_rename_chat(request: Request, chat_id: int, title: str = Form(...),
                    user: User = Depends(chat_user), db: Session = Depends(get_db)):
@@ -1192,18 +1227,20 @@ def ai_rename_chat(request: Request, chat_id: int, title: str = Form(...),
     if title.strip():
         convo.title = title.strip()[:160]
         db.commit()
-    return redirect(f"/ki?chat={chat_id}")
+    return redirect(f"/agent?chat={chat_id}")
 
 
+@app.post("/agent/{chat_id:int}/delete", dependencies=[Depends(check_csrf)])
 @app.post("/ki/{chat_id:int}/delete", dependencies=[Depends(check_csrf)])
 def ai_delete_chat(request: Request, chat_id: int, user: User = Depends(chat_user),
                    db: Session = Depends(get_db)):
     db.delete(_conversation(db, chat_id, user))
     db.commit()
     flash(request, "Unterhaltung gelöscht.")
-    return redirect("/ki")
+    return redirect("/agent")
 
 
+@app.get("/agent/{chat_id:int}/export")
 @app.get("/ki/{chat_id:int}/export")
 def ai_export_chat(chat_id: int, user: User = Depends(chat_user),
                    db: Session = Depends(get_db)):

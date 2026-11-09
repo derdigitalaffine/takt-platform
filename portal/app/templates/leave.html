@@ -218,6 +218,7 @@
                         </label>
                     </form>
                 {% endif %}
+                {% if user.is_admin %}<a class="btn btn-sm btn-outline-danger mt-2" href="/urlaub/{{row.id}}/loeschen">Urlaubsabwesenheit löschen</a>{% endif %}
             </article>
         {% endif %}
         {% else %}
@@ -328,6 +329,11 @@
         <div class="planning-empty" role="status"><span class="planning-muted-icon mb-2"><i class="fa-solid fa-building" aria-hidden="true"></i></span><h2>Organisationseinheit erforderlich</h2><p>Für die Urlaubsplanung ist zunächst eine aktive Organisationszuordnung erforderlich. Die Verwaltung kann diese im bestehenden Personen-Editor hinterlegen.</p></div>
     {% endif %}
 </div>
+{% if user.is_admin and admin_absences %}
+<details class="card mt-3"><summary class="card-header">Weitere eingetragene Abwesenheiten verwalten</summary><div class="card-body">
+{% for entry in admin_absences %}<p class="d-flex flex-wrap gap-2 align-items-center"><span>{{people|selectattr('id','equalto',entry.user_id)|map(attribute='name')|first}} · {{entry.starts_on}} bis {{entry.ends_on}}</span><a class="btn btn-sm btn-outline-danger" href="/urlaub/abwesenheit/{{entry.id}}/loeschen">Abwesenheit löschen</a></p>{% endfor %}
+</div></details>
+{% endif %}
 {% endblock %}
 {% block scripts %}
     <script src="/static/vendor/fullcalendar/index.global.min.js"></script>

@@ -25,7 +25,7 @@ def _member(email: str, permissions: str) -> None:
 def _shortcut_before_groups(html: str) -> bool:
     # The top-level link must remain visible even when the Wissen group was hidden or collapsed.
     before_groups = html.split('data-group="fav"', 1)[0]
-    return 'href="/ki"' in before_groups
+    return 'href="/agent"' in before_groups
 
 
 def test_ki_chat_is_visible_as_primary_link_when_module_is_enabled():
@@ -55,10 +55,10 @@ def test_module_cards_have_distinct_descriptions_and_stats_for_ki_tasks_calendar
     response = admin.get("/admin/modules")
     assert response.status_code == 200
     content = response.text
-    assert "Persönlicher KI-Chat mit verschlüsselter" in content
+    assert "Zentraler TAKT Agent mit ausgefüllten Fachvorschlägen" in content
     assert "Persönliche und gemeinsame Aufgaben" in content
     assert "Persönliche, freigegebene und organisationsbezogene Kalender" in content
-    assert "KI-Chat und internes Wissen" in content
+    assert "TAKT Agent und internes Wissen" in content
     assert "Aufgaben und Aufgabenboards" in content
     assert "Kalender und Urlaubsplanung" in content
     assert content.count("Formularbaukasten (wie Nextcloud Forms)") == 1

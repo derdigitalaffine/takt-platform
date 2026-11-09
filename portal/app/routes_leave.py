@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from . import people_choices
 from .main import app, current_user, get_db, check_csrf, render, redirect, flash
-from .db import User, Organization, get_settings
+from .db import User, Organization, Absence, get_settings
 from .org_models import OrgMembership
 from .holidays import STATES
 from .leave_models import LeaveRequest, LeavePolicy
@@ -231,9 +231,10 @@ def page(
     if section == "mein-urlaub" and personal_unit and all(p.id != user.id for p in people):
         people.append(user)
     ids = [p.id for p in people]
+    from .leave_admin import removed_ids
     rows = []
     if section in {"planer", "mein-urlaub", "genehmigungen"}:
-        query = select(LeaveRequest).where(LeaveRequest.person_id.in_(ids))
+        query = select(LeaveRequest).where(LeaveRequest.person_id.in_(ids), LeaveRequest.id.not_in(removed_ids()))
         if section == "mein-urlaub":
             query = query.where(LeaveRequest.person_id == user.id)
         elif section == "genehmigungen":
@@ -354,6 +355,10 @@ def page(
                 db, user, leave.cancellation_unit(db, r), "approve"
             ) for r in rows
         },
+        admin_absences=(list(db.scalars(select(Absence).where(
+            Absence.user_id.in_(ids),
+            Absence.id.not_in(select(LeaveRequest.absence_id).where(LeaveRequest.absence_id.is_not(None)))
+        ))) if user.is_admin and section == "planer" else []),
         history_rights={r.id: can_read_history(db, user, r) for r in rows},
     )
 
@@ -394,8 +399,9 @@ def data(unit: int, user: User = Depends(current_user), db: Session = Depends(ge
     ]
     requests = []
     bindings = []
+    from .leave_admin import removed_ids
     for req in db.scalars(
-        select(LeaveRequest).where(LeaveRequest.person_id.in_(ids))
+        select(LeaveRequest).where(LeaveRequest.person_id.in_(ids), LeaveRequest.id.not_in(removed_ids()))
     ):
         if not can_read_request(db, user, req):
             continue
@@ -760,3 +766,48 @@ def open_request(
         if readable(db, user, oid):
             return redirect(f"/urlaub?unit={oid}#leave-row-{rid}")
     raise HTTPException(403)
+
+
+@app.get("/urlaub/{rid:int}/loeschen")
+def delete_leave_preview(request: Request, rid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return _removal_preview(request, db, user, "leave", rid)
+
+
+@app.get("/urlaub/abwesenheit/{rid:int}/loeschen")
+def delete_absence_preview(request: Request, rid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return _removal_preview(request, db, user, "absence", rid)
+
+
+def _removal_preview(request, db, user, kind, rid):
+    from . import leave_admin
+    row = leave_admin.item(db, user, kind, rid)
+    uid = row.person_id if kind == "leave" else row.user_id
+    response = render(request, "leave_delete.html", user, row=row, person=db.get(User, uid),
+                      kind=kind, version=str(row.version) if kind == "leave" else leave_admin.absence_version(row))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.post("/urlaub/{rid:int}/loeschen", dependencies=[Depends(check_csrf)])
+async def delete_leave(request: Request, rid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return await _remove_absence(request, db, user, "leave", rid)
+
+
+@app.post("/urlaub/abwesenheit/{rid:int}/loeschen", dependencies=[Depends(check_csrf)])
+async def delete_absence(request: Request, rid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return await _remove_absence(request, db, user, "absence", rid)
+
+
+async def _remove_absence(request, db, user, kind, rid):
+    from . import leave_admin
+    payload = await request.form()
+    if payload.get("confirm") != "1":
+        raise HTTPException(422, "Die Löschung muss ausdrücklich bestätigt werden.")
+    try:
+        leave_admin.remove(db, user, kind, rid, payload.get("version"), payload.get("reason", ""))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    flash(request, "Abwesenheit aus der aktiven Planung gelöscht. Begründung und Verlauf bleiben erhalten.")
+    return redirect("/urlaub/planer")

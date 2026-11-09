@@ -36,7 +36,7 @@ def test_temporary_chat_does_not_persist_content_regular_fallback(monkeypatch):
     page = client.get("/ki/temporary")
     assert page.status_code == 200
     assert "Nicht im Verlauf gespeichert" in page.text
-    assert 'action="/ki/temporary/message"' in page.text
+    assert 'action="/agent/temporary/message"' in page.text
     assert 'data-ai-temporary="1"' in page.text
     assert 'name="use_knowledge"' not in page.text
     assert 'name="use_web"' not in page.text

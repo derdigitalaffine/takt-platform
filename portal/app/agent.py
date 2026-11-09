@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from . import anliegen as issues, tasks as ts, agent_modules as modules
 from .anliegen_models import Anliegen, AnliegenCategory
@@ -27,7 +27,8 @@ SENSITIVE_REQUEST = re.compile(r"\b(?:vertraulich\w*|beschwerd\w*|mobbing|beläs
 
 
 def available(user):
-    return any(allowed(user, m) for m in ("tasks", "anliegen", "calendars", "forms", "processes", "dms"))
+    from .main import enabled_modules
+    return bool(user.active and user.can("ai_chat") and "ai" in enabled_modules())
 
 
 def sensitive_request(prompt):
@@ -100,13 +101,21 @@ def search(db, user, spec):
             elif phrase.lstrip("#").isdigit():
                 query = query.where(Anliegen.id == int(phrase.lstrip("#")))
             else:
-                query = query.where(Anliegen.title.ilike(_like(phrase), escape="\\"))
+                query = query.where(or_(Anliegen.title.ilike(_like(phrase), escape="\\"), Anliegen.description.ilike(_like(phrase), escape="\\")))
         if scope == "assigned":
             query = query.where(Anliegen.assignee_id == user.id)
         elif scope == "reported":
             query = query.where(Anliegen.reporter_id == user.id)
+        elif scope == "orders":
+            query = query.join(AnliegenCategory).where(AnliegenCategory.key.in_(issues.ORDER_KEYS), Anliegen.assignee_id == user.id)
+        elif scope == "unassigned":
+            if not user.can("anliegen_manage"):
+                raise HTTPException(403)
+            query = query.where(Anliegen.assignee_id.is_(None))
         elif scope not in ("all", ""):
             raise ValueError("Unbekannter Anliegenfilter")
+        if type(spec.get("category_id")) is int:
+            query = query.where(Anliegen.category_id == spec["category_id"])
         if spec.get("status") in issues.STATUSES:
             query = query.where(Anliegen.status == spec["status"])
         records = list(db.scalars(query.order_by(Anliegen.updated_at.desc(), Anliegen.id.desc()).limit(20)))
@@ -146,7 +155,7 @@ def search_instructions(user):
         kinds.extend(["search_tasks(query,scope=all|assigned|created,status?,overdue?)",
                       "search_people(query) für Zuweisungen"])
     if allowed(user, "anliegen"):
-        kinds.append("search_anliegen(query,scope=all|assigned|reported,status?)")
+        kinds.append("search_anliegen(query,scope=all|assigned|reported|orders|unassigned,status?,category_id?)")
         if user.can("anliegen_manage") and not allowed(user, "tasks"):
             kinds.append("search_people(query) für Zuständigkeitsänderungen")
     kinds.extend(tool + "(query)" for tool, module in modules.READ.items() if allowed(user, module))
@@ -154,7 +163,7 @@ def search_instructions(user):
         {"role": "system", "content": (
             "Du bist TAKT Agent. Antworte nur als JSON-Objekt: "
             '{"searches":[{"tool":"search_tasks","query":"","scope":"assigned","overdue":true}]}. '
-            "Plane 0 bis 6 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
+            "Für allgemeine Fragen, Texte und Wissensfragen plane KEINE Fachsuche; antworte später im message-Feld. Sonst plane 0 bis 6 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
             "bei Aufgaben und Anliegen sind 0 Suchen erlaubt. Für Termine zuerst Kalender suchen; für Kopien Formulare, für DMS-Verschiebungen Akten UND Zielbereiche suchen. "
             "Filter nach Status und Fälligkeit zielgerichtet, aber erfinde keine IDs. "
             "Erlaubte Werkzeuge: " + "; ".join(kinds) + ". "
@@ -182,7 +191,8 @@ def parse_searches(reply, user):
         valid.append({"tool": s["tool"], "query": _term(s.get("query")),
                       "scope": str(s.get("scope") or "all")[:20],
                       "status": str(s.get("status") or "")[:30],
-                      "overdue": s.get("overdue") is True})
+                      "overdue": s.get("overdue") is True,
+                      **({"category_id": s["category_id"]} if type(s.get("category_id")) is int else {})})
     return valid
 
 
@@ -203,8 +213,10 @@ def plan_instructions(user, prompt, findings, categories, requester_id):
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
         "move_dms": "move_dms(id,area_id): freigegebene manuelle Wissensakte in berechtigten Zielbereich verschieben",
     }.items() if allowed(user, modules.WRITE[tool]))
+    if allowed(user, "anliegen") and user.is_admin:
+        capabilities.append("configure_anliegen_category(id,title,routing=person|lead,assignee_id?,enabled=true|false,apply_open=false): nur nicht-vertrauliche Kategorien, bestehende Zuständigkeiten ausschließlich bei explizitem Auftrag migrieren")
     system = (
-        "Du bist der TAKT-Bedienagent. Plane konkrete, sparsame Schritte für die deutsche Benutzeranfrage. "
+        "Du bist TAKT Agent, der zentrale LLM-Chat und Bedienassistent von TAKT. Beantworte allgemeine Fragen, verfasse Texte und nutze freigegebene Wissensbelege. Für konkrete Bedienwünsche plane sparsame Fachschritte. Das message-Feld enthält die vollständige deutsche Antwort (auch Markdown möglich), eine konkrete Rückfrage oder den erklärten Plan. Allgemeine Antworten brauchen keine actions. Behaupte niemals, schon etwas gespeichert zu haben. Schreibvorschläge öffnen eine ausgefüllte Fachmaske und müssen dort geprüft und bestätigt werden. "
         "Du bist kein autonomer Administrator. Antwort NUR als JSON: "
         '{"message":"Kurze Erklärung","actions":[{"tool":"set_task_status","id":12,"status":"in_progress"}]}. '
         "0 bis 4 Schreibaktionen. Für reine Suchanfragen actions=[]. "
@@ -332,7 +344,7 @@ def normalize_plan(reply, user, findings, categories, db):
         # Reject privileges and invalid transitions BEFORE presenting a confirmation.
         validate_action(db, user, action, target)
         proposals.append(action)
-    return {"message": str(obj.get("message") or "Hier ist mein Vorschlag.")[:1200],
+    return {"message": str(obj.get("message") or "Hier ist mein Vorschlag.")[:9000],
             "actions": proposals}
 
 
@@ -509,3 +521,70 @@ def execute(db, user, actions):
     db.commit()
     _badge_cache.clear()
     return results
+
+
+def reference_accessible(db, user, source):
+    """Historical agent answers never transfer record rights to later turns."""
+    if not available(user) or type(source.get("record_id")) is not int:
+        return False
+    kind, rid = source.get("record_type"), source["record_id"]
+    if source.get("record_version") and source["record_version"] != reference_revision(db, kind, rid):
+        return False
+    try:
+        if kind == "task":
+            require(user, "tasks")
+            return ts.get(db, user, rid).archived_at is None
+        if kind == "anliegen":
+            require(user, "anliegen")
+            return not issues.get(db, user, rid).confidential
+        if kind == "person":
+            return bool((allowed(user, "tasks") or (allowed(user, "anliegen") and user.can("anliegen_manage")))
+                        and (person := db.get(User, rid)) and person.active)
+        from . import calendars, forms, ai_dms, dms
+        from .calendar_models import Calendar, CalendarEvent
+        from .db import Form, Process
+        if kind in ("calendar", "event"):
+            require(user, "calendars")
+            if kind == "calendar":
+                row = db.get(Calendar, rid)
+                return bool(row and calendars.access(db, user, row))
+            row = db.get(CalendarEvent, rid)
+            cal = db.get(Calendar, row.calendar_id) if row else None
+            return bool(row and cal and cal.source == "free" and calendars.event_access(db, user, cal, row))
+        if kind == "form":
+            require(user, "forms")
+            row = db.get(Form, rid)
+            return bool(row and not row.deleted_at and not row.archived_at and forms.access_level(db, row, user))
+        if kind == "process":
+            require(user, "processes")
+            return db.get(Process, rid) is not None
+        if kind == "dms":
+            return ai_dms.authorized(db, user, rid)
+        if kind == "dms_area":
+            return ai_dms.available(db, user) and dms.levels(db, user).get(rid, 0) >= dms.WRITE
+        if kind == "anliegen_category":
+            require(user, "anliegen")
+            row = db.get(AnliegenCategory, rid)
+            return bool(row and not row.confidential and (row.enabled or user.is_admin))
+    except HTTPException:
+        return False
+    return False
+
+
+def reference_revision(db, kind, rid):
+    """Pin only the metadata exposed by module lookups, never user credentials."""
+    import hashlib
+    from .calendar_models import Calendar, CalendarEvent
+    from .db import Form, Process, DmsRecord, DmsArea
+    model = {"task": Task, "anliegen": Anliegen, "person": User, "calendar": Calendar,
+             "event": CalendarEvent, "form": Form, "process": Process,
+             "dms": DmsRecord, "dms_area": DmsArea, "anliegen_category": AnliegenCategory}.get(kind)
+    row = db.get(model, rid) if model else None
+    if row is None:
+        return None
+    fields = ("title", "name", "status", "version", "updated_at", "owner_id", "assignee_id",
+              "reporter_id", "category_id", "calendar_id", "source", "visibility", "org_id",
+              "area_id", "internal", "active", "enabled", "archived_at", "deleted_at",
+              "routing", "parent_id", "starts_at", "ends_at")
+    values = [kind, rid, *[str(getattr(row, key, None)) for key in fields]]
+    return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode()).hexdigest()

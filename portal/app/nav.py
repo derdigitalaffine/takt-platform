@@ -177,8 +177,8 @@ ITEMS: list[Item] = [
     Item("trash", "admin", "/admin/loeschen", "fa-trash-can", "Löschen & Papierkorb", lambda c: c.admin,
          _pre("/admin/loeschen")),
 ]
-ITEMS.append(Item("ai", "know", "/ki", "fa-brain", "KI-Chat",
-                  lambda c: "ai" in c.modules and c.can("ai_chat"), _pre("/ki")))
+ITEMS.append(Item("ai", "know", "/agent", "fa-wand-magic-sparkles", "TAKT Agent",
+                  lambda c: "ai" in c.modules and c.can("ai_chat"), lambda path: path == "/agent" or path.startswith("/agent/") or path == "/ki" or path.startswith("/ki/")))
 ITEMS.append(Item("ai_admin", "admin", "/admin/ai", "fa-brain", "KI & Sprachmodelle",
                   lambda c: c.admin, _pre("/admin/ai")))
 ITEMS.append(Item("oidc", "admin", "/admin/oidc", "fa-key", "Nextcloud / OIDC-Anmeldung", lambda c: c.admin, _pre("/admin/oidc")))
@@ -209,7 +209,7 @@ ADMIN_SECTIONS = {
 }
 DESCRIPTIONS = {
     "anliegen": ("Interne Mängel, Beschaffungen, Wünsche und vertrauliche Beschwerden erfassen und an zuständige Personen leiten.", "Anliegen einreichen · Bearbeitungsstand verfolgen", "Anliegen Mangel Bestellung Beschwerde Büromaterial Möbel"),
-    "ai": ("Stellen Sie Fragen an freigegebene Sprachmodelle und durchsuchen Sie zugelassene interne TAKT-Wissensquellen.", "Persönlichen KI-Chat öffnen · Wissen recherchieren", "KI LLM AI Chat Gemma Wissen"),
+    "ai": ("Der zentrale KI-Arbeitsplatz: Fragen beantworten, freigegebenes Wissen nutzen und vorausgefüllte Fachvorschläge prüfen.", "TAKT Agent öffnen · Wissen und Fachabläufe", "KI LLM AI Chat Gemma Wissen"),
     "tasks": ("Sehen Sie, was Sie als Nächstes erledigen können. Eigene Aufgaben und Aufgaben aus Ihren Fachbereichen an einem Ort.", "Aufgaben bearbeiten · Zuständigkeiten prüfen", "Aufgaben Arbeitsplatz"),
     "kanban": ("Organisieren Sie gemeinsame Arbeit in übersichtlichen Spalten. Verknüpfte Aufgaben und Umfragen zeigen ihren aktuellen Status.", "Boards öffnen · Arbeit organisieren", "Board Projekt"),
     "circulations": ("Teilen Sie Informationen und verfolgen Sie Rückmeldungen und Kenntnisnahmen.", "Aushänge lesen · Rückmeldungen geben", "Umlauf Sammelmappe Kenntnisnahme"),

@@ -92,7 +92,7 @@ def test_agent_requires_ai_module_and_is_global():
     settings(module_ai="0")
     assert 'data-takt-agent' not in c.get("/").text
     assert c.post("/agent/plan", data={"csrf": csrf_of(c.get("/").text),
-                   "prompt": "Zeige meine Aufgaben"}).status_code == 403
+                   "prompt": "Zeige meine Aufgaben"}).status_code == 404
 
 
 def test_create_task_is_only_committed_after_confirmation_and_cannot_replay(monkeypatch):
@@ -193,7 +193,12 @@ def test_confidential_request_never_reaches_provider(monkeypatch):
     monkeypatch.setattr(ai_provider, "complete", forbidden)
     c = login(*ADMIN)
     response, _ = _plan(c, "Erfasse eine vertrauliche Beschwerde wegen Mobbing")
-    assert response.status_code == 422
+    assert response.status_code == 200
+    assert response.json()["open_url"].startswith("/anliegen/neu?agent_private=")
+    page = c.get(response.json()["open_url"])
+    assert page.status_code == 200 and "Mobbing" in page.text
+    assert "nicht an einen KI-Provider" in page.text
+    assert 'id="anliegen-ai"' not in page.text
 
 
 def test_agent_csrf_and_non_ai_permissions(monkeypatch):
