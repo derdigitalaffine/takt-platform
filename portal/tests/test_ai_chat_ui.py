@@ -54,8 +54,11 @@ def test_chat_client_keeps_safe_incremental_output_without_reload():
     assert "document.createTextNode(chunk)" in js
     assert "new FormData(form)" in js
     assert "new URL(source.url, window.location.origin)" in js
-    # General streaming answers stay inline; server-owned proposals open allowlisted native forms.
-    assert "window.location.assign(data.open_url)" in js
+    # User must explicitly click the link. No automatic navigation in the agent.
+    assert "window.location.assign(data.open_url)" not in js
+    assert "parent.location.assign(data.open_url)" not in js
+    assert "link.href = data.open_url" in js
+    assert "link.target = '_top'" in js
     assert "data.open_url.includes" in js
     assert "eventData.kind === 'render'" in js
     assert "assistantBubble.content.innerHTML = eventData.value.html" in js
