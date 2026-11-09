@@ -34,6 +34,11 @@ def exercise(page):
     expect(page).not_to_have_url(re.compile('/login'))
     page.goto(BASE+'/')
     expect(page.locator('.dashboard-page #dash-title')).to_be_visible()
+    expect(page.locator('.dashboard-page > header.workspace-head')).to_be_visible()
+    assert page.locator('.workspace-head').evaluate("el => getComputedStyle(el).backgroundImage === 'none'")
+    assert page.locator('.workspace-head').bounding_box()['height'] < 160
+    assert page.locator('.dash-intro-metrics').evaluate("el => !document.querySelector('.workspace-head').contains(el)")
+
     expect(page.locator('.dash-intro-metrics')).to_be_visible()
     expect(page.locator('#dash-tiles .dash-module-card').first).to_be_visible()
     no_horizontal_scroll(page)
@@ -53,6 +58,10 @@ def exercise(page):
     page.set_viewport_size({'width':1440,'height':1000})
     page.goto(BASE+'/tasks?view=list')
     expect(page.get_by_role('heading',name='Meine Aufgaben',exact=True)).to_be_visible()
+    expect(page.locator('.task-page > header.workspace-head')).to_be_visible()
+    assert page.locator('.workspace-head').evaluate("el => getComputedStyle(el).backgroundImage === 'none'")
+    assert page.locator('.workspace-head').bounding_box()['height'] < 185
+
     expect(page.locator('#capture-text')).to_be_visible()
     assert page.locator('.task-page .btn-primary:visible').count()==1
     no_horizontal_scroll(page)
