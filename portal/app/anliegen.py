@@ -74,11 +74,23 @@ def update_status(db, case, actor, new_status, *, supplier="", order_reference="
         from . import tasks
         task = db.get(Task, case.task_id)
         if task:
+            old_task_status = task.status
             task.status = ("done" if new_status in ("done", "closed")
                            else "open" if new_status == "open"
                            else "in_progress")
+            if task.status == "done":
+                task.completed_at = utcnow()
+                task.completed_by = actor.id
+            elif old_task_status == "done":
+                task.completed_at = None
+                task.completed_by = None
             tasks.audit(db, task, actor, "status",
                         f"Status des Anliegens: {STATUSES[new_status]}")
+            if task.status != old_task_status:
+                db.flush()
+                from . import task_rules
+                task_rules.emit(db, task, "status_changed",
+                                f"anliegen-status:{case.id}:{new_status}:{task.version}")
     return case
 
 
