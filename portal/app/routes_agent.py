@@ -33,7 +33,7 @@ async def _conversational_answer(
     import json
     from . import ai_knowledge
     from .routes_ai import (
-        _conversation, _model_history, _internal_ai_sources, _web_sources,
+        _conversation, _model_history, _history_sources, _internal_ai_sources, _web_sources,
         _source_meta, _ai_markdown,
     )
     from .db import utcnow
@@ -41,6 +41,7 @@ async def _conversational_answer(
                if use_knowledge == "1" else [])
     sources += await _web_sources(db, user, prompt, use_web, request)
     history = []
+    rows = []
     if convo:
         _conversation(db, convo.id, user)
         rows = list(db.scalars(
@@ -79,7 +80,9 @@ async def _conversational_answer(
         raise HTTPException(502, "Ich habe noch keine Antwort erhalten. Versuch es bitte erneut.")
     db.expire_all()
     _access(user)
-    metadata = json.loads(_source_meta(sources))
+    # Derived answers retain the live ACL/revision of every historical
+    # source they relied on, even if no new retrieval occurred in this turn.
+    metadata = json.loads(_source_meta(sources)) + _history_sources(db, user, rows)
     if not ai_knowledge.sources_accessible(db, user, metadata):
         raise HTTPException(409, "Die Wissensfreigabe hat sich geändert. Versuch es bitte erneut.")
     if convo:
