@@ -150,7 +150,7 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
                    expected_delivery: str = Form(""), back: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
+    # Authenticated recipients are authorized through the per-case ACL.
     case = service.get(db, user, case_id)
     if not service.can_handle(user, case):
         raise HTTPException(403)
@@ -174,7 +174,7 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
 def assign_anliegen(request: Request, case_id: int, assignee_id: int = Form(...),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
+    # Authenticated recipients are authorized through the per-case ACL.
     case = service.get(db, user, case_id)
     if case.confidential or not user.can("anliegen_manage"):
         raise HTTPException(403, "Vertrauliche Beschwerden dürfen nicht allgemein zugewiesen werden.")
