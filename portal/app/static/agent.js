@@ -22,7 +22,7 @@
   // confine the drawer to the header. All event references remain unchanged.
   document.body.append(shade, panel);
   const csrf = document.querySelector('meta[name="csrf"]')?.content || '';
-  const reset = root.querySelector('[data-agent-reset]');
+  const reset = panel.querySelector('[data-agent-reset]');
   let pending = '';
   let busy = false;
 
@@ -190,7 +190,7 @@
       }
     }
   });
-  root.querySelectorAll('[data-agent-sample]').forEach(function (button) {
+  panel.querySelectorAll('[data-agent-sample]').forEach(function (button) {
     button.addEventListener('click', function () {
       input.value = button.dataset.agentSample;
       input.focus();
