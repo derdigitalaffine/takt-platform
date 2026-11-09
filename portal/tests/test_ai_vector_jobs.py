@@ -35,7 +35,7 @@ def test_automatic_index_changes_and_revocation(monkeypatch):
         db.add(doc)
         db.commit()
         doc_id = doc.id
-    assert asyncio.run(ai_vector_jobs.tick()) == 1
+    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 1
     assert len(calls) == 1
     with SessionLocal() as db:
         vectors = list(db.scalars(select(AIKnowledgeVector).where(
@@ -45,14 +45,14 @@ def test_automatic_index_changes_and_revocation(monkeypatch):
         assert job.status == "done"
         db.get(AIKnowledge, doc_id).body_md = "Text B (aktualisiert)"
         db.commit()
-    assert asyncio.run(ai_vector_jobs.tick()) == 1
+    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 1
     with SessionLocal() as db:
         rows = list(db.scalars(select(AIKnowledgeVector).where(
             AIKnowledgeVector.knowledge_id == doc_id)))
         assert rows and all(row.source_hash == ai_vector.source_hash("Text B (aktualisiert)") for row in rows)
         db.get(AIKnowledge, doc_id).enabled = False
         db.commit()
-    assert asyncio.run(ai_vector_jobs.tick()) == 0
+    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 0
     with SessionLocal() as db:
         assert db.scalar(select(AIKnowledgeVector).where(AIKnowledgeVector.knowledge_id == doc_id)) is None
         assert db.scalar(select(AIIndexJob).where(AIIndexJob.knowledge_id == doc_id)) is None
@@ -69,13 +69,13 @@ def test_index_failure_is_retryable_without_flood(monkeypatch):
         db.add(doc)
         db.commit()
         doc_id = doc.id
-    assert asyncio.run(ai_vector_jobs.tick()) == 0
+    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 0
     with SessionLocal() as db:
         job = db.scalar(select(AIIndexJob).where(AIIndexJob.knowledge_id == doc_id))
         assert job.status == "failed" and job.attempts == 1
         assert job.next_attempt_at > utcnow()
         assert "Secret" not in str(job.__dict__)
-    assert asyncio.run(ai_vector_jobs.tick()) == 0  # backoff blocks repeated failures
+    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 0  # backoff blocks repeated failures
     async def repaired(provider, texts, model_id):
         return [[1.0, 0.0] for _ in texts]
     monkeypatch.setattr(ai_provider, "embed", repaired)
@@ -83,7 +83,7 @@ def test_index_failure_is_retryable_without_flood(monkeypatch):
         job = db.scalar(select(AIIndexJob).where(AIIndexJob.knowledge_id == doc_id))
         job.next_attempt_at = utcnow()
         db.commit()
-    assert asyncio.run(ai_vector_jobs.tick()) == 1
+    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 1
 
 
 def test_auto_index_off_produces_no_provider_traffic(monkeypatch):
@@ -95,4 +95,4 @@ def test_auto_index_off_produces_no_provider_traffic(monkeypatch):
     with SessionLocal() as db:
         db.add(AIKnowledge(title="Off", body_md="Do not index this", enabled=True))
         db.commit()
-    assert asyncio.run(ai_vector_jobs.tick()) == 0
+    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 0
