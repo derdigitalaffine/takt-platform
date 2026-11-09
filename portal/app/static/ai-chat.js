@@ -193,7 +193,6 @@
     var doneData = null;
     var serverError = '';
     var receivedText = false;
-    var rawAnswer = '';
 
     try {
       var response = await fetch(form.dataset.streamAction, {
@@ -240,8 +239,7 @@
             var follow = isAtBottom();
             // Raw deltas always remain inert. Only Markdown HTML generated
             // by the server's locked-down renderer may become markup.
-            rawAnswer += chunk;
-            assistantBubble.content.textContent = rawAnswer;
+            assistantBubble.content.appendChild(document.createTextNode(chunk));
             if (!receivedText) {
               receivedText = true;
               progress.textContent = 'Antwort wird live übertragen …';
