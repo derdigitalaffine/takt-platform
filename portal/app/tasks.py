@@ -269,6 +269,12 @@ def transition(db, user, row, target, reason=''):
         raise HTTPException(403, 'Sie können den Arbeitsstatus dieser Aufgabe nicht ändern.')
     if target not in STATUSES:
         raise Invalid('Bitte einen gültigen Status wählen.')
+    if row.source_type == 'anliegen' and target == 'done':
+        from .anliegen_models import Anliegen
+        from .anliegen import ORDER_KEYS
+        linked = db.scalar(select(Anliegen).where(Anliegen.task_id == row.id))
+        if linked and linked.category.key in ORDER_KEYS and linked.status in {'ordered', 'partially_delivered'}:
+            raise Invalid('Die Bestellung ist noch nicht vollständig geliefert. Bitte den Lieferstatus zuerst im Anliegen erfassen.')
     if row.archived_at:
         raise Invalid('Die Aufgabe ist archiviert. Stellen Sie sie zuerst wieder her.')
     if target == row.status:
