@@ -212,7 +212,7 @@
       {% if key in current %}{% set n.checked = n.checked + 1 %}{% endif %}
     {% endfor %}
     {% if n.total %}
-    <details class="perm-editor-group" data-permission-group {% if loop.first or n.checked %}open{% endif %}>
+    <details class="perm-editor-group" data-permission-group>
       <summary>
         <span class="perm-editor-group-icon"><i class="fa-solid {{ icon }}" aria-hidden="true"></i></span>
         <span class="perm-editor-group-heading">{{ heading }}</span>
