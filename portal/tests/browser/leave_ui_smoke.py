@@ -203,7 +203,14 @@ with tempfile.TemporaryDirectory(prefix="takt-leave-") as root:
                 holidays.click()
                 expect(holidays).to_have_attribute("aria-pressed", "true")
                 p.set_viewport_size({"width": 390, "height": 844})
-                p.wait_for_function("document.documentElement.scrollWidth<=innerWidth+1")
+                # wait_for_function() uses eval internally and violates the application's
+    # correctly strict Content-Security-Policy; evaluate() does not.
+    for _ in range(30):
+        if p.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"):
+            break
+        p.wait_for_timeout(100)
+    else:
+        raise AssertionError("Mobile calendar page overflows viewport")
                 p.set_viewport_size({"width": 1440, "height": 1000})
                 p.locator('form[action="/kalender/jahresplanung"] button').click()
                 expect(p.get_by_text("Gemeinsamer Jahresplan: Jahresplanung")).to_be_visible()
