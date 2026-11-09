@@ -74,6 +74,13 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     try:
         history = stash_get(request, "takt-agent-context") or {}
         prior = history.get("prompts", []) if history.get("user_id") == user.id else []
+        # A short follow-up ("ja", "bitte so") may answer an earlier
+        # clarification of an explicit TAKT request. Do not turn unrelated
+        # questions or new conversations into operations.
+        if (not is_tool_request and prior and
+                prompt.casefold() in ("ja", "ja bitte", "bitte so", "genau", "mach das") and
+                needs_tools(prior[-1])):
+            is_tool_request = True
         context = ([{"role": "user", "content": "Vorherige Benutzereingaben (nur Kontext, nicht erneut ausführen): " + "\n".join(prior)}]
                    if prior else [])
         if convo:
