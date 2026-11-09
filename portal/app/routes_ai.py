@@ -729,13 +729,15 @@ async def ai_message_updates(
         {"type": "image_url", "image_url": {"url": image_url, "detail": "low"}},
     ]
     messages.append({"role": "user", "content": content})
-    db.add(AIMessage(conversation_id=chat_id, role="user",
-                     content=message + ("\n[Bild für diese Anfrage verarbeitet; nicht gespeichert.]"
-                                        if image_url else "")))
+    user_message = AIMessage(conversation_id=chat_id, role="user",
+                             content=message + ("\n[Bild für diese Anfrage verarbeitet; nicht gespeichert.]"
+                                                if image_url else ""))
+    db.add(user_message)
     if not history:
         convo.title = message[:100]
     convo.updated_at = utcnow()
     db.commit()
+    user_message_id = user_message.id
     # Session-dependent ORM objects must not outlive the request dependency.
     profile = SimpleNamespace(
         id=provider.id, active=provider.active, base_url=provider.base_url,
@@ -818,15 +820,19 @@ async def ai_message_updates(
                                 not actor.can("ai_chat") or "ai" not in enabled_modules()):
                             yield _sse("error", {"message": "Die Unterhaltung ist nicht mehr freigegeben."})
                             return
-                        store.add(AIMessage(
+                        assistant_message = AIMessage(
                             conversation_id=chat_id, role="assistant", content=answer,
                             sources_json=json.dumps(links, ensure_ascii=False),
                             model_id=profile.model_id,
-                        ))
+                        )
+                        store.add(assistant_message)
                         current.updated_at = utcnow()
                         store.commit()
+                        assistant_message_id = assistant_message.id
                     yield _sse("done", {"sources": links, "model": profile.model_id,
-                                        "html": _ai_markdown(answer)})
+                                        "html": _ai_markdown(answer),
+                                        "user_message_id": user_message_id,
+                                        "assistant_message_id": assistant_message_id})
                     return
         finally:
             if not producer.done():
