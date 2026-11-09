@@ -71,7 +71,7 @@ _ACTION_VERB = re.compile(
 _ACTION_OBJECT = re.compile(
     r"\b(?:aufgab\w*|anliegen|formular\w*|kalender|termin\w*|"
     r"prozess\w*|akten|akte|dms|büromaterial|büromöbel|"
-    r"bestellung\w*|status|zuständigkeit|priorität|"
+    r"bestellung\w*|beschwerd\w*|mobbing|status|zuständigkeit|priorität|"
     r"organisation\w*|bereich\w*|kategorie\w*|mitglieder|profil)\b", re.I)
 _ACTION_REQUEST = re.compile(
     r"\b(?:bitte|kannst du|könntest du|würdest du|ich möchte|ich will|"
