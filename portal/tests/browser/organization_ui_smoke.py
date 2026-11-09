@@ -64,6 +64,10 @@ with tempfile.TemporaryDirectory(prefix="takt-org-") as root:
                 p.on("pageerror", lambda e: errors.append(str(e)))
                 login(p)
                 assert p.goto(BASE + "/admin/organization").status == 200
+                expect(p.locator(".admin-org-workspace > header.workspace-head")).to_be_visible()
+                assert p.locator(".workspace-head").evaluate("el => getComputedStyle(el).backgroundImage === 'none'")
+                assert p.locator(".workspace-head").bounding_box()["height"] < 160
+
                 tree = p.get_by_role(
                     "navigation", name="Organisationseinheiten", exact=True
                 )
@@ -157,6 +161,9 @@ with tempfile.TemporaryDirectory(prefix="takt-org-") as root:
                 expect(drawer).to_be_hidden()
                 p.set_viewport_size({"width": 1440, "height": 1000})
                 p.goto(BASE + "/admin/users")
+                expect(p.locator(".admin-users-workspace > header.workspace-head")).to_be_visible()
+                assert p.locator(".workspace-head").evaluate("el => getComputedStyle(el).backgroundImage === 'none'")
+                assert p.locator(".workspace-head").bounding_box()["height"] < 160
                 expect(p.locator("body")).to_contain_text("Finanzplanung")
                 expect(p.locator("body")).to_contain_text("Hauptzuordnung")
                 expect(p.locator(".admin-users-workspace")).to_be_visible()
