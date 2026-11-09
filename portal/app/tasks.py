@@ -244,6 +244,9 @@ def update(db, user, row, data):
                 before, after = str(old), str(value)
             audit(db, row, user, key, f'{labels[key]} geändert.' if key == 'description' else f'{labels[key]}: {before} → {after}')
             setattr(row, key, value)
+    if row.source_type == "anliegen" and old_assignee != row.assignee_id:
+        from . import anliegen
+        anliegen.sync_from_native_task(db, row, user, assignment=True)
     if old_assignee != row.assignee_id or old_external != row.external_email:
         from .task_models import TaskExternal
         link = db.get(TaskExternal, row.id)
@@ -290,6 +293,9 @@ def transition(db, user, row, target, reason=''):
     row.completed_at = utcnow() if target == 'done' else None
     row.completed_by = user.id if target == 'done' else None
     audit(db, row, user, 'status', f'{STATUSES[old]} → {STATUSES[target]}')
+    if row.source_type == "anliegen":
+        from . import anliegen
+        anliegen.sync_from_native_task(db, row, user, status=True)
     ping(db, row, {row.creator_id, row.assignee_id} - {user.id}, f'Aufgabenstatus: {STATUSES[target]}')
     db.flush()
     from . import task_rules
