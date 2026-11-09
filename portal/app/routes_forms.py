@@ -189,7 +189,7 @@ async def form_ai_draft(
         current=current, mode=mode, blocks=blocks, knowledge=knowledge,
     )
     try:
-        answer = await ai_provider.complete(provider, messages, max_tokens=2048)
+        answer = await ai_provider.complete(provider, messages, max_tokens=4096)
         draft = form_ai.parse_result(answer, current, mode, {b["id"] for b in blocks})
     except ai_provider.AIProviderError as exc:
         raise HTTPException(502, str(exc)) from exc
