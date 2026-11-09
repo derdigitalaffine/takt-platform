@@ -28,6 +28,8 @@ def exercise(page):
     chat_url = page.url
     expect(page.locator('[name="use_agent"]')).to_be_checked()
     command = 'Termin am 12.11.2026 von 9 bis 10 Uhr in Raum 1 zur Projektbesprechung mit Tagesordnung prüfen; Projektformular kopieren und Projektwissen in Projektablage verschieben.'
+    if page.locator('[data-ai-chat-form]').get_attribute('data-ai-ready') != '1':
+        raise AssertionError('Chat JS did not initialize: ' + str(errors) + '; streaming=' + str(page.evaluate('!!window.ReadableStream')))
     page.locator('#ai-prompt').fill(command)
     page.get_by_role('button', name='Nachricht senden', exact=True).click()
     # The agent must never navigate automatically on receiving a model URL.

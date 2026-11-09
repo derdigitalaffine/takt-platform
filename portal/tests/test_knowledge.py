@@ -164,4 +164,4 @@ def test_csrf_required_for_writes(sample):
     author = login("wissen-reader@example.org", "knowledge-test-123")
     assert author.post(f"/wissen/raum/{space_id}/artikel", data={
         "title": "Ohne Schutz", "kind": "article",
-    }).status_code == 403
+    }).status_code == 400
