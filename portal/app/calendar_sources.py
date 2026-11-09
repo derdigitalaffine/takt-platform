@@ -26,6 +26,7 @@ SOURCES = {
     "absences": ("Meine weiteren Abwesenheiten", "module_calendars"),
     "closures": ("Schließzeiten meines Bereichs", "module_calendars"),
     "holidays": ("Gesetzliche Feiertage", "module_calendars"),
+    "birthdays": ("Geburtstage", "module_calendars"),
 }
 
 
@@ -36,9 +37,12 @@ def enabled(db, kind):
     )
 
 
-def project(db, user, kind, start, end):
+def project(db, user, kind, start, end, *, channel="web"):
     if not user or not user.active or not enabled(db, kind):
         return []
+    if kind == "birthdays":
+        from . import birthdays
+        return birthdays.events(db, user, start, end, channel=channel)
     a = start.astimezone(timezone.utc).replace(tzinfo=None)
     b = end.astimezone(timezone.utc).replace(tzinfo=None)
     out = []
@@ -357,6 +361,7 @@ def dav_objects(db, user, calendar):
         calendar.source,
         datetime(1970, 1, 1, tzinfo=timezone.utc),
         datetime(2200, 12, 31, tzinfo=timezone.utc),
+        channel="caldav",
     )
     result = {}
     for event in events:
