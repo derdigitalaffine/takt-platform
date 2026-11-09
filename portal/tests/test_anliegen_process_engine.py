@@ -15,7 +15,7 @@ from app.anliegen_process_engine import (
     cancel_run, complete_task, pause_run, request_start, resume_run,
     validate_internal_version,
 )
-from app.db import FormResponse, Process, ProcessVersion, Setting, User
+from app.db import FormResponse, Organization, Process, ProcessVersion, Setting, User
 from app.process_context import anliegen_context, form_context
 from app.security import decrypt
 
@@ -174,7 +174,7 @@ def test_idempotent_start_preserves_one_task_and_version(prepared):
 
 def test_approval_gate_requires_second_authorized_person(prepared):
     db, case, proc, version, rule, admin, reviewer, outsider = prepared
-    rule.policy_json = json.dumps({"start_modes": ["handler"], "approval_required": True})
+    rule.policy_json = json.dumps({"start_modes": ["handler"], "approval_required": True,\n                                   "field_mapping": [{"source": "description", "target": "amount"}]})
     db.flush()
     run = start(prepared)
     assert run.state == "requested" and task_of(db, run) is None
@@ -260,7 +260,10 @@ def test_fail_closed_permissions_confidential_org_and_feature_flag(prepared):
     with pytest.raises(ProcessAccessDenied):
         request_start(db, case, rule, outsider, origin="handler",
                       launch_key="unauthorized:123456")
-    rule.org_id = 123456
+    foreign_org = Organization(name=f"Test Fremdorganisation {uuid4().hex}", kind="fachbereich")
+    db.add(foreign_org)
+    db.flush()
+    rule.org_id = foreign_org.id
     db.flush()
     with pytest.raises(ProcessAccessDenied):
         start(prepared)
