@@ -162,6 +162,8 @@ def category(db, category_id, *, enabled=False):
 
 
 def can_view(user, row):
+    if not user.active or not (user.can("anliegen_submit") or user.can("anliegen_manage")):
+        return False
     # Confidential cases never become visible through broad management permissions.
     if row.confidential:
         return user.id in (row.reporter_id, row.assignee_id)
@@ -170,6 +172,8 @@ def can_view(user, row):
 
 
 def can_handle(user, row):
+    if not user.active or not (user.can("anliegen_submit") or user.can("anliegen_manage")):
+        return False
     if row.confidential:
         return row.assignee_id == user.id
     return row.assignee_id == user.id or user.can("anliegen_manage")
@@ -183,6 +187,8 @@ def get(db, user, case_id):
 
 
 def visible_query(user):
+    if not user.active or not (user.can("anliegen_submit") or user.can("anliegen_manage")):
+        return select(Anliegen).where(Anliegen.id == -1)
     # Never leak confidential complaints to global managers.
     member = or_(Anliegen.reporter_id == user.id, Anliegen.assignee_id == user.id)
     return select(Anliegen).where(
