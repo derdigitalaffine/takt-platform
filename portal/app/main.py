@@ -135,7 +135,7 @@ templates.env.globals["form_constraints"] = lambda item: _forms_mod().validation
 templates.env.globals["form_rule_hint"] = lambda item: _forms_mod().validation_hint(item)
 templates.env.globals["perm_modules"] = {"processes": "applications", "app_create": "applications", "formblocks": "forms",
                                          "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources",
-                                         "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai"}
+                                         "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "concerns_manage": "concerns", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai"}
 templates.env.globals.update(planning_when=planning.when, cancel_recipients=planning.cancel_recipients, local_input=planning.local_input,
                              is_upcoming=planning.is_upcoming, rsvp_labels=planning.RSVP_LABELS,
                              rsvp_summary=planning.rsvp_summary)
@@ -178,6 +178,7 @@ MODULES = {
     "ai": ("KI-Chat", "module_ai", ("/ki",)),
     "calendars": ("Kalender & Urlaub", "module_calendars", ("/kalender", "/urlaub", "/caldav", "/.well-known/caldav")),
     "tasks": ("Aufgaben & Zusammenarbeit", "module_tasks", ("/aufgaben",)),
+    "concerns": ("Interne Anliegen", "module_concerns", ("/anliegen",)),
     "seminars": ("Seminare & Lehrgänge", "module_seminars", ("/seminare",)),
     "shortlinks": ("Kurzlinks & QR-Codes", "module_shortlinks", ("/shortlinks", "/s/", "/s")),
     "forms": ("Formulare", "module_forms", ("/forms", "/f/")),
@@ -201,7 +202,9 @@ def enabled_modules() -> set[str]:
             cfg = get_settings(db)
         enabled = {key for key, (_, setting, _) in MODULES.items() if cfg.get(setting, "1") == "1"}
         if "forms" not in enabled:
-            enabled.discard("applications")   # Anträge bauen auf dem Formularserver auf
+            enabled.discard("applications")
+        if "tasks" not in enabled:
+            enabled.discard("concerns")  # Native tasks required for concerns.   # Anträge bauen auf dem Formularserver auf
         _module_cache["enabled"] = enabled
         _module_cache["at"] = time.monotonic()
     return _module_cache["enabled"]
@@ -2282,6 +2285,12 @@ def _release_owned(db: Session, target: User) -> None:
     """Kurzlinks und Formulare einer gelöschten Person bleiben erhalten und gehen an die löschende Verwaltung
     bzw. werden herrenlos (Admins sehen sie weiter)."""
     from .db import BookingPage, Form as FormModel, Poll, ShortLink
+    from .concern_models import Concern
+    if db.scalar(select(Concern.id).where(
+        (Concern.reporter_id == target.id) | (Concern.assignee_id == target.id)
+    ).limit(1)):
+        raise HTTPException(409, "Dieses Konto ist noch mit internen Anliegen verknüpft. "
+                                    "Bitte die Vorgänge vor einer Kontolöschung abschließen oder gesondert archivieren.")
     for page in db.scalars(select(BookingPage).where(BookingPage.owner_id == target.id)):
         page.owner_id = None
     for poll in db.scalars(select(Poll).where(Poll.owner_id == target.id)):
@@ -2953,6 +2962,7 @@ from . import routes_oidc  # noqa: E402,F401
 from . import routes_seminar_planning, routes_seminar_hybrid  # noqa: E402,F401
 
 from . import routes_tasks  # noqa: E402,F401
+from . import routes_concerns  # noqa: E402,F401
 
 from . import routes_seminar_operations  # noqa: E402,F401
 
