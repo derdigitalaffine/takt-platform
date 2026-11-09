@@ -174,7 +174,8 @@ def test_idempotent_start_preserves_one_task_and_version(prepared):
 
 def test_approval_gate_requires_second_authorized_person(prepared):
     db, case, proc, version, rule, admin, reviewer, outsider = prepared
-    rule.policy_json = json.dumps({"start_modes": ["handler"], "approval_required": True,\n                                   "field_mapping": [{"source": "description", "target": "amount"}]})
+    rule.policy_json = json.dumps({"start_modes": ["handler"], "approval_required": True,
+                                   "field_mapping": [{"source": "description", "target": "amount"}]})
     db.flush()
     run = start(prepared)
     assert run.state == "requested" and task_of(db, run) is None
