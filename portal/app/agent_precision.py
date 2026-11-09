@@ -93,6 +93,10 @@ def needs_tools(prompt: str) -> bool:
         return False
     if _EXPLANATION.search(value):
         return False
+    if re.search(r"\b(?:schritte?|arbeitsplan|workflow)\b", value, re.I) and re.search(
+        r"\b(?:vorbereiten|plane|planen|mach|bitte|erstellen)\b", value, re.I
+    ):
+        return True
     if _ACTION_VERB.search(value) and _ACTION_OBJECT.search(value):
         return True
     # "Meine offenen Aufgaben" and similar scoped in-app lookups.
