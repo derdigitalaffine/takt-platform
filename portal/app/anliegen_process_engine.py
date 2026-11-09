@@ -244,7 +244,10 @@ def request_start(db: Session, case: Anliegen, rule: AnliegenProcessRule, actor:
             raise ProcessConflict("Der Startschlüssel ist bereits anderweitig belegt.")
         return existing
     process = db.get(Process, rule.process_id)
-    version = process.current if process else None
+    version = (db.get(ProcessVersion, rule.process_version_id)
+               if rule.process_version_id else (process.current if process else None))
+    if process is None or version is None or version.process_id != process.id:
+        raise ProcessEngineError("Die freigegebene Prozessversion ist nicht verfügbar.")
     validate_internal_version(version)
     data = _safe_inputs(policy, inputs)
     run = AnliegenProcessRun(
@@ -272,7 +275,10 @@ def request_start(db: Session, case: Anliegen, rule: AnliegenProcessRule, actor:
 def approve_run(db: Session, run: AnliegenProcessRun, actor: User):
     _check_available(db)
     case = _case(db, run)
-    _require_handler(actor, case)
+    from . import anliegen_process_config
+    if not (cases.can_handle(actor, case)
+            or anliegen_process_config.can_approve_run(db, actor, case)):
+        raise ProcessAccessDenied("Keine Berechtigung zur Prozessfreigabe.")
     if run.state != "requested":
         raise ProcessConflict("Dieser Prozess wartet nicht auf eine Freigabe.")
     if run.requested_by_id == actor.id:
