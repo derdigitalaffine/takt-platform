@@ -29,6 +29,9 @@ class Anliegen(Base):
     task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, unique=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
+    # Confidential payload is encrypted; title/description store neutral text only.
+    title_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidential: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(24), default="new")
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
@@ -37,6 +40,20 @@ class Anliegen(Base):
     reporter = relationship("User", foreign_keys=[reporter_id])
     assignee = relationship("User", foreign_keys=[assignee_id])
     task = relationship("Task", foreign_keys=[task_id])
+
+    @property
+    def display_title(self) -> str:
+        if self.confidential and self.title_enc:
+            from .security import decrypt
+            return decrypt(self.title_enc) or "Vertrauliches Anliegen"
+        return self.title
+
+    @property
+    def display_description(self) -> str:
+        if self.confidential and self.description_enc:
+            from .security import decrypt
+            return decrypt(self.description_enc)
+        return self.description
 
 
 class AnliegenEvent(Base):
