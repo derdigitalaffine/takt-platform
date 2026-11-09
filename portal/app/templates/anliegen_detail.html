@@ -7,8 +7,8 @@
 <div class="row g-3"><div class="col-12 col-xl-8">
   <article class="card"><div class="card-body">
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3"><span class="badge text-bg-primary">{{case.category.title}}</span><span class="badge text-bg-{{'success' if case.status in ('done','closed') else 'secondary'}}">{{statuses[case.status]}}</span>{% if case.confidential %}<span class="badge text-bg-warning"><i class="fa-solid fa-lock me-1"></i>Vertraulich</span>{% endif %}</div>
-    <h2 class="h4">{{case.title}}</h2>
-    <div class="text-break" style="white-space:pre-wrap">{{case.description}}</div>
+    <h2 class="h4">{{case.display_title}}</h2>
+    <div class="text-break" style="white-space:pre-wrap">{{case.display_description}}</div>
     <hr><dl class="row small mb-0">
       <dt class="col-sm-4">Gemeldet von</dt><dd class="col-sm-8">{{case.reporter.name}}</dd>
       <dt class="col-sm-4">Zuständig</dt><dd class="col-sm-8">{{case.assignee.name if case.assignee else 'Nicht eindeutig ermittelt'}}</dd>
