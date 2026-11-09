@@ -7,6 +7,9 @@ import base64
 import asyncio
 import io
 import json
+import time
+from markdown_it import MarkdownIt
+from markupsafe import Markup
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -26,6 +29,14 @@ from .security import decrypt, encrypt, mask_secret
 chat_user = require("ai_chat")
 _MAX_IMAGE = 4 * 1024 * 1024
 _MAX_PROMPT = 8000
+# Markdown is rendered server-side with raw HTML and linkification disabled.
+# This is the only HTML accepted by the streaming chat frontend.
+_AI_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "maxNesting": 20}).enable(["table", "strikethrough"])
+
+
+def _ai_markdown(text: str) -> str:
+    return _AI_MARKDOWN.render(text or "")
+
 
 
 def _provider(db: Session, provider_id: int, *, active: bool = False) -> AIProvider:
@@ -69,8 +80,10 @@ def _message_view(db: Session, user: User, row: AIMessage) -> dict:
         sources = [{"url": "", "title": "Ungültige Quellenreferenz"}]
     if not isinstance(sources, list) or not ai_knowledge.sources_accessible(db, user, sources):
         return {"role": row.role, "content": "[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]",
+                "html": Markup(_ai_markdown("[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]")),
                 "sources": [], "model": row.model_id}
     return {"role": row.role, "content": row.content,
+            "html": Markup(_ai_markdown(row.content)) if row.role == "assistant" else None,
             "sources": sources, "model": row.model_id}
 
 
@@ -440,6 +453,7 @@ async def ai_message_updates(
 
     async def generate():
         response_parts = []
+        last_render = 0.0
         yield _sse("status", {"message": (
             "Antwort wird live übertragen …" if profile.stream_enabled
             else "Modell verarbeitet die Anfrage …"
@@ -450,6 +464,11 @@ async def ai_message_updates(
                                                                 image=bool(image_url)):
                     response_parts.append(chunk)
                     yield _sse("delta", {"text": chunk})
+                    # Throttle full Markdown previews instead of sending large HTML per token.
+                    now = time.monotonic()
+                    if now - last_render >= 0.12:
+                        yield _sse("render", {"html": _ai_markdown("".join(response_parts))})
+                        last_render = now
             else:
                 full = await ai_provider.complete(profile, messages, image=bool(image_url))
                 response_parts.append(full)
@@ -468,7 +487,8 @@ async def ai_message_updates(
                 ))
                 current.updated_at = utcnow()
                 store.commit()
-            yield _sse("done", {"sources": links, "model": profile.model_id})
+            yield _sse("done", {"sources": links, "model": profile.model_id,
+                                "html": _ai_markdown(answer)})
         except ai_provider.AIProviderError as exc:
             yield _sse("error", {"message": str(exc)})
         # Client disconnect/abort cancels the coroutine. Do not save incomplete answers.
