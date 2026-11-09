@@ -2771,6 +2771,11 @@ DEFAULT_SETTINGS = {
     "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
     "ai_knowledge_enabled": "0",
+    "ai_laws_include_all": "0",
+    "ai_laws_excluded_ids": "[]",
+    "ai_dms_include_all": "0",
+    "ai_dms_excluded_ids": "[]",
+    "ai_dms_excluded_areas": "[]",
     "ai_web_enabled": "0",
     "ai_web_key_enc": "",
     "ai_vector_enabled": "0",

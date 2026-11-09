@@ -7,11 +7,11 @@ every request, including citations shown to the user.
 import re
 import hashlib
 from datetime import date
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from .ai_models import AIKnowledge, AILawSource
 from .db import LawSection, LawText, get_settings
-from . import laws
+from . import laws, ai_source_policy
 
 _WORD_RE = re.compile(r"[^\W_]{3,}", re.UNICODE)
 _DAY_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
@@ -83,11 +83,25 @@ def retrieve(db, user, question: str, limit: int = 5) -> list[dict]:
     # The current authenticated user may read published internal laws;
     # unpublished drafts are never exposed by AI retrieval.
     if cfg.get("module_laws", "1") == "1":
-        ids = select(AILawSource.law_id)
-        law_rows = db.scalars(select(LawText).where(LawText.id.in_(ids),
-                                                     LawText.published.is_(True)).limit(300)).all()
+        candidates = select(LawText).where(LawText.published.is_(True))
+        if cfg.get("ai_laws_include_all") != "1":
+            candidates = candidates.where(LawText.id.in_(select(AILawSource.law_id)))
+        # Historical wording may exist only in an older version. Do not
+        # pre-filter by the current body when a validity date was supplied.
         day = requested_day(question)
-        for law in law_rows:
+        if not day:
+            candidates = candidates.where(or_(*[
+                or_(LawText.title.ilike(f"%{word}%"),
+                    LawText.body_md.ilike(f"%{word}%"),
+                    LawText.short_title.ilike(f"%{word}%"))
+                for word in words
+            ]))
+        candidates = candidates.order_by(LawText.id).limit(1500)
+        for law in db.scalars(candidates):
+            if law.internal and not user.can("laws"):
+                continue
+            if not ai_source_policy.law_included(db, law, cfg=cfg):
+                continue
             if day:
                 version = laws.version_for_date(law, day, include_internal=True)
                 if version is None and law.valid_from and day < law.valid_from:
@@ -191,7 +205,9 @@ def sources_accessible(db, user, sources: list[dict]) -> bool:
                 return False
             parts = path.strip("/").split("/")
             law = db.scalar(select(LawText).where(LawText.slug == parts[1])) if len(parts) > 1 else None
-            if law is None or not law.published or db.get(AILawSource, law.id) is None:
+            if law is None or not law.published or not ai_source_policy.law_included(db, law, cfg=cfg):
+                return False
+            if law.internal and not user.can("laws"):
                 return False
             if len(parts) >= 4 and parts[2] == "fassung":
                 from .db import LawVersion
