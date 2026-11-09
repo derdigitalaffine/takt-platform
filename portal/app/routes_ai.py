@@ -19,8 +19,8 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource
-from . import ai_knowledge, ai_provider
+from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector
+from . import ai_knowledge, ai_provider, ai_vector
 from .db import LawText, User, SessionLocal, get_settings, set_setting, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
                    flash, get_db, rate_limit, redirect, render, require)
@@ -98,10 +98,12 @@ def admin_ai(request: Request, edit: int | None = None, user: User = Depends(adm
     docs = list(db.scalars(select(AIKnowledge).order_by(AIKnowledge.title)))
     laws = list(db.scalars(select(LawText).where(LawText.published.is_(True)).order_by(LawText.title)))
     allowed = set(db.scalars(select(AILawSource.law_id)))
+    vector_count = len(list(db.scalars(select(AIKnowledgeVector.id))))
     return render(request, "admin_ai.html", user, providers=providers, selected=selected,
                   masked_text=mask_secret(decrypt(selected.text_key_enc)) if selected else "",
                   masked_image=mask_secret(decrypt(selected.image_key_enc)) if selected else "",
-                  cfg=cfg, docs=docs, laws=laws, allowed_laws=allowed)
+                  cfg=cfg, docs=docs, laws=laws, allowed_laws=allowed,
+                   vector_count=vector_count)
 
 
 @app.post("/admin/ai/provider", dependencies=[Depends(check_csrf)])
@@ -181,6 +183,38 @@ def admin_ai_knowledge_settings(request: Request, enabled: str = Form(""), reten
     db.commit()
     flash(request, "Wissens- und Aufbewahrungseinstellungen gespeichert.")
     return redirect("/admin/ai#knowledge")
+
+
+@app.post("/admin/ai/vector/settings", dependencies=[Depends(check_csrf)])
+def admin_ai_vector_settings(
+    request: Request, enabled: str = Form(""),
+    provider_id: int = Form(0), model_id: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    model_id = model_id.strip()
+    if enabled == "1":
+        if not model_id or len(model_id) > 200:
+            raise HTTPException(400, "Ein Embedding-Modell wird benötigt.")
+        _provider(db, provider_id, active=True)
+    set_setting(db, "ai_vector_enabled", "1" if enabled == "1" else "0")
+    set_setting(db, "ai_vector_provider_id", str(provider_id) if enabled == "1" else "0")
+    set_setting(db, "ai_vector_model_id", model_id[:200] if enabled == "1" else "")
+    db.commit()
+    flash(request, "Vektor-RAG-Konfiguration gespeichert. Bestehende Einträge bei Modellwechsel neu indizieren.")
+    return redirect("/admin/ai#knowledge")
+
+
+@app.post("/admin/ai/vector/reindex", dependencies=[Depends(check_csrf)])
+async def admin_ai_vector_reindex(
+    request: Request, doc_id: int = Form(...),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    try:
+        count = await ai_vector.reindex_document(db, doc_id)
+        flash(request, f"Wissenseintrag erfolgreich in {count} semantische Textabschnitte indiziert.")
+    except ai_provider.AIProviderError as exc:
+        flash(request, str(exc), "error")
+    return redirect(f"/admin/ai#knowledge-{doc_id}")
 
 
 @app.post("/admin/ai/knowledge", dependencies=[Depends(check_csrf)])
@@ -345,6 +379,10 @@ async def ai_send_message(
             raise HTTPException(400, "Für dieses Modell wurde kein Bildanalyse-Schlüssel eingerichtet.")
 
     sources = (ai_knowledge.retrieve(db, user, message) if use_knowledge == "1" else [])
+    if use_knowledge == "1":
+        semantic = await ai_vector.retrieve(db, user, message)
+        urls = {entry["url"] for entry in sources}
+        sources = (sources + [entry for entry in semantic if entry["url"] not in urls])[:5]
     history = list(db.scalars(select(AIMessage)
                               .where(AIMessage.conversation_id == convo.id)
                               .order_by(AIMessage.id.desc()).limit(14)))
@@ -418,6 +456,10 @@ async def ai_message_updates(
         if not provider.image_key_enc:
             raise HTTPException(400, "Für dieses Modell wurde kein Bildanalyse-Schlüssel eingerichtet.")
     sources = ai_knowledge.retrieve(db, user, message) if use_knowledge == "1" else []
+    if use_knowledge == "1":
+        semantic = await ai_vector.retrieve(db, user, message)
+        urls = {entry["url"] for entry in sources}
+        sources = (sources + [entry for entry in semantic if entry["url"] not in urls])[:5]
     history = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == chat_id)
                               .order_by(AIMessage.id.desc()).limit(14)))
     history.reverse()
