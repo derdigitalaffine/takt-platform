@@ -5,7 +5,7 @@ from datetime import datetime
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, Integer
 from sqlalchemy.orm import Session
 
 from .anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
@@ -193,7 +193,18 @@ def categories_anliegen(request: Request, user: User = Depends(admin_user),
     categories = list(db.scalars(select(AnliegenCategory).order_by(
         AnliegenCategory.position, AnliegenCategory.title)))
     users = list(db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)))
-    return render(request, "anliegen_categories.html", user, categories=categories, users=users)
+    from sqlalchemy import func
+    counts = {
+        cid: (total, unresolved or 0)
+        for cid, total, unresolved in db.execute(
+            select(Anliegen.category_id, func.count(Anliegen.id),
+                   func.sum(func.cast(Anliegen.assignee_id.is_(None), Integer)))
+            .where(Anliegen.status.not_in(("done", "closed", "cancelled")))
+            .group_by(Anliegen.category_id)
+        )
+    }
+    return render(request, "anliegen_categories.html", user,
+                  categories=categories, users=users, counts=counts)
 
 
 @app.post("/anliegen/kategorien/{category_id:int}", dependencies=[Depends(check_csrf)])
