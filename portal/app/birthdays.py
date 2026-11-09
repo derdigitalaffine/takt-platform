@@ -52,16 +52,17 @@ def managed_roots(db, user):
     return [row for row in roots if org.allows(db, user, row.id, "settings")]
 
 
-def _viewer_paths(db, actor):
+def _viewer_paths(db, actor, nodes=None):
     if not actor or not actor.active:
         return []
-    return [
-        org.active_path(db, unit)
-        for unit in db.scalars(
-            select(OrgMembership.org_id).where(OrgMembership.user_id == actor.id)
-        )
-        if org.active_path(db, unit)
-    ]
+    paths = []
+    for unit in db.scalars(
+        select(OrgMembership.org_id).where(OrgMembership.user_id == actor.id)
+    ):
+        path = org.active_path(db, unit, nodes)
+        if path:
+            paths.append(path)
+    return paths
 
 
 def external_allowed(db, actor, channel):
@@ -106,7 +107,8 @@ def events(db, actor, start, end, *, channel="web"):
     """Return rights-scoped occurrences in [start, end); no birth year is sent."""
     if channel not in CHANNELS or not actor or not actor.active:
         return []
-    viewer = _viewer_paths(db, actor)
+    nodes = {node.id: node for node in db.scalars(select(Organization))}
+    viewer = _viewer_paths(db, actor, nodes)
     if not viewer or end <= start:
         return []
     start_day, end_day = start.date(), end.date()
@@ -123,7 +125,7 @@ def events(db, actor, start, end, *, channel="web"):
         ).where(User.active.is_(True), OrgMembership.is_primary.is_(True))
     )
     for person, uid in memberships:
-        path = org.active_path(db, uid)
+        path = org.active_path(db, uid, nodes)
         if not path:
             continue
         policy = rules(db, path[-1], cfg)
