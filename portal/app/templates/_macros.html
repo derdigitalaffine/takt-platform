@@ -165,13 +165,83 @@
 
 
 {% macro perm_switches(prefix, current) -%}
-<div class="row g-2">
-{% for key, p in permissions.items() if key in ('video', 'users', 'orgs', 'org_members', 'org_roles', 'absences', 'calendar_publish') or perm_modules.get(key, key) in modules %}
-  <div class="col-sm-6"><div class="form-check form-switch">
-    <input class="form-check-input" type="checkbox" role="switch" id="{{ prefix }}-p-{{ key }}" name="perm" value="{{ key }}" {% if key in current %}checked{% endif %}>
-    <label class="form-check-label" for="{{ prefix }}-p-{{ key }}"><i class="fa-solid {{ p[1] }} fa-fw me-1 text-secondary"></i><strong>{{ p[0] }}</strong><div class="form-text mt-0">{{ p[2] }}</div></label>
-  </div></div>
-{% endfor %}
+{# The form contract remains name="perm"/value="<permission>"; backend authorization is unchanged. #}
+{% set categories = {
+  'video':'communication','shortlinks':'communication','polls':'communication','votes':'communication',
+  'circulations_create':'communication','circulations_publish':'communication','circulations_manage':'communication',
+  'tasks':'tasks','tasks_manage':'tasks','concerns_manage':'tasks',
+  'calendars':'schedule','calendar_publish':'schedule','bookings':'schedule','resources':'schedule',
+  'seminars':'schedule','seminars_manage':'schedule','locations_manage':'schedule',
+  'forms':'documents','formblocks':'documents','internal_forms':'documents','app_create':'documents',
+  'processes':'documents','dms_admin':'documents','laws':'documents','maps':'documents','maps_admin':'documents',
+  'payments':'documents',
+  'users':'organization','orgs':'organization','org_members':'organization','org_roles':'organization',
+  'absences':'organization','krank':'organization','krank_admin':'organization',
+  'ai_chat':'ai','ai_knowledge':'ai','ai_vision':'ai'
+} %}
+{% set sections = [
+  ('tasks', 'Aufgaben & Zusammenarbeit', 'fa-list-check'),
+  ('communication', 'Kommunikation & Beteiligung', 'fa-comments'),
+  ('schedule', 'Kalender, Termine & Ressourcen', 'fa-calendar-days'),
+  ('documents', 'Dokumente, Verfahren & Fachmodule', 'fa-folder-open'),
+  ('organization', 'Organisation & Personal', 'fa-users-gear'),
+  ('ai', 'KI & Assistenz', 'fa-brain'),
+  ('other', 'Weitere Berechtigungen', 'fa-puzzle-piece')
+] %}
+<div class="perm-editor" data-permission-editor>
+  <div class="perm-editor-toolbar">
+    <label class="perm-editor-search" for="{{ prefix }}-perm-search">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <input type="search" class="form-control" id="{{ prefix }}-perm-search"
+             data-permission-search placeholder="Recht oder Tätigkeit suchen …"
+             aria-label="Berechtigungen durchsuchen" autocomplete="off">
+    </label>
+    <span class="perm-editor-total" data-permission-count role="status" aria-live="polite"></span>
+    <div class="d-flex gap-1 flex-wrap">
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-permission-action="expand">Alle aufklappen</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-permission-action="collapse">Alle einklappen</button>
+    </div>
+  </div>
+  <p class="small text-secondary px-3 pt-2 mb-2">Wählen Sie nur die benötigten Rechte. Änderungen werden erst beim Speichern des Benutzerformulars übernommen.</p>
+  <div class="perm-editor-sections">
+  {% for code, heading, icon in sections %}
+    {% set n = namespace(total=0, checked=0) %}
+    {% for key, p in permissions.items() if categories.get(key, 'other') == code and
+       (key in ('video', 'users', 'orgs', 'org_members', 'org_roles', 'absences', 'calendar_publish') or perm_modules.get(key, key) in modules) %}
+      {% set n.total = n.total + 1 %}
+      {% if key in current %}{% set n.checked = n.checked + 1 %}{% endif %}
+    {% endfor %}
+    {% if n.total %}
+    <details class="perm-editor-group" data-permission-group {% if loop.first or n.checked %}open{% endif %}>
+      <summary>
+        <span class="perm-editor-group-icon"><i class="fa-solid {{ icon }}" aria-hidden="true"></i></span>
+        <span class="perm-editor-group-heading">{{ heading }}</span>
+        <span class="perm-editor-group-count" data-permission-group-count>{{ n.checked }} / {{ n.total }}</span>
+      </summary>
+      <div class="perm-editor-group-body">
+        <div class="perm-editor-group-tools d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-sm btn-link" data-permission-action="select-group">Alle auswählen</button>
+          <button type="button" class="btn btn-sm btn-link" data-permission-action="clear-group">Alle abwählen</button>
+        </div>
+        <div class="perm-editor-grid">
+        {% for key, p in permissions.items() if categories.get(key, 'other') == code and
+           (key in ('video', 'users', 'orgs', 'org_members', 'org_roles', 'absences', 'calendar_publish') or perm_modules.get(key, key) in modules) %}
+          <label class="perm-editor-option" data-permission-option data-search="{{ (p[0] ~ ' ' ~ p[2] ~ ' ' ~ key)|lower }}">
+            <input type="checkbox" class="form-check-input" role="switch" id="{{ prefix }}-p-{{ key }}"
+                   name="perm" value="{{ key }}" {% if key in current %}checked{% endif %}>
+            <span class="perm-editor-option-content">
+              <span class="perm-editor-option-title"><i class="fa-solid {{ p[1] }} fa-fw" aria-hidden="true"></i> {{ p[0] }}</span>
+              <span class="perm-editor-option-help">{{ p[2] }}</span>
+            </span>
+          </label>
+        {% endfor %}
+        </div>
+      </div>
+    </details>
+    {% endif %}
+  {% endfor %}
+  </div>
+  <p class="small text-secondary px-3 py-3 mb-0" data-permission-empty hidden>Keine Berechtigung zu diesem Suchbegriff gefunden.</p>
 </div>
 {%- endmacro %}
 
