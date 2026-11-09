@@ -37,13 +37,26 @@
         <strong class="text-truncate ai-chat-heading" data-ai-chat-title>{{ current.title }}</strong>
         <div class="d-flex gap-2 flex-wrap">
           <a class="btn btn-sm btn-outline-secondary" href="/ki/{{ current.id }}/export" aria-label="Chat exportieren" title="Chat exportieren"><i class="fa-solid fa-file-export" aria-hidden="true"></i></a>
-          <details>
+          <details class="ai-chat-management">
             <summary class="btn btn-sm btn-outline-secondary" aria-label="Chat verwalten" title="Chat verwalten"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></summary>
             <form method="post" action="/ki/{{ current.id }}/rename" class="my-2 d-flex gap-2">
               <input type="hidden" name="csrf" value="{{ csrf }}">
               <input type="text" name="title" class="form-control form-control-sm" maxlength="160" value="{{ current.title }}" aria-label="Unterhaltung umbenennen" required>
               <button class="btn btn-sm btn-primary" type="submit">Speichern</button>
             </form>
+            <form method="post" action="/ki/{{ current.id }}/model" class="my-2 ai-model-switch">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <label class="form-label small mb-1" for="ai-current-model">Modell für nächste Antworten</label>
+              <div class="input-group input-group-sm">
+                <select name="provider_id" id="ai-current-model" class="form-select" required aria-label="Aktives KI-Modell wählen">
+                  {% for provider in providers %}
+                  <option value="{{ provider.id }}" {% if current.provider_id == provider.id %}selected{% endif %}>{{ provider.name }} ({{ provider.model_id }})</option>
+                  {% endfor %}
+                </select>
+                <button class="btn btn-outline-primary" type="submit" {% if not providers %}disabled{% endif %}>Wechseln</button>
+              </div>
+            </form>
+            <p class="small text-secondary mb-2 ai-context-note">Für Folgefragen nutzt TAKT maximal die letzten 14 Nachrichten und 20.000 Zeichen. Ältere Nachrichten werden nicht automatisch zusammengefasst; Antworten mit gesperrten Wissensquellen werden ausgeschlossen.</p>
             <form method="post" action="/ki/{{ current.id }}/delete">
               <input type="hidden" name="csrf" value="{{ csrf }}">
               <button class="btn btn-sm btn-outline-danger" type="submit">Unterhaltung löschen</button>
@@ -69,6 +82,13 @@
               </div>
               {% endif %}
               {% if item.model %}<div class="ai-message-model">Modell: {{ item.model }}</div>{% endif %}
+              {% if item.forkable and item.id %}
+              <form method="post" action="/ki/{{ current.id }}/fork" class="ai-fork-action mt-2">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="message_id" value="{{ item.id }}">
+                <button type="submit" class="btn btn-sm btn-link text-secondary px-1 py-0" title="Neuen, unabhängigen Chat ab hier erstellen"><i class="fa-solid fa-code-branch me-1" aria-hidden="true"></i>Ab hier verzweigen</button>
+              </form>
+              {% endif %}
             </div>
           </li>
           {% else %}
@@ -78,7 +98,7 @@
         </div>
         <button class="btn btn-sm btn-outline-secondary ai-jump-to-latest" type="button" data-ai-jump hidden><i class="fa-solid fa-arrow-down me-1" aria-hidden="true"></i>Zur neuesten Nachricht</button>
       </div>
-        <form class="ai-chat-composer" method="post" action="/ki/{{ current.id }}/message" data-ai-chat-form data-stream-action="/ki/{{ current.id }}/message/updates" data-ai-has-messages="{{ '1' if chat_messages else '0' }}" enctype="multipart/form-data">
+        <form class="ai-chat-composer" method="post" action="/ki/{{ current.id }}/message" data-ai-chat-form data-stream-action="/ki/{{ current.id }}/message/updates" data-ai-fork-action="/ki/{{ current.id }}/fork" data-ai-has-messages="{{ '1' if chat_messages else '0' }}" enctype="multipart/form-data">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <div class="ai-chat-compose-main">
             <label class="visually-hidden" for="ai-prompt">Ihre Nachricht</label>
