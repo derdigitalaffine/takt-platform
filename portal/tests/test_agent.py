@@ -186,6 +186,16 @@ def test_stale_task_plan_does_not_change_data(monkeypatch):
         assert db.get(Task, task_id).status == "open"
 
 
+def test_confidential_request_never_reaches_provider(monkeypatch):
+    _enable()
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("Confidential text must not reach the LLM")
+    monkeypatch.setattr(ai_provider, "complete", forbidden)
+    c = login(*ADMIN)
+    response, _ = _plan(c, "Erfasse eine vertrauliche Beschwerde wegen Mobbing")
+    assert response.status_code == 422
+
+
 def test_agent_csrf_and_non_ai_permissions(monkeypatch):
     _enable()
     _member("agent-forbidden@example.org")
