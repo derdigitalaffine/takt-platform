@@ -348,10 +348,10 @@ def test_description_first_form_keeps_original_and_persists_user_reviewed_text()
     page = c.get("/anliegen/neu")
     assert page.status_code == 200
     assert 'id="anliegen-description"' in page.text
-    assert 'id="anliegen-ai"' in page.text or "manuelle Erfassung" in page.text
+    assert 'id="anliegen-review"' in page.text  # manual path works even without ai_chat
     assert 'name="description_final"' in page.text
     assert 'id="anliegen-recipient-preview"' in page.text
-    assert '/static/anliegen-form.css' in page.text
+    assert '/static/anliegen-intake.css' in page.text
     csrf = csrf_of(page.text)
     created = c.post("/anliegen/neu", data={
         "csrf": csrf, "category_id": category,
@@ -371,7 +371,118 @@ def test_description_first_javascript_does_not_submit_ai_result():
     from pathlib import Path
     asset = (Path(__file__).resolve().parents[1] / "app" / "static" / "anliegen.js").read_text()
     assert "new AbortController()" in asset
-    assert "finalDescription.value = proposal.description" in asset
+    assert "finalBody.value = draft.description" in asset
     assert "previewRecipient()" in asset
     assert "form.submit(" not in asset
-    assert "Originaltext" in asset or "Originalbeschreibung" in asset
+    assert "No automatic submission" in asset or "no auto" in asset or "original" in asset.lower()
+
+
+def test_intake_starts_with_one_prompt_and_manual_editor_is_disclosed():
+    _enabled()
+    _user("anliegen-intake-ux@example.org", "anliegen_submit,ai_chat")
+    c = login("anliegen-intake-ux@example.org", "test-anliegen-pass")
+    page = c.get("/anliegen/neu")
+    assert page.status_code == 200
+    html = page.text
+    assert 'id="anliegen-description"' in html
+    assert 'id="anliegen-ai"' in html
+    assert 'id="anliegen-review"' in html
+    assert "Ohne KI erfassen" in html
+    assert 'name="description_final"' in html
+    assert "Mit KI Vorschlag erstellen" in html
+    assert 'data-confidential="1"' in html
+    assert "/static/anliegen-intake.css" in html
+
+
+def test_manual_without_ai_saves_only_reviewed_content():
+    _enabled()
+    _user("anliegen-manual-only@example.org", "anliegen_submit")
+    settings(module_ai="0")
+    c = login("anliegen-manual-only@example.org", "test-anliegen-pass")
+    page = c.get("/anliegen/neu")
+    assert page.status_code == 200
+    assert 'id="anliegen-review"' in page.text and 'open' in page.text
+    assert 'id="anliegen-ai"' not in page.text
+    csrf = csrf_of(page.text)
+    response = c.post("/anliegen/neu", data={
+        "csrf": csrf, "category_id": _cat("platform_feedback"),
+        "title": "TAKT-Suche optimieren",
+        "description": "",
+        "description_final": "Bei der Suche im TAKT-Portal soll die Filterauswahl erhalten bleiben.",
+    })
+    assert response.status_code == 303
+    case_id = int(response.headers["location"].rsplit("/", 1)[1])
+    with SessionLocal() as db:
+        row = db.get(Anliegen, case_id)
+        assert row.category.key == "platform_feedback"
+        assert row.description == "Bei der Suche im TAKT-Portal soll die Filterauswahl erhalten bleiben."
+
+
+def test_reported_and_assigned_are_separate_and_orders_belong_to_recipient():
+    _enabled()
+    _user("anliegen-reporter-tabs@example.org")
+    recipient_id = _user("anliegen-owner-tabs@example.org")
+    cat_id = _cat("office_supply")
+    with SessionLocal() as db:
+        cat = db.get(AnliegenCategory, cat_id)
+        cat.assignee_id = recipient_id
+        cat.routing = "person"
+        cat.enabled = True
+        db.commit()
+    reporter, case_id = _post_case("anliegen-reporter-tabs@example.org", cat_id,
+                                   "Papier für die Außenstelle", "Für die Außenstelle werden Papierpakete benötigt.")
+    assignee = login("anliegen-owner-tabs@example.org", "test-anliegen-pass")
+    mine = reporter.get("/anliegen")
+    assert mine.status_code == 200
+    assert "Von mir eingereichte Anliegen" in mine.text
+    assert "Papier für die Außenstelle" in mine.text
+    assert "Status ansehen" in mine.text
+    assert "Papier für die Außenstelle" not in reporter.get("/anliegen?view=mine").text
+    assigned = assignee.get("/anliegen?view=mine")
+    assert assigned.status_code == 200
+    assert "Mir zugewiesene Anliegen" in assigned.text
+    assert "Papier für die Außenstelle" in assigned.text
+    assert "Papier für die Außenstelle" in assignee.get("/anliegen?view=orders").text
+    assert "Papier für die Außenstelle" not in assignee.get("/anliegen?view=reported").text
+    assert "Papier für die Außenstelle" not in reporter.get("/anliegen?view=orders").text
+    assert assignee.get(f"/anliegen/{case_id}").status_code == 200
+
+
+def test_recipient_with_only_object_access_can_open_and_process():
+    _enabled()
+    _user("anliegen-sender-object@example.org")
+    recipient_id = _user("anliegen-processor-object@example.org", "")
+    cat_id = _cat("defect")
+    with SessionLocal() as db:
+        cat = db.get(AnliegenCategory, cat_id)
+        cat.assignee_id = recipient_id
+        cat.routing = "person"
+        cat.enabled = True
+        db.commit()
+    _, cid = _post_case("anliegen-sender-object@example.org", cat_id,
+                       "Störung im Büro", "Die Beleuchtung im Büro funktioniert nicht mehr.")
+    assignee = login("anliegen-processor-object@example.org", "test-anliegen-pass")
+    view = assignee.get("/anliegen?view=mine")
+    assert view.status_code == 200
+    assert "Störung im Büro" in view.text
+    detail = assignee.get(f"/anliegen/{cid}")
+    assert detail.status_code == 200
+    assert assignee.get("/anliegen/neu").status_code == 403
+    csrf = csrf_of(detail.text)
+    changed = assignee.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "in_progress",
+    })
+    assert changed.status_code == 303
+    with SessionLocal() as db:
+        assert db.get(Anliegen, cid).status == "in_progress"
+
+
+def test_intake_javascript_does_not_auto_submit_and_rejects_stale_drafts():
+    from pathlib import Path
+    script = (Path(__file__).resolve().parents[1] / "app" / "static" / "anliegen.js").read_text()
+    assert "new AbortController()" in script
+    assert "description_final" not in script or "finalBody" in script
+    assert "input !== prompt.value.trim()" in script
+    assert "editVersion !== initialVersion" in script
+    assert "details.open = true" in script
+    assert "form.submit(" not in script
