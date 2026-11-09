@@ -1,0 +1,20 @@
+{# Single on-demand group editor. Never render all group x user checkboxes in the directory. #}
+<div class="modal fade" id="admin-group-editor-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+    <form method="post" action="{{action}}">
+      <input type="hidden" name="csrf" value="{{csrf}}">
+      <input type="hidden" name="action" value="save">
+      <div class="modal-header"><div><h2 class="modal-title h5 mb-1">{{ 'Gruppe bearbeiten' if group else 'Neue Gruppe' }}</h2><p class="text-secondary small mb-0">Mitgliedschaften und Gruppenleitung verwalten.</p></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
+      <div class="modal-body">
+        {% if group and group.id in org_group_roles %}<div class="alert alert-info small">Diese Gruppe trägt Bereichsrollen. Alle Gruppenmitglieder erhalten diese Rollen; für Mitgliedschaftsänderungen sind Organisationsrollen-Rechte erforderlich.</div>{% endif %}
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="admin-group-name">Gruppenname</label><input class="form-control" id="admin-group-name" name="name" required maxlength="120" value="{{group.name if group else ''}}"></div>
+          <div class="col-md-6"><label class="form-label" for="admin-group-description">Beschreibung</label><input class="form-control" id="admin-group-description" name="description" maxlength="255" value="{{group.description if group else ''}}"></div>
+          <div class="col-12"><label class="form-label" for="admin-group-lead">Gruppenleitung</label><select class="form-select js-select" data-search="1" id="admin-group-lead" name="lead_id"><option value="">– keine –</option>{% for person in members %}<option value="{{person.id}}" {{'selected' if group and group.lead_id==person.id}}>{{person.name}} ({{person.email}})</option>{% endfor %}</select><p class="form-text">Darf Abwesenheiten und Vertretungen für die Mitglieder eintragen.</p></div>
+          <div class="col-12"><label class="form-label" for="admin-group-members">Mitglieder auswählen</label><select class="form-select js-select" data-search="1" id="admin-group-members" name="members" multiple>{% for person in members %}<option value="{{person.id}}" {{'selected' if person.id in selected_member_ids}}>{{person.name}} ({{person.email}})</option>{% endfor %}</select><div class="form-text">{{members|length}} Konten stehen zur Auswahl. Vorhandene Mitglieder sind vorausgewählt.</div></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Speichern</button></div>
+    </form>
+  </div></div>
+</div>

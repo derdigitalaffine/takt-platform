@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Benutzer{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/permission-editor.css">{% endblock %}
-
+{% block title %}Benutzer & Gruppen{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/organization.css"><link rel="stylesheet" href="/static/ui-density.css"><link rel="stylesheet" href="/static/permission-editor.css"><link rel="stylesheet" href="/static/admin-workspace.css">{% endblock %}
 {% block content %}
-{{ m.page_head('Benutzer & Gruppen', 'Neue Personen werden per E-Mail eingeladen und legen ihr Passwort selbst fest. Je Person schalten Sie frei, welche Bereiche sie nutzen darf. Gruppen erleichtern das Einladen zu Formularen. Gäste brauchen kein Konto.') }}
-
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-ui-preferences data-csrf="{{csrf}}">
-  <a class="btn btn-outline-secondary" href="/admin/organization"><i class="fa-solid fa-sitemap me-2" aria-hidden="true"></i>Organisation öffnen</a>
-  <div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte">
-    <button class="btn btn-outline-secondary" type="button" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button>
-    <button class="btn btn-outline-secondary" type="button" data-ui-density="compact" aria-pressed="false">Kompakt</button>
-  </div>
-</div>
-{% if invite_links %}
+<div class="admin-workspace admin-users-workspace">
+  <header class="admin-welcome">
+    <div><span class="admin-eyebrow"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i> Administration · Zugänge</span>
+      <h1>Benutzer &amp; Gruppen</h1>
+      <p>Konten suchen, Zugänge verwalten, Teams zuordnen und Einladungen versenden.</p></div>
+    <div class="admin-welcome-actions">
+      <a href="/admin/organization" class="btn btn-outline-secondary"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Organisation</a>
+      <a href="#einladen" class="btn btn-primary"><i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i>Personen einladen</a>
+    </div>
+  </header>
+  {% if invite_links %}
 <div class="alert alert-info">
   <div class="fw-semibold mb-2"><i class="fa-solid fa-link me-2"></i>Kein E-Mail-Versand eingerichtet – bitte diese Links weitergeben:</div>
   {% for l in invite_links %}
@@ -28,7 +28,147 @@
   <div><strong>E-Mail-Versand ist nicht eingerichtet.</strong> Einladungen können erst per Mail verschickt werden, wenn unter <a href="/admin/notifications">Benachrichtigungen</a> SMTP hinterlegt ist.</div></div>
 {% endif %}
 
-<div class="row g-3 mb-4">
+
+  <nav class="admin-subnav" aria-label="Benutzerverwaltung">
+    <a href="#benutzer"><i class="fa-solid fa-users" aria-hidden="true"></i>Benutzer</a>
+    <a href="#gruppen"><i class="fa-solid fa-people-group" aria-hidden="true"></i>Gruppen</a>
+    <a href="#einladen"><i class="fa-solid fa-user-plus" aria-hidden="true"></i>Einladen</a>
+    <a href="#import"><i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i>Import</a>
+    {% if user.is_admin %}<a href="#sicherheit"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>Sicherheit</a>{% endif %}
+  </nav>
+  <section class="admin-metrics" aria-label="Benutzerstatistik">
+    <a class="admin-metric" href="/admin/users"><span class="admin-metric-icon"><i class="fa-solid fa-users" aria-hidden="true"></i></span><strong>{{counts.total}}</strong><span>Konten insgesamt</span></a>
+    <a class="admin-metric" href="/admin/users?status=active#benutzer"><span class="admin-metric-icon"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></span><strong>{{counts.active}}</strong><span>Aktiv</span></a>
+    <a class="admin-metric" href="/admin/users?status=invited#benutzer"><span class="admin-metric-icon"><i class="fa-solid fa-envelope" aria-hidden="true"></i></span><strong>{{counts.invited}}</strong><span>Einladung offen</span></a>
+    <a class="admin-metric" href="/admin/users?status=blocked#benutzer"><span class="admin-metric-icon"><i class="fa-solid fa-lock" aria-hidden="true"></i></span><strong>{{counts.blocked}}</strong><span>Gesperrt</span></a>
+    <a class="admin-metric" href="/admin/users?role=admin#benutzer"><span class="admin-metric-icon"><i class="fa-solid fa-user-shield" aria-hidden="true"></i></span><strong>{{counts.admins}}</strong><span>Administratoren</span></a>
+  </section>
+  <section id="benutzer" class="admin-users-directory" aria-labelledby="admin-users-heading">
+    <div class="admin-section-heading"><div><span class="admin-eyebrow">Suchen &amp; verwalten</span><h2 id="admin-users-heading">Benutzerverzeichnis</h2><p>Gezielt suchen, nach Status oder Gruppe filtern und Personen direkt bearbeiten.</p></div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Informationsdichte" data-ui-preferences data-csrf="{{csrf}}">
+        <button class="btn btn-outline-secondary" type="button" data-ui-density="comfortable" aria-pressed="true">Komfortabel</button>
+        <button class="btn btn-outline-secondary" type="button" data-ui-density="compact" aria-pressed="false">Kompakt</button>
+      </div>
+    </div>
+    <form class="admin-user-filters" method="get" action="/admin/users" role="search" aria-label="Benutzer filtern">
+      <div class="admin-filter-search"><label for="admin-user-query" class="form-label">Name oder E-Mail</label><input id="admin-user-query" name="q" type="search" class="form-control" value="{{filters.q}}" placeholder="Person suchen …" autocomplete="off"></div>
+      <div><label for="admin-user-status" class="form-label">Status</label><select id="admin-user-status" name="status" class="form-select">{% for key,label in [('all','Alle'),('active','Aktiv'),('invited','Einladung offen'),('blocked','Gesperrt'),('mfa','Mit Zwei-Faktor')] %}<option value="{{key}}" {{'selected' if filters.status==key}}>{{label}}</option>{% endfor %}</select></div>
+      <div><label for="admin-user-role" class="form-label">Rolle</label><select id="admin-user-role" name="role" class="form-select">{% for key,label in [('all','Alle'),('admin','Administrator'),('member','Normale Konten')] %}<option value="{{key}}" {{'selected' if filters.role==key}}>{{label}}</option>{% endfor %}</select></div>
+      <div><label for="admin-user-group" class="form-label">Gruppe</label><select id="admin-user-group" name="group" class="form-select"><option value="">Alle Gruppen</option>{% for g in groups %}<option value="{{g.id}}" {{'selected' if filters.group==g.id}}>{{g.name}}</option>{% endfor %}</select></div>
+      <div><label for="admin-user-sort" class="form-label">Sortieren</label><select id="admin-user-sort" name="sort" class="form-select">{% for key,label in [('name','Name A–Z'),('email','E-Mail A–Z'),('newest','Neueste zuerst')] %}<option value="{{key}}" {{'selected' if filters.sort==key}}>{{label}}</option>{% endfor %}</select></div>
+      <div><label for="admin-user-page-size" class="form-label">Pro Seite</label><select id="admin-user-page-size" name="per_page" class="form-select">{% for count in [25,50,100] %}<option value="{{count}}" {{'selected' if filters.per_page==count}}>{{count}}</option>{% endfor %}</select></div>
+      <div class="admin-filter-actions"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-magnifying-glass me-1" aria-hidden="true"></i>Anwenden</button><a href="/admin/users#benutzer" class="btn btn-outline-secondary">Zurücksetzen</a></div>
+    </form>
+    <p class="admin-result-count" role="status">{{filtered}} passende Konten · Seite {{page}} von {{pages}}</p>
+    <div class="card mb-3 admin-user-table-card"><div class="card-header d-flex justify-content-between align-items-center"><strong><i class="fa-solid fa-users me-2" aria-hidden="true"></i>Benutzerverzeichnis</strong><span class="small text-secondary">{{page_start}}–{{page_end}} von {{filtered}}</span></div><div class="card-body"><div class="admin-users-table-scroll">
+<table class="table table-hover align-middle w-100 admin-users-table">
+  <thead><tr><th>Name</th><th>E-Mail</th><th>Rechte</th><th>Gruppen</th><th>Status</th><th>Angelegt</th><th class="no-sort col-actions">Aktionen</th></tr></thead>
+  <tbody>
+  {% for u in users %}
+  <tr class="admin-user-row">
+    <td data-label="Person"><div class="d-flex align-items-center gap-2"><span class="avatar">{{ m.initials(u.name) }}</span><span class="fw-semibold">{{ u.name }}</span></div></td>
+    <td data-label="Kontakt & Organisation">{{ u.email }}{% for role in org_user_roles.get(u.id,[]) if role.role in ('Leitung','Stellvertretende Leitung') %}<span class="badge {{'text-bg-primary' if role.role=='Leitung' else 'text-bg-info'}} ms-1" title="{{role.org}} · {{'einschließlich Untereinheiten' if role.children else 'nur diese Einheit'}}">{{role.role}}</span>{% endfor %}{% for item in org_directory.get(u.id,[]) %}<div class="small"><a href="/admin/organization?unit={{item.id}}&amp;person={{u.id}}">{{item.name}}</a>{{' · Hauptzuordnung' if item.primary else ' · zusätzlich'}}</div>{% endfor %}</td>
+    <td data-label="Berechtigungen">{% if u.is_admin %}<span class="badge text-bg-primary"><i class="fa-solid fa-user-shield me-1"></i>Admin</span>
+        {% else %}<span class="badge text-bg-light border">{{ u.perms|length }} {{ 'Recht' if u.perms|length == 1 else 'Rechte' }}</span>
+        {% if u.perms %}<details class="perm-inline-details d-inline-block ms-1"><summary class="small">Anzeigen</summary>
+        <div class="d-flex flex-wrap gap-1 mt-2">{% for key, p in permissions.items() if key in u.perms %}
+        <span class="badge text-bg-light border" title="{{ p[2] }}"><i class="fa-solid {{ p[1] }} me-1" aria-hidden="true"></i>{{ p[0] }}</span>{% endfor %}</div>
+        </details>{% endif %}{% endif %}{% if org_user_roles.get(u.id) %}<details class="small mt-2"><summary>Bereichsrollen ({{org_user_roles[u.id]|length}})</summary><ul class="mt-1 mb-0">{% for item in org_user_roles[u.id] %}<li><a href="/admin/organization?unit={{item.org_id}}&amp;person={{u.id}}#org-roles">{{item.role}} · {{item.org}}</a> · {{item.source}}{{' · mit Untereinheiten' if item.children}}</li>{% endfor %}</ul></details>{% endif %}</td>
+    <td data-label="Gruppen">{% for g in u.groups %}<span class="badge text-bg-secondary me-1">{{ g.name }}</span>{% endfor %}</td>
+    <td data-label="Status">{% if u.totp_enabled or u.mfa_email %}<i class="fa-solid fa-shield-halved text-success me-1" title="Zwei-Faktor eingerichtet"></i>{% endif %}{% if u.id in away %}<span class="badge text-bg-secondary me-1" title="{{ away_label(away[u.id]) }}"><i class="fa-solid fa-plane-departure me-1"></i>{{ away_label(away[u.id]) }}</span>{% endif %}{% if not u.active %}<span class="badge text-bg-danger">gesperrt</span>{% elif not u.password_set %}<span class="badge text-bg-warning">eingeladen</span>{% else %}<span class="badge text-bg-success">aktiv</span>{% endif %}</td>
+    <td data-label="Angelegt" data-order="{{ u.created_at.isoformat() }}">{{ u.created_at | local('%d.%m.%Y') }}</td>
+    <td class="col-actions" data-label="Aktionen">
+      {% if manageable_users[u.id] %}
+      <form method="post" action="/admin/users/{{ u.id }}?q={{filters.q|urlencode}}&status={{filters.status}}&role={{filters.role}}&group={{filters.group or ''}}&sort={{filters.sort}}&per_page={{filters.per_page}}&page={{page}}" class="d-inline-flex gap-1">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#edit-{{ u.id }}" title="Bearbeiten" aria-label="Bearbeiten"><i class="fa-solid fa-pen"></i></button><button type="button" class="btn btn-sm btn-outline-primary" data-org-person-editor data-person="{{u.id}}" data-origin="users" title="Organisation und Bereichsrollen bearbeiten" aria-label="Organisation und Bereichsrollen von {{u.name}} bearbeiten"><i class="fa-solid fa-sitemap" aria-hidden="true"></i></button>
+        {% if user.is_admin %}<a class="btn btn-sm btn-outline-secondary" href="/profile/identity?user_id={{ u.id }}" title="OIDC-Kontoverknüpfung" aria-label="OIDC-Kontoverknüpfung für {{u.name}}"><i class="fa-solid fa-link" aria-hidden="true"></i></a>{% endif %}
+        {% if u.id != user.id %}
+        <button class="btn btn-sm btn-outline-secondary" name="action" value="invite" data-bs-toggle="tooltip" title="{{ 'Einladung erneut senden' if not u.password_set else 'Passwort-Link senden' }}" aria-label="Link senden"><i class="fa-solid fa-paper-plane"></i></button>
+        {% if user.is_admin %}<button class="btn btn-sm btn-outline-secondary" name="action" value="toggle_admin" data-bs-toggle="tooltip" title="{{ 'Admin-Recht entziehen' if u.is_admin else 'Zum Admin machen' }}" aria-label="Rolle ändern"><i class="fa-solid fa-user-shield"></i></button>{% endif %}
+        {% if u.totp_enabled or u.mfa_email or u.recovery_json %}<button class="btn btn-sm btn-outline-secondary" name="action" value="reset_2fa" data-confirm-title="Zwei-Faktor zurücksetzen?" data-confirm="App, E-Mail-Code und Notfallcodes von {{ u.email }} werden entfernt – z. B. bei verlorenem Telefon." data-confirm-button="Zurücksetzen" data-bs-toggle="tooltip" title="Zwei-Faktor zurücksetzen" aria-label="Zwei-Faktor zurücksetzen"><i class="fa-solid fa-shield-halved"></i></button>{% endif %}
+        <button class="btn btn-sm btn-outline-secondary" name="action" value="toggle_active" data-bs-toggle="tooltip" title="{{ 'Sperren' if u.active else 'Entsperren' }}" aria-label="Sperren oder entsperren"><i class="fa-solid {{ 'fa-lock' if u.active else 'fa-lock-open' }}"></i></button>
+        <button class="btn btn-sm btn-outline-danger" name="action" value="delete" data-confirm-title="{{ u.email }} löschen?" data-confirm="Konto und zugehörige Meetings werden gelöscht. Aufnahmen bleiben für Admins sichtbar, Kurzlinks und Formulare bleiben erhalten (dann nur für Admins sichtbar)." data-bs-toggle="tooltip" title="Löschen" aria-label="Löschen"><i class="fa-regular fa-trash-can"></i></button>
+        {% else %}<span class="text-secondary small align-self-center ms-1">Ihr Konto</span>{% endif %}
+      </form>
+      {% else %}<span class="text-secondary small">nur durch Admins</span>{% endif %}
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="text-secondary text-center py-5">Keine passenden Benutzer gefunden. Bitte Filter oder Suchbegriff ändern.</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+</div></div>
+
+
+    <nav aria-label="Benutzerseiten" class="admin-page-nav">
+      <span>{{page_start}}–{{page_end}} von {{filtered}} Konten</span>
+      <div class="admin-page-nav-buttons">
+        {% if page>1 %}<a class="btn btn-outline-secondary btn-sm" href="/admin/users?q={{filters.q|urlencode}}&status={{filters.status}}&role={{filters.role}}&group={{filters.group or ''}}&sort={{filters.sort}}&per_page={{filters.per_page}}&page={{page-1}}#benutzer" rel="prev"><i class="fa-solid fa-chevron-left me-1" aria-hidden="true"></i>Zurück</a>{% endif %}
+        <span class="admin-page-indicator">{{page}} / {{pages}}</span>
+        {% if page<pages %}<a class="btn btn-outline-secondary btn-sm" href="/admin/users?q={{filters.q|urlencode}}&status={{filters.status}}&role={{filters.role}}&group={{filters.group or ''}}&sort={{filters.sort}}&per_page={{filters.per_page}}&page={{page+1}}#benutzer" rel="next">Weiter<i class="fa-solid fa-chevron-right ms-1" aria-hidden="true"></i></a>{% endif %}
+      </div>
+    </nav>
+  </section>
+  {% for u in users if manageable_users[u.id] %}
+<div class="modal fade" id="edit-{{ u.id }}" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable">
+  <form class="modal-content" method="post" action="/admin/users/{{ u.id }}?q={{filters.q|urlencode}}&status={{filters.status}}&role={{filters.role}}&group={{filters.group or ''}}&sort={{filters.sort}}&per_page={{filters.per_page}}&page={{page}}">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="edit">
+    <div class="modal-header"><h2 class="modal-title h5">{{ u.email }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
+    <div class="modal-body"><div class="row g-3">
+      <div class="col-md-6"><label class="form-label" for="en-{{ u.id }}">Name</label>
+        <input class="form-control" id="en-{{ u.id }}" name="name" value="{{ u.name }}" maxlength="200" required></div>
+      <div class="col-md-6"><label class="form-label" for="eg-{{ u.id }}">Gruppen</label>
+        <select class="form-select js-select" id="eg-{{ u.id }}" name="groups" multiple data-search="1">
+          {% for g in groups %}<option value="{{ g.id }}" {% if g in u.groups %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+        </select></div>
+      <div class="col-12"><button type="button" class="btn btn-outline-primary" data-org-person-editor data-person="{{u.id}}" data-origin="users"><i class="fa-solid fa-sitemap me-2" aria-hidden="true"></i>Organisationszuordnungen & Mehrfachrollen bearbeiten</button><p class="form-text">Der gemeinsame Personen-Editor wird auch in der Organisationsverwaltung verwendet. Bereichsrollen sind von den globalen Rechten unten getrennt.</p></div>
+      <div class="col-12"><div class="form-label">Globale Portalrechte</div>
+        {% if u.is_admin %}<div class="alert alert-info py-2 mb-2 small">Administrator:innen dürfen immer alles. Die Schalter gelten erst, wenn das Admin-Recht entzogen wird.</div>{% endif %}
+        {{ m.perm_switches('e' ~ u.id, u.perms) }}</div>
+    </div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+      <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button></div>
+  </form>
+</div></div>
+{% endfor %}
+
+
+  <section class="admin-groups-section" aria-labelledby="admin-groups-heading">
+    <div class="admin-section-heading"><div><span class="admin-eyebrow">Zusammenarbeit</span><h2 id="admin-groups-heading">Gruppen &amp; Teams</h2><p>Mitglieder und Bereichsrollen bündeln, statt Zugänge einzeln zu pflegen.</p></div></div>
+    <div class="card admin-group-list-card" id="gruppen"><div class="card-header d-flex justify-content-between align-items-center">
+  <span><i class="fa-solid fa-people-group me-2"></i>Gruppen</span>
+  <button class="btn btn-sm btn-primary" type="button" data-admin-group-editor="0"><i class="fa-solid fa-plus me-1"></i>Neue Gruppe</button>
+</div><div class="card-body">
+{% if groups %}
+<table class="table table-hover align-middle js-table w-100 admin-groups-table" data-order='[[0,"asc"]]'>
+  <thead><tr><th>Gruppe</th><th>Beschreibung</th><th>Mitglieder</th><th class="no-sort col-actions">Aktionen</th></tr></thead>
+  <tbody>
+  {% for g in groups %}
+  <tr>
+    <td class="fw-semibold">{{ g.name }}<div class="small fw-normal"><a href="/admin/organization?group={{g.id}}#org-roles">Bereichsrollen{{' · geschützt' if g.id in org_group_roles}}</a></div></td>
+    <td class="small text-secondary">{{ g.description }}{% if g.lead %}<div><i class="fa-solid fa-user-tie me-1"></i>Leitung: {{ g.lead.name }}</div>{% endif %}</td>
+    <td data-order="{{ g.members|length }}">{% for mbr in g.members[:6] %}<span class="avatar avatar-sm me-1" title="{{ mbr.name }}">{{ m.initials(mbr.name) }}</span>{% endfor %}{% if g.members|length > 6 %}<span class="small text-secondary">+{{ g.members|length - 6 }}</span>{% endif %}
+      <span class="small text-secondary ms-1">({{ g.members|length }})</span></td>
+    <td class="col-actions">{% if g.id not in org_group_roles or user.is_admin or user.can("org_roles") %}<form method="post" action="/admin/groups/{{ g.id }}" class="d-inline-flex gap-1">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-sm btn-outline-primary" type="button" data-admin-group-editor="{{ g.id }}" title="Bearbeiten" aria-label="Bearbeiten"><i class="fa-solid fa-pen"></i></button>
+      <button class="btn btn-sm btn-outline-danger" name="action" value="delete" data-confirm-title="Gruppe „{{ g.name }}“ löschen?" data-confirm="Die Mitglieder behalten ihre Konten." title="Löschen" aria-label="Löschen"><i class="fa-regular fa-trash-can"></i></button>
+    </form>{% else %}<span class="small text-secondary">Rollen geschützt</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-secondary mb-0">Noch keine Gruppen. Mit Gruppen laden Sie z. B. alle Mitglieder eines Fachbereichs auf einmal zu einem Formular ein.</p>
+{% endif %}
+</div></div>
+
+
+  </section>
+  <section class="admin-advanced-section" aria-labelledby="admin-advanced-heading">
+    <div class="admin-section-heading"><div><span class="admin-eyebrow">Weitere Einstellungen</span><h2 id="admin-advanced-heading">Zugänge einrichten</h2><p>Einladungen, CSV-Import sowie Anmelde- und Sicherheitsoptionen an einem Ort.</p></div></div>
+    <details class="admin-accordion" id="einladen"><summary><span class="admin-accordion-icon"><i class="fa-solid fa-user-plus" aria-hidden="true"></i></span><span><strong>Personen einladen</strong><small>Einzelne oder mehrere neue Konten mit Gruppen und Berechtigungen anlegen</small></span><i class="fa-solid fa-chevron-down ms-auto" aria-hidden="true"></i></summary>
+      <div class="admin-accordion-content"><div class="row g-3 mb-4">
   <div class="col-12 col-xl-8"><div class="card h-100">
     <div class="card-header"><i class="fa-solid fa-user-plus me-2"></i>Personen einladen</div>
     <div class="card-body">
@@ -79,7 +219,10 @@
   {% endif %}
 </div>
 
-<div class="card mb-4" id="import"><div class="card-header"><i class="fa-solid fa-file-csv me-2"></i>Benutzer aus CSV importieren</div><div class="card-body">
+</div>
+    </details>
+    <details class="admin-accordion" id="import"><summary><span class="admin-accordion-icon"><i class="fa-solid fa-file-csv" aria-hidden="true"></i></span><span><strong>CSV-Import</strong><small>Viele Benutzer gemeinsam prüfen und einlesen</small></span><i class="fa-solid fa-chevron-down ms-auto" aria-hidden="true"></i></summary>
+      <div class="admin-accordion-content"><div class="card mb-0 admin-inline-card"><div class="card-header"><i class="fa-solid fa-file-csv me-2"></i>Benutzer aus CSV importieren</div><div class="card-body">
   <div class="row g-3 align-items-end">
     <div class="col-lg-7">
       <p class="small text-secondary mb-2">Viele Konten auf einmal anlegen, z. B. aus einer Excel-Liste. Spalten (englisch): <code>email</code> (Pflicht), <code>name</code>, <code>password</code>, <code>groups</code>, <code>permissions</code>, <code>admin</code>. Mehrere Gruppen bzw. Rechte mit <code>;</code> trennen. Fehlende Gruppen werden angelegt, bestehende Konten in die Gruppen aufgenommen. Ohne Passwort können Sie die neuen Konten anschließend per Mail einladen lassen. Vor dem Übernehmen zeigt das Portal eine Vorschau.</p>
@@ -95,7 +238,9 @@
   </div>
 </div></div>
 
-{% if user.is_admin %}
+</div>
+    </details>
+    {% if user.is_admin %}
 <a class="btn btn-outline-primary mb-3" href="/admin/oidc"><i class="fa-solid fa-key me-2" aria-hidden="true"></i>Nextcloud / OIDC-Anmeldung einrichten</a>
 <div class="card mb-4" id="sicherheit"><div class="card-header"><i class="fa-solid fa-shield-halved me-2"></i>Anmeldung &amp; Zwei-Faktor</div><div class="card-body">
   <form method="post" action="/admin/security" class="row g-3 align-items-end">
@@ -112,119 +257,8 @@
 </div></div>
 {% endif %}
 
-<div class="card mb-4"><div class="card-header"><i class="fa-solid fa-users me-2"></i>Benutzer</div><div class="card-body">
-<table class="table table-hover align-middle js-table w-100" data-order='[[0,"asc"]]'>
-  <thead><tr><th>Name</th><th>E-Mail</th><th>Rechte</th><th>Gruppen</th><th>Status</th><th>Angelegt</th><th class="no-sort col-actions">Aktionen</th></tr></thead>
-  <tbody>
-  {% for u in users %}
-  <tr>
-    <td><div class="d-flex align-items-center gap-2"><span class="avatar">{{ m.initials(u.name) }}</span><span class="fw-semibold">{{ u.name }}</span></div></td>
-    <td>{{ u.email }}{% for role in org_user_roles.get(u.id,[]) if role.role in ('Leitung','Stellvertretende Leitung') %}<span class="badge {{'text-bg-primary' if role.role=='Leitung' else 'text-bg-info'}} ms-1" title="{{role.org}} · {{'einschließlich Untereinheiten' if role.children else 'nur diese Einheit'}}">{{role.role}}</span>{% endfor %}{% for item in org_directory.get(u.id,[]) %}<div class="small"><a href="/admin/organization?unit={{item.id}}&amp;person={{u.id}}">{{item.name}}</a>{{' · Hauptzuordnung' if item.primary else ' · zusätzlich'}}</div>{% endfor %}</td>
-    <td>{% if u.is_admin %}<span class="badge text-bg-primary"><i class="fa-solid fa-user-shield me-1"></i>Admin</span>
-        {% else %}<span class="badge text-bg-light border">{{ u.perms|length }} {{ 'Recht' if u.perms|length == 1 else 'Rechte' }}</span>
-        {% if u.perms %}<details class="perm-inline-details d-inline-block ms-1"><summary class="small">Anzeigen</summary>
-        <div class="d-flex flex-wrap gap-1 mt-2">{% for key, p in permissions.items() if key in u.perms %}
-        <span class="badge text-bg-light border" title="{{ p[2] }}"><i class="fa-solid {{ p[1] }} me-1" aria-hidden="true"></i>{{ p[0] }}</span>{% endfor %}</div>
-        </details>{% endif %}{% endif %}{% if org_user_roles.get(u.id) %}<details class="small mt-2"><summary>Bereichsrollen ({{org_user_roles[u.id]|length}})</summary><ul class="mt-1 mb-0">{% for item in org_user_roles[u.id] %}<li><a href="/admin/organization?unit={{item.org_id}}&amp;person={{u.id}}#org-roles">{{item.role}} · {{item.org}}</a> · {{item.source}}{{' · mit Untereinheiten' if item.children}}</li>{% endfor %}</ul></details>{% endif %}</td>
-    <td>{% for g in u.groups %}<span class="badge text-bg-secondary me-1">{{ g.name }}</span>{% endfor %}</td>
-    <td>{% if u.totp_enabled or u.mfa_email %}<i class="fa-solid fa-shield-halved text-success me-1" title="Zwei-Faktor eingerichtet"></i>{% endif %}{% if u.id in away %}<span class="badge text-bg-secondary me-1" title="{{ away_label(away[u.id]) }}"><i class="fa-solid fa-plane-departure me-1"></i>{{ away_label(away[u.id]) }}</span>{% endif %}{% if not u.active %}<span class="badge text-bg-danger">gesperrt</span>{% elif not u.password_set %}<span class="badge text-bg-warning">eingeladen</span>{% else %}<span class="badge text-bg-success">aktiv</span>{% endif %}</td>
-    <td data-order="{{ u.created_at.isoformat() }}">{{ u.created_at | local('%d.%m.%Y') }}</td>
-    <td class="col-actions">
-      {% if manageable_users[u.id] %}
-      <form method="post" action="/admin/users/{{ u.id }}" class="d-inline-flex gap-1">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#edit-{{ u.id }}" title="Bearbeiten" aria-label="Bearbeiten"><i class="fa-solid fa-pen"></i></button><button type="button" class="btn btn-sm btn-outline-primary" data-org-person-editor data-person="{{u.id}}" data-origin="users" title="Organisation und Bereichsrollen bearbeiten" aria-label="Organisation und Bereichsrollen von {{u.name}} bearbeiten"><i class="fa-solid fa-sitemap" aria-hidden="true"></i></button>
-        {% if user.is_admin %}<a class="btn btn-sm btn-outline-secondary" href="/profile/identity?user_id={{ u.id }}" title="OIDC-Kontoverknüpfung" aria-label="OIDC-Kontoverknüpfung für {{u.name}}"><i class="fa-solid fa-link" aria-hidden="true"></i></a>{% endif %}
-        {% if u.id != user.id %}
-        <button class="btn btn-sm btn-outline-secondary" name="action" value="invite" data-bs-toggle="tooltip" title="{{ 'Einladung erneut senden' if not u.password_set else 'Passwort-Link senden' }}" aria-label="Link senden"><i class="fa-solid fa-paper-plane"></i></button>
-        {% if user.is_admin %}<button class="btn btn-sm btn-outline-secondary" name="action" value="toggle_admin" data-bs-toggle="tooltip" title="{{ 'Admin-Recht entziehen' if u.is_admin else 'Zum Admin machen' }}" aria-label="Rolle ändern"><i class="fa-solid fa-user-shield"></i></button>{% endif %}
-        {% if u.totp_enabled or u.mfa_email or u.recovery_json %}<button class="btn btn-sm btn-outline-secondary" name="action" value="reset_2fa" data-confirm-title="Zwei-Faktor zurücksetzen?" data-confirm="App, E-Mail-Code und Notfallcodes von {{ u.email }} werden entfernt – z. B. bei verlorenem Telefon." data-confirm-button="Zurücksetzen" data-bs-toggle="tooltip" title="Zwei-Faktor zurücksetzen" aria-label="Zwei-Faktor zurücksetzen"><i class="fa-solid fa-shield-halved"></i></button>{% endif %}
-        <button class="btn btn-sm btn-outline-secondary" name="action" value="toggle_active" data-bs-toggle="tooltip" title="{{ 'Sperren' if u.active else 'Entsperren' }}" aria-label="Sperren oder entsperren"><i class="fa-solid {{ 'fa-lock' if u.active else 'fa-lock-open' }}"></i></button>
-        <button class="btn btn-sm btn-outline-danger" name="action" value="delete" data-confirm-title="{{ u.email }} löschen?" data-confirm="Konto und zugehörige Meetings werden gelöscht. Aufnahmen bleiben für Admins sichtbar, Kurzlinks und Formulare bleiben erhalten (dann nur für Admins sichtbar)." data-bs-toggle="tooltip" title="Löschen" aria-label="Löschen"><i class="fa-regular fa-trash-can"></i></button>
-        {% else %}<span class="text-secondary small align-self-center ms-1">Ihr Konto</span>{% endif %}
-      </form>
-      {% else %}<span class="text-secondary small">nur durch Admins</span>{% endif %}
-    </td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div></div>
 
-{% for u in users if manageable_users[u.id] %}
-<div class="modal fade" id="edit-{{ u.id }}" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable">
-  <form class="modal-content" method="post" action="/admin/users/{{ u.id }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="edit">
-    <div class="modal-header"><h2 class="modal-title h5">{{ u.email }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
-    <div class="modal-body"><div class="row g-3">
-      <div class="col-md-6"><label class="form-label" for="en-{{ u.id }}">Name</label>
-        <input class="form-control" id="en-{{ u.id }}" name="name" value="{{ u.name }}" maxlength="200" required></div>
-      <div class="col-md-6"><label class="form-label" for="eg-{{ u.id }}">Gruppen</label>
-        <select class="form-select js-select" id="eg-{{ u.id }}" name="groups" multiple data-search="1">
-          {% for g in groups %}<option value="{{ g.id }}" {% if g in u.groups %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
-        </select></div>
-      <div class="col-12"><button type="button" class="btn btn-outline-primary" data-org-person-editor data-person="{{u.id}}" data-origin="users"><i class="fa-solid fa-sitemap me-2" aria-hidden="true"></i>Organisationszuordnungen & Mehrfachrollen bearbeiten</button><p class="form-text">Der gemeinsame Personen-Editor wird auch in der Organisationsverwaltung verwendet. Bereichsrollen sind von den globalen Rechten unten getrennt.</p></div>
-      <div class="col-12"><div class="form-label">Globale Portalrechte</div>
-        {% if u.is_admin %}<div class="alert alert-info py-2 mb-2 small">Administrator:innen dürfen immer alles. Die Schalter gelten erst, wenn das Admin-Recht entzogen wird.</div>{% endif %}
-        {{ m.perm_switches('e' ~ u.id, u.perms) }}</div>
-    </div></div>
-    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
-      <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button></div>
-  </form>
-</div></div>
-{% endfor %}
-
-<div class="card" id="gruppen"><div class="card-header d-flex justify-content-between align-items-center">
-  <span><i class="fa-solid fa-people-group me-2"></i>Gruppen</span>
-  <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#group-new"><i class="fa-solid fa-plus me-1"></i>Neue Gruppe</button>
-</div><div class="card-body">
-{% if groups %}
-<table class="table table-hover align-middle js-table w-100" data-order='[[0,"asc"]]'>
-  <thead><tr><th>Gruppe</th><th>Beschreibung</th><th>Mitglieder</th><th class="no-sort col-actions">Aktionen</th></tr></thead>
-  <tbody>
-  {% for g in groups %}
-  <tr>
-    <td class="fw-semibold">{{ g.name }}<div class="small fw-normal"><a href="/admin/organization?group={{g.id}}#org-roles">Bereichsrollen{{' · geschützt' if g.id in org_group_roles}}</a></div></td>
-    <td class="small text-secondary">{{ g.description }}{% if g.lead %}<div><i class="fa-solid fa-user-tie me-1"></i>Leitung: {{ g.lead.name }}</div>{% endif %}</td>
-    <td data-order="{{ g.members|length }}">{% for mbr in g.members[:6] %}<span class="avatar avatar-sm me-1" title="{{ mbr.name }}">{{ m.initials(mbr.name) }}</span>{% endfor %}{% if g.members|length > 6 %}<span class="small text-secondary">+{{ g.members|length - 6 }}</span>{% endif %}
-      <span class="small text-secondary ms-1">({{ g.members|length }})</span></td>
-    <td class="col-actions">{% if g.id not in org_group_roles or user.is_admin or user.can("org_roles") %}<form method="post" action="/admin/groups/{{ g.id }}" class="d-inline-flex gap-1">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#group-{{ g.id }}" title="Bearbeiten" aria-label="Bearbeiten"><i class="fa-solid fa-pen"></i></button>
-      <button class="btn btn-sm btn-outline-danger" name="action" value="delete" data-confirm-title="Gruppe „{{ g.name }}“ löschen?" data-confirm="Die Mitglieder behalten ihre Konten." title="Löschen" aria-label="Löschen"><i class="fa-regular fa-trash-can"></i></button>
-    </form>{% else %}<span class="small text-secondary">Rollen geschützt</span>{% endif %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="text-secondary mb-0">Noch keine Gruppen. Mit Gruppen laden Sie z. B. alle Mitglieder eines Fachbereichs auf einmal zu einem Formular ein.</p>
-{% endif %}
-</div></div>
-
-{% macro group_modal(id, action, g=None) %}
-<div class="modal fade" id="{{ id }}" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content">
-  <form method="post" action="{{ action }}">
-    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="save">
-    <div class="modal-header"><h2 class="modal-title h5">{{ 'Gruppe bearbeiten' if g else 'Neue Gruppe' }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button></div>
-    <div class="modal-body row g-3">{% if g and g.id in org_group_roles %}<div class="col-12"><div class="alert alert-info small">Diese Gruppe trägt Bereichsrollen. Alle Gruppenmitglieder erhalten diese Rollen; Mitgliedschaftsänderungen erfordern zusätzlich Organisationsrollen-Rechte.</div></div>{% endif %}
-      <div class="col-md-6"><label class="form-label" for="{{ id }}-n">Name</label><input class="form-control" id="{{ id }}-n" name="name" maxlength="120" required value="{{ g.name if g else '' }}"></div>
-      <div class="col-md-6"><label class="form-label" for="{{ id }}-d">Beschreibung</label><input class="form-control" id="{{ id }}-d" name="description" maxlength="255" value="{{ g.description if g else '' }}"></div>
-      <div class="col-md-6"><label class="form-label" for="{{ id }}-l">Gruppenleitung</label>
-        <select class="form-select" id="{{ id }}-l" name="lead_id"><option value="">– keine –</option>
-          {% for u in users %}<option value="{{ u.id }}" {% if g and g.lead_id == u.id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select>
-        <div class="form-text">Darf Abwesenheiten und Vertretungen für die Mitglieder eintragen.</div></div>
-      <div class="col-12"><label class="form-label" for="{{ id }}-m">Mitglieder</label>
-        <select class="form-select js-select" id="{{ id }}-m" name="members" multiple data-search="1">
-          {% for u in users %}<option value="{{ u.id }}" {% if g and u in g.members %}selected{% endif %}>{{ u.name }} ({{ u.email }})</option>{% endfor %}
-        </select></div>
-    </div>
-    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
-      <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button></div>
-  </form>
-</div></div></div>
-{% endmacro %}
-{{ group_modal('group-new', '/admin/groups') }}
-{% for g in groups %}{{ group_modal('group-' ~ g.id, '/admin/groups/' ~ g.id, g) }}{% endfor %}
+  </section>
+</div>
 {% endblock %}
-{% block scripts %}<script src="/static/organization-person.js" defer></script><script src="/static/ui-preferences.js" defer></script><script src="/static/permission-editor.js" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/organization-person.js" defer></script><script src="/static/ui-preferences.js" defer></script><script src="/static/permission-editor.js" defer></script><script src="/static/admin-users.js" defer></script>{% endblock %}
