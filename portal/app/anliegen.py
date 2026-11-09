@@ -272,3 +272,41 @@ def routing_preview(db, user, cat):
             "message": ("Keine eindeutige Leitung für Ihre primäre Organisation gefunden."
                         if cat.routing == "lead"
                         else "Noch keine aktive zuständige Person für diese Kategorie hinterlegt.")}
+
+
+def reassign_open(db, cat, actor):
+    """Explicit administrative migration for already assigned, unfinished cases.
+
+    Never silently touch confidential cases, historical completions or other
+    categories. Repoint a native task and notify the new owner only on change.
+    """
+    if cat.confidential or not cat.enabled:
+        return 0
+    cases = list(db.scalars(select(Anliegen).where(
+        Anliegen.category_id == cat.id,
+        Anliegen.confidential.is_(False),
+        Anliegen.status.not_in(("done", "closed", "cancelled")),
+        Anliegen.assignee_id.is_not(None),
+    ).order_by(Anliegen.id).limit(300)))
+    count = 0
+    for case in cases:
+        reporter = db.get(User, case.reporter_id)
+        if not reporter or not reporter.active:
+            continue
+        receiver = recipient(db, reporter, cat, case.org_id)
+        if not receiver or receiver == case.assignee_id:
+            continue
+        case.assignee_id = receiver
+        record(db, case, actor, "routing", "Bestehende Zuständigkeit nach ausdrücklicher Freigabe angepasst.")
+        if case.task_id:
+            from .task_models import Task
+            from . import tasks
+            task = db.get(Task, case.task_id)
+            if task:
+                task.assignee_id = receiver
+                tasks.audit(db, task, actor, "assignment", "Zuständigkeit aus Anliegenverwaltung aktualisiert.")
+                tasks.ping(db, task, [receiver], "Internes Anliegen wurde Ihnen zugewiesen")
+        else:
+            task_for(db, case)
+        count += 1
+    return count
