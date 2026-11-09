@@ -2774,6 +2774,7 @@ DEFAULT_SETTINGS = {
     "ai_web_enabled": "0",
     "ai_web_key_enc": "",
     "ai_vector_enabled": "0",
+    "ai_vector_auto_index": "0",
     "ai_vector_provider_id": "0",
     "ai_vector_model_id": "",
     "ai_retention_days": "90",

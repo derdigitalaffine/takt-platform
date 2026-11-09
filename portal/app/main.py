@@ -100,8 +100,14 @@ async def lifespan(_app: FastAPI):
             logging.getLogger("portal").exception("Rechtstexte: Neuzerlegen der Gliederung fehlgeschlagen")
     chat.prepare_dir()
     task = asyncio.create_task(worker.run_forever())
-    yield
-    task.cancel()
+    # Isolate potentially slow embedding calls from the central reminder worker.
+    from . import ai_vector_jobs
+    rag_task = asyncio.create_task(ai_vector_jobs.run_forever())
+    try:
+        yield
+    finally:
+        rag_task.cancel()
+        task.cancel()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
