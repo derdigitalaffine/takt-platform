@@ -115,6 +115,7 @@ def retrieve(db, user, question: str, limit: int = 5) -> list[dict]:
                             if s.kind != "group"]
                 url_prefix = f"/recht/{law.slug}"
                 validity = f"Gültig ab {law.valid_from or 'unbekannt'}"
+                current_revision = law_revision(law)
             for number, section_title, plain, anchor in segments[:700]:
                 if not plain:
                     continue
