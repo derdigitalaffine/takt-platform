@@ -110,3 +110,24 @@ def test_admin_can_correct_leave_after_primary_assignment_changed(db, entered):
     leave_admin.remove(db, admin, "leave", rid, row.version, "Fehler nach Organisationswechsel")
     db.commit()
     assert not db.get(LeaveRequest, rid).effective_json
+
+
+def test_old_manual_absence_preview_cannot_delete_a_recreated_record(db, entered):
+    from datetime import timedelta
+    person, _, _, _ = entered
+    actor = db.scalar(select(User).where(User.email == ADMIN[0]))
+    old = Absence(user_id=person.id, starts_on="2026-12-15", ends_on="2026-12-16", status="confirmed")
+    db.add(old); db.commit()
+    aid, created = old.id, old.created_at
+    stale = leave_admin.absence_version(old)
+    db.delete(old); db.commit()
+    new = Absence(id=aid, user_id=person.id, starts_on="2026-12-15", ends_on="2026-12-16", status="confirmed", created_at=created + timedelta(seconds=1))
+    db.add(new); db.commit()
+    try:
+        with pytest.raises(HTTPException) as exc:
+            leave_admin.remove(db, actor, "absence", aid, stale, "Vorschau eines alten Eintrags")
+        assert exc.value.status_code == 409
+        db.rollback()
+        assert db.get(Absence, aid)
+    finally:
+        db.delete(db.get(Absence, aid)); db.commit()

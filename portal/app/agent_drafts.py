@@ -44,7 +44,7 @@ def url(plan, step=0):
 def load(request, user, nonce, step):
     from .main import stash_get
     plan = stash_get(request, "takt-agent-plan")
-    if (not plan or not nonce or not secrets.compare_digest(nonce, plan.get("nonce", ""))
+    if (not plan or not nonce or not nonce.isascii() or not secrets.compare_digest(nonce, plan.get("nonce", ""))
             or plan.get("user_id") != user.id or type(step) is not int
             or not 0 <= step < len(plan.get("actions", []))):
         raise HTTPException(409, "Dieser Vorschlag ist abgelaufen. Bitte im Agenten neu planen.")

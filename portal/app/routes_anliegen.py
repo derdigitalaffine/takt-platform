@@ -98,7 +98,7 @@ def new_anliegen(request: Request, user: User = Depends(current_user), db: Sessi
         import secrets
         from .main import stash_get
         private = stash_get(request, "takt-agent-private-intake")
-        if (not private or private.get("user_id") != user.id or not secrets.compare_digest(nonce, private.get("nonce", ""))):
+        if (not private or private.get("user_id") != user.id or not nonce.isascii() or not secrets.compare_digest(nonce, private.get("nonce", ""))):
             raise HTTPException(409, "Dieser geschützte Vorschlag ist abgelaufen.")
         cat = service.category(db, private["category_id"], enabled=True)
         if not cat.confidential:

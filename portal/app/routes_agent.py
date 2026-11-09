@@ -150,7 +150,7 @@ def takt_agent_cancel(request: Request, plan_id: str = Form(...),
                       user: User = Depends(current_user)):
     _access(user)
     plan = stash_get(request, "takt-agent-plan", pop=True)
-    if (not plan or not plan_id or not secrets.compare_digest(plan_id, plan.get("nonce", ""))
+    if (not plan or not plan_id or not plan_id.isascii() or not secrets.compare_digest(plan_id, plan.get("nonce", ""))
             or plan.get("user_id") != user.id):
         raise HTTPException(409, "Dieser Vorschlag ist nicht mehr gültig.")
     return _response({"cancelled": True})
@@ -164,7 +164,7 @@ def takt_agent_execute(request: Request, plan_id: str = Form(...),
     rate_limit(request, "takt-agent-execute", limit=30, window=3600, key=str(user.id))
     # Pop first: a confirmation cannot be replayed, including after validation failures.
     plan = stash_get(request, "takt-agent-plan", pop=True)
-    if (not plan or not plan_id or not secrets.compare_digest(plan_id, plan.get("nonce", ""))
+    if (not plan or not plan_id or not plan_id.isascii() or not secrets.compare_digest(plan_id, plan.get("nonce", ""))
             or plan.get("user_id") != user.id or not plan.get("actions")):
         raise HTTPException(409, "Der Vorschlag ist nicht mehr gültig. Bitte neu planen.")
     if plan.get("delivery") == "forms":
@@ -229,7 +229,7 @@ def takt_agent_draft_save(request: Request, plan_id: str = Form(...), review_id:
     # A failed save also consumes the review. No retry can duplicate a step.
     plan = stash_get(request, "takt-agent-plan", pop=True)
     review = (plan or {}).get("review", {})
-    if (not plan or plan.get("user_id") != user.id or not plan_id or not review_id
+    if (not plan or plan.get("user_id") != user.id or not plan_id or not review_id or not plan_id.isascii() or not review_id.isascii()
             or not secrets.compare_digest(plan_id, plan.get("nonce", ""))
             or not secrets.compare_digest(review_id, review.get("nonce", ""))):
         raise HTTPException(409, "Diese Freigabe ist abgelaufen. Bitte neu planen.")

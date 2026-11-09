@@ -19,7 +19,8 @@ def require_admin(actor):
 
 def absence_version(row):
     values = [row.id, row.user_id, row.starts_on, row.ends_on, row.status, row.substitute_id,
-              row.note, row.auto_reply, row.decided_at.isoformat() if row.decided_at else None]
+              row.note, row.auto_reply, row.decided_at.isoformat() if row.decided_at else None,
+              row.created_by, row.created_at.isoformat() if row.created_at else None]
     return hashlib.sha256(json.dumps(values).encode()).hexdigest()
 
 

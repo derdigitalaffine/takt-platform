@@ -92,6 +92,7 @@ def test_native_handoff_is_csrf_session_bound_and_revalidates_rights(monkeypatch
     _, _, fid, _, _, _ = seed()
     fake(monkeypatch, [dict(tool="search_forms", query="Agent")], [dict(tool="copy_form", id=fid)])
     c = login(*ADMIN); response, csrf = plan(c); pid = response.json()["plan_id"]
+    assert c.get("/agent/draft", params=dict(plan_id="ungültig")).status_code == 409
     other = login(*ADMIN)
     assert other.get("/agent/draft", params=dict(plan_id=pid)).status_code == 409
     assert c.post("/agent/draft/review", data=dict(agent_plan=pid)).status_code == 400
