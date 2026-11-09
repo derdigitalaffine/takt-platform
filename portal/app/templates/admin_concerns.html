@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Zuständigkeiten für interne Anliegen{% endblock %}
+{% block content %}
+{% call m.page_head('Anliegen-Kategorien & Zuständigkeiten', 'Die Kategorie bestimmt die empfangende Person. Beschwerden gehen immer an die eindeutige Leitung der primären Organisationseinheit.') %}
+<a class="btn btn-outline-secondary" href="/anliegen"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Interne Anliegen</a>
+<a class="btn btn-outline-secondary" href="/admin/organization"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Organisation & Leitungsrollen</a>
+{% endcall %}
+<div class="alert alert-info">
+  <strong>Routing ohne Rätselraten:</strong> Hinterlegen Sie für Büromaterial und Büromöbel verschiedene zuständige Personen.
+  Für Beschwerden wird automatisch die eindeutige Rolle „Leitung“ im primären Organisationsbereich verwendet.
+  Ist keine eindeutige Leitung vorhanden, bleibt das Anliegen im Formular zur Korrektur; es wird nicht falsch weitergeleitet.
+</div>
+<div class="row g-3">
+  <div class="col-12 col-xl-8">
+    <div class="card"><div class="card-header"><i class="fa-solid fa-route me-2"></i>Bestehende Kategorien</div>
+      <div class="card-body">
+      {% for cat in categories %}
+      <details class="border rounded p-3 mb-2" {% if not cat.active or (cat.routing == 'person' and not cat.responsible_id) %}open{% endif %}>
+        <summary class="d-flex flex-wrap align-items-center gap-2">
+          <strong>{{ cat.title }}</strong>
+          {% if not cat.active %}<span class="badge text-bg-secondary">Inaktiv</span>{% endif %}
+          {% if cat.confidential or cat.kind == 'complaint' %}<span class="badge text-bg-warning">Vertraulich</span>{% endif %}
+          {% if cat.routing == 'person' and not cat.responsible_id %}<span class="badge text-bg-danger">Zuständigkeit fehlt</span>
+          {% else %}<span class="small text-secondary">{{ routes[cat.routing] }}{% if cat.responsible %}: {{ cat.responsible.name }}{% endif %}</span>{% endif %}
+        </summary>
+        <form method="post" action="/admin/anliegen/kategorie" class="row g-3 mt-2">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="category_id" value="{{ cat.id }}">
+          <div class="col-md-6"><label class="form-label" for="cat-title-{{ cat.id }}">Name</label>
+            <input class="form-control" id="cat-title-{{ cat.id }}" name="title" maxlength="160" value="{{ cat.title }}" required></div>
+          <div class="col-md-6"><label class="form-label" for="cat-kind-{{ cat.id }}">Art</label>
+            <select class="form-select" id="cat-kind-{{ cat.id }}" name="kind">
+              {% for key, label in kinds.items() %}<option value="{{ key }}" {% if cat.kind == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+          <div class="col-12"><label class="form-label" for="cat-description-{{ cat.id }}">Beschreibung</label>
+            <textarea class="form-control" id="cat-description-{{ cat.id }}" name="description" rows="2" maxlength="2000">{{ cat.description }}</textarea></div>
+          <div class="col-md-6"><label class="form-label" for="cat-route-{{ cat.id }}">Weiterleitung</label>
+            <select class="form-select" id="cat-route-{{ cat.id }}" name="routing">
+              {% for key, label in routes.items() %}<option value="{{ key }}" {% if cat.routing == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select></div>
+          <div class="col-md-6"><label class="form-label" for="cat-to-{{ cat.id }}">Feste zuständige Person</label>
+            <select class="form-select" id="cat-to-{{ cat.id }}" name="responsible_id">
+              <option value="0">Keine ausgewählt</option>
+              {% for person in people %}<option value="{{ person.id }}" {% if cat.responsible_id == person.id %}selected{% endif %}>{{ person.name }} ({{ person.email }})</option>{% endfor %}
+            </select></div>
+          <div class="col-md-6">
+            <label class="form-check"><input class="form-check-input" type="checkbox" name="active" value="1" {% if cat.active %}checked{% endif %}><span class="form-check-label">Kategorie aktiv</span></label>
+            <label class="form-check"><input class="form-check-input" type="checkbox" name="confidential" value="1" {% if cat.confidential %}checked{% endif %}><span class="form-check-label">Inhalt vertraulich behandeln</span></label>
+          </div>
+          <div class="col-md-6 d-flex align-items-end justify-content-md-end">
+            <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Änderungen speichern</button>
+          </div>
+        </form>
+        {% if cat.kind == 'complaint' %}<p class="form-text mt-2">Für Beschwerden erzwingt TAKT unabhängig von der Auswahl Vertraulichkeit und Vorgesetztenrouting.</p>{% endif %}
+      </details>
+      {% else %}<p class="text-secondary">Keine Kategorien vorhanden.</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4">
+    <div class="card"><div class="card-header"><i class="fa-solid fa-plus me-2"></i>Weitere Kategorie</div>
+      <div class="card-body">
+        <form method="post" action="/admin/anliegen/kategorie" class="d-grid gap-3">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div><label class="form-label" for="new-cat-name">Name</label>
+            <input class="form-control" id="new-cat-name" name="title" maxlength="160" placeholder="z. B. IT-Störung" required></div>
+          <div><label class="form-label" for="new-cat-kind">Art</label>
+            <select class="form-select" id="new-cat-kind" name="kind">{% for key, label in kinds.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+          <div><label class="form-label" for="new-cat-desc">Beschreibung</label>
+            <textarea class="form-control" id="new-cat-desc" name="description" maxlength="2000" rows="3"></textarea></div>
+          <div><label class="form-label" for="new-cat-route">Routing</label>
+            <select class="form-select" id="new-cat-route" name="routing">
+              {% for key, label in routes.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select></div>
+          <div><label class="form-label" for="new-cat-to">Feste zuständige Person</label>
+            <select class="form-select" id="new-cat-to" name="responsible_id"><option value="0">Keine ausgewählt</option>
+              {% for person in people %}<option value="{{ person.id }}">{{ person.name }} ({{ person.email }})</option>{% endfor %}</select></div>
+          <label class="form-check"><input type="checkbox" name="confidential" class="form-check-input" value="1"><span class="form-check-label">Vertraulich</span></label>
+          <label class="form-check"><input type="checkbox" name="active" class="form-check-input" value="1" checked><span class="form-check-label">Aktiv</span></label>
+          <button type="submit" class="btn btn-primary">Kategorie anlegen</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
