@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Anliegen – Zuständigkeiten{% endblock %}
+{% block title %}Anliegen – Kategorien & Zuständigkeiten{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/anliegen-dashboard.css">{% endblock %}
 {% block content %}
+<div class="anliegen-dashboard anliegen-categories">
 {{ m.page_head('Kategorien & Zuständigkeiten', 'Einfach nachvollziehen, wer was erhält und welche Meldungen noch auf Bearbeitung warten.') }}
 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
   <a href="/anliegen" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zum Anliegen-Eingang</a>
@@ -11,6 +13,51 @@
   <i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>
   <strong>Datenschutz:</strong> Vertrauliche Beschwerden gehen ausschließlich an eine eindeutig zuständige Organisationsleitung. Sie können nicht pauschal umverteilt werden.
 </div>
+<details class="card anliegen-create-card mb-4" id="category-new">
+  <summary class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <span class="fw-semibold"><i class="fa-solid fa-circle-plus me-2 text-primary" aria-hidden="true"></i>Neue Kategorie anlegen</span>
+    <span class="small text-secondary">Bezeichnung, Tags und Zuständigkeit festlegen</span>
+  </summary>
+  <div class="card-body border-top">
+    <form method="post" action="/anliegen/kategorien/neu" class="row g-3">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="col-12 col-lg-6">
+        <label class="form-label fw-semibold" for="new-cat-title">Bezeichnung</label>
+        <input class="form-control" id="new-cat-title" name="title" minlength="3" maxlength="120" required placeholder="z. B. Gebäudemanagement">
+      </div>
+      <div class="col-12 col-lg-6">
+        <label class="form-label fw-semibold" for="new-cat-tags">Schlagwörter / Tags</label>
+        <input class="form-control" id="new-cat-tags" name="tags" maxlength="1000" placeholder="gebäude, hausmeister, reparatur">
+        <div class="form-text">Durch Kommas trennen, höchstens 15 Tags. Sie helfen der KI bei der Zuordnung.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="new-cat-description">Beschreibung für Mitarbeitende und KI</label>
+        <textarea class="form-control" id="new-cat-description" name="description" rows="2" maxlength="255" placeholder="Welche Anliegen gehören in diese Kategorie?"></textarea>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold" for="new-cat-routing">Empfänger bestimmen über</label>
+        <select class="form-select" id="new-cat-routing" name="routing">
+          <option value="person">Eine feste Person</option><option value="lead">Leitung der primären Organisation</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold" for="new-cat-assignee">Fester Ansprechpartner (optional)</label>
+        <select class="form-select" id="new-cat-assignee" name="assignee_id">
+          <option value="0">Noch nicht festgelegt</option>
+          {% for person in users %}<option value="{{ person.id }}">{{ person.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="form-check form-switch">
+          <input class="form-check-input" id="new-cat-enabled" type="checkbox" name="enabled" value="1" checked>
+          <label class="form-check-label" for="new-cat-enabled">Sofort für neue Anliegen anbieten</label>
+        </div>
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Kategorie anlegen</button>
+      </div>
+    </form>
+    <p class="form-text mt-3 mb-0">Neue Kategorien sind zunächst nicht vertraulich. Geschützte Beschwerden bleiben ausschließlich in der vorgesehenen vertraulichen Kategorie.</p>
+  </div>
+</details>
 <div class="row g-3">
 {% for cat in categories %}
   {% set workload = counts.get(cat.id, (0, 0)) %}
@@ -22,7 +69,10 @@
         {% if cat.confidential %}<span class="badge text-bg-warning ms-auto"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Vertraulich</span>{% endif %}
       </div>
       <div class="card-body">
-        <p class="small text-secondary">{{ cat.description }}</p>
+        <p class="small text-secondary mb-2">{{ cat.description or 'Noch keine Beschreibung hinterlegt' }}</p>
+        {% if cat.tags %}<div class="anliegen-category-tags mb-3" aria-label="Schlagwörter">
+          {% for tag in cat.tags.split(',') %}<span class="anliegen-category-tag">{{ tag }}</span>{% endfor %}
+        </div>{% endif %}
         <div class="d-flex flex-wrap gap-2 mb-3">
           <span class="badge text-bg-light border text-body">{{ workload[0] or 0 }} aktive Vorgänge</span>
           {% if workload[1] %}<span class="badge text-bg-warning">{{ workload[1] }} noch ohne Empfänger</span>{% endif %}
@@ -38,6 +88,16 @@
             <label class="form-label fw-semibold" for="cat-title-{{ cat.id }}">Bezeichnung</label>
             <input class="form-control" id="cat-title-{{ cat.id }}" name="title"
                    value="{{ cat.title }}" minlength="3" maxlength="120" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="cat-description-{{ cat.id }}">Beschreibung</label>
+            <textarea class="form-control" name="description" id="cat-description-{{ cat.id }}" maxlength="255" rows="2">{{ cat.description }}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="cat-tags-{{ cat.id }}">Schlagwörter / Tags für die KI</label>
+            <input class="form-control" id="cat-tags-{{ cat.id }}" name="tags" maxlength="1000"
+                   value="{{ cat.tags }}" placeholder="begriff, synonym, arbeitsbereich">
+            <div class="form-text">Kommagetrennt, maximal 15. Änderungen beeinflussen neue KI-Vorschläge, nicht vorhandene Anliegen.</div>
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold" for="cat-route-{{ cat.id }}">Empfänger bestimmen über</label>
@@ -80,5 +140,6 @@
     </div>
   </div>
 {% endfor %}
+</div>
 </div>
 {% endblock %}

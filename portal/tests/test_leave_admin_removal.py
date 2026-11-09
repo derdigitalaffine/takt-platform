@@ -68,6 +68,59 @@ def test_admin_remove_preview_confirmation_audit_and_replay(db, entered):
     db.rollback()
 
 
+def test_admin_removal_is_not_an_actionable_task_and_receipt_can_be_read(db, entered):
+    from app import task_overview
+    person, other, rid, _ = entered
+    admin = login(*ADMIN)
+    preview = admin.get(f"/urlaub/{rid}/loeschen")
+    row = db.get(LeaveRequest, rid)
+    response = admin.post(f"/urlaub/{rid}/loeschen", data=dict(
+        csrf=csrf_of(preview.text), version=row.version,
+        reason="Falsch eingetragene Abwesenheit", confirm="1"))
+    assert response.status_code == 303
+    db.expire_all()
+    receipt = db.scalar(select(LeaveInbox).where(
+        LeaveInbox.request_id == rid, LeaveInbox.user_id == person.id,
+        LeaveInbox.title.like("Urlaubsabwesenheit administrativ gelöscht%")))
+    assert receipt is not None and not receipt.read
+    # Historical evidence remains in the personal inbox, never as a task.
+    view = task_overview.collect(db, db.get(User, person.id), {"calendars"})
+    assert all(rid != item.get("request_id") and "administrativ gelöscht" not in item["title"]
+               for item in view["ready"])
+    employee = login(person.email, "task-passwort-123")
+    inbox = employee.get("/urlaub/mein-urlaub")
+    assert inbox.status_code == 200
+    assert "Urlaubsabwesenheit administrativ gelöscht" in inbox.text
+    assert f'href="/urlaub/vorgang/{rid}"' not in inbox.text
+    outsider = login(other.email, "task-passwort-123")
+    assert outsider.post(f"/urlaub/hinweise/{receipt.id}/lesen", data=dict(
+        csrf=csrf_of(outsider.get("/").text))).status_code == 404
+    assert employee.post(f"/urlaub/hinweise/{receipt.id}/lesen", data=dict(
+        csrf=csrf_of(employee.get("/").text), back="leave")).status_code == 303
+    db.expire_all()
+    assert db.get(LeaveInbox, receipt.id).read is True
+
+
+def test_regular_leave_notice_can_be_dismissed_from_tasks(db, entered):
+    from app import task_overview
+    person, _, _, _ = entered
+    receipt = LeaveInbox(user_id=person.id, request_id=None, title="Information zur Urlaubsplanung")
+    db.add(receipt)
+    db.commit()
+    try:
+        view = task_overview.collect(db, db.get(User, person.id), {"calendars"})
+        item = next(item for item in view["ready"] if item["title"] == receipt.title)
+        assert item["leave_notice_id"] == receipt.id
+        c = login(person.email, "task-passwort-123")
+        assert c.post(f"/urlaub/hinweise/{receipt.id}/lesen", data=dict(
+            csrf=csrf_of(c.get("/").text), back="tasks")).status_code == 303
+        db.expire_all()
+        assert db.get(LeaveInbox, receipt.id).read is True
+    finally:
+        db.delete(db.get(LeaveInbox, receipt.id))
+        db.commit()
+
+
 def test_non_admin_and_stale_admin_remove_fail_closed(db, entered):
     person, other, rid, unit = entered
     c = login(person.email, "task-passwort-123")

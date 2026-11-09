@@ -1,0 +1,78 @@
+/* Internal concerns: shared TAKT design language, compatible with light/dark themes. */
+.anliegen-dashboard { --anliegen-radius: 1.05rem; }
+.anliegen-dashboard .card { border-radius:var(--anliegen-radius); }
+.anliegen-view-grid .anliegen-view-card {
+  border:1px solid var(--bs-border-color);
+  box-shadow:0 .2rem 1rem rgba(20,30,50,.045);
+  transition: border-color .17s ease, box-shadow .17s ease, transform .17s ease;
+  overflow:hidden;
+}
+.anliegen-view-grid .anliegen-view-card .card-body { padding:1.05rem 1.12rem; }
+.anliegen-view-grid .anliegen-view-card:hover,
+.anliegen-view-grid .anliegen-view-card:focus-visible {
+  border-color:var(--bs-primary);
+  box-shadow:0 .4rem 1.5rem rgba(20,30,50,.11);
+  transform:translateY(-2px);
+}
+.anliegen-view-grid .anliegen-view-card[aria-current="page"] {
+  border-color:var(--bs-primary) !important;
+  background:color-mix(in srgb,var(--bs-primary) 5%,var(--bs-body-bg));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bs-primary) 30%,transparent);
+}
+.anliegen-view-grid .anliegen-view-card .rounded-3 { width:3.3rem; height:3.3rem; padding:.8rem !important; flex-shrink:0; }
+.anliegen-view-grid .anliegen-view-card strong { font-size:.97rem; letter-spacing:-.012em; }
+.anliegen-view-grid .anliegen-view-card small { display:block; line-height:1.45; }
+.anliegen-view-grid .anliegen-view-card .badge { font-variant-numeric:tabular-nums; font-size:.78rem; }
+.anliegen-section-heading h2 { font-weight:700; letter-spacing:-.02em; }
+.anliegen-filter-card { border:1px solid var(--bs-border-color); box-shadow:0 .1rem .6rem rgba(20,30,50,.03); }
+.anliegen-filter-card .card-body { padding:1.05rem 1.2rem; }
+.anliegen-filter-card .form-label { font-weight:650; color:var(--bs-secondary-color); }
+.anliegen-filter-card .form-control,
+.anliegen-filter-card .form-select { border-radius:.65rem; }
+.anliegen-results-card { border:1px solid var(--bs-border-color); overflow:hidden; box-shadow:0 .25rem 1.2rem rgba(20,30,50,.045); }
+.anliegen-results-table { --bs-table-hover-bg:color-mix(in srgb,var(--bs-primary) 4%,transparent); }
+.anliegen-results-table th {
+  background:var(--bs-tertiary-bg);
+  color:var(--bs-secondary-color);
+  font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  border-bottom:1px solid var(--bs-border-color); white-space:nowrap;
+  padding:.9rem 1rem;
+}
+.anliegen-results-table td { padding:1rem; vertical-align:middle; border-color:var(--bs-border-color); }
+.anliegen-results-table tbody tr:last-child td { border-bottom:0; }
+.anliegen-results-table td:nth-child(2) { min-width:13rem; }
+.anliegen-results-table td:last-child { min-width:10rem; }
+.anliegen-results-table td .btn { border-radius:.55rem; min-height:2rem; }
+.anliegen-results-table td .badge { padding:.48em .7em; font-weight:600; }
+.anliegen-reference {
+  font-variant-numeric:tabular-nums; font-weight:700; font-size:.74rem;
+  color:var(--bs-secondary-color);
+  background:var(--bs-tertiary-bg); padding:.35rem .55rem; border-radius:.45rem;
+}
+.anliegen-category-label { display:inline-flex; gap:.25rem; align-items:center; }
+.anliegen-category-label i { color:var(--bs-primary); }
+.anliegen-category-tags { display:flex; flex-wrap:wrap; gap:.35rem; }
+.anliegen-category-tag {
+  display:inline-flex; align-items:center; padding:.24rem .52rem;
+  color:var(--bs-primary-text-emphasis); background:var(--bs-primary-bg-subtle);
+  border:1px solid color-mix(in srgb,var(--bs-primary) 15%,transparent);
+  border-radius:100px; font-size:.73rem; font-weight:550;
+}
+.anliegen-categories .card { overflow:hidden; }
+.anliegen-categories .card-header { padding:.9rem 1.1rem; background:var(--bs-tertiary-bg); }
+.anliegen-categories .card-body { padding:1.15rem; }
+.anliegen-create-card > summary { list-style:none; cursor:pointer; }
+.anliegen-create-card > summary::-webkit-details-marker { display:none; }
+.anliegen-create-card[open] > summary { color:var(--bs-primary); }
+.anliegen-dashboard :is(a,button,input,select,textarea,summary):focus-visible {
+  outline:2px solid var(--bs-primary); outline-offset:2px;
+}
+@media (max-width:767px) {
+  .anliegen-view-grid .anliegen-view-card .card-body { padding:.85rem; }
+  .anliegen-results-table th,.anliegen-results-table td { padding:.8rem; }
+  .anliegen-section-heading { padding:0 .1rem; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .anliegen-view-grid .anliegen-view-card { transition:none; }
+  .anliegen-view-grid .anliegen-view-card:hover { transform:none; }
+}

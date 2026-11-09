@@ -2951,6 +2951,7 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "anliegen_categories": {"tags": "TEXT NOT NULL DEFAULT ''"},
     "anliegen": {
         "title_enc": "TEXT",
         "description_enc": "TEXT",

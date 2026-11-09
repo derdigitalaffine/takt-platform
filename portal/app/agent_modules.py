@@ -58,11 +58,14 @@ def search(db, user, spec):
     phrase = _term(spec.get("query"))
     pattern = _like(phrase)
     if tool == "search_anliegen_categories":
-        query = select(AnliegenCategory).where(AnliegenCategory.confidential.is_(False), or_(AnliegenCategory.title.ilike(pattern, escape="\\"), AnliegenCategory.key.ilike(pattern, escape="\\")))
+        query = select(AnliegenCategory).where(AnliegenCategory.confidential.is_(False), or_(AnliegenCategory.title.ilike(pattern, escape="\\"), AnliegenCategory.key.ilike(pattern, escape="\\"),
+                         AnliegenCategory.description.ilike(pattern, escape="\\"),
+                         AnliegenCategory.tags.ilike(pattern, escape="\\")))
         if not user.is_admin:
             query = query.where(AnliegenCategory.enabled.is_(True))
         return [dict(type="anliegen_category", id=c.id, title=c.title, key=c.key, routing=c.routing,
                      assignee_id=c.assignee_id, enabled=c.enabled, description=c.description,
+                     tags=[tag for tag in c.tags.split(',') if tag],
                      url="/anliegen/kategorien" if user.is_admin else "/anliegen/neu") for c in db.scalars(query.order_by(AnliegenCategory.position).limit(20))]
     if tool == "search_calendars":
         rows = db.scalars(select(Calendar).where(Calendar.title.ilike(pattern, escape="\\")).order_by(Calendar.id))

@@ -317,6 +317,7 @@ def page(
                 .limit(50)
             )) if section == "mein-urlaub" else []
         ),
+        removed_notice_requests=set(db.scalars(removed_ids())),
         accounts=(
             leave_rules.account_balances(db, user.id)
             if section == "mein-urlaub" and personal_unit

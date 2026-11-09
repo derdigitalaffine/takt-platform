@@ -40,10 +40,21 @@ def collect(db, user, modules, *, now=None):
                     due=due, scope=scope, detail=detail, icon=icon, late=bool(due and due < now), **extra)
 
     if 'calendars' in modules:
-        from sqlalchemy import select
+        from sqlalchemy import select, or_
         from .leave_extensions import LeaveInbox
-        for notice in db.scalars(select(LeaveInbox).where(LeaveInbox.user_id == user.id, LeaveInbox.read.is_(False)).order_by(LeaveInbox.id.desc()).limit(200)):
-            ready.append(entry('leave', notice.title, f'/urlaub/vorgang/{notice.request_id}' if notice.request_id else '/urlaub', 'Ansehen', icon='fa-calendar-check', detail='Urlaubsplanung · neuer Hinweis'))
+        from .leave_admin import removed_ids
+        # Administrative deletions are audit notifications, not pending work.
+        # Keep their receipt in the personal leave inbox, not in the task queue.
+        notices = select(LeaveInbox).where(
+            LeaveInbox.user_id == user.id, LeaveInbox.read.is_(False),
+            or_(LeaveInbox.request_id.is_(None), LeaveInbox.request_id.not_in(removed_ids())),
+            ~LeaveInbox.title.like('Urlaubsabwesenheit administrativ gelöscht%'),
+        ).order_by(LeaveInbox.id.desc()).limit(200)
+        for notice in db.scalars(notices):
+            ready.append(entry('leave', notice.title,
+                               f'/urlaub/vorgang/{notice.request_id}' if notice.request_id else '/urlaub',
+                               'Ansehen', icon='fa-calendar-check', detail='Urlaubsplanung · neuer Hinweis',
+                               leave_notice_id=notice.id))
     if 'tasks' in modules:
         from . import tasks as native
         from .task_models import Task, TaskCheck

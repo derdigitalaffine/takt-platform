@@ -2,7 +2,7 @@
 
 import json, math
 from datetime import date
-from fastapi import Depends, Request, HTTPException
+from fastapi import Depends, Request, HTTPException, Form
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .main import app, current_user, get_db, check_csrf, redirect, flash
@@ -25,6 +25,18 @@ def number(raw):
         return int(raw)
     except (ValueError, TypeError):
         raise HTTPException(422, "Gültige Auswahl erforderlich.")
+
+
+@app.post("/urlaub/hinweise/{notice_id:int}/lesen", dependencies=[Depends(check_csrf)])
+def dismiss_leave_notice(notice_id: int, back: str = Form(""),
+                         user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Only the addressee can acknowledge a notification from their task list."""
+    notice = db.get(LeaveInbox, notice_id)
+    if notice is None or notice.user_id != user.id:
+        raise HTTPException(404)
+    notice.read = True
+    db.commit()
+    return redirect('/urlaub/mein-urlaub' if back == 'leave' else '/tasks')
 
 
 @app.post("/urlaub/konfiguration", dependencies=[Depends(check_csrf)])
