@@ -21,7 +21,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
 from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector
-from . import ai_knowledge, ai_provider, ai_vector, ai_web
+from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web
 from .db import LawText, User, SessionLocal, get_settings, set_setting, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
                    flash, get_db, rate_limit, redirect, render, require)
@@ -105,7 +105,7 @@ def admin_ai(request: Request, edit: int | None = None, user: User = Depends(adm
                   masked_text=mask_secret(decrypt(selected.text_key_enc)) if selected else "",
                   masked_image=mask_secret(decrypt(selected.image_key_enc)) if selected else "",
                   cfg=cfg, docs=docs, laws=laws, allowed_laws=allowed,
-                   vector_count=vector_count,
+                   vector_count=vector_count, vector_jobs=ai_vector_jobs.counts(db),
                    masked_web_key=mask_secret(decrypt(cfg.get('ai_web_key_enc', ''))))
 
 
@@ -281,6 +281,7 @@ def admin_ai_knowledge_save(request: Request, doc_id: int = Form(0), title: str 
     doc.body_md = body_md
     doc.enabled = enabled == "1"
     doc.updated_at = utcnow()
+    ai_vector_jobs.enqueue_document(db, doc)
     db.commit()
     flash(request, "Interner Wissenseintrag gespeichert.")
     return redirect("/admin/ai#knowledge")
@@ -309,7 +310,9 @@ async def admin_ai_knowledge_upload(request: Request, file: UploadFile = File(..
     if not body.strip() or len(body) > 80_000:
         raise HTTPException(400, "Der erkannte Dokumenttext ist leer oder zu lang.")
     label = title.strip()[:200] or filename.rsplit("/", 1)[-1][:200]
-    db.add(AIKnowledge(title=label, body_md=body, enabled=enabled == "1"))
+    doc = AIKnowledge(title=label, body_md=body, enabled=enabled == "1")
+    db.add(doc)
+    ai_vector_jobs.enqueue_document(db, doc)
     db.commit()
     flash(request, "Dokument als interner Wissenseintrag eingelesen. Das Original wird nicht gespeichert.")
     return redirect("/admin/ai#knowledge")
