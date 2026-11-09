@@ -150,9 +150,13 @@ def exercise(page):
     assert frame.evaluate("document.documentElement.scrollHeight <= innerHeight + 1 && document.querySelector('[data-ai-chat-form]').getBoundingClientRect().bottom <= innerHeight + 1")
     page.screenshot(path=str(OUTPUT / 'agent-dock-mobile.png'), full_page=True)
     chat.get_by_role('button', name='Nachricht senden', exact=True).click()
-    # Even in the floating dock, the assistant must never take over the host
-    # page. Only a click on the offered link may move into the native form.
-    expect(page).to_have_url(re.compile(r'127\.0\.0\.1:8765/
+    # The floating dock cannot navigate the host page without a click.
+    expect(page).to_have_url(re.compile(r'127\.0\.0\.1:8765/$'))
+    expect(chat.locator('.ai-agent-destination a')).to_be_visible()
+    chat.locator('.ai-agent-destination a').click()
+    try:
+        expect(page).to_have_url(re.compile(r'/forms\?agent_plan='))
+    except Exception:
         print('Dock errors:', errors, flush=True)
         print('Dock chat:', chat.locator('body').inner_text(), flush=True)
         raise
