@@ -278,7 +278,7 @@ def test_rule_lifecycle_http_and_pinned_version(bundle):
         "csrf": csrf_of(approvals.text)})
     assert approved.status_code == 303
     with SessionLocal() as db:
-        db.refresh(run)
+        run = db.get(AnliegenProcessRun, run.id)
         assert run.state == "running"
         first = db.scalar(select(AnliegenProcessTask).where(
             AnliegenProcessTask.run_id == run.id))
@@ -314,7 +314,7 @@ def test_four_eyes_review_versioning_stale_and_supersede(bundle):
         rid = rule.id
     csrf = _csrf(author, "/anliegen/prozesse")
     clone = author.post(f"/anliegen/prozesse/{rid}", data={
-        "csrf": csrf, "action": "revise", "state_version": "1"})
+        "csrf": csrf, "action": "revise", "state_version": "2"})
     assert clone.status_code == 303
     with SessionLocal() as db:
         new = db.scalar(select(AnliegenProcessRule).where(
