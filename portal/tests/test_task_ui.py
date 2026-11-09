@@ -24,6 +24,10 @@ def test_workplace_keeps_a_single_primary_action_and_quick_capture(db,task_peopl
     assert len(actions.primary)==1 and actions.primary[0]['href'].startswith('/aufgaben/neu?')
     assert 'id="capture-text"' in html and 'Aufgabe erfassen' in html
     assert 'nav nav-tabs task-perspectives' in html
+    assert 'task-hero' in html and 'task-hero-eyebrow' in html
+    assert 'task-summary' in html and 'task-stat-primary' in html
+    assert 'task-modern.css' in html
+    assert 'perspective=overdue' in html and 'perspective=group' in html
     assert 'Ansicht' in actions.groups and 'btn-group btn-group-sm task-view-switch' in html
     preview=c.post('/aufgaben/vorschau',data={'csrf':token,'capture':'Ein neuer Schritt morgen'})
     assert preview.status_code==200 and 'Kurz prüfen, dann loslegen' in preview.text
