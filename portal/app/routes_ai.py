@@ -85,10 +85,12 @@ def _message_view(db: Session, user: User, row: AIMessage) -> dict:
     except (TypeError, ValueError):
         sources = [{"url": "", "title": "Ungültige Quellenreferenz"}]
     if not isinstance(sources, list) or not ai_knowledge.sources_accessible(db, user, sources):
-        return {"role": row.role, "content": "[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]",
+        return {"id": row.id, "forkable": False,
+                "role": row.role, "content": "[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]",
                 "html": Markup(_ai_markdown("[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]")),
                 "sources": [], "model": row.model_id}
-    return {"role": row.role, "content": row.content,
+    return {"id": row.id, "forkable": True,
+            "role": row.role, "content": row.content,
             "html": Markup(_ai_markdown(row.content)) if row.role == "assistant" else None,
             "sources": sources, "model": row.model_id}
 
@@ -763,13 +765,15 @@ async def ai_message_updates(
         {"type": "image_url", "image_url": {"url": image_url, "detail": "low"}},
     ]
     messages.append({"role": "user", "content": content})
-    db.add(AIMessage(conversation_id=chat_id, role="user",
-                     content=message + ("\n[Bild für diese Anfrage verarbeitet; nicht gespeichert.]"
-                                        if image_url else "")))
+    user_message = AIMessage(conversation_id=chat_id, role="user",
+                             content=message + ("\n[Bild für diese Anfrage verarbeitet; nicht gespeichert.]"
+                                                if image_url else ""))
+    db.add(user_message)
     if not history:
         convo.title = message[:100]
     convo.updated_at = utcnow()
     db.commit()
+    user_message_id = user_message.id
     # Session-dependent ORM objects must not outlive the request dependency.
     profile = SimpleNamespace(
         id=provider.id, active=provider.active, base_url=provider.base_url,
@@ -850,15 +854,19 @@ async def ai_message_updates(
                                 not actor.can("ai_chat") or "ai" not in enabled_modules()):
                             yield _sse("error", {"message": "Die Unterhaltung ist nicht mehr freigegeben."})
                             return
-                        store.add(AIMessage(
+                        assistant_message = AIMessage(
                             conversation_id=chat_id, role="assistant", content=answer,
                             sources_json=json.dumps(links, ensure_ascii=False),
                             model_id=profile.model_id,
-                        ))
+                        )
+                        store.add(assistant_message)
                         current.updated_at = utcnow()
                         store.commit()
+                        assistant_message_id = assistant_message.id
                     yield _sse("done", {"sources": links, "model": profile.model_id,
-                                        "html": _ai_markdown(answer)})
+                                        "html": _ai_markdown(answer),
+                                        "user_message_id": user_message_id,
+                                        "assistant_message_id": assistant_message_id})
                     return
         finally:
             if not producer.done():
@@ -870,6 +878,77 @@ async def ai_message_updates(
                              headers={"Cache-Control": "no-store, no-transform",
                                       "X-Accel-Buffering": "no",
                                       "X-Content-Type-Options": "nosniff"})
+
+
+@app.post("/ki/{chat_id:int}/model", dependencies=[Depends(check_csrf)])
+def ai_change_chat_model(
+    request: Request, chat_id: int, provider_id: int = Form(...),
+    user: User = Depends(chat_user), db: Session = Depends(get_db),
+):
+    """Only an active admin-approved model may be used for future replies."""
+    convo = _conversation(db, chat_id, user)
+    provider = _provider(db, provider_id, active=True)
+    convo.provider_id = provider.id
+    convo.updated_at = utcnow()
+    db.commit()
+    flash(request, "Modell gewechselt. Bestehende Antworten und deren Modellangaben bleiben unverändert.")
+    return redirect(f"/ki?chat={chat_id}")
+
+
+@app.post("/ki/{chat_id:int}/fork", dependencies=[Depends(check_csrf)])
+def ai_fork_chat(
+    request: Request, chat_id: int, message_id: int = Form(...),
+    user: User = Depends(chat_user), db: Session = Depends(get_db),
+):
+    """Create a private independent fork through one earlier message.
+
+    Reject cloning any stored response whose current sources are inaccessible.
+    The copied transcript is limited to the newest 120 preceding messages to
+    avoid an unbounded POST; originals are never edited. No provider calls.
+    """
+    original = _conversation(db, chat_id, user)
+    if db.scalar(select(AIMessage.id).where(
+        AIMessage.id == message_id,
+        AIMessage.conversation_id == original.id,
+    )) is None:
+        raise HTTPException(404, "Ausgewählte Nachricht nicht gefunden.")
+    _selected_provider(db, original)
+    messages = list(db.scalars(
+        select(AIMessage).where(
+            AIMessage.conversation_id == original.id,
+            AIMessage.id <= message_id,
+        ).order_by(AIMessage.id.desc()).limit(120)
+    ))
+    messages.reverse()
+    if not messages:
+        raise HTTPException(404, "Keine Nachrichten zum Verzweigen.")
+    for item in messages:
+        if item.role not in ("user", "assistant"):
+            raise HTTPException(409, "Die Unterhaltung enthält einen unzulässigen Nachrichtentyp.")
+        if item.role == "assistant":
+            try:
+                citations = json.loads(item.sources_json or "[]")
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(409, "Eine Quellreferenz ist ungültig.") from exc
+            if not isinstance(citations, list) or not ai_knowledge.sources_accessible(db, user, citations):
+                raise HTTPException(409, "Zuerst den Quellenzugriff prüfen: Eine ältere Antwort ist nicht mehr freigegeben.")
+    branch = AIConversation(
+        owner_id=user.id,
+        provider_id=original.provider_id,
+        title=("Abzweig: " + original.title)[:160],
+    )
+    db.add(branch)
+    db.flush()
+    for item in messages:
+        db.add(AIMessage(
+            conversation_id=branch.id,
+            role=item.role, content=item.content,
+            sources_json=item.sources_json,
+            model_id=item.model_id,
+        ))
+    db.commit()
+    flash(request, f"Neuer, unabhängiger Gesprächszweig mit {len(messages)} Nachrichten erstellt.")
+    return redirect(f"/ki?chat={branch.id}")
 
 
 @app.post("/ki/{chat_id:int}/rename", dependencies=[Depends(check_csrf)])
