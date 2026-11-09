@@ -5,6 +5,7 @@ enabled by an administrator; rights and publication state are checked for
 every request, including citations shown to the user.
 """
 import re
+import hashlib
 from datetime import date
 from sqlalchemy import select
 
@@ -15,6 +16,23 @@ from . import laws
 _WORD_RE = re.compile(r"[^\W_]{3,}", re.UNICODE)
 _DAY_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 _DE_DAY_RE = re.compile(r"\b(\d{2})\.(\d{2})\.(\d{4})\b")
+def revision(*parts: object) -> str:
+    """Version token for a cited source. No document contents stored in messages."""
+    payload = "\x00".join(str(part if part is not None else "") for part in parts)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def knowledge_revision(doc: AIKnowledge) -> str:
+    return revision(doc.title, doc.body_md)
+
+
+def law_revision(law, version=None) -> str:
+    if version is not None:
+        return revision(law.id, law.slug, version.id, version.body_md,
+                        version.valid_from, version.public, version.internal)
+    return revision(law.id, law.slug, law.body_md, law.valid_from, law.published)
+
+
 _STOP = {"und", "die", "der", "das", "ist", "sind", "ein", "eine", "einer", "oder",
          "mit", "für", "von", "zur", "zum", "auf", "des", "den", "wie", "was",
          "welche", "welcher", "welches", "kann", "ich", "mir", "bitte", "über"}
@@ -59,7 +77,8 @@ def retrieve(db, user, question: str, limit: int = 5) -> list[dict]:
         score = _score(doc.title, body, words)
         if score > 0:
             found.append((score, {"title": doc.title, "url": f"/ki/wissen/{doc.id}",
-                                  "text": body[:1800], "kind": "Internes Wissen"}))
+                                  "text": body[:1800], "kind": "Internes Wissen",
+                                  "revision": knowledge_revision(doc)}))
 
     # The current authenticated user may read published internal laws;
     # unpublished drafts are never exposed by AI retrieval.
@@ -84,11 +103,13 @@ def retrieve(db, user, question: str, limit: int = 5) -> list[dict]:
                     ]
                     url_prefix = f"/recht/{law.slug}/fassung/{version.id}"
                     validity = f"Fassung gültig ab {version.valid_from or 'unbekannt'}"
+                    current_revision = law_revision(law, version)
                 else:
                     segments = [(s.number, s.title, s.plain, s.anchor) for s in law.sections
                                 if s.kind != "group"]
                     url_prefix = f"/recht/{law.slug}"
                     validity = f"Gültig ab {law.valid_from or 'unbekannt'}"
+                    current_revision = law_revision(law)
             else:
                 segments = [(s.number, s.title, s.plain, s.anchor) for s in law.sections
                             if s.kind != "group"]
@@ -105,6 +126,7 @@ def retrieve(db, user, question: str, limit: int = 5) -> list[dict]:
                         "url": url_prefix + ("/" + anchor if anchor else ""),
                         "text": plain[:1800],
                         "kind": "Rechtstext",
+                        "revision": current_revision,
                     }))
     found.sort(key=lambda pair: pair[0], reverse=True)
     return [item for _score_value, item in found[:max(0, min(limit, 8))]]
@@ -155,6 +177,8 @@ def sources_accessible(db, user, sources: list[dict]) -> bool:
             doc = db.get(AIKnowledge, doc_id)
             if doc is None or not doc.enabled:
                 return False
+            if source.get("revision") and source["revision"] != knowledge_revision(doc):
+                return False
         elif path.startswith("/recht/"):
             if cfg.get("module_laws", "1") != "1":
                 return False
@@ -172,6 +196,10 @@ def sources_accessible(db, user, sources: list[dict]) -> bool:
                     return False
                 if version.internal and not user.can("laws"):
                     return False
+                if source.get("revision") and source["revision"] != law_revision(law, version):
+                    return False
+            elif source.get("revision") and source["revision"] != law_revision(law):
+                return False
         else:
             return False
     return True
