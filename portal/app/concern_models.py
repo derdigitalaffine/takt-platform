@@ -56,6 +56,10 @@ class Concern(Base):
     )
     title: Mapped[str] = mapped_column(String(240))
     description: Mapped[str] = mapped_column(Text)
+    # For confidential cases these two plaintext fields contain no confidential
+    # narratives; the real contents are encrypted using TAKT's existing Fernet key.
+    title_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidential: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
@@ -64,6 +68,20 @@ class Concern(Base):
     reporter = relationship("User", foreign_keys=[reporter_id])
     assignee = relationship("User", foreign_keys=[assignee_id])
     task = relationship("Task", foreign_keys=[task_id])
+
+    @property
+    def display_title(self) -> str:
+        if self.confidential:
+            from .security import decrypt
+            return decrypt(self.title_enc) or "Vertrauliches Anliegen"
+        return self.title
+
+    @property
+    def display_description(self) -> str:
+        if self.confidential:
+            from .security import decrypt
+            return decrypt(self.description_enc) or ""
+        return self.description
 
     @property
     def reference(self) -> str:
