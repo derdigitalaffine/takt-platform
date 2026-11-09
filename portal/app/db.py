@@ -2935,6 +2935,7 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "anliegen": {"title_enc": "TEXT", "description_enc": "TEXT"},
     "ai_providers": {"stream_enabled": "BOOLEAN NOT NULL DEFAULT 0"},
     "leave_policies": {"holiday_state": "VARCHAR(8) NOT NULL DEFAULT 'inherit'",
                        "external_attestation": "BOOLEAN NOT NULL DEFAULT 0"},
@@ -3086,6 +3087,25 @@ def init_db() -> None:
     from . import anliegen_models  # noqa: F401 – register additive internal request tables
     Base.metadata.create_all(engine)
     _migrate()
+    # One-way idempotent migration: encrypt any pre-existing confidential
+    # complaints before serving requests from this application version.
+    from .anliegen_models import Anliegen
+    from .security import encrypt
+    with SessionLocal() as db:
+        changed = False
+        for item in db.scalars(select(Anliegen).where(Anliegen.confidential.is_(True))):
+            if not item.title_enc:
+                item.title_enc = encrypt(item.title)
+                changed = True
+            if not item.description_enc:
+                item.description_enc = encrypt(item.description)
+                changed = True
+            if item.title != "Vertrauliches Anliegen" or item.description:
+                item.title = "Vertrauliches Anliegen"
+                item.description = ""
+                changed = True
+        if changed:
+            db.commit()
     with SessionLocal() as db:
         for key, value in DEFAULT_SETTINGS.items():
             if db.get(Setting, key) is None:
