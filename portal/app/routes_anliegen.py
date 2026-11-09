@@ -68,7 +68,12 @@ def list_anliegen(request: Request, scope: str = "assigned", category_id: int = 
                   scope=scope, selected_category=category_id, selected_status=status,
                   query=q, assigned_count=assigned_count, reported_count=reported_count,
                   manage=user.can("anliegen_manage"),
-                  may_submit=user.can("anliegen_submit"))
+                  may_submit=user.can("anliegen_submit"),
+                  quick_actions={case.id: [
+                      key for key in ("in_progress", "ordered", "partially_delivered",
+                                      "delivered", "done")
+                      if key in service.choices(case)
+                  ][:2] if service.can_handle(user, case) else [] for case in cases})
 
 @app.get("/anliegen/neu")
 def new_anliegen(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
