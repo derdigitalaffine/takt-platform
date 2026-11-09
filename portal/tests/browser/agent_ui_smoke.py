@@ -104,13 +104,40 @@ def exercise(page):
     page.get_by_role('button', name='TAKT Agent', exact=True).click()
     expect(page.locator('#agent-dock-panel')).to_be_visible()
     chat = page.frame_locator('[data-agent-frame]')
-    chat.locator('.ai-chat-conversations > summary').click()
-    chat.get_by_role('button', name='Neuer Chat', exact=True).click()
+    chat.locator('.agent-embedded-tools').get_by_role('button', name='Neuer Chat', exact=True).click()
     expect(chat.locator('[name="chat_id"]')).not_to_have_value('1')
     chat.locator('#ai-prompt').fill('Erstelle mir ein Formular mit dem ich die Geburtstage der Belegschaft abfragen kann')
+    frame = next(f for f in page.frames if '/agent?chat=' in f.url)
+    frame.evaluate("""() => {
+      const list = document.querySelector('[data-ai-messages]');
+      list.querySelector('[data-ai-empty]')?.remove();
+      for (let i = 0; i < 30; i++) {
+        const item = document.createElement('li'); item.className = 'ai-message';
+        item.textContent = 'Lange Testnachricht zur Prüfung des Nachrichtenverlaufs. '.repeat(8); list.append(item);
+      }
+    }""")
+    metrics = frame.evaluate("""() => {
+      const history = document.querySelector('[data-ai-scroll-area]');
+      const composer = document.querySelector('[data-ai-chat-form]').getBoundingClientRect();
+      return {page: document.documentElement.scrollHeight, height: innerHeight, bottom: composer.bottom,
+              history: history.clientHeight, scroll: history.scrollHeight,
+              scrolls: [...document.querySelectorAll('body *')].filter(e => e.tagName !== 'TEXTAREA' && ['auto','scroll'].includes(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1).map(e => e.className)};
+    }""")
+    assert not frame.locator('.app-navbar').is_visible()
+    assert metrics['page'] <= metrics['height'] + 1, metrics
+    assert metrics['bottom'] <= metrics['height'] + 1 and metrics['history'] > 50, metrics
+    assert metrics['scroll'] > metrics['history'], metrics
+    assert len(metrics['scrolls']) == 1 and 'ai-chat-history' in metrics['scrolls'][0], metrics
+    with page.expect_popup() as detached:
+      page.locator('[data-agent-detach]').click()
+    detached_page = detached.value
+    expect(detached_page).to_have_url(re.compile(r'/agent\?chat=[0-9]+'))
+    assert detached_page.evaluate('window.opener === null')
+    detached_page.close()
     assert page.locator('#agent-dock-panel').bounding_box()['x'] > 700
     page.screenshot(path=str(OUTPUT / 'agent-dock-desktop.png'), full_page=True)
     page.set_viewport_size(dict(width=390, height=844))
+    assert frame.evaluate("document.documentElement.scrollHeight <= innerHeight + 1 && document.querySelector('[data-ai-chat-form]').getBoundingClientRect().bottom <= innerHeight + 1")
     page.screenshot(path=str(OUTPUT / 'agent-dock-mobile.png'), full_page=True)
     chat.get_by_role('button', name='Nachricht senden', exact=True).click()
     try:
