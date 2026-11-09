@@ -1,40 +1,105 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}Anliegen ANL-{{'%06d'|format(case.id)}}{% endblock %}
+{% block title %}Anliegen ANL-{{ '%06d'|format(case.id) }}{% endblock %}
 {% block content %}
-{{m.page_head('Anliegen ANL-' ~ ('%06d'|format(case.id)), 'Interner Vorgang mit Zuständigkeits- und Bearbeitungsnachweis.')}}
-<p class="mb-3"><a href="/anliegen"><i class="fa-solid fa-arrow-left me-1"></i>Zurück zu meinen Anliegen</a></p>
-<div class="row g-3"><div class="col-12 col-xl-8">
-  <article class="card"><div class="card-body">
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-3"><span class="badge text-bg-primary">{{case.category.title}}</span><span class="badge text-bg-{{'success' if case.status in ('done','closed') else 'secondary'}}">{{statuses[case.status]}}</span>{% if case.confidential %}<span class="badge text-bg-warning"><i class="fa-solid fa-lock me-1"></i>Vertraulich</span>{% endif %}</div>
-    <h2 class="h4">{{case.title}}</h2>
-    <div class="text-break" style="white-space:pre-wrap">{{case.description}}</div>
-    <hr><dl class="row small mb-0">
-      <dt class="col-sm-4">Gemeldet von</dt><dd class="col-sm-8">{{case.reporter.name}}</dd>
-      <dt class="col-sm-4">Zuständig</dt><dd class="col-sm-8">{{case.assignee.name if case.assignee else 'Nicht eindeutig ermittelt'}}</dd>
-      <dt class="col-sm-4">Eingereicht</dt><dd class="col-sm-8">{{case.created_at|local('%d.%m.%Y %H:%M')}}</dd>
-      {% if case.task_id and tasks_enabled %}<dt class="col-sm-4">TAKT-Aufgabe</dt><dd class="col-sm-8"><a href="/aufgaben/{{case.task_id}}">Aufgabe #{{case.task_id}} öffnen</a></dd>{% endif %}
-    </dl>
-  </div></article>
-  <section class="card mt-3"><div class="card-header">Bearbeitungsverlauf</div><div class="card-body">
-    <ol class="list-unstyled mb-0">{% for event in events %}<li class="border-bottom pb-2 mb-2 small"><strong>{{event.kind}}</strong> – {{event.note}}<div class="text-secondary">{{event.created_at|local('%d.%m.%Y %H:%M')}}</div></li>{% else %}<li>Keine Einträge.</li>{% endfor %}</ol>
-  </div></section>
-</div><div class="col-12 col-xl-4">
-  {% if can_handle %}
-  <div class="card mb-3"><div class="card-header">Bearbeitung</div><div class="card-body">
-    {% if choices %}<form method="post" action="/anliegen/{{case.id}}/status">
-      <input type="hidden" name="csrf" value="{{csrf}}">
-      <label class="form-label" for="anliegen-next">Nächster Status</label><select class="form-select mb-3" id="anliegen-next" name="status">
-        {% for choice in choices|sort %}<option value="{{choice}}">{{statuses[choice]}}</option>{% endfor %}
-      </select><button type="submit" class="btn btn-primary">Status ändern</button>
-    </form>{% else %}<p class="small text-secondary">Kein weiterer Statuswechsel möglich.</p>{% endif %}
-  </div></div>{% endif %}
-  {% if people %}<div class="card mb-3"><div class="card-header">Zuständigkeit ändern</div><div class="card-body">
-    <form method="post" action="/anliegen/{{case.id}}/assign"><input type="hidden" name="csrf" value="{{csrf}}">
-    <label class="form-label" for="anliegen-assignee">Verantwortliche Person</label><select class="form-select mb-3" name="assignee_id" id="anliegen-assignee">
-    {% for person in people %}<option value="{{person.id}}" {% if case.assignee_id==person.id %}selected{% endif %}>{{person.name}}</option>{% endfor %}
-    </select><button type="submit" class="btn btn-outline-primary">Zuweisen</button></form>
-  </div></div>{% endif %}
-  {% if case.status=='unassigned' %}<div class="alert alert-warning small">Für dieses Anliegen konnte keine eindeutige Zuständigkeit ermittelt werden. {% if case.confidential %}Bitte wenden Sie sich direkt an Ihre zuständige Leitung; diese Meldung wird nicht automatisch weitergegeben.{% else %}Die Anliegenverwaltung kann eine Person zuweisen.{% endif %}</div>{% endif %}
-</div></div>
+{{ m.page_head('Anliegen ANL-' ~ ('%06d'|format(case.id)), 'Verantwortlichkeit, Lieferung und Bearbeitungsverlauf an einem Ort.') }}
+<p><a href="/anliegen?scope=assigned"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zum Anliegen-Eingang</a></p>
+<div class="row g-3">
+  <div class="col-12 col-xl-8">
+    <article class="card">
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+          <span class="badge text-bg-primary">{{ case.category.title }}</span>
+          <span class="badge text-bg-{{ 'success' if case.status in ('delivered','done','closed') else ('warning' if case.status == 'unassigned' else 'secondary') }}">{{ statuses[case.status] }}</span>
+          {% if case.confidential %}<span class="badge text-bg-warning"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Vertraulich</span>{% endif %}
+          {% if case.category.procurement %}<span class="badge text-bg-light border text-body"><i class="fa-solid fa-boxes-stacked me-1" aria-hidden="true"></i>Beschaffung</span>{% endif %}
+        </div>
+        <h2 class="h4">{{ case.title }}</h2>
+        <p class="text-break" style="white-space:pre-wrap">{{ case.description }}</p>
+        <hr>
+        <dl class="row small mb-0">
+          <dt class="col-sm-4">Meldende Person</dt><dd class="col-sm-8">{{ case.reporter.name }}</dd>
+          <dt class="col-sm-4">Zuständig</dt><dd class="col-sm-8">{{ case.assignee.name if case.assignee else 'Noch keine eindeutige Zuordnung' }}</dd>
+          <dt class="col-sm-4">Eingereicht</dt><dd class="col-sm-8">{{ case.created_at|local('%d.%m.%Y %H:%M') }}</dd>
+          {% if case.category.procurement %}
+          <dt class="col-sm-4">Lieferant</dt><dd class="col-sm-8">{{ case.supplier_name or 'Noch nicht erfasst' }}</dd>
+          <dt class="col-sm-4">Bestellreferenz</dt><dd class="col-sm-8">{{ case.order_reference or 'Noch nicht erfasst' }}</dd>
+          {% endif %}
+          {% if case.task_id and tasks_enabled %}
+          <dt class="col-sm-4">Verknüpfte Aufgabe</dt><dd class="col-sm-8"><a href="/aufgaben/{{ case.task_id }}">Aufgabe #{{ case.task_id }} öffnen</a></dd>
+          {% endif %}
+        </dl>
+      </div>
+    </article>
+    <section class="card mt-3">
+      <div class="card-header"><i class="fa-solid fa-clock-rotate-left me-1" aria-hidden="true"></i>Verlauf</div>
+      <div class="card-body">
+        <ol class="list-unstyled mb-0">
+          {% for event in events %}
+          <li class="d-flex gap-3 border-bottom pb-3 mb-3">
+            <span class="text-primary"><i class="fa-solid {{ 'fa-truck-fast' if event.kind == 'status' and 'Liefer' in event.note else 'fa-circle-check' }}" aria-hidden="true"></i></span>
+            <div><div class="small fw-semibold">{{ event.note }}</div>
+              <div class="small text-secondary">{{ event.created_at|local('%d.%m.%Y %H:%M') }}</div></div>
+          </li>
+          {% else %}<li class="small text-secondary">Noch kein Bearbeitungseintrag.</li>{% endfor %}
+        </ol>
+      </div>
+    </section>
+  </div>
+  <div class="col-12 col-xl-4">
+    {% if can_handle %}
+    <section class="card mb-3">
+      <div class="card-header"><i class="fa-solid fa-bolt me-1" aria-hidden="true"></i>Schnell bearbeiten</div>
+      <div class="card-body">
+        {% if choices %}
+        <form method="post" action="/anliegen/{{ case.id }}/status" class="d-grid gap-3">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if case.category.procurement %}
+          <div>
+            <label class="form-label" for="anliegen-supplier">Lieferant</label>
+            <input class="form-control" id="anliegen-supplier" name="supplier_name" maxlength="160" value="{{ case.supplier_name }}" placeholder="z. B. Büroausstattung">
+          </div>
+          <div>
+            <label class="form-label" for="anliegen-ref">Bestell- oder Vorgangsnummer</label>
+            <input class="form-control" id="anliegen-ref" name="order_reference" maxlength="160" value="{{ case.order_reference }}" placeholder="Optional">
+          </div>
+          {% endif %}
+          <div>
+            <label class="form-label fw-semibold" for="anliegen-next">Nächster Schritt</label>
+            <select class="form-select" id="anliegen-next" name="status" required>
+              {% for state in choices|sort %}<option value="{{ state }}">{{ statuses[state] }}</option>{% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Status übernehmen</button>
+        </form>
+        {% else %}<p class="small text-secondary mb-0">Dieser Vorgang ist bereits abgeschlossen.</p>{% endif %}
+      </div>
+    </section>
+    {% endif %}
+    {% if people %}
+    <section class="card mb-3">
+      <div class="card-header">Zuständigkeit ändern</div>
+      <div class="card-body">
+        <form method="post" action="/anliegen/{{ case.id }}/assign">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="form-label" for="anliegen-assignee">Verantwortliche Person</label>
+          <select class="form-select mb-3" name="assignee_id" id="anliegen-assignee">
+            {% for person in people %}
+            <option value="{{ person.id }}" {% if case.assignee_id == person.id %}selected{% endif %}>{{ person.name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-outline-primary" type="submit">Weiterleiten</button>
+        </form>
+      </div>
+    </section>
+    {% endif %}
+    {% if case.status == 'unassigned' %}
+    <div class="alert alert-warning small" role="status">
+      <strong>Zuständigkeit noch offen.</strong>
+      {% if case.confidential %}Bitte wenden Sie sich direkt an Ihre Leitung. Die Beschwerde wurde nicht an andere Personen weitergegeben.
+      {% else %}Die Verwaltung kann die Kategorie-Regel aktualisieren oder einen Empfänger bestimmen.{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}
