@@ -200,6 +200,33 @@
   </div>
 </section>
 
+<section id="dms-sources" class="mt-4">
+  <details class="card">
+    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-folder-open me-2" aria-hidden="true"></i>KI-Wissensquellen aus der Ablage (DMS) · {{ allowed_dms|length }} ausdrücklich freigegeben</summary>
+    <div class="card-body">
+      <p class="small text-secondary">Hier werden nur <strong>manuell angelegte</strong> Einträge ohne Antragsteller-, Personen-, Buchungs- oder Vorgangsverknüpfung angeboten. Ausschließlich Titel und manuelle Notiz kommen als KI-Wissen infrage; Anhänge und Anträge bleiben ausgeschlossen. Die Freigabe berechtigt niemals über die ursprünglichen DMS-Bereichsrechte hinaus.</p>
+      <div class="list-group">
+      {% for record in dms_candidates %}
+        <div class="list-group-item d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <span><a href="/dms/r/{{ record.id }}">{{ record.title }}</a>
+            {% if record.id in allowed_dms %}<span class="badge text-bg-success ms-1">Für KI freigegeben</span>{% endif %}</span>
+          <form method="post" action="/admin/ai/dms/{{ record.id }}/source" class="m-0">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            {% if record.id in allowed_dms %}
+              <button type="submit" class="btn btn-sm btn-outline-danger">KI-Freigabe entziehen</button>
+            {% else %}
+              <button type="submit" name="allowed" value="1" class="btn btn-sm btn-outline-primary">Als KI-Quelle freigeben</button>
+            {% endif %}
+          </form>
+        </div>
+      {% else %}
+        <p class="text-secondary small mb-0">Keine geeigneten manuellen Ablageeinträge mit Textnotiz vorhanden.</p>
+      {% endfor %}
+      </div>
+    </div>
+  </details>
+</section>
+
 <section id="laws" class="mt-4">
   {{ m.page_head('Rechtstexte als KI-Wissen', 'Aktuell nur ausdrücklich gewählte veröffentlichte Rechtstexte. Geschützte und unveröffentlichte Entwürfe werden nicht automatisch übernommen.') }}
   <div class="card"><div class="card-body">

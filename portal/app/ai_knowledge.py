@@ -138,6 +138,13 @@ def sources_accessible(db, user, sources: list[dict]) -> bool:
             continue
         if cfg.get("ai_knowledge_enabled") != "1" or not user.can("ai_knowledge"):
             return False
+        if source.get("kind") == "dms":
+            if not isinstance(path, str) or not re.fullmatch(r"/dms/r/[0-9]+", path):
+                return False
+            from . import ai_dms
+            if not ai_dms.authorized(db, user, int(path.rsplit("/", 1)[-1])):
+                return False
+            continue
         if not isinstance(path, str) or not path.startswith("/") or path.startswith("//"):
             return False
         if path.startswith("/ki/wissen/"):

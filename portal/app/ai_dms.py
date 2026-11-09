@@ -1,0 +1,87 @@
+"""Read-only, explicitly approved DMS source adapter for TAKT AI.
+
+Safety boundaries:
+- Only *manual* records without applicant/person/booking/case links qualify.
+- An admin explicitly approves each record for AI-use.
+- Only its title + manually written note are consulted; never attachments,
+  indexed form answers, archived cases or other citizen information.
+- Before every retrieval and again on history/export, recompute the user's
+  current inherited DMS-area read permissions. An index is never an ACL.
+"""
+from sqlalchemy import select
+
+from . import dms
+from .ai_models import AIDmsSource
+from .db import DmsRecord, get_settings
+from .ai_knowledge import terms, _score
+
+
+def eligible(record: DmsRecord | None) -> bool:
+    return bool(
+        record is not None
+        and record.kind == "manuell"
+        and record.response_id is None
+        and record.person_id is None
+        and record.booking_id is None
+        and not record.applicant
+        and not record.applicant_email
+        and record.archived_at is None
+        and (record.note or "").strip()
+    )
+
+
+def available(db, user) -> bool:
+    cfg = get_settings(db)
+    return bool(
+        cfg.get("module_ai") == "1"
+        and cfg.get("ai_knowledge_enabled") == "1"
+        and dms.enabled(db)
+        and user.can("ai_knowledge")
+    )
+
+
+def authorized(db, user, record_id: int) -> bool:
+    """Fail closed on any revocation, deletion, archive, move or module switch."""
+    if not available(db, user):
+        return False
+    if db.get(AIDmsSource, record_id) is None:
+        return False
+    record = db.get(DmsRecord, record_id)
+    if not eligible(record):
+        return False
+    return dms.levels(db, user).get(record.area_id, 0) >= dms.READ
+
+
+def retrieve(db, user, question: str, limit: int = 2) -> list[dict]:
+    if not available(db, user):
+        return []
+    words = terms(question)
+    if not words:
+        return []
+    permitted = dms.levels(db, user)
+    if not permitted:
+        return []
+    rows = db.scalars(
+        select(DmsRecord).join(AIDmsSource, AIDmsSource.record_id == DmsRecord.id)
+        .where(DmsRecord.area_id.in_(list(permitted)), DmsRecord.kind == "manuell",
+               DmsRecord.archived_at.is_(None))
+        .order_by(DmsRecord.id).limit(400)
+    )
+    found = []
+    for record in rows:
+        if not eligible(record):
+            continue
+        score = _score(record.title or "", record.note or "", words)
+        if score:
+            found.append((score, record))
+    found.sort(key=lambda pair: pair[0], reverse=True)
+    out = []
+    for _score_value, record in found[:max(0, min(limit, 3))]:
+        # Re-validate the source against the current permissions before use.
+        if not authorized(db, user, record.id):
+            continue
+        out.append({"title": record.title[:200],
+                    "url": f"/dms/r/{record.id}",
+                    "text": (record.note or "")[:1800],
+                    "kind": "dms"})
+    return out

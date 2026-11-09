@@ -20,9 +20,9 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
-from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector
-from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web
-from .db import LawText, User, SessionLocal, get_settings, set_setting, utcnow
+from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector, AIDmsSource
+from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms
+from .db import LawText, User, DmsRecord, SessionLocal, get_settings, set_setting, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
                    flash, get_db, rate_limit, redirect, render, require)
 from .security import decrypt, encrypt, mask_secret
@@ -100,11 +100,21 @@ def admin_ai(request: Request, edit: int | None = None, user: User = Depends(adm
     docs = list(db.scalars(select(AIKnowledge).order_by(AIKnowledge.title)))
     laws = list(db.scalars(select(LawText).where(LawText.published.is_(True)).order_by(LawText.title)))
     allowed = set(db.scalars(select(AILawSource.law_id)))
+    allowed_dms = set(db.scalars(select(AIDmsSource.record_id)))
+    dms_candidates = [
+        item for item in db.scalars(
+            select(DmsRecord).where(DmsRecord.kind == "manuell")
+            .order_by(DmsRecord.id.desc()).limit(400))
+        if ai_dms.eligible(item)
+    ]
+    dms_candidates.sort(key=lambda item: (item.id not in allowed_dms, -item.id))
+    dms_candidates = dms_candidates[:120]
     vector_count = len(list(db.scalars(select(AIKnowledgeVector.id))))
     return render(request, "admin_ai.html", user, providers=providers, selected=selected,
                   masked_text=mask_secret(decrypt(selected.text_key_enc)) if selected else "",
                   masked_image=mask_secret(decrypt(selected.image_key_enc)) if selected else "",
                   cfg=cfg, docs=docs, laws=laws, allowed_laws=allowed,
+                  dms_candidates=dms_candidates, allowed_dms=allowed_dms,
                    vector_count=vector_count, vector_jobs=ai_vector_jobs.counts(db),
                    masked_web_key=mask_secret(decrypt(cfg.get('ai_web_key_enc', ''))))
 
@@ -256,9 +266,29 @@ async def _web_sources(db, user, question: str, selected: str, request: Request)
 def _source_meta(sources: list[dict]) -> str:
     return json.dumps([
         {"title": item["title"], "url": item["url"],
-         **({"kind": "web"} if item.get("kind") == "web" else {})}
+         **({"kind": item["kind"]} if item.get("kind") in ("web", "dms") else {})}
         for item in sources
     ], ensure_ascii=False)
+
+
+@app.post("/admin/ai/dms/{record_id:int}/source", dependencies=[Depends(check_csrf)])
+def admin_ai_dms_source(
+    request: Request, record_id: int, allowed: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    record = db.get(DmsRecord, record_id)
+    if not ai_dms.eligible(record):
+        raise HTTPException(400, "Nur manuelle Ablageeinträge ohne Bürger-/Vorgangsbezug dürfen KI-Quellen sein.")
+    if get_settings(db).get("module_dms", "1") != "1":
+        raise HTTPException(404, "Die Ablage ist deaktiviert.")
+    source = db.get(AIDmsSource, record_id)
+    if allowed == "1" and source is None:
+        db.add(AIDmsSource(record_id=record_id))
+    elif allowed != "1" and source is not None:
+        db.delete(source)
+    db.commit()
+    flash(request, "KI-Freigabe des Ablageeintrags aktualisiert. Alle DMS-Leserechte gelten weiterhin.")
+    return redirect("/admin/ai#dms-sources")
 
 
 @app.post("/admin/ai/knowledge", dependencies=[Depends(check_csrf)])
@@ -435,7 +465,9 @@ async def ai_send_message(
         semantic = await ai_vector.retrieve(db, user, message)
         urls = {entry["url"] for entry in sources}
         # Reserve room for semantic hits without sacrificing high-ranked lexical evidence.
-        sources = (sources[:3] + [entry for entry in semantic if entry["url"] not in urls][:2])[:5]
+        dms_hits = ai_dms.retrieve(db, user, message)
+        additional = semantic[:1] + dms_hits[:1] + semantic[1:2] + dms_hits[1:2]
+        sources = (sources[:3] + [entry for entry in additional if entry["url"] not in urls][:2])[:5]
     sources += await _web_sources(db, user, message, use_web, request)
     history = list(db.scalars(select(AIMessage)
                               .where(AIMessage.conversation_id == convo.id)
@@ -514,7 +546,9 @@ async def ai_message_updates(
         semantic = await ai_vector.retrieve(db, user, message)
         urls = {entry["url"] for entry in sources}
         # Reserve room for semantic hits without sacrificing high-ranked lexical evidence.
-        sources = (sources[:3] + [entry for entry in semantic if entry["url"] not in urls][:2])[:5]
+        dms_hits = ai_dms.retrieve(db, user, message)
+        additional = semantic[:1] + dms_hits[:1] + semantic[1:2] + dms_hits[1:2]
+        sources = (sources[:3] + [entry for entry in additional if entry["url"] not in urls][:2])[:5]
     sources += await _web_sources(db, user, message, use_web, request)
     history = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == chat_id)
                               .order_by(AIMessage.id.desc()).limit(14)))
@@ -549,7 +583,8 @@ async def ai_message_updates(
         stream_enabled=provider.stream_enabled,
     )
     links = [{"title": src["title"], "url": src["url"],
-              **({"kind": "web"} if src.get("kind") == "web" else {})} for src in sources]
+              **({"kind": src["kind"]} if src.get("kind") in ("web", "dms") else {})}
+             for src in sources]
     owner_id = user.id
 
 
