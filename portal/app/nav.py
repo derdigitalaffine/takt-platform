@@ -87,6 +87,8 @@ def _krank_badge(c: Ctx) -> tuple[int, str]:
 
 ITEMS: list[Item] = [
     # Mein Arbeitsplatz
+    Item("anliegen", "work", "/anliegen", "fa-inbox", "Interne Anliegen",
+         lambda c: "anliegen" in c.modules and (c.can("anliegen_submit") or c.can("anliegen_manage")), _pre("/anliegen")),
     Item("tasks", "work", "/tasks", "fa-list-check", "Meine Aufgaben",
          lambda c: _apps(c) or c.res_nav or "circulations" in c.modules or "tasks" in c.modules, lambda p: _pre("/tasks", "/aufgaben")(p) and not p.startswith("/tasks/boards"), _tasks_badge),
     Item("kanban", "work", "/tasks/boards", "fa-table-columns", "Aufgabenboards",
@@ -188,7 +190,7 @@ BY_ID = {it.id: it for it in ITEMS}
 # Stable entry IDs preserve bookmarks and personal favorites.
 FAMILIES = [
     ("calendars",), ("leave",),
-    ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
+    ("anliegen",), ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
     ("surveys", "polls", "votes"), ("shortlinks",),
     ("meetings", "meeting_plan"), ("seminars",),
     ("resources", "res_planner", "res_bookings"), ("bookings",),
@@ -206,6 +208,7 @@ ADMIN_SECTIONS = {
     "Portal & Betrieb": ["modules", "design", "public_nav", "sessions", "https", "domains", "trash"],
 }
 DESCRIPTIONS = {
+    "anliegen": ("Interne Mängel, Beschaffungen, Wünsche und vertrauliche Beschwerden erfassen und an zuständige Personen leiten.", "Anliegen einreichen · Bearbeitungsstand verfolgen", "Anliegen Mangel Bestellung Beschwerde Büromaterial Möbel"),
     "ai": ("Stellen Sie Fragen an freigegebene Sprachmodelle und durchsuchen Sie zugelassene interne TAKT-Wissensquellen.", "Persönlichen KI-Chat öffnen · Wissen recherchieren", "KI LLM AI Chat Gemma Wissen"),
     "tasks": ("Sehen Sie, was Sie als Nächstes erledigen können. Eigene Aufgaben und Aufgaben aus Ihren Fachbereichen an einem Ort.", "Aufgaben bearbeiten · Zuständigkeiten prüfen", "Aufgaben Arbeitsplatz"),
     "kanban": ("Organisieren Sie gemeinsame Arbeit in übersichtlichen Spalten. Verknüpfte Aufgaben und Umfragen zeigen ihren aktuellen Status.", "Boards öffnen · Arbeit organisieren", "Board Projekt"),
