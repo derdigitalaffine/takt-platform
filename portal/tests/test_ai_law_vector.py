@@ -208,3 +208,28 @@ def test_chat_both_paths_include_semantic_law_and_progress_UI(monkeypatch):
           "static" / "ai-admin-knowledge.js").read_text()
     assert "data-ai-law-index-progressbar" in js
     assert "data-ai-law-source-progress" in js
+
+
+def test_large_law_index_resumes_in_batches_and_exposes_real_progress(monkeypatch):
+    _pid, law_id = _setup(
+        "ai-semantic-teilfortschritt",
+        body="# Gemeindeordnung\n\n### § 1 Langer Text\n\n" +
+             ("Die Nutzung kommunaler Wege wird geregelt. " * 235),
+    )
+    calls = _fake_embeddings(monkeypatch)
+    first = asyncio.run(ai_law_vector_jobs.tick(law_id=law_id))
+    assert first == ai_law_vector_jobs.BATCH_SIZE
+    with SessionLocal() as db:
+        report = ai_law_vector_jobs.progress(db)["laws"][str(law_id)]
+        assert report["chunks_ready"] == ai_law_vector_jobs.BATCH_SIZE
+        assert report["chunks_total"] > report["chunks_ready"]
+        assert 0 < report["percent"] < 100
+        job = db.scalar(select(AILawIndexJob).where(
+            AILawIndexJob.law_id == law_id, AILawIndexJob.version_id == 0,
+        ))
+        assert job.status == "pending"
+    second = asyncio.run(ai_law_vector_jobs.tick(law_id=law_id))
+    assert second > 0
+    with SessionLocal() as db:
+        assert ai_law_vector_jobs.progress(db)["laws"][str(law_id)]["percent"] == 100
+    assert len(calls) == 2
