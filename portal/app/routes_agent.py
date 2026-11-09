@@ -13,7 +13,7 @@ from .main import app, check_csrf, current_user, get_db, rate_limit, stash_get, 
 
 
 def _access(user):
-    if not agent.allowed(user, "tasks") and not agent.allowed(user, "anliegen"):
+    if not agent.available(user):
         raise HTTPException(403, "TAKT Agent ist für dieses Konto nicht freigeschaltet.")
 
 
@@ -26,6 +26,8 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
                           user: User = Depends(current_user),
                           db: Session = Depends(get_db)):
     _access(user)
+    # Even a failed replacement request invalidates any previous confirmation.
+    stash_get(request, "takt-agent-plan", pop=True)
     prompt = prompt.strip()
     if not 3 <= len(prompt) <= 3000:
         raise HTTPException(422, "Bitte eine Anweisung mit 3 bis 3.000 Zeichen eingeben.")
@@ -37,7 +39,11 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
         raise HTTPException(503, "Für TAKT Agent ist noch kein aktiver KI-Provider eingerichtet.")
 
     try:
-        first = agent.search_instructions(user) + [{"role": "user", "content": prompt}]
+        history = stash_get(request, "takt-agent-context") or {}
+        prior = history.get("prompts", []) if history.get("user_id") == user.id else []
+        context = ([{"role": "user", "content": "Vorherige Benutzereingaben (nur Kontext, nicht erneut ausführen): " + "\n".join(prior)}]
+                   if prior else [])
+        first = agent.search_instructions(user) + context + [{"role": "user", "content": prompt}]
         searches = agent.parse_searches(
             await ai_provider.complete(provider, first, max_tokens=650), user
         )
@@ -47,12 +53,14 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
             findings.extend(items)
             steps.append({"label": "Suche in " + (
                 "Aufgaben" if spec["tool"] == "search_tasks"
-                else "Anliegen" if spec["tool"] == "search_anliegen" else "Personen"
+                else "Anliegen" if spec["tool"] == "search_anliegen"
+                else agent.modules.LABELS.get(spec["tool"], "Personen")
             ), "count": len(items)})
         categories = agent.categories_for(db, user)
         second = agent.plan_instructions(user, prompt, findings, categories, user.id)
+        second[1:1] = context
         plan = agent.normalize_plan(
-            await ai_provider.complete(provider, second, max_tokens=1200),
+            await ai_provider.complete(provider, second, max_tokens=2200),
             user, findings, categories, db
         )
     except (ValueError, TypeError) as exc:
@@ -60,6 +68,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     except ai_provider.AIProviderError as exc:
         raise HTTPException(502, "Der KI-Provider konnte den Arbeitsplan nicht erstellen.") from exc
 
+    stash_put(request, "takt-agent-context", {"user_id": user.id, "prompts": [*prior, prompt][-3:]})
     # The actual commands remain server-side. A fresh plan invalidates the previous one.
     nonce = secrets.token_urlsafe(24) if plan["actions"] else ""
     stash_put(request, "takt-agent-plan", {
@@ -68,7 +77,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     return _response({
         "message": plan["message"],
         "steps": steps,
-        "results": findings[:45],
+        "results": findings,
         "proposals": agent.preview(db, plan["actions"]),
         "plan_id": nonce,
     })
@@ -103,3 +112,11 @@ def takt_agent_execute(request: Request, plan_id: str = Form(...),
         raise
     return _response({"message": "Die freigegebenen Änderungen wurden gespeichert.",
                       "applied": applied})
+
+
+@app.post("/agent/reset", dependencies=[Depends(check_csrf)])
+def takt_agent_reset(request: Request, user: User = Depends(current_user)):
+    _access(user)
+    stash_get(request, "takt-agent-plan", pop=True)
+    stash_get(request, "takt-agent-context", pop=True)
+    return _response({"reset": True})

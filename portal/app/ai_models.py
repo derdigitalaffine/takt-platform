@@ -124,3 +124,14 @@ class AIDmsSource(Base):
     __tablename__ = "ai_dms_sources"
     record_id: Mapped[int] = mapped_column(
         ForeignKey("dms_records.id", ondelete="CASCADE"), primary_key=True)
+
+
+class AgentAudit(Base):
+    """Successful confirmed operations; no prompts, answers or record contents."""
+    __tablename__ = "agent_audit"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    tool: Mapped[str] = mapped_column(String(40))
+    target_url: Mapped[str] = mapped_column(String(200))
+    target_id: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)

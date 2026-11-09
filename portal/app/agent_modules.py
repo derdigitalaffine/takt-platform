@@ -1,0 +1,200 @@
+"""Explicit module adapters. No arbitrary routes, code, publication or deletion.
+
+DMS deliberately uses the newer opt-in AI source policy, not general fulltext.
+Only metadata reaches the planner; form answers and process definitions do not.
+"""
+from datetime import datetime
+from itertools import islice
+
+from fastapi import HTTPException
+from sqlalchemy import select, or_, func
+
+from . import ai_dms, calendars, dms, forms as fm
+from .ai_models import AIDmsSource
+from .calendar_models import Calendar, CalendarEvent
+from .db import DmsArea, DmsRecord, Form, Process
+
+READ = {
+    "search_calendars": "calendars", "search_events": "calendars",
+    "search_forms": "forms", "search_processes": "processes",
+    "search_dms": "dms", "search_dms_areas": "dms",
+}
+WRITE = {
+    "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
+}
+LABELS = {
+    "search_calendars": "Kalendern", "search_events": "Terminen",
+    "search_forms": "Formularen", "search_processes": "Prozessen",
+    "search_dms": "freigegebenen DMS-Wissensakten", "search_dms_areas": "DMS-Zielbereichen",
+}
+KINDS = {"create_event": "calendar", "copy_form": "form", "move_dms": "dms"}
+MODELS = {"create_event": Calendar, "copy_form": Form, "move_dms": DmsRecord}
+
+
+def enabled(user, module):
+    from .main import enabled_modules
+    mods = enabled_modules()
+    if module == "processes":
+        return "applications" in mods and user.can("processes")
+    if module == "forms":
+        return "forms" in mods and user.can("forms")
+    if module == "calendars":
+        return "calendars" in mods
+    if module == "dms":
+        # Record ACLs and knowledge opt-in are checked with the live DB below.
+        return "dms" in mods and user.can("ai_knowledge")
+    return False
+
+
+def search(db, user, spec):
+    from .agent import _like, _term, require
+    tool = spec["tool"]
+    require(user, READ[tool])
+    phrase = _term(spec.get("query"))
+    pattern = _like(phrase)
+    if tool == "search_calendars":
+        rows = db.scalars(select(Calendar).where(Calendar.title.ilike(pattern, escape="\\")).order_by(Calendar.id))
+        return list(islice((dict(type="calendar", id=r.id, title=r.title, writable=calendars.access(db, user, r, True),
+                     url="/kalender?ansicht=termine") for r in rows if calendars.access(db, user, r)), 20))
+    if tool == "search_events":
+        # Only stored, free-calendar events. Source calendars keep their own business ACLs.
+        rows = db.scalars(select(CalendarEvent).join(Calendar).where(
+            Calendar.source == "free", CalendarEvent.title.ilike(pattern, escape="\\")
+        ).order_by(CalendarEvent.starts_at, CalendarEvent.id))
+        out = []
+        for row in rows:
+            cal = db.get(Calendar, row.calendar_id)
+            if calendars.event_access(db, user, cal, row):
+                out.append(dict(type="event", id=row.id, title=row.title, calendar_id=cal.id,
+                                start=row.starts_at, end=row.ends_at,
+                                series=bool(calendars.event_data(row)["extendedProps"].get("series")), url="/kalender?ansicht=termine"))
+            if len(out) == 20:
+                break
+        return out
+    if tool == "search_forms":
+        rows = db.scalars(select(Form).where(Form.deleted_at.is_(None), Form.archived_at.is_(None),
+                          Form.title.ilike(pattern, escape="\\")).order_by(Form.id))
+        return list(islice((dict(type="form", id=r.id, title=r.title, active=r.active, kind=r.kind,
+                     url=f"/forms/{r.id}") for r in rows if fm.access_level(db, r, user) >= fm.VIEW), 20))
+    if tool == "search_processes":
+        # Process editor uses the global processes role; there is no owner-only ACL.
+        rows = db.scalars(select(Process).where(Process.name.ilike(pattern, escape="\\")).order_by(Process.id).limit(20))
+        return [dict(type="process", id=r.id, title=r.name, published=bool(r.current),
+                     url=f"/processes/{r.id}") for r in rows]
+    if not ai_dms.available(db, user):
+        return []
+    if tool == "search_dms_areas":
+        levels = dms.levels(db, user)
+        return [dict(type="dms_area", id=r.id, title=r.name) for r in dms.areas(db)
+                if levels.get(r.id, 0) >= dms.WRITE and phrase.casefold() in r.name.casefold()][:20]
+    if tool == "search_dms":
+        rows = db.scalars(select(DmsRecord).join(AIDmsSource).where(
+            or_(DmsRecord.title.ilike(pattern, escape="\\"), DmsRecord.ref_no.ilike(pattern, escape="\\"))
+        ).order_by(DmsRecord.id))
+        return list(islice((dict(type="dms", id=r.id, title=r.title[:200], area_id=r.area_id,
+                     url=f"/dms/r/{r.id}") for r in rows if ai_dms.authorized(db, user, r.id)), 20))
+    raise ValueError("Unbekanntes Suchwerkzeug")
+
+
+def version(row):
+    return row.version if isinstance(row, Calendar) else row.updated_at.isoformat()
+
+
+def target(db, user, action):
+    from .agent import require
+    tool = action["tool"]
+    require(user, WRITE[tool])
+    row = db.get(MODELS[tool], action["id"])
+    if row is None:
+        raise HTTPException(404, "Vorgang nicht gefunden.")
+    if tool == "create_event" and not calendars.access(db, user, row, True):
+        raise HTTPException(403)
+    if tool == "create_event" and db.scalar(select(func.count()).select_from(CalendarEvent).where(CalendarEvent.calendar_id == row.id)) >= 10000:
+        raise HTTPException(409, "Dieser Kalender enthält bereits 10000 Termine.")
+    if tool == "copy_form" and (row.deleted_at or row.archived_at or fm.access_level(db, row, user) < fm.VIEW):
+        raise HTTPException(403)
+    if tool == "move_dms":
+        area = db.get(DmsArea, action["area_id"])
+        levels = dms.levels(db, user)
+        if (not ai_dms.authorized(db, user, row.id) or area is None
+                or levels.get(row.area_id, 0) < dms.WRITE or levels.get(area.id, 0) < dms.WRITE):
+            raise HTTPException(403)
+    return row
+
+
+def normalize(db, user, raw, findings):
+    tool = raw["tool"]
+    def found(key, kind):
+        value = raw.get(key)
+        if type(value) is not int or not any(r.get("type") == kind and r["id"] == value for r in findings):
+            raise ValueError("Die Datensatz-ID ist nicht durch eine berechtigte Suche belegt.")
+        return value
+    action = dict(tool=tool, id=found("id", KINDS[tool]))
+    if tool == "move_dms":
+        action["area_id"] = found("area_id", "dms_area")
+    if tool == "create_event":
+        for field, limit in (("title", 200), ("description", 10000), ("location", 500)):
+            value = raw.get(field, "")
+            if not isinstance(value, str) or len(value) > limit:
+                raise ValueError("Terminangaben prüfen.")
+            action[field] = value.strip()
+        if not action["title"]:
+            raise ValueError("Termintitel fehlt.")
+        for key in ("start", "end"):
+            try:
+                value = raw[key]
+                if not isinstance(value, str) or len(value) > 40:
+                    raise ValueError()
+                parsed = datetime.fromisoformat(value)
+                if parsed.tzinfo is None or not 1970 <= parsed.year <= 2200:
+                    raise ValueError()
+            except (KeyError, TypeError, ValueError):
+                raise ValueError("Beginn und Ende mit expliziter Zeitzone angeben.")
+            action[key] = value
+        if datetime.fromisoformat(action["end"]) <= datetime.fromisoformat(action["start"]):
+            raise ValueError("Das Terminende muss nach dem Beginn liegen.")
+    row = target(db, user, action)
+    action["version"] = version(row)
+    if tool == "move_dms":
+        # The destination name/position is part of the preview too.
+        area = db.get(DmsArea, action["area_id"])
+        action["area_snapshot"] = [area.name, area.parent_id]
+    return action
+
+
+def preview(db, action):
+    row = db.get(MODELS[action["tool"]], action["id"])
+    if action["tool"] == "create_event":
+        return (f"Termin erstellen in Kalender „{row.title}“: {action['title']}\n"
+                f"{action['start']} bis {action['end']}\nOrt: {action['location'] or '–'}\n"
+                f"Beschreibung: {action['description'] or '–'}")
+    if action["tool"] == "copy_form":
+        return f"Formular „{row.title}“ als geschlossenen Entwurf kopieren. Keine Antworten, Einladungen oder öffentlichen Links."
+    area = db.get(DmsArea, action["area_id"])
+    return f"DMS-Akte #{row.id} „{row.title}“ von „{row.area.name}“ nach „{area.name}“ verschieben. Aufbewahrung nach Zielbereich."
+
+
+def execute(db, user, action):
+    row = target(db, user, action)
+    if version(row) != action["version"]:
+        raise HTTPException(409, "Der Vorgang hat sich geändert. Bitte neu planen.")
+    label = preview(db, action)
+    if action["tool"] == "create_event":
+        event = calendars.save_event(db, user, row, action)
+        target_id = event.id
+        url = "/kalender?ansicht=termine"
+    elif action["tool"] == "copy_form":
+        clone = fm.copy_form(db, row, user)
+        # Preserve the internal boundary even though the existing copy service defaults to public.
+        clone.internal = row.internal
+        db.flush()
+        target_id = clone.id
+        url = f"/forms/{clone.id}"
+    else:
+        area = db.get(DmsArea, action["area_id"])
+        if [area.name, area.parent_id] != action["area_snapshot"]:
+            raise HTTPException(409, "Der Zielbereich hat sich geändert. Bitte neu planen.")
+        dms.move_record(db, row, area, user)
+        target_id = row.id
+        url = f"/dms/r/{row.id}"
+    return dict(label=label, url=url, target_id=target_id)

@@ -2982,3 +2982,8 @@ from . import routes_caldav  # noqa: E402,F401
 from . import routes_leave_rules  # noqa: E402,F401
 
 from . import routes_calendar_sharing  # noqa: E402,F401
+
+# The panel and API share the same module/role gate.
+from .agent import available as takt_agent_available, allowed as takt_agent_allowed
+templates.env.globals["takt_agent_available"] = takt_agent_available
+templates.env.globals["takt_agent_allowed"] = takt_agent_allowed
