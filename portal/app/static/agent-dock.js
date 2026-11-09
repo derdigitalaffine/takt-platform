@@ -4,20 +4,24 @@
   if (!root || window.self !== window.top) return;
   const button = root.querySelector('[data-agent-open]');
   const panel = root.querySelector('#agent-dock-panel');
-  const frame = root.querySelector('[data-agent-frame]');
+  const frame = panel?.querySelector('[data-agent-frame]');
+  if (!button || !panel || !frame) return;
+  // The fixed chat panel must not inherit the sticky navbar's backdrop-filter
+  // containing block. Keep the trigger in the header, portal the panel to body.
+  document.body.appendChild(panel);
   function close() { panel.hidden = true; button.setAttribute('aria-expanded', 'false'); button.focus(); }
   function place() {
     const header = document.querySelector('.app-topbar, header, .navbar');
     const bottom = header ? Math.max(0, header.getBoundingClientRect().bottom) : 0;
-    root.style.setProperty('--agent-top', Math.min(bottom + 8, 120) + 'px');
+    panel.style.setProperty('--agent-top', Math.min(bottom + 8, 120) + 'px');
   }
   button.addEventListener('click', () => {
     if (!panel.hidden) return close();
     place(); panel.hidden = false; button.setAttribute('aria-expanded', 'true');
     if (frame.getAttribute('src') === 'about:blank') frame.src = '/agent?panel=1';
-    root.querySelector('[data-agent-close]').focus();
+    panel.querySelector('[data-agent-close]').focus();
   });
-  root.querySelector('[data-agent-close]').addEventListener('click', close);
+  panel.querySelector('[data-agent-close]').addEventListener('click', close);
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && !panel.hidden) close(); });
   frame.addEventListener('load', () => {
     try {
@@ -26,7 +30,7 @@
       doc.documentElement.dataset.agentEmbedded = 'true';
       const url = new URL(frame.contentWindow.location.href);
       const chatId = url.searchParams.get('chat');
-      root.querySelector('[data-agent-detach]').href = '/agent' + (chatId && /^\d+$/.test(chatId) ? '?chat=' + chatId : '');
+      panel.querySelector('[data-agent-detach]').href = '/agent' + (chatId && /^\d+$/.test(chatId) ? '?chat=' + chatId : '');
       const workspace = doc.querySelector('[data-ai-workspace]');
       if (workspace && !doc.querySelector('.agent-embedded-tools')) {
         const tools = doc.createElement('div'); tools.className = 'agent-embedded-tools';
