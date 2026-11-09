@@ -2953,6 +2953,12 @@ DEFAULT_SETTINGS = {
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
     "anliegen_categories": {"tags": "TEXT NOT NULL DEFAULT ''"},
+    "anliegen_process_runs": {
+        "cursor": "INTEGER NOT NULL DEFAULT 0",
+        "state_version": "INTEGER NOT NULL DEFAULT 0",
+        "inputs_enc": "TEXT NOT NULL DEFAULT ''",
+        "error_code": "VARCHAR(40) NOT NULL DEFAULT ''",
+    },
     "anliegen": {
         "title_enc": "TEXT",
         "description_enc": "TEXT",

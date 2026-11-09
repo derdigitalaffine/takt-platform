@@ -439,6 +439,11 @@ def evaluate(cond: dict | None, resp: FormResponse) -> bool:
     else:
         done = [t for t in resp.tasks if t.step_id == cond["key"] and t.state == "done"]
         value = {"approved": "genehmigt", "rejected": "abgelehnt", "done": "erledigt"}.get(done[-1].outcome) if done else None
+    return evaluate_value(cond, value)
+
+
+def evaluate_value(cond: dict, value) -> bool:
+    """Shared, pure comparison semantics for form and internal-case contexts."""
     values = value if isinstance(value, list) else [value]
     texts = [str(v).strip().lower() for v in values if v not in (None, "")]
     if isinstance(value, dict):
