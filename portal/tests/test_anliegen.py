@@ -1,5 +1,6 @@
 """Internal Anliegen: routing, task linkage, confidentiality and opt-in AI tests."""
-from sqlalchemy import select
+from sqlalchemy import select, delete
+import pytest
 
 from app import ai_provider
 from app.anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
@@ -8,6 +9,54 @@ from app.org_models import OrgMembership, OrgRoleGrant
 from app.security import hash_password
 from app.task_models import Task
 from conftest import login, csrf_of, settings
+
+
+@pytest.fixture(autouse=True)
+def _isolate_anliegen_tests():
+    """Reset feature switches, routing and native tasks after every Anliegen test."""
+    from app import main
+    from app.db import get_settings, set_setting, Organization
+    from app.task_models import TaskActivity
+    from app.ai_models import AIProvider
+    from app.org_models import OrgMembership, OrgRoleGrant
+    with SessionLocal() as db:
+        settings_before = get_settings(db)
+        original = {key: settings_before[key]
+                    for key in ("module_anliegen", "module_tasks", "module_ai")}
+        original_categories = {
+            cat.id: (cat.title, cat.routing, cat.assignee_id, cat.enabled)
+            for cat in db.scalars(select(AnliegenCategory))
+        }
+        existing_cases = set(db.scalars(select(Anliegen.id)))
+        existing_orgs = set(db.scalars(select(Organization.id)))
+    yield
+    with SessionLocal() as db:
+        new_cases = [row for row in db.scalars(select(Anliegen))
+                     if row.id not in existing_cases]
+        native_ids = [row.task_id for row in new_cases if row.task_id]
+        for row in new_cases:
+            db.execute(delete(AnliegenEvent).where(AnliegenEvent.anliegen_id == row.id))
+            db.delete(row)
+        db.flush()
+        for tid in native_ids:
+            db.execute(delete(TaskActivity).where(TaskActivity.task_id == tid))
+            task = db.get(Task, tid)
+            if task is not None:
+                db.delete(task)
+        db.execute(delete(AIProvider).where(AIProvider.name == "Anliegen AI Fake"))
+        for category_id, values in original_categories.items():
+            cat = db.get(AnliegenCategory, category_id)
+            if cat:
+                cat.title, cat.routing, cat.assignee_id, cat.enabled = values
+        for org in list(db.scalars(select(Organization))):
+            if org.id not in existing_orgs and org.name == "Anliegen Testorganisation":
+                db.execute(delete(OrgRoleGrant).where(OrgRoleGrant.org_id == org.id))
+                db.execute(delete(OrgMembership).where(OrgMembership.org_id == org.id))
+                db.delete(org)
+        for key, value in original.items():
+            set_setting(db, key, value)
+        db.commit()
+    main._module_cache["at"] = 0.0
 
 ADMIN = ("admin@example.org", "admin-passwort-123")
 
@@ -103,12 +152,21 @@ def test_confidential_complaint_goes_only_to_explicit_org_lead_without_native_ta
         row = db.get(Anliegen, cid)
         assert row.confidential and row.assignee_id == lead_id
         assert row.task_id is None
+        assert row.title == "Vertrauliches Anliegen" and row.description == ""
+        assert row.title_enc and row.description_enc
+        assert "Vertrauliche Beschwerde" not in row.title_enc
+        assert row.display_title == "Vertrauliche Beschwerde"
+        assert row.display_description == "Ich benötige ein vertrauliches Gespräch."
     lead = login("anliegen-supervisor@example.org", "test-anliegen-pass")
     assert lead.get(f"/anliegen/{cid}").status_code == 200
     manager_id = _user("anliegen-global-manager@example.org", "anliegen_submit,anliegen_manage,tasks_manage")
     manager = login("anliegen-global-manager@example.org", "test-anliegen-pass")
     assert manager.get(f"/anliegen/{cid}").status_code == 404
-    assert "Vertrauliche Beschwerde" not in manager.get("/anliegen").text
+    # The complaint category remains selectable for everyone; only this specific
+    # confidential case and its narrative must be invisible to the global manager.
+    overview = manager.get("/anliegen").text
+    assert f"/anliegen/{cid}" not in overview
+    assert "Ich benötige ein vertrauliches Gespräch." not in overview
     # Administrators must not gain automatic read access to complaint narratives.
     admin = login(*ADMIN)
     assert admin.get(f"/anliegen/{cid}").status_code == 404
@@ -180,3 +238,102 @@ def test_ai_draft_requires_user_action_never_creates_a_case(monkeypatch):
         "text": "Ich möchte vertrauliche Details formulieren.",
     })
     assert deny.status_code == 403
+
+
+def test_ordering_workflow_fast_actions_and_assignee_filters():
+    _enabled()
+    sender = _user("anliegen-order-sender@example.org")
+    owner = _user("anliegen-order-manager@example.org")
+    cat = _cat("office_furniture")
+    admin = login(*ADMIN)
+    token = csrf_of(admin.get("/anliegen/kategorien").text)
+    change = admin.post(f"/anliegen/kategorien/{cat}", data={
+        "csrf": token, "title": "Büromöbel", "routing": "person",
+        "assignee_id": owner, "enabled": "1",
+    })
+    assert change.status_code == 303
+    with SessionLocal() as db:
+        assert db.get(AnliegenCategory, cat).assignee_id == owner
+    preview_client = login("anliegen-order-sender@example.org", "test-anliegen-pass")
+    preview = preview_client.get(f"/anliegen/empfaenger-vorschau?category_id={cat}")
+    assert preview.status_code == 200
+    assert preview.json()["ready"] is True
+    assert "anliegen-order-manager" in preview.json()["recipient"]
+    reporter, cid = _post_case(
+        "anliegen-order-sender@example.org", cat, "Stuhl beschaffen",
+        "Ein ergonomischer Bürostuhl wird benötigt.")
+    recipient = login("anliegen-order-manager@example.org", "test-anliegen-pass")
+    csrf = csrf_of(recipient.get(f"/anliegen/{cid}").text)
+    assert f"Stuhl beschaffen" in recipient.get("/anliegen?view=mine").text
+    assert "Stuhl beschaffen" in recipient.get("/anliegen?view=orders").text
+    assert "Stuhl beschaffen" in recipient.get(
+        f"/anliegen?view=orders&category_id={cat}&status=open&q=Stuhl").text
+    ordered = recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "ordered", "supplier": "Möbelpartner",
+        "order_reference": "BEST-123", "expected_delivery": "2026-12-10",
+        "back": "orders",
+    })
+    assert ordered.status_code == 303
+    assert ordered.headers["location"] == "/anliegen?view=orders"
+    with SessionLocal() as db:
+        row = db.get(Anliegen, cid)
+        assert row.status == "ordered"
+        assert row.supplier == "Möbelpartner"
+        assert row.order_reference == "BEST-123"
+        assert row.expected_delivery_at.year == 2026
+        assert db.get(Task, row.task_id).status == "in_progress"
+    assert recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "partially_delivered"}).status_code == 303
+    assert recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "delivered"}).status_code == 303
+    assert recipient.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "done"}).status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, cid)
+        assert case.status == "done" and case.delivered_at is not None
+        assert db.get(Task, case.task_id).status == "done"
+    assert "Interne Anliegen" in admin.get("/tasks").text
+    assert 'href="/anliegen/neu"' in admin.get("/tasks").text
+
+
+def test_admin_can_explicitly_migrate_open_orders_to_new_recipient():
+    _enabled()
+    old_owner = _user("anliegen-old-owner@example.org")
+    new_owner = _user("anliegen-new-owner@example.org")
+    _user("anliegen-reporter-migrate@example.org")
+    cat = _cat("office_supply")
+    admin = login(*ADMIN)
+    csrf = csrf_of(admin.get("/anliegen/kategorien").text)
+    first = admin.post(f"/anliegen/kategorien/{cat}", data={
+        "csrf": csrf, "title": "Büromaterial", "routing": "person",
+        "assignee_id": old_owner, "enabled": "1",
+    })
+    assert first.status_code == 303
+    _, cid = _post_case("anliegen-reporter-migrate@example.org", cat)
+    change = admin.post(f"/anliegen/kategorien/{cat}", data={
+        "csrf": csrf, "title": "Büromaterial", "routing": "person",
+        "assignee_id": new_owner, "enabled": "1", "apply_open": "1",
+    })
+    assert change.status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, cid)
+        assert case.assignee_id == new_owner
+        assert db.get(Task, case.task_id).assignee_id == new_owner
+    assigned = login("anliegen-new-owner@example.org", "test-anliegen-pass")
+    assert assigned.get(f"/anliegen/{cid}").status_code == 200
+    old = login("anliegen-old-owner@example.org", "test-anliegen-pass")
+    assert old.get(f"/anliegen/{cid}").status_code == 404
+
+
+def test_platform_feedback_category_and_non_order_status_restrictions():
+    _enabled()
+    _user("anliegen-software@example.org")
+    cat = _cat("platform_feedback")
+    sender, cid = _post_case(
+        "anliegen-software@example.org", cat,
+        "TAKT Suche verbessern", "Die Suche in der TAKT-Plattform soll schneller werden.")
+    assert "TAKT verbessern" in sender.get("/anliegen/neu").text
+    csrf = csrf_of(sender.get(f"/anliegen/{cid}").text)
+    response = sender.post(f"/anliegen/{cid}/status", data={
+        "csrf": csrf, "status": "ordered"})
+    assert response.status_code in (403, 422)

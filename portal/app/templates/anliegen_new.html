@@ -11,12 +11,13 @@
   <select class="form-select mb-3" name="category_id" id="anliegen-category" required>
     {% for cat in categories %}<option value="{{cat.id}}" data-confidential="{{'1' if cat.confidential else '0'}}">{{cat.title}}</option>{% endfor %}
   </select>
+  <div class="alert alert-light border small mb-3" id="anliegen-recipient-preview" role="status" aria-live="polite">Zuständigkeit wird geprüft …</div>
   <div class="alert alert-warning small" id="anliegen-secret" hidden><i class="fa-solid fa-lock me-1"></i>Vertrauliche Beschwerden werden ausschließlich für Sie und die eindeutig zuständige Leitung angezeigt. Sie werden nicht als allgemeine Aufgabe erstellt. KI-Entwürfe sind in dieser Kategorie aus Datenschutzgründen deaktiviert.</div>
   <label class="form-label" for="anliegen-title">Kurzer Titel</label>
   <input id="anliegen-title" name="title" class="form-control mb-3" minlength="3" maxlength="200" placeholder="Worum geht es?" required>
   <label class="form-label" for="anliegen-description">Beschreibung</label>
   <textarea id="anliegen-description" name="description" class="form-control mb-2" rows="7" minlength="5" maxlength="10000" placeholder="Beschreiben Sie den Bedarf oder Mangel möglichst konkret." required></textarea>
-  <p class="form-text">Bitte keine unnötigen personenbezogenen oder besonders schutzwürdigen Angaben eintragen.</p>
+  <p class="form-text">Die ausgewählte Kategorie bestimmt die Weiterleitung. Die Empfängerprüfung erfolgt vor der Einreichung. Bitte keine unnötigen personenbezogenen oder besonders schutzwürdigen Angaben eintragen.</p>
   {% if ai_available %}
   <button id="anliegen-ai" class="btn btn-outline-primary mb-3" type="button" data-action="/anliegen/ki-entwurf"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Mit KI strukturieren</button>
   <p class="small text-secondary">Nur nach Ihrem Klick wird die bisherige Beschreibung an den konfigurierten KI-Provider übermittelt. Der Vorschlag wird nicht automatisch eingereicht oder zugewiesen.</p>

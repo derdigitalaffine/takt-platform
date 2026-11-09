@@ -29,14 +29,35 @@ class Anliegen(Base):
     task_id: Mapped[int | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, unique=True)
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
+    title_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidential: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(24), default="new")
+    supplier: Mapped[str] = mapped_column(String(160), default="")
+    order_reference: Mapped[str] = mapped_column(String(120), default="")
+    ordered_at: Mapped[object | None] = mapped_column(DateTime, nullable=True)
+    expected_delivery_at: Mapped[object | None] = mapped_column(DateTime, nullable=True)
+    delivered_at: Mapped[object | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     category = relationship("AnliegenCategory")
     reporter = relationship("User", foreign_keys=[reporter_id])
     assignee = relationship("User", foreign_keys=[assignee_id])
     task = relationship("Task", foreign_keys=[task_id])
+
+    @property
+    def display_title(self) -> str:
+        if self.confidential:
+            from .security import decrypt
+            return decrypt(self.title_enc) if self.title_enc else "Vertrauliches Anliegen"
+        return self.title
+
+    @property
+    def display_description(self) -> str:
+        if self.confidential:
+            from .security import decrypt
+            return decrypt(self.description_enc) if self.description_enc else ""
+        return self.description
 
 
 class AnliegenEvent(Base):
