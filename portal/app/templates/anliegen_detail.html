@@ -42,7 +42,7 @@
         <div class="d-flex gap-2 flex-wrap">
           <select class="form-select flex-grow-1" id="anliegen-start-process" name="rule_id" required>
             {% for rule in process_rules %}
-              <option value="{{rule.id}}">Prozess #{{rule.process_id}} · Revision {{rule.revision}}</option>
+              <option value="{{rule.id}}">{{process_names.get(rule.id, 'Prozess')}} · Regelrevision {{rule.revision}}</option>
             {% endfor %}
           </select>
           <button class="btn btn-primary" type="submit"><i class="fa-solid fa-play me-1" aria-hidden="true"></i>Starten</button>
