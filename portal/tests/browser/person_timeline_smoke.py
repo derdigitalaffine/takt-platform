@@ -39,7 +39,7 @@ try:
         page.get_by_role('searchbox',name='Person suchen').fill('')
         page.get_by_role('button',name='Jahr',exact=True).click()
         expect(page.locator('.pt-table')).to_be_visible()
-        assert page.locator('.pt-lane').count()==2
+        expect(page.locator('.pt-lane')).to_have_count(2)
         assert page.locator('.pt-nonwork').count()<250
         page.get_by_role('button',name='Monat',exact=True).click()
         page.set_viewport_size({'width':360,'height':800});page.emulate_media(color_scheme='dark')
@@ -48,7 +48,7 @@ try:
         page.screenshot(path='/tmp/takt-person-timeline-mobile.png',full_page=True)
         page.set_viewport_size({'width':1440,'height':900})
         elapsed=page.evaluate('''() => { const start=performance.now(); timeline.setPeople(Array.from({length:150},(_,i)=>({id:String(i+1),name:'Mitarbeitende '+(i+1),group:'Bereich '+Math.floor(i/25),canSelect:i===0}))); calendar.changeView('taktPeopleYear'); return performance.now()-start; }''')
-        assert page.locator('.pt-lane').count()==150
+        expect(page.locator('.pt-lane')).to_have_count(150)
         assert page.locator('.pt-nonwork').count()<16000
         assert elapsed<5000, f'150-person annual view took {elapsed:.0f} ms'
         print(f'150-person annual render: {elapsed:.0f} ms')
