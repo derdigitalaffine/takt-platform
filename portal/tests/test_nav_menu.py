@@ -30,6 +30,8 @@ def nav_html(html: str) -> str:
 def test_groups_and_single_active_entry():
     c = login(*ADMIN)
     html = nav_html(c.get("/forms/inbox").text)
+    assert 'app-sidebar-heading' in c.get("/forms/inbox").text
+    assert '/static/nav-modern.css' in c.get("/forms/inbox").text
     labels = [v for v in nav.GROUPS.values() if f"<span>{v.replace('&', '&amp;')}</span>" in html]
     assert labels[0] == "Zusammenarbeit" and labels[-1] == "Personal & Vertretung"
     assert html.count('aria-current="page"') == 1                 # nur „Zum Ausfüllen“, nicht auch „Formulare“
