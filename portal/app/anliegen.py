@@ -1,21 +1,66 @@
 """Internal intake workflow, category-based routing, and safe native task linkage."""
+import re
 from sqlalchemy import select, or_
 from fastapi import HTTPException
 
-from .db import GroupMember, Organization, User, utcnow
+from .db import GroupMember, Organization, User, Setting, utcnow
 from .org_models import OrgMembership, OrgRoleGrant
 from .anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
 
 DEFAULT_CATEGORIES = (
     ("office_supply", "Büromaterial", "Verbrauchsmaterial und allgemeine Bestellungen", "fa-paperclip", "person", False),
     ("office_furniture", "Büromöbel", "Möbelbeschaffung und Ausstattung", "fa-chair", "person", False),
+    ("it_procurement", "IT-Beschaffung", "Hardware, Zubehör, Softwarelizenzen und IT-Ausstattung bestellen", "fa-laptop", "person", False),
     ("defect", "Mangel melden", "Defekte, Schäden und Störungen", "fa-screwdriver-wrench", "person", False),
     ("complaint", "Vertrauliche Beschwerde", "Vertrauliche Meldung an die zuständige Leitung", "fa-shield-halved", "lead", True),
     ("improvement", "Verbesserungsvorschlag", "Ideen und Verbesserungen des Arbeitsalltags", "fa-lightbulb", "person", False),
     ("platform_feedback", "TAKT verbessern", "Fehler, Bedienbarkeit, fehlende Funktionen und Verbesserungsvorschläge zur TAKT-Plattform", "fa-wand-magic-sparkles", "person", False),
     ("other", "Sonstiges Anliegen", "Andere interne Anliegen", "fa-inbox", "person", False),
 )
-ORDER_KEYS = frozenset({"office_supply", "office_furniture"})
+DEFAULT_TAGS = {
+    "office_supply": "büromaterial,verbrauchsmaterial,papier,stifte,druckerzubehör",
+    "office_furniture": "büromöbel,stuhl,schreibtisch,ausstattung",
+    "it_procurement": "it-beschaffung,hardware,software,lizenz,notebook,monitor,zubehör",
+    "defect": "mangel,defekt,reparatur,schaden,störung",
+    "complaint": "vertraulich,beschwerde,personal,schutz",
+    "improvement": "verbesserung,idee,optimierung,arbeitsablauf",
+    "platform_feedback": "takt,software,fehler,benutzerführung,feature",
+    "other": "sonstiges,anliegen,allgemein",
+}
+ORDER_KEYS = frozenset({"office_supply", "office_furniture", "it_procurement"})
+
+
+def normalize_tags(value):
+    """Safe, predictable metadata for matching LLM category suggestions."""
+    if len(value) > 1000:
+        raise HTTPException(422, "Die Schlagwortliste ist zu lang.")
+    result, seen = [], set()
+    for raw in re.split(r"[,;\\n]+", value):
+        tag = " ".join(raw.strip().lstrip("#").split()).casefold()
+        if not tag:
+            continue
+        if len(tag) > 40 or not re.fullmatch(r"[\\w][\\w .-]*", tag):
+            raise HTTPException(422, "Schlagwörter dürfen höchstens 40 Zeichen und nur Buchstaben, Zahlen, Leerzeichen, Punkte oder Bindestriche enthalten.")
+        if tag not in seen:
+            seen.add(tag)
+            result.append(tag)
+    if len(result) > 15:
+        raise HTTPException(422, "Maximal 15 Schlagwörter pro Kategorie.")
+    return ",".join(result)
+
+
+def validate_category_fields(title, description, routing, assignee_id, db):
+    title, description = title.strip(), description.strip()
+    if not 3 <= len(title) <= 120 or len(description) > 255:
+        raise HTTPException(422, "Ungültige Kategorienbezeichnung oder Beschreibung.")
+    if routing not in ("person", "lead"):
+        raise HTTPException(422, "Unbekannte Zuständigkeitsregel.")
+    if routing == "person" and assignee_id:
+        who = db.get(User, assignee_id)
+        if not who or not who.active:
+            raise HTTPException(422, "Zuständige Person nicht verfügbar.")
+    return title, description
+
 STATUSES = {
     "unassigned": "Zuständigkeit offen",
     "open": "Offen",
@@ -95,11 +140,18 @@ def update_status(db, case, actor, new_status, *, supplier="", order_reference="
 
 
 def seed(db):
+    # One-time backfill: subsequent admin edits (including clearing all tags) win.
+    already_seeded = db.get(Setting, "anliegen_category_tags_seeded") is not None
     for position, (key, title, desc, icon, route, secret) in enumerate(DEFAULT_CATEGORIES):
-        if not db.scalar(select(AnliegenCategory.id).where(AnliegenCategory.key == key)):
-            db.add(AnliegenCategory(key=key, title=title, description=desc, icon=icon,
-                                   routing=route, confidential=secret, enabled=True,
+        cat = db.scalar(select(AnliegenCategory).where(AnliegenCategory.key == key))
+        if cat is None:
+            db.add(AnliegenCategory(key=key, title=title, description=desc, tags=DEFAULT_TAGS.get(key, ""),
+                                   icon=icon, routing=route, confidential=secret, enabled=True,
                                    position=position))
+        elif not already_seeded and not cat.tags:
+            cat.tags = DEFAULT_TAGS.get(key, "")
+    if not already_seeded:
+        db.add(Setting(key="anliegen_category_tags_seeded", value="1"))
 
 
 def category(db, category_id, *, enabled=False):
