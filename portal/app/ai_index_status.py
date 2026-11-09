@@ -1,0 +1,67 @@
+"""Read-only live embedding/index diagnostics for administrators.
+
+All health data comes from current local SQL rows; never ping external model
+providers during page rendering and never expose embeddings or source texts.
+"""
+from sqlalchemy import select
+
+from . import ai_vector, ai_vector_jobs, ai_qdrant
+from .ai_models import AIIndexJob, AIKnowledge, AIKnowledgeVector
+from .db import get_settings
+
+
+def status(db, docs: list[AIKnowledge] | None = None) -> dict:
+    cfg = get_settings(db)
+    selection = ai_vector._settings(db)
+    model = selection[1] if selection else ""
+    provider_name = selection[0].name if selection else ""
+    if docs is None:
+        docs = list(db.scalars(select(AIKnowledge).order_by(AIKnowledge.id)))
+    stored = {}
+    for row in db.execute(select(
+        AIKnowledgeVector.knowledge_id, AIKnowledgeVector.model_id,
+        AIKnowledgeVector.source_hash,
+    )):
+        doc_id, model_id, fingerprint = row
+        key = (doc_id, model_id, fingerprint)
+        stored[key] = stored.get(key, 0) + 1
+    jobs = {job.knowledge_id: job.status for job in db.scalars(select(AIIndexJob))}
+    doc_status = {}
+    ready = 0
+    missing = 0
+    for doc in docs:
+        if not doc.enabled:
+            info = {"label": "Nicht freigegeben", "color": "secondary"}
+        elif not selection:
+            info = {"label": "Embeddings deaktiviert", "color": "secondary"}
+        else:
+            expected = len(ai_vector.chunks(doc.body_md or ""))
+            count = stored.get((doc.id, model, ai_vector.source_hash(doc.body_md or "")), 0)
+            if expected and count == expected:
+                info = {"label": f"{count} Chunks aktuell", "color": "success"}
+                ready += 1
+            else:
+                missing += 1
+                state = jobs.get(doc.id)
+                info = {
+                    "pending": {"label": "Wartet auf Embedding", "color": "warning"},
+                    "running": {"label": "Wird indiziert", "color": "warning"},
+                    "failed": {"label": "Embedding fehlgeschlagen", "color": "danger"},
+                }.get(state, {"label": "Noch nicht indiziert" if count == 0 else "Index unvollständig",
+                               "color": "secondary"})
+        doc_status[str(doc.id)] = info
+    return {
+        "active": bool(selection),
+        "model": model,
+        "provider": provider_name,
+        "total": sum(bool(doc.enabled) for doc in docs),
+        "ready": ready,
+        "missing": missing,
+        "vectors": sum(stored.values()),
+        "jobs": ai_vector_jobs.counts(db),
+        "qdrant": "Aktuell" if ai_qdrant.active(db) else (
+            "Neuaufbau nötig" if ai_qdrant.configured(db) else "Aus"),
+        "documents": doc_status,
+        "law_embedding": "Nur Textsuche – kein Embedding-Index",
+        "dms_embedding": "Nur Textsuche – kein Embedding-Index",
+    }
