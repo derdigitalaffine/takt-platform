@@ -102,6 +102,10 @@ def test_confidential_complaint_goes_only_to_explicit_org_lead_without_native_ta
     with SessionLocal() as db:
         row = db.get(Anliegen, cid)
         assert row.confidential and row.assignee_id == lead_id
+        from app.security import decrypt
+        assert row.title == "Vertrauliches Anliegen" and row.description == ""
+        assert decrypt(row.title_enc) == "Vertrauliche Beschwerde"
+        assert decrypt(row.description_enc) == "Ich benötige ein vertrauliches Gespräch."
         assert row.task_id is None
     lead = login("anliegen-supervisor@example.org", "test-anliegen-pass")
     assert lead.get(f"/anliegen/{cid}").status_code == 200
@@ -180,3 +184,40 @@ def test_ai_draft_requires_user_action_never_creates_a_case(monkeypatch):
         "text": "Ich möchte vertrauliche Details formulieren.",
     })
     assert deny.status_code == 403
+
+
+
+def test_existing_plaintext_complaint_is_migrated_idempotently():
+    """Protect previously stored complaints without losing their contents."""
+    _enabled()
+    _user("anliegen-legacy-reporter@example.org")
+    with SessionLocal() as db:
+        user_id = db.scalar(select(User.id).where(
+            User.email == "anliegen-legacy-reporter@example.org"))
+        legacy = Anliegen(
+            category_id=_cat("complaint"), reporter_id=user_id,
+            confidential=True, title="Vertraulicher Altbestand",
+            description="Historischer sensibler Beschreibungstext",
+            status="unassigned"
+        )
+        db.add(legacy)
+        db.commit()
+        case_id = legacy.id
+
+    from app import anliegen
+    from app.security import decrypt
+    with SessionLocal() as db:
+        anliegen.migrate_confidential_payload(db)
+        db.commit()
+        row = db.get(Anliegen, case_id)
+        first_ciphertext = row.description_enc
+        assert row.title == "Vertrauliches Anliegen"
+        assert row.description == ""
+        assert decrypt(row.title_enc) == "Vertraulicher Altbestand"
+        assert decrypt(row.description_enc) == "Historischer sensibler Beschreibungstext"
+
+    with SessionLocal() as db:
+        anliegen.migrate_confidential_payload(db)
+        db.commit()
+        row = db.get(Anliegen, case_id)
+        assert row.description_enc == first_ciphertext
