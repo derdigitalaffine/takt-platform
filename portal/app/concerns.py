@@ -61,14 +61,20 @@ def destination(db, reporter: User, category: ConcernCategory) -> User:
                             "Bitte die Kategorieverwaltung informieren.")
 
 
+def current_assignee_id(concern: Concern) -> int | None:
+    """Task assignment is authoritative after reassignment by native TAKT workflows."""
+    return concern.task.assignee_id if concern.task is not None else None
+
+
 def can_read(user: User, concern: Concern) -> bool:
-    """A generic task manager is *not* entitled to read confidential narratives."""
-    return bool(user.is_admin or user.id in {concern.reporter_id, concern.assignee_id}
+    """Always re-check current task assignee; former assignees lose access."""
+    return bool(user.is_admin or user.id == concern.reporter_id
+                or user.id == current_assignee_id(concern)
                 or (not concern.confidential and user.can("concerns_manage")))
 
 
 def can_work(user: User, concern: Concern) -> bool:
-    return bool(user.is_admin or user.id == concern.assignee_id)
+    return bool(user.is_admin or user.id == current_assignee_id(concern))
 
 
 def create(db, reporter: User, category: ConcernCategory, title: str, description: str) -> Concern:
