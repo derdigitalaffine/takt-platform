@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ item.reference }} · Internes Anliegen{% endblock %}
+{% block content %}
+{% call m.page_head(item.reference, item.category.title) %}
+<a class="btn btn-outline-secondary" href="/anliegen"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zur Übersicht</a>
+{% if item.task_id and (not item.confidential or user.id == item.assignee_id or user.is_admin) %}
+<a class="btn btn-primary" href="/aufgaben/{{ item.task_id }}"><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>Bearbeitungsaufgabe öffnen</a>
+{% endif %}
+{% endcall %}
+{% if item.confidential %}
+<div class="alert alert-info d-flex gap-2 align-items-start"><i class="fa-solid fa-lock mt-1" aria-hidden="true"></i>
+  <div><strong>Vertrauliches Anliegen.</strong> Der Inhalt ist nur für die meldende und die zuständige Person sowie technisch berechtigte Administratoren zugänglich. Die allgemeine Aufgabenübersicht enthält nicht den Beschwerdetext.</div>
+</div>
+{% endif %}
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="fa-solid fa-file-lines me-2" aria-hidden="true"></i>{{ item.display_title }}</div>
+      <div class="card-body"><div class="text-break" style="white-space:pre-wrap">{{ item.display_description }}</div></div>
+    </div>
+  </div>
+  <aside class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Vorgangsdaten</div>
+      <div class="card-body">
+        <dl class="mb-0">
+          <dt>Kategorie</dt><dd>{{ item.category.title }}</dd>
+          <dt>Gemeldet von</dt><dd>{{ item.reporter.name }}</dd>
+          <dt>Zuständig</dt><dd>{{ item.task.assignee.name if item.task and item.task.assignee else 'Nicht zugewiesen' }}</dd>
+          <dt>Erfasst am</dt><dd>{{ item.created_at|local('%d.%m.%Y %H:%M') }}</dd>
+          <dt>Status der Aufgabe</dt><dd><span class="badge text-bg-secondary">{{ statuses.get(item.task.status, item.task.status) if item.task else 'Keine Aufgabe' }}</span></dd>
+          {% if item.task_id %}<dt>Aufgabennummer</dt><dd>#{{ item.task_id }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}
