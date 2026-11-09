@@ -262,7 +262,7 @@
       addAnswerMetadata(assistantBubble.bubble, data);
       const list = document.createElement('ul');
       for (const result of data.results || []) {
-        if (!/^\/(?:(?:aufgaben|anliegen|forms|processes)\/\d+|dms\/r\/\d+|kalender\?ansicht=termine)$/.test(result.url || '')) continue;
+        if (!/^\/(?:(?:aufgaben|anliegen|forms|processes)\/\d+|dms\/r\/\d+|urlaub\/vorgang\/\d+|kalender\?ansicht=termine)$/.test(result.url || '')) continue;
         const li = document.createElement('li'); const link = document.createElement('a');
         link.href = result.url; link.textContent = result.title || result.name || 'TAKT-Bereich';
         li.appendChild(link); list.appendChild(li);
@@ -271,7 +271,7 @@
       // A suggested destination is informational only. Navigating the
       // application requires the user's explicit click, never a model output.
       if (typeof data.open_url === 'string' &&
-          /^\/(?:aufgaben|anliegen|forms|dms|kalender|processes)(?:[/?#]|$)/.test(data.open_url) &&
+          /^\/(?:aufgaben|anliegen|forms|dms|kalender|processes|urlaub)(?:[/?#]|$)/.test(data.open_url) &&
           !data.open_url.startsWith('//') && !data.open_url.includes('\\')) {
         var actionBox = document.createElement('div');
         actionBox.className = 'ai-agent-destination';
