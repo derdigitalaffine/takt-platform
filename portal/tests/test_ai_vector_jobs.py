@@ -95,4 +95,4 @@ def test_auto_index_off_produces_no_provider_traffic(monkeypatch):
     with SessionLocal() as db:
         db.add(AIKnowledge(title="Off", body_md="Do not index this", enabled=True))
         db.commit()
-    assert asyncio.run(ai_vector_jobs.tick(doc_id=doc_id)) == 0
+    assert asyncio.run(ai_vector_jobs.tick()) == 0
