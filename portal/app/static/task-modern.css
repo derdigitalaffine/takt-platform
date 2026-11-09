@@ -328,7 +328,7 @@ a.task-stat:hover {
   font-weight: 750;
   margin: .7rem 0 .65rem;
 }
-.task-hero .ds-page-title h1::after { content: '.'; color: var(--bs-primary); }
+.task-hero .ds-page-title h1::after { content: ''; display: inline-block; width: .12em; height: .12em; border-radius: 50%; background: var(--bs-primary); margin-left: .07em; }
 .task-hero .ds-page-title p {
   font-size: clamp(.96rem,1.2vw,1.07rem);
   max-width: 46ch;
