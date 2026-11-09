@@ -23,7 +23,7 @@
         {% endif %}
         <div class="list-group list-group-flush" role="list">
           {% for chat in chats %}
-          <a href="/ki?chat={{ chat.id }}" class="list-group-item list-group-item-action {{ 'active' if current and current.id == chat.id }}" {% if current and current.id == chat.id %}aria-current="page"{% endif %}>{{ chat.title }}</a>
+          <a href="/ki?chat={{ chat.id }}" class="list-group-item list-group-item-action {{ 'active' if current and current.id == chat.id }}" {% if current and current.id == chat.id %}aria-current="page" data-ai-current-link{% endif %}>{{ chat.title }}</a>
           {% else %}<p class="text-secondary small">Noch keine Unterhaltungen vorhanden.</p>{% endfor %}
         </div>
       </div>
@@ -106,7 +106,6 @@
           </div>
           <div class="small text-danger mt-2" data-ai-hint role="status" aria-live="polite"></div>
         </form>
-      </div>
       {% else %}
       <div class="card-body py-5 text-center">
         <i class="fa-solid fa-brain fa-2x text-secondary mb-3" aria-hidden="true"></i>
