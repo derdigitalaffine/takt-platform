@@ -260,3 +260,17 @@ def test_image_part_format_is_compatible():
     Image.new("RGB", (2, 2), (255, 0, 0)).save(stream, format="PNG")
     uri = _image_data(stream.getvalue())
     assert uri.startswith("data:image/png;base64,")
+
+
+
+def test_admin_imports_internal_markdown_document():
+    _enable()
+    c = login(*ADMIN)
+    csrf = csrf_of(c.get("/admin/ai").text)
+    response = c.post("/admin/ai/knowledge/upload", data={
+        "csrf": csrf, "title": "Interne Testanweisung", "enabled": "1",
+    }, files={"file": ("intern.md", b"# Interne Testanweisung\n\nNur Demo-Inhalt.", "text/markdown")})
+    assert response.status_code == 303
+    with SessionLocal() as db:
+        doc = db.scalar(select(AIKnowledge).where(AIKnowledge.title == "Interne Testanweisung"))
+        assert doc and "Nur Demo-Inhalt" in doc.body_md and doc.enabled
