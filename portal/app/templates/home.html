@@ -2,27 +2,60 @@
 {% import "_macros.html" as m with context %}
 {% from '_work_list.html' import work_list %}
 {% block title %}Übersicht{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/home-modern.css">{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-  <div class="flex-grow-1"><h1 class="h3 mb-0">Guten {{ 'Morgen' if (now | local('%H') | int) < 11 else ('Tag' if (now | local('%H') | int) < 18 else 'Abend') }}, {{ user.name.split(' ')[0] }}</h1>
-    <div class="text-secondary small">{{ now | local('%A, %d.%m.%Y') | replace('Monday', 'Montag') | replace('Tuesday', 'Dienstag') | replace('Wednesday', 'Mittwoch') | replace('Thursday', 'Donnerstag') | replace('Friday', 'Freitag') | replace('Saturday', 'Samstag') | replace('Sunday', 'Sonntag') }}</div></div>
-  <button class="btn btn-sm btn-outline-secondary" type="button" id="dash-edit" aria-pressed="false"><i class="fa-solid fa-sliders me-1"></i>Anpassen</button>
-</div>
-<p><a href="/module">Alle verfügbaren Module entdecken <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>
+<div class="dashboard-page">
+<header class="dash-intro" aria-labelledby="dash-title">
+  <div class="dash-intro-main">
+    <div class="dash-eyebrow"><span class="dash-signal" aria-hidden="true"></span> Mein Arbeitsplatz</div>
+    <h1 id="dash-title">Guten {{ 'Morgen' if (now | local('%H') | int) < 11 else ('Tag' if (now | local('%H') | int) < 18 else 'Abend') }}, {{ user.name.split(' ')[0] }}<span class="dash-title-dot" aria-hidden="true">.</span></h1>
+    <p class="dash-intro-description">Alles Wichtige für Ihren Tag – direkt griffbereit.</p>
+    <p class="dash-intro-date"><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>{{ now | local('%A, %d.%m.%Y') | replace('Monday', 'Montag') | replace('Tuesday', 'Dienstag') | replace('Wednesday', 'Mittwoch') | replace('Thursday', 'Donnerstag') | replace('Friday', 'Freitag') | replace('Saturday', 'Samstag') | replace('Sunday', 'Sonntag') }}</p>
+    <div class="dash-intro-actions">
+      {% if top.work.available %}<a href="/tasks" class="btn btn-primary"><i class="fa-solid fa-list-check me-2" aria-hidden="true"></i>Meine Aufgaben</a>{% endif %}
+      <a href="/module" class="btn btn-outline-secondary"><i class="fa-solid fa-grip me-2" aria-hidden="true"></i>Modulkatalog öffnen</a>
+      <button class="btn btn-outline-secondary" type="button" id="dash-edit" aria-pressed="false"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Anpassen</button>
+    </div>
+  </div>
+  <div class="dash-intro-metrics" aria-label="Auf einen Blick">
+    {% if top.work.available %}
+    <a href="/tasks" class="dash-metric">
+      <span class="dash-metric-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+      <strong>{{ top.work.count }}</strong><span>zu erledigen</span>
+    </a>
+    <a href="/tasks?perspective=overdue" class="dash-metric {{ 'dash-metric-urgent' if top.work.overdue else '' }}">
+      <span class="dash-metric-icon"><i class="fa-regular fa-clock" aria-hidden="true"></i></span>
+      <strong>{{ top.work.overdue }}</strong><span>überfällig</span>
+    </a>
+    {% else %}
+    <a href="#dash-today" class="dash-metric">
+      <span class="dash-metric-icon"><i class="fa-solid fa-compass" aria-hidden="true"></i></span>
+      <strong>{{ top.actions|length }}</strong><span>Hinweise</span>
+    </a>
+    {% endif %}
+    <a href="#dash-today-title" class="dash-metric">
+      <span class="dash-metric-icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span>
+      <strong>{{ top.agenda|length }}</strong><span>heute geplant</span>
+    </a>
+  </div>
+</header>
 {% if quick %}
 <nav class="dash-quick d-flex flex-wrap gap-2 mb-3" aria-label="Schnellaktionen">
   {% for href, icon, label in quick %}<a class="btn btn-sm btn-outline-primary" href="{{ href }}"><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</a>{% endfor %}
 </nav>
 {% endif %}
 
-<div class="row g-3 mb-4" id="dash-today">
-  <div class="col-12 col-lg-7"><section class="card h-100" aria-labelledby="dash-act-title">
-    <div class="card-header d-flex flex-wrap align-items-center gap-2"><i class="fa-solid fa-list-check text-primary" aria-hidden="true"></i><h2 class="h6 mb-0 flex-grow-1" id="dash-act-title">Handlungsbedarf – Jetzt bearbeiten</h2>{% if top.work.available %}<a class="small" href="/tasks">Alle Aufgaben <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>{% endif %}</div>
+<div class="dash-section-heading dash-focus-heading">
+  <div><span class="dash-overline">Heute im Fokus</span><h2>Ihr Arbeitstag auf einen Blick</h2><p>Was jetzt Aufmerksamkeit braucht und was als Nächstes ansteht.</p></div>
+</div>
+<div class="row g-3 mb-4 dash-focus-grid" id="dash-today">
+  <div class="col-12 col-lg-7"><section class="card h-100 dash-feature-card dash-needs-card" aria-labelledby="dash-act-title">
+    <div class="card-header d-flex flex-wrap align-items-center gap-2"><span class="dash-section-icon"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span><h2 class="h6 mb-0 flex-grow-1" id="dash-act-title">Handlungsbedarf – Jetzt bearbeiten</h2>{% if top.work.available %}<a class="small" href="/tasks">Alle Aufgaben <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>{% endif %}</div>
     {% if top.work.ready %}{{work_list(top.work.ready[:5], now, csrf)}}{% else %}<div class="card-body text-secondary"><i class="fa-regular fa-face-smile me-1" aria-hidden="true"></i>Keine Aufgaben, die Sie jetzt bearbeiten müssen.</div>{% endif %}
     {% if top.work.group_count or top.work.waiting_count %}<div class="card-footer small d-flex flex-wrap gap-3">{% if top.work.group_count %}<a href="/tasks?scope=group"><i class="fa-solid fa-users me-1"></i>{{top.work.group_count}} Gruppenaufgaben übernehmen</a>{% endif %}{% if top.work.waiting_count %}<a href="/tasks#waiting"><i class="fa-solid fa-hourglass-half me-1"></i>{{top.work.waiting_count}} warten auf andere</a>{% endif %}</div>{% endif %}
   </section></div>
-  <div class="col-12 col-lg-5"><section class="card h-100" aria-labelledby="dash-today-title">
-    <div class="card-header d-flex align-items-center gap-2"><i class="fa-regular fa-calendar text-primary" aria-hidden="true"></i><h2 class="h6 mb-0" id="dash-today-title">Heute</h2></div>
+  <div class="col-12 col-lg-5"><section class="card h-100 dash-feature-card dash-agenda-card" aria-labelledby="dash-today-title">
+    <div class="card-header d-flex align-items-center gap-2"><span class="dash-section-icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span><h2 class="h6 mb-0" id="dash-today-title">Heute</h2></div>
     <ul class="list-group list-group-flush small">
       {% for e in top.agenda %}<li class="list-group-item d-flex gap-2 align-items-center"><span class="text-nowrap fw-semibold" style="min-width: 3.2rem">{{ e.at | local('%H:%M') }}</span><i class="fa-solid {{ e.icon }} fa-fw text-secondary" aria-hidden="true"></i><a class="flex-grow-1 text-truncate" href="{{ e.url }}">{{ e.label }}</a>{% if e.sub %}<span class="text-secondary text-truncate" style="max-width: 40%">{{ e.sub }}</span>{% endif %}</li>
       {% else %}<li class="list-group-item text-secondary">Heute keine Termine, Buchungen oder Übergaben.</li>{% endfor %}
@@ -30,18 +63,32 @@
   </section></div>
 </div>
 
-{% if top.actions %}<section class="mb-4" aria-label="Weitere Hinweise"><h2 class="h6 text-secondary">Weitere Hinweise</h2><div class="d-flex flex-wrap gap-2">{% for a in top.actions %}<a class="btn btn-sm btn-outline-secondary" href="{{a.url}}"><i class="fa-solid {{a.icon}} me-1" aria-hidden="true"></i>{{a.count}} {{a.label}}</a>{% endfor %}</div></section>{% endif %}
+{% if top.actions %}
+<section class="dash-alert-strip mb-4" aria-labelledby="dash-alert-title">
+  <div class="dash-section-heading"><div><span class="dash-overline">Nicht verpassen</span><h2 id="dash-alert-title">Weitere Hinweise</h2></div></div>
+  <div class="dash-alert-actions">{% for a in top.actions %}
+    <a class="dash-alert-action dash-alert-{{a.level}}" href="{{a.url}}">
+      <span class="dash-alert-icon"><i class="fa-solid {{a.icon}}" aria-hidden="true"></i></span>
+      <strong>{{a.count}}</strong><span>{{a.label}}</span><i class="fa-solid fa-arrow-up-right-from-square dash-alert-arrow" aria-hidden="true"></i>
+    </a>{% endfor %}
+  </div>
+</section>
+{% endif %}
 <div class="alert alert-light border small d-none" id="dash-help"><i class="fa-solid fa-arrows-up-down-left-right me-1"></i>Kacheln am <i class="fa-solid fa-grip-vertical"></i> ziehen, um die Reihenfolge zu ändern; mit <i class="fa-regular fa-eye-slash"></i> aus- und einblenden. Wird automatisch gespeichert.</div>
 
+<div class="dash-section-heading dash-modules-heading">
+  <div><span class="dash-overline">Individuell für Sie</span><h2>Meine Bereiche</h2><p>Ihre wichtigsten Module, Inhalte und Schnellzugriffe – nach Wunsch sortierbar.</p></div>
+  <a href="/module" class="dash-section-link">Alle Module entdecken <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+</div>
 <p class="small text-secondary" id="dash-save-status" role="status" aria-live="polite"></p>
 <button class="btn btn-sm btn-outline-secondary d-none mb-3" type="button" id="dash-retry"><i class="fa-solid fa-rotate-right me-1" aria-hidden="true"></i>Speichern wiederholen</button>
 <div class="row g-3" id="dash-tiles">
 {% for t in tiles %}{% set d = t.data %}
 <div class="col-12 col-lg-6 col-xxl-4 dash-tile {{ 'is-hidden' if t.hidden }}" data-key="{{ t.key }}">
-  <div class="card h-100">
+  <div class="card h-100 dash-module-card">
     <div class="card-header d-flex align-items-center gap-2">
       <span class="dash-handle d-none text-secondary" title="Ziehen"><i class="fa-solid fa-grip-vertical"></i></span>
-      <i class="fa-solid {{ t.icon }} text-primary"></i><strong class="flex-grow-1">{{ t.title }}</strong>
+      <span class="dash-tile-icon"><i class="fa-solid {{ t.icon }}" aria-hidden="true"></i></span><strong class="flex-grow-1">{{ t.title }}</strong>
       <span class="dash-move d-none d-flex gap-1"><button class="btn btn-sm btn-link p-0 text-secondary" type="button" data-dash-move="up" aria-label="Kachel nach oben verschieben"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button><button class="btn btn-sm btn-link p-0 text-secondary" type="button" data-dash-move="down" aria-label="Kachel nach unten verschieben"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></button></span>
       <button class="btn btn-sm btn-link p-0 text-secondary dash-toggle d-none" type="button" title="Aus-/einblenden" aria-label="Kachel aus- oder einblenden"><i class="fa-regular {{ 'fa-eye' if t.hidden else 'fa-eye-slash' }}"></i></button>
     </div>
@@ -70,7 +117,7 @@
         <a class="flex-grow-1 text-truncate" href="{{ '/meetings/' ~ mt.id if mt.id in d.own else '/join/' ~ mt.room }}">{{ mt.title }}</a>
         {% if mt.id not in d.own %}<span class="badge text-bg-light border">eingeladen</span>{% endif %}</li>{% else %}<li class="list-group-item text-secondary">Keine anstehenden Termine.</li>{% endfor %}</ul>
       <div class="card-footer small d-flex gap-3"><a href="/meetings/plan"><i class="fa-solid fa-calendar-plus me-1"></i>Planen</a><a href="/meetings">Alle Meetings <i class="fa-solid fa-arrow-right"></i></a></div>
-    {% elif t.key == 'seminars' %}<p>{{d.count}} bevorstehende Teilnahmen / Einladungen</p>{% for item in d['items'] %}<a class="d-block mb-2" href="/seminare?tab=mine">{{item.row.title}} · {{item.status}}</a>{% endfor %}<a href="/seminare">Seminare entdecken</a>
+    {% elif t.key == 'seminars' %}<div class="card-body"><p class="small text-secondary mb-3">{{d.count}} bevorstehende Teilnahmen / Einladungen</p>{% for item in d['items'] %}<a class="d-block mb-2" href="/seminare?tab=mine">{{item.row.title}} · {{item.status}}</a>{% endfor %}<a class="dash-inline-link" href="/seminare">Seminare entdecken <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></div>
     {% elif t.key == 'polls' %}
       <ul class="list-group list-group-flush small">
         {% for pp in d.todo %}<li class="list-group-item d-flex gap-2"><i class="fa-solid fa-hand-point-right text-warning mt-1"></i><a class="flex-grow-1" href="/t/p/{{ pp.edit_token }}">{{ pp.poll.title }}</a><span class="badge text-bg-warning">abstimmen</span></li>{% endfor %}
@@ -136,6 +183,7 @@
   </div>
 </div>
 {% endfor %}
+</div>
 </div>
 {% endblock %}
 {% block scripts %}

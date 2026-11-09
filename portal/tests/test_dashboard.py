@@ -30,6 +30,15 @@ def test_today_quick_actions_and_new_tiles():
     c = login(*ADMIN)
     html = c.get("/").text
     assert "Handlungsbedarf" in html and 'id="dash-today"' in html
+    assert '/static/home-modern.css' in html
+    assert 'class="dashboard-page"' in html and 'id="dash-title"' in html
+    assert 'class="dash-intro-metrics"' in html
+    assert 'dash-metric' in html and 'dash-section-heading' in html
+    assert 'dash-feature-card dash-needs-card' in html and 'dash-feature-card dash-agenda-card' in html
+    assert 'class="card h-100 dash-module-card"' in html
+    assert 'class="dash-tile-icon"' in html
+    assert 'id="dash-edit"' in html and 'id="dash-tiles"' in html
+
     today = html[html.index('id="dash-today-title"'):html.index('id="dash-help"')]
     assert "Abstimmung Haushalt" in today and "/meetings/" in today
     quick = html[html.index('aria-label="Schnellaktionen"'):html.index('id="dash-today"')]
