@@ -32,7 +32,9 @@ def clean(raw):
     mode = raw.get('birthday_visibility', 'hidden')
     if mode not in ('hidden', 'date', 'age'):
         raise ValueError('Bitte eine gültige Geburtstagsfreigabe wählen.')
-    values = {'prefill_enabled': raw.get('prefill_enabled') in ('1', True), 'birthday_visibility': mode}
+    values = {'prefill_enabled': raw.get('prefill_enabled') in ('1', True)}
+    if 'birthday_visibility' in raw:
+        values['birthday_visibility'] = mode
     for key, (_, label, kind, limit, _) in FIELDS.items():
         value = str(raw.get(key) or '').strip()
         if not value:
