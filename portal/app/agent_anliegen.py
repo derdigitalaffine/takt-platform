@@ -9,7 +9,7 @@ from .db import User
 
 
 def version(cat):
-    return [cat.title, cat.routing, cat.assignee_id, cat.enabled]
+    return [cat.title, cat.description, cat.tags, cat.routing, cat.assignee_id, cat.enabled]
 
 
 def affected(db, cat):
