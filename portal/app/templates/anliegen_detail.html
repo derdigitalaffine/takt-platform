@@ -56,7 +56,7 @@
         <div class="ap-run-header mb-2">
           <div>
             <div class="small text-secondary">Lauf #{{run.id}} · Start {{run.created_at|local('%d.%m.%Y %H:%M')}}</div>
-            <strong>{{card.process.name if card.process else 'Archivierter Prozess'}}</strong>
+            <strong>{{(card.process.name if card.process else 'Archivierter Prozess') if card.can_view_details else 'Interner Bearbeitungsprozess'}}</strong>
           </div>
           <span class="badge {{'text-bg-success' if run.state == 'done' else 'text-bg-warning' if run.state in ('requested','blocked') else 'text-bg-danger' if run.state in ('rejected','cancelled') else 'text-bg-secondary'}}">
             {{ {'requested':'Startfreigabe ausstehend', 'running':'In Bearbeitung', 'done':'Abgeschlossen', 'rejected':'Abgelehnt', 'paused':'Pausiert', 'cancelled':'Abgebrochen', 'blocked':'Blockiert'}.get(run.state,run.state) }}
@@ -70,7 +70,7 @@
           <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-stamp me-1" aria-hidden="true"></i>Prozessstart freigeben</button>
         </form>
         {% endif %}
-        {% if card.tasks %}
+        {% if card.tasks and card.can_view_details %}
         <ol class="list-unstyled mb-2">
         {% for item in card.tasks %}
           {% set task = item.task %}
