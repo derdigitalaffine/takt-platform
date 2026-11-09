@@ -96,3 +96,61 @@ def test_auto_index_off_produces_no_provider_traffic(monkeypatch):
         db.add(AIKnowledge(title="Off", body_md="Do not index this", enabled=True))
         db.commit()
     assert asyncio.run(ai_vector_jobs.tick()) == 0
+
+
+def test_reconcile_scrubs_stale_plaintext_vectors_and_queues_reindex():
+    _setup()
+    with SessionLocal() as db:
+        doc = AIKnowledge(title="Stale cached source", body_md="Fassung aktuell",
+                          enabled=True)
+        db.add(doc)
+        db.flush()
+        db.add(AIKnowledgeVector(knowledge_id=doc.id, chunk_no=0,
+            model_id="old-model", source_hash="0" * 64,
+            chunk_text="Nicht mehr gültige personenbezogene Passage",
+            vector_json="[1.0, 0.0]"))
+        db.commit()
+        doc_id = doc.id
+        ai_vector_jobs.reconcile(db)
+        assert db.scalar(select(AIKnowledgeVector).where(
+            AIKnowledgeVector.knowledge_id == doc_id)) is None
+        job = db.scalar(select(AIIndexJob).where(AIIndexJob.knowledge_id == doc_id))
+        assert job is not None and job.status == "pending"
+        # Index invalidation must also prevent Qdrant ranking from stale IDs.
+        from app.db import get_settings
+        assert int(get_settings(db)["ai_qdrant_revision"]) >= 1
+
+
+def test_admin_retry_reschedules_only_failed_jobs_without_network():
+    _setup()
+    with SessionLocal() as db:
+        doc = AIKnowledge(title="Retrieable source", body_md="Wichtige Inhalte",
+                          enabled=True)
+        db.add(doc)
+        db.flush()
+        db.add(AIIndexJob(knowledge_id=doc.id, model_id="queue-test-model",
+                          desired_hash=ai_vector.source_hash(doc.body_md),
+                          status="failed", attempts=3,
+                          next_attempt_at=utcnow()))
+        db.commit()
+        assert ai_vector_jobs.retry_failed(db) == 1
+        job = db.scalar(select(AIIndexJob).where(AIIndexJob.knowledge_id == doc.id))
+        assert job.status == "pending" and job.attempts == 0
+        assert ai_vector_jobs.retry_failed(db) == 0
+
+
+def test_qdrant_auto_sync_requires_explicit_opt_in(monkeypatch):
+    _setup()
+    settings(ai_qdrant_enabled="1", ai_qdrant_auto_sync="0",
+             ai_qdrant_revision="2", ai_qdrant_synced_revision="1")
+    from app import ai_qdrant
+    calls = []
+    async def fake_rebuild(db):
+        calls.append(True)
+        return 2
+    monkeypatch.setattr(ai_qdrant, "rebuild", fake_rebuild)
+    assert asyncio.run(ai_vector_jobs.sync_qdrant_if_needed()) == 0
+    assert not calls
+    settings(ai_qdrant_auto_sync="1")
+    assert asyncio.run(ai_vector_jobs.sync_qdrant_if_needed()) == 2
+    assert calls == [True]
