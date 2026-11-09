@@ -89,6 +89,8 @@ ITEMS: list[Item] = [
     # Mein Arbeitsplatz
     Item("tasks", "work", "/tasks", "fa-list-check", "Meine Aufgaben",
          lambda c: _apps(c) or c.res_nav or "circulations" in c.modules or "tasks" in c.modules, lambda p: _pre("/tasks", "/aufgaben")(p) and not p.startswith("/tasks/boards"), _tasks_badge),
+    Item("concerns", "work", "/anliegen", "fa-inbox", "Interne Anliegen",
+         lambda c: "concerns" in c.modules, _pre("/anliegen")),
     Item("kanban", "work", "/tasks/boards", "fa-table-columns", "Aufgabenboards",
          lambda c: "tasks" in c.modules, _pre("/tasks/boards")),
     Item("inbox", "work", "/forms/inbox", "fa-inbox", "Zum Ausfüllen", lambda c: "forms" in c.modules, _pre("/forms/inbox")),
@@ -177,6 +179,8 @@ ITEMS: list[Item] = [
 ]
 ITEMS.append(Item("ai", "know", "/ki", "fa-brain", "KI-Chat",
                   lambda c: "ai" in c.modules and c.can("ai_chat"), _pre("/ki")))
+ITEMS.append(Item("concerns_admin", "admin", "/admin/anliegen", "fa-route", "Anliegen-Kategorien",
+                  lambda c: "concerns" in c.modules and c.can("concerns_manage"), _pre("/admin/anliegen")))
 ITEMS.append(Item("ai_admin", "admin", "/admin/ai", "fa-brain", "KI & Sprachmodelle",
                   lambda c: c.admin, _pre("/admin/ai")))
 ITEMS.append(Item("oidc", "admin", "/admin/oidc", "fa-key", "Nextcloud / OIDC-Anmeldung", lambda c: c.admin, _pre("/admin/oidc")))
@@ -188,7 +192,7 @@ BY_ID = {it.id: it for it in ITEMS}
 # Stable entry IDs preserve bookmarks and personal favorites.
 FAMILIES = [
     ("calendars",), ("leave",),
-    ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
+    ("tasks",), ("concerns",), ("kanban",), ("circulations", "circulation_reports"),
     ("surveys", "polls", "votes"), ("shortlinks",),
     ("meetings", "meeting_plan"), ("seminars",),
     ("resources", "res_planner", "res_bookings"), ("bookings",),
@@ -201,11 +205,12 @@ CONTEXT_ONLY = {i for family in FAMILIES for i in family[1:]}
 ADMIN_SECTIONS = {
     "Menschen & Organisation": ["users", "orgs"],
     "Finanzen": ["payments", "expense_rules", "pay_settings"],
-    "Inhalte & Fachkonfiguration": ["map_layers", "recordings"],
+    "Inhalte & Fachkonfiguration": ["map_layers", "recordings", "concerns_admin"],
     "Integrationen & Versand": ["oidc", "notifications", "mail_templates", "speechmind", "ai_admin"],
     "Portal & Betrieb": ["modules", "design", "public_nav", "sessions", "https", "domains", "trash"],
 }
 DESCRIPTIONS = {
+    "concerns": ("Melden Sie interne Mängel, Bestellungen, Beschwerden und Verbesserungsvorschläge. TAKT weist sie anhand der hinterlegten Zuständigkeit als Aufgabe zu.", "Neues Anliegen melden · Meine Anliegen verfolgen", "Mangel Bestellung Beschwerde Büromaterial Büromöbel"),
     "ai": ("Stellen Sie Fragen an freigegebene Sprachmodelle und durchsuchen Sie zugelassene interne TAKT-Wissensquellen.", "Persönlichen KI-Chat öffnen · Wissen recherchieren", "KI LLM AI Chat Gemma Wissen"),
     "tasks": ("Sehen Sie, was Sie als Nächstes erledigen können. Eigene Aufgaben und Aufgaben aus Ihren Fachbereichen an einem Ort.", "Aufgaben bearbeiten · Zuständigkeiten prüfen", "Aufgaben Arbeitsplatz"),
     "kanban": ("Organisieren Sie gemeinsame Arbeit in übersichtlichen Spalten. Verknüpfte Aufgaben und Umfragen zeigen ihren aktuellen Status.", "Boards öffnen · Arbeit organisieren", "Board Projekt"),
