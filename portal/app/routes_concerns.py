@@ -53,11 +53,14 @@ def concern_home(request: Request, user: User = Depends(current_user), db: Sessi
     if user.is_admin:
         items = list(db.scalars(select(Concern).order_by(Concern.created_at.desc()).limit(200)))
     else:
-        base = or_(Concern.reporter_id == user.id, Concern.assignee_id == user.id)
+        from .task_models import Task
+        # Native task reassignment immediately changes who may open the case.
+        base = or_(Concern.reporter_id == user.id, Task.assignee_id == user.id)
         if user.can("concerns_manage"):
             base = or_(base, Concern.confidential.is_(False))
-        items = list(db.scalars(select(Concern).where(base)
-                                .order_by(Concern.created_at.desc()).limit(200)))
+        items = list(db.scalars(select(Concern).outerjoin(
+            Task, Concern.task_id == Task.id
+        ).where(base).order_by(Concern.created_at.desc()).limit(200)))
     return render(request, "concerns.html", user, items=items,
                   statuses=tasks.STATUSES, can_manage=user.is_admin or user.can("concerns_manage"))
 
