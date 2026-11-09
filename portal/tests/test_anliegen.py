@@ -152,6 +152,11 @@ def test_confidential_complaint_goes_only_to_explicit_org_lead_without_native_ta
         row = db.get(Anliegen, cid)
         assert row.confidential and row.assignee_id == lead_id
         assert row.task_id is None
+        assert row.title == "Vertrauliches Anliegen" and row.description == ""
+        assert row.title_enc and row.description_enc
+        assert "Vertrauliche Beschwerde" not in row.title_enc
+        assert row.display_title == "Vertrauliche Beschwerde"
+        assert row.display_description == "Ich benötige ein vertrauliches Gespräch."
     lead = login("anliegen-supervisor@example.org", "test-anliegen-pass")
     assert lead.get(f"/anliegen/{cid}").status_code == 200
     manager_id = _user("anliegen-global-manager@example.org", "anliegen_submit,anliegen_manage,tasks_manage")
