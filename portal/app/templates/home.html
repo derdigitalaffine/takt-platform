@@ -13,7 +13,7 @@
     <p class="dash-intro-date"><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>{{ now | local('%A, %d.%m.%Y') | replace('Monday', 'Montag') | replace('Tuesday', 'Dienstag') | replace('Wednesday', 'Mittwoch') | replace('Thursday', 'Donnerstag') | replace('Friday', 'Freitag') | replace('Saturday', 'Samstag') | replace('Sunday', 'Sonntag') }}</p>
     <div class="dash-intro-actions">
       {% if top.work.available %}<a href="/tasks" class="btn btn-primary"><i class="fa-solid fa-list-check me-2" aria-hidden="true"></i>Meine Aufgaben</a>{% endif %}
-      <a href="/module" class="btn btn-outline-secondary"><i class="fa-solid fa-grip me-2" aria-hidden="true"></i>Module entdecken</a>
+      <a href="/module" class="btn btn-outline-secondary"><i class="fa-solid fa-grip me-2" aria-hidden="true"></i>Modulkatalog öffnen</a>
       <button class="btn btn-outline-secondary" type="button" id="dash-edit" aria-pressed="false"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Anpassen</button>
     </div>
   </div>
