@@ -348,7 +348,7 @@ def test_description_first_form_keeps_original_and_persists_user_reviewed_text()
     page = c.get("/anliegen/neu")
     assert page.status_code == 200
     assert 'id="anliegen-description"' in page.text
-    assert 'id="anliegen-ai"' in page.text or "manuelle Erfassung" in page.text
+    assert 'id="anliegen-review"' in page.text  # manual path works even without ai_chat
     assert 'name="description_final"' in page.text
     assert 'id="anliegen-recipient-preview"' in page.text
     assert '/static/anliegen-intake.css' in page.text
