@@ -6,8 +6,9 @@
 {% block content %}<div class="task-page">
 {% set form_url='/aufgaben/neu?back=' ~ (back|urlencode) %}
 <div class="task-hero">
-  <div class="task-hero-eyebrow"><span class="task-hero-signal" aria-hidden="true"></span> Mein Arbeitsbereich</div>
-{% call m.page_header('Meine Aufgaben', 'Ein klarer Blick auf das, was als Nächstes ansteht.', form_url if native_on and may_create and not capture else '', 'Mit Formular anlegen', 'fa-plus') %}
+  <div class="task-hero-content">
+    <div class="task-hero-eyebrow"><span class="task-hero-signal" aria-hidden="true"></span> Mein digitaler Arbeitsplatz</div>
+{% call m.page_header('Meine Aufgaben', 'Alles, was jetzt wichtig ist – fokussiert, übersichtlich und mit wenigen Klicks erledigt.', form_url if native_on and may_create and not capture else '', 'Mit Formular anlegen', 'fa-plus') %}
 {% if native_on and may_create and capture %}<a class="btn btn-outline-secondary" href="{{form_url}}"><i class="fa-regular fa-pen-to-square me-1" aria-hidden="true"></i>Mit Formular anlegen</a>{% endif %}
 {% if anliegen_on %}
   {% if user.can('anliegen_submit') %}<a class="btn btn-outline-primary" href="/anliegen/neu"><i class="fa-solid fa-inbox me-1" aria-hidden="true"></i>Internes Anliegen erfassen</a>{% endif %}
@@ -16,14 +17,38 @@
 {% endif %}
 {% if apps_on or circulations_on or resources_on or (native_on and user.can('tasks_manage')) %}{% call m.action_menu() %}{% if native_on and user.can('tasks_manage') %}<a class="btn btn-outline-secondary" href="/aufgaben/regeln">Aufgabenregeln</a>{% endif %}{% if apps_on %}<a class="btn btn-outline-secondary" href="/forms/applications">Antragseingang</a>{% endif %}{% if circulations_on %}<a class="btn btn-outline-secondary" href="/umlaeufe?tab=open">Umläufe</a>{% endif %}{% if resources_on %}<a class="btn btn-outline-secondary" href="/resources/bookings">Buchungen</a>{% endif %}{% endcall %}{% endif %}
 {% endcall %}
+  </div>
+  <div class="task-hero-aside" aria-hidden="true">
+    <div class="task-hero-art">
+      <span class="task-hero-art-tile"><i class="fa-solid fa-list-check"></i></span>
+      <span class="task-hero-art-tile"><i class="fa-regular fa-calendar-check"></i></span>
+      <span class="task-hero-art-tile"><i class="fa-solid fa-people-group"></i></span>
+      <span class="task-hero-art-tile"><i class="fa-solid fa-bolt"></i></span>
+    </div>
+    <div class="task-hero-quickstats">
+      <div><strong>{{work.count}}</strong><span>jetzt anstehend</span></div>
+      <div><strong>{{work.overdue}}</strong><span>überfällig</span></div>
+    </div>
+  </div>
 </div>
-{% if native_on and may_create %}{% include '_task_capture.html' %}{% endif %}
 <section class="task-summary" aria-label="Aufgabenstatus">
   <div class="task-stat task-stat-primary"><span class="task-stat-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.count}}</strong><span>Jetzt bearbeitbar</span></span></div>
   <a class="task-stat {{'task-stat-alert' if work.overdue else ''}}" href="{{task_url(perspective='overdue')}}"><span class="task-stat-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.overdue}}</strong><span>Überfällig</span></span><i class="fa-solid fa-arrow-up-right-from-square task-stat-arrow" aria-hidden="true"></i></a>
   <a class="task-stat" href="{{task_url(perspective='group')}}"><span class="task-stat-icon"><i class="fa-solid fa-people-group" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.group_count}}</strong><span>Für meine Gruppen</span></span><i class="fa-solid fa-arrow-up-right-from-square task-stat-arrow" aria-hidden="true"></i></a>
   <a class="task-stat" href="{{task_url(perspective='waiting')}}"><span class="task-stat-icon"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.waiting_count}}</strong><span>Warten auf andere</span></span><i class="fa-solid fa-arrow-up-right-from-square task-stat-arrow" aria-hidden="true"></i></a>
 </section>
+{% if native_on and may_create %}
+<section class="task-workspace-create" aria-labelledby="task-create-heading">
+  <div class="task-section-heading">
+    <div><span class="task-overline">Schnell &amp; einfach</span><h2 id="task-create-heading">Neue Aufgabe erfassen</h2><p>Eine kurze Eingabe genügt. Die Details lassen sich anschließend prüfen.</p></div>
+  </div>
+  {% include '_task_capture.html' %}
+</section>
+{% endif %}
+<section class="task-workspace-list" aria-labelledby="task-workspace-heading">
+<div class="task-section-heading task-list-heading">
+  <div><span class="task-overline">Organisieren &amp; erledigen</span><h2 id="task-workspace-heading">Mein Aufgabenbereich</h2><p>Perspektive und Ansicht wechseln oder gezielt nach Aufgaben filtern.</p></div>
+</div>
 <nav class="ds-nav nav nav-tabs task-perspectives mb-3" aria-label="Aufgabenperspektive">
 {% for key in ['all','today','upcoming','delegated'] %}{% if native_on or key!='delegated' %}<a class="nav-link {{'active' if work.perspective==key}}" href="{{task_url(perspective=key)}}" {% if work.perspective==key %}aria-current="page"{% endif %}>{{work.perspectives[key]}}</a>{% endif %}{% endfor %}
 {% if work.perspective not in ['all','today','upcoming','delegated'] %}<a class="nav-link active" href="{{task_url()}}" aria-current="page">{{work.perspectives[work.perspective]}}</a>{% endif %}
@@ -46,6 +71,7 @@
 {% else %}<section class="card task-results mb-3" aria-labelledby="ready-title"><div class="card-header"><h2 class="h6 mb-0" id="ready-title"><i class="fa-solid fa-list-check me-2" aria-hidden="true"></i>{{work.perspectives[work.perspective]}}</h2></div>{% if work.ready %}{{work_list(work.ready, work.now, csrf, quiet=true)}}{% else %}<div class="card-body">{{m.empty_state('Keine Aufgaben in dieser Ansicht', 'Für diese Auswahl ist gerade nichts zu bearbeiten. Ändern Sie die Perspektive oder erfassen Sie eine neue Aufgabe.', '/tasks?perspective=all', 'Alle Aufgaben ansehen', 'fa-circle-check')}}</div>{% endif %}</section>{% endif %}
 {% if work.pool %}<section class="card task-results mb-3" aria-labelledby="pool-title"><div class="card-header"><h2 class="h6 mb-0" id="pool-title"><i class="fa-solid fa-users me-2" aria-hidden="true"></i>Für meine Gruppen · {{work.pool|length}}</h2></div><div class="card-body small text-secondary py-2">Übernehmen Sie eine Aufgabe, damit niemand doppelt arbeitet.</div>{{work_list(work.pool, work.now, csrf, quiet=true)}}</section>{% endif %}
 {% if work.waiting and mode=='list' %}<details class="card task-results mb-3" id="waiting"><summary class="card-header"><i class="fa-solid fa-hourglass-half me-2" aria-hidden="true"></i>Wartet auf andere · {{work.waiting|length}}</summary><div class="card-body small text-secondary py-2">Spätere Stationen, gestoppte Umläufe und offene Rückfragen zählen nicht zu Ihrem aktuellen Handlungsbedarf.</div>{{work_list(work.waiting, work.now, csrf, true, quiet=true)}}</details>{% endif %}
+</section>
 </div>{% endblock %}
 
 {% block scripts %}{% if native_on %}<form method="post" action="/aufgaben/ansicht-aktion" id="task-drag-form" hidden><input name="csrf" value="{{csrf}}"><input name="task_id"><input name="version"><input name="status"><input name="due_date"><input name="back" value="{{back}}"></form><script src="/static/task-views.js" defer></script>{% endif %}{% endblock %}
