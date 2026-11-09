@@ -210,6 +210,7 @@ def plan_instructions(user, prompt, findings, categories, requester_id):
         capabilities.extend(["set_anliegen_status(id,status,supplier?,order_reference?,expected_delivery=YYYY-MM-DD?): Bestell- und Lieferstatus nur gemäß next_states", "assign_anliegen(id,assignee_id)"])
     capabilities.extend(signature for tool, signature in {
         "create_event": "create_event(id=calendar_id,title,description,location,start,end): nur Einzeltermine mit ISO-Zeitzone, keine Einladungen oder Ressourcenbuchungen",
+        "create_form": "create_form(title,fields=[{type:short|long|date|time|number|yesno,title,required:true|false}]): neuen internen geschlossenen Formularentwurf MIT konkreten Fragen anlegen, keine zusätzliche Vorab-Erlaubnis erfragen; Publikation bleibt manuell",
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
         "move_dms": "move_dms(id,area_id): freigegebene manuelle Wissensakte in berechtigten Zielbereich verschieben",
     }.items() if allowed(user, modules.WRITE[tool]))
@@ -258,6 +259,9 @@ def normalize_plan(reply, user, findings, categories, db):
             raise ValueError("Nicht unterstützte KI-Aktion.")
         if tool in modules.WRITE:
             action = modules.normalize(db, user, raw, findings)
+            if tool == "create_form":
+                proposals.append(action)
+                continue
             key = (modules.KINDS[tool], action["id"])
             if key in seen:
                 raise ValueError("Mehrere Änderungen am selben Vorgang sind nicht zulässig.")

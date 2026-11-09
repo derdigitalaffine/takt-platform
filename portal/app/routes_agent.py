@@ -30,8 +30,8 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     # Even a failed replacement request invalidates any previous confirmation.
     stash_get(request, "takt-agent-plan", pop=True)
     prompt = prompt.strip()
-    if not 3 <= len(prompt) <= 8000:
-        raise HTTPException(422, "Bitte eine Anweisung mit 3 bis 8.000 Zeichen eingeben.")
+    if not 1 <= len(prompt) <= 8000:
+        raise HTTPException(422, "Bitte eine Anweisung mit 1 bis 8.000 Zeichen eingeben.")
     if agent.sensitive_request(prompt):
         # Protected manual handoff: this branch precedes every provider/history call.
         agent.require(user, "anliegen")

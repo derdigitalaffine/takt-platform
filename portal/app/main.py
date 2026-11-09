@@ -280,7 +280,10 @@ async def _security_headers(request: Request, call_next):
         response.headers.setdefault(key, value)
     prefix = embed_prefix(request.url.path)
     frame_ancestors = "'none'"
-    if prefix:
+    if request.url.path in {"/agent", "/ki"}:
+        frame_ancestors = "'self'"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    elif prefix:
         # Einbettbar (iframe): nur die freigegebenen Webseiten, ohne Liste alle
         with SessionLocal() as db:
             origins = embed_origins(db, prefix)
@@ -360,6 +363,8 @@ class LoginRequired(Exception):
 
 @app.exception_handler(LoginRequired)
 async def _login_redirect(_request: Request, exc: LoginRequired):
+    if _request.url.path in {"/agent/plan", "/agent/draft", "/agent/execute", "/agent/cancel", "/agent/reset"}:
+        return JSONResponse({"detail": "Sitzung abgelaufen. Bitte erneut anmelden."}, status_code=401, headers={"Cache-Control": "no-store"})
     return RedirectResponse(f"/login?next={quote(exc.next_url)}", status_code=303)
 
 
@@ -2964,8 +2969,8 @@ def admin_design_reset(request: Request, user: User = Depends(admin_user), db: S
 
 @app.exception_handler(StarletteHTTPException)
 async def _http_error(request: Request, exc: StarletteHTTPException):
-    if "application/json" in request.headers.get("accept", ""):
-        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+    if "application/json" in request.headers.get("accept", "") or request.url.path in {"/agent/plan", "/agent/draft", "/agent/execute", "/agent/cancel", "/agent/reset"}:
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers={**(exc.headers or {}), "Cache-Control": "no-store"})
     uid = request.session.get("uid")
     with SessionLocal() as db:
         user = db.get(User, uid) if uid else None
