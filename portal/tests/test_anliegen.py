@@ -180,3 +180,147 @@ def test_ai_draft_requires_user_action_never_creates_a_case(monkeypatch):
         "text": "Ich möchte vertrauliche Details formulieren.",
     })
     assert deny.status_code == 403
+
+
+
+def test_procurement_lifecycle_tracks_supplier_and_native_task():
+    _enabled()
+    _user("procurement-reporter@example.org")
+    assignee = _user("procurement-recipient@example.org")
+    cat_id = _cat("office_furniture")
+    admin = login(*ADMIN)
+    csrf = csrf_of(admin.get("/anliegen/kategorien").text)
+    assert admin.post(f"/anliegen/kategorien/{cat_id}", data={
+        "csrf": csrf, "title": "Büromöbel", "routing": "person",
+        "assignee_id": assignee, "procurement": "1", "enabled": "1",
+    }).status_code == 303
+    _, case_id = _post_case("procurement-reporter@example.org", cat_id,
+                           "Drehstuhl bestellen", "Ein Drehstuhl mit verstellbarer Lehne wird benötigt.")
+    receiver = login("procurement-recipient@example.org", "test-anliegen-pass")
+    page = receiver.get("/anliegen?scope=orders&status=open")
+    assert page.status_code == 200
+    assert "Drehstuhl bestellen" in page.text
+    assert "Beim Lieferanten bestellt" in page.text
+    csrf = csrf_of(page.text)
+    assert receiver.post(f"/anliegen/{case_id}/status", data={
+        "csrf": csrf, "status": "ordered", "supplier_name": "Beispiel Lieferant",
+        "order_reference": "BEST-0001", "return_to": "list",
+    }).status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, case_id)
+        task = db.get(Task, case.task_id)
+        assert case.status == "ordered"
+        assert case.supplier_name == "Beispiel Lieferant"
+        assert case.order_reference == "BEST-0001"
+        assert task.status == "in_progress"
+    for state in ("partially_delivered", "delivered", "done"):
+        result = receiver.post(f"/anliegen/{case_id}/status", data={
+            "csrf": csrf, "status": state,
+        })
+        assert result.status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, case_id)
+        assert case.status == "done" and db.get(Task, case.task_id).status == "done"
+    assert "Beispiel Lieferant" in receiver.get(f"/anliegen/{case_id}").text
+
+
+def test_saved_routing_rule_assigns_old_unassigned_and_supports_self_assignment():
+    _enabled()
+    sender_id = _user("routing-backlog@example.org")
+    cat_id = _cat("office_supply")
+    with SessionLocal() as db:
+        cat = db.get(AnliegenCategory, cat_id)
+        cat.assignee_id = None
+        db.commit()
+    sender, case_id = _post_case("routing-backlog@example.org", cat_id,
+                                "Neues Papier", "Druckerpapier für das Büro fehlt.")
+    with SessionLocal() as db:
+        assert db.get(Anliegen, case_id).status == "unassigned"
+    admin = login(*ADMIN)
+    csrf = csrf_of(admin.get("/anliegen/kategorien").text)
+    changed = admin.post(f"/anliegen/kategorien/{cat_id}", data={
+        "csrf": csrf, "title": "Büromaterial", "routing": "person",
+        "assignee_id": sender_id, "procurement": "1", "enabled": "1",
+    })
+    assert changed.status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, case_id)
+        assert case.assignee_id == sender_id and case.status == "open"
+        assert case.task_id and db.get(Task, case.task_id).assignee_id == sender_id
+    inbox = sender.get("/anliegen?scope=assigned")
+    assert "Neues Papier" in inbox.text
+    workplace = sender.get("/tasks?source=anliegen")
+    assert workplace.status_code == 200
+    assert "Neues Papier" in workplace.text
+
+
+def test_reassignment_only_on_explicit_admin_action():
+    _enabled()
+    first = _user("routing-first@example.org")
+    second = _user("routing-second@example.org")
+    _user("routing-reporter@example.org")
+    cat_id = _cat("defect")
+    admin = login(*ADMIN)
+    csrf = csrf_of(admin.get("/anliegen/kategorien").text)
+    def save(assignee):
+        return admin.post(f"/anliegen/kategorien/{cat_id}", data={
+            "csrf": csrf, "title": "Mangel melden", "routing": "person",
+            "assignee_id": assignee, "enabled": "1",
+        })
+    assert save(first).status_code == 303
+    _, case_id = _post_case("routing-reporter@example.org", cat_id,
+                           "Defekte Bürolampe", "Die Lampe lässt sich nicht mehr einschalten.")
+    assert save(second).status_code == 303
+    with SessionLocal() as db:
+        assert db.get(Anliegen, case_id).assignee_id == first
+    changed = admin.post(f"/anliegen/kategorien/{cat_id}/neuverteilen",
+                         data={"csrf": csrf, "mode": "all_open"})
+    assert changed.status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, case_id)
+        assert case.assignee_id == second
+        assert db.get(Task, case.task_id).assignee_id == second
+        assert list(db.scalars(select(AnliegenEvent).where(
+            AnliegenEvent.anliegen_id == case_id, AnliegenEvent.kind == "assignment")))
+
+
+def test_platform_feedback_and_reviewed_text_are_saved_separately():
+    _enabled()
+    _user("anliegen-software@example.org")
+    cat_id = _cat("platform_feedback")
+    person = login("anliegen-software@example.org", "test-anliegen-pass")
+    csrf = csrf_of(person.get("/anliegen/neu").text)
+    result = person.post("/anliegen/neu", data={
+        "csrf": csrf, "category_id": cat_id, "title": "TAKT: Suchfilter verbessern",
+        "description": "Mein ursprünglicher Bericht als einfacher Rohtext.",
+        "description_final": "Im TAKT-Aufgabenbereich sollte der gewählte Filter erhalten bleiben.",
+    })
+    assert result.status_code == 303
+    case_id = int(result.headers["location"].split("/")[-1])
+    with SessionLocal() as db:
+        case = db.get(Anliegen, case_id)
+        assert case.category.key == "platform_feedback"
+        assert case.description.startswith("Im TAKT-Aufgabenbereich")
+        assert "ursprünglicher Bericht" not in case.description
+    assert "TAKT &amp; Software verbessern" in person.get("/anliegen/neu").text
+
+
+def test_non_procurement_category_rejects_supplier_order_status():
+    _enabled()
+    _user("anliegen-defect-reporter@example.org")
+    assignee = _user("anliegen-defect-manager@example.org")
+    cat_id = _cat("defect")
+    with SessionLocal() as db:
+        cat = db.get(AnliegenCategory, cat_id)
+        cat.assignee_id = assignee
+        cat.procurement = False
+        db.commit()
+    _, case_id = _post_case("anliegen-defect-reporter@example.org", cat_id,
+                           "Meldung Heizung", "Die Heizung im Büro funktioniert nicht.")
+    assigned = login("anliegen-defect-manager@example.org", "test-anliegen-pass")
+    csrf = csrf_of(assigned.get(f"/anliegen/{case_id}").text)
+    result = assigned.post(f"/anliegen/{case_id}/status",
+                           data={"csrf": csrf, "status": "ordered"})
+    assert result.status_code == 422
+    with SessionLocal() as db:
+        assert db.get(Anliegen, case_id).status == "open"
