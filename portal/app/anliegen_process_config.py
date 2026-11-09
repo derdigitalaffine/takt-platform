@@ -5,7 +5,6 @@ administrator. ACL checks are intentionally separate from the application-form
 process editor; no implicit escalation from a module permission to org scope.
 """
 import json
-from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import func, or_, select
@@ -320,7 +319,7 @@ def start_auto(db: Session, case: Anliegen, actor: User) -> list[AnliegenProcess
         try:
             with db.begin_nested():
                 run = launch(db, case, rule.id, service_actor, origin="auto",
-                             token=uuid4().hex if False else f"{case.id:016x}{rule.id:016x}")
+                             token=f"{case.id:016x}{rule.id:016x}")
             started.append(run)
         except HTTPException:
             cases.record(db, case, actor, "process", "Automatischer Prozessstart nicht möglich.")
