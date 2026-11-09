@@ -130,10 +130,6 @@ def create_draft(db: Session, actor: User, category_id: int, process_id: int,
         raise HTTPException(422, str(exc)) from exc
     if not normalized["start_modes"]:
         raise HTTPException(422, "Wähle mindestens eine erlaubte Startart.")
-    if org_id is not None and "auto" in normalized["start_modes"]:
-        # The current engine requires a privileged service actor. Scoped
-        # background execution needs a separate service principal in #293.
-        raise HTTPException(422, "Automatischer Start ist derzeit nur für globale Regeln zulässig.")
     rev = (db.scalar(select(func.max(AnliegenProcessRule.revision)).where(
         AnliegenProcessRule.category_id == category_id,
         AnliegenProcessRule.process_id == process_id,
@@ -161,8 +157,6 @@ def update_draft(db: Session, rule: AnliegenProcessRule, actor: User, policy: di
         raise HTTPException(422, str(exc)) from exc
     if not normalized["start_modes"]:
         raise HTTPException(422, "Bitte eine Startart wählen.")
-    if rule.org_id is not None and "auto" in normalized["start_modes"]:
-        raise HTTPException(422, "Automatik für organisationsbezogene Regeln ist noch nicht freigegeben.")
     _lock(db, rule, expected)
     rule.policy_json = json.dumps(normalized, ensure_ascii=False)
     rule.updated_at = utcnow()
@@ -199,10 +193,6 @@ def approve(db: Session, rule: AnliegenProcessRule, actor: User,
         policy = policies.normalize_policy(json.loads(rule.policy_json or "{}"))
     except (TypeError, ValueError) as exc:
         raise HTTPException(422, "Ungültige Prozessregel.") from exc
-    if rule.org_id is not None and "auto" in policy["start_modes"]:
-        raise HTTPException(422, "Automatik für organisationsbezogene Regeln ist noch nicht freigegeben.")
-    if "auto" in policy["start_modes"] and not actor.can("anliegen_manage"):
-        raise HTTPException(403, "Automatische Starts benötigen eine berechtigte Verwaltungsidentität.")
     _lock(db, rule, expected)
     # One active revision per category, process and exact organizational scope.
     active = list(db.scalars(select(AnliegenProcessRule).where(
@@ -304,7 +294,7 @@ def launch(db: Session, case: Anliegen, rule_id: int, actor: User,
         allowed = applicable(db, case.category_id, case.org_id, origin="auto")
         rule = db.get(AnliegenProcessRule, rule_id)
         if (not rule or rule not in allowed or rule.approved_by_id != actor.id
-                or not actor.active or not actor.can("anliegen_manage")):
+                or not actor.active or not can_approve_config(db, actor, rule.org_id)):
             raise HTTPException(403, "Automatischer Start nicht autorisiert.")
     else:
         raise HTTPException(422, "Unbekannte Startart.")
