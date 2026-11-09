@@ -6,12 +6,13 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 from fastapi import Depends, Form as FormField, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from . import applications as apps, fees, formio, forms as fm, payments, shortlinks as sl, worker
-from .db import LOCAL_TZ, SessionLocal, Form, FormInvite, FormResponse, FormShare, Group, User, get_settings, to_local, utcnow
+from . import applications as apps, fees, formio, forms as fm, payments, shortlinks as sl, worker, ai_provider, ai_knowledge, form_ai
+from .db import LOCAL_TZ, SessionLocal, Form, FormInvite, FormResponse, FormShare, FormBlock, Group, User, get_settings, to_local, utcnow
+from .ai_models import AIProvider
 from .main import (
     app, check_csrf, current_user, enabled_modules, flash, get_db, rate_limit, redirect, render, require, session_user,
 )
@@ -110,8 +111,15 @@ def forms_inbox(request: Request, user: User = Depends(current_user), db: Sessio
 @app.get("/forms/{form_id}")
 def form_builder(request: Request, form_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     form, level = _form(db, form_id, user, fm.EDIT)
+    ai_allowed = "ai" in enabled_modules() and user.can("ai_chat")
+    ai_providers = (list(db.scalars(select(AIProvider).where(
+        AIProvider.active.is_(True), AIProvider.text_key_enc != "").order_by(AIProvider.name)))
+        if ai_allowed else [])
     return render(request, "form_builder.html", user, **_ctx(db, form, "build", level),
                   schema=fm.raw_schema(form), subtypes=fm.SUBTYPES, max_file_mb=fm.MAX_FILE_MB,
+                  ai_allowed=ai_allowed, ai_providers=ai_providers,
+                  ai_knowledge_allowed=(ai_allowed and user.can("ai_knowledge")
+                                        and get_settings(db).get("ai_knowledge_enabled") == "1"),
                   **builder_extras(db, user))
 
 
@@ -132,6 +140,65 @@ def builder_extras(db, user: User | None = None) -> dict:
             "hidden_types": fm.HIDDEN_TYPES, "blocks": blocks,
             "block_order": [b["id"] for b in sorted(blocks.values(), key=lambda b: b["name"].lower())],
             "can_blocks": bool(user and user.can("formblocks"))}
+
+
+@app.post("/forms/{form_id:int}/ai-draft", dependencies=[Depends(check_csrf)])
+async def form_ai_draft(
+    request: Request, form_id: int, prompt: str = FormField(""),
+    mode: str = FormField("append"), current_json: str = FormField("[]"),
+    form_title: str = FormField(""), form_description: str = FormField(""),
+    provider_id: int = FormField(0), include_knowledge: str = FormField(""),
+    user: User = Depends(current_user), db: Session = Depends(get_db),
+):
+    """Read-only, authorized generation; result must be reviewed and saved in the existing builder."""
+    existing_form, _level = _form(db, form_id, user, fm.EDIT)
+    if "ai" not in enabled_modules() or not user.can("ai_chat"):
+        raise HTTPException(403, "Für den KI-Formularassistenten fehlt die Berechtigung.")
+    prompt = prompt.strip()
+    if not prompt or len(prompt) > form_ai.MAX_PROMPT or mode not in ("append", "replace"):
+        raise HTTPException(400, "Bitte einen Auftrag mit höchstens 6.000 Zeichen und einen gültigen Modus eingeben.")
+    if len(current_json) > form_ai.MAX_CURRENT_BYTES:
+        raise HTTPException(413, "Der übermittelte Formularentwurf ist zu groß.")
+    try:
+        current_raw = json.loads(current_json)
+    except ValueError:
+        raise HTTPException(400, "Der aktuelle Formularentwurf ist kein gültiges JSON.") from None
+    if not isinstance(current_raw, list) or len(current_raw) > 500:
+        raise HTTPException(400, "Die aktuelle Formularstruktur ist ungültig.")
+    current = fm.clean_schema(current_raw)
+    if len(current) != len(current_raw):
+        raise HTTPException(400, "Ein aktuelles Formularelement konnte nicht gelesen werden.")
+    rate_limit(request, "ki-form-draft", limit=8, window=600, key=str(user.id))
+    if provider_id:
+        provider = db.get(AIProvider, provider_id)
+    else:
+        provider = db.scalar(select(AIProvider).where(
+            AIProvider.active.is_(True), AIProvider.text_key_enc != "").order_by(AIProvider.id))
+    if provider is None or not provider.active or not provider.text_key_enc:
+        raise HTTPException(503, "Kein aktives KI-Textmodell mit API-Zugang konfiguriert.")
+    blocks = []
+    for block in db.scalars(select(FormBlock).order_by(FormBlock.name).limit(50)):
+        blocks.append({"id": block.id, "name": block.name, "description": block.description[:240] if block.description else ""})
+    # Optionales TAKT-Wissen wird ausschließlich nach ausdrücklichem Opt-in und ACL-Prüfung ergänzt.
+    sources = (ai_knowledge.retrieve(db, user, prompt, limit=4)
+               if include_knowledge == "1" and user.can("ai_knowledge") else [])
+    knowledge = ai_knowledge.context_text(sources)
+    messages = form_ai.messages(
+        prompt, form_title=form_title or existing_form.title,
+        form_description=form_description or existing_form.description or "",
+        current=current, mode=mode, blocks=blocks, knowledge=knowledge,
+    )
+    try:
+        answer = await ai_provider.complete(provider, messages, max_tokens=2048)
+        draft = form_ai.parse_result(answer, current, mode, {b["id"] for b in blocks})
+    except ai_provider.AIProviderError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return JSONResponse({**draft, "mode": mode, "model": provider.name,
+                         "question_count": len(fm.questions(draft["items"])),
+                         "sources": [{"title": s["title"], "url": s["url"]} for s in sources]},
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.post("/forms/{form_id}/schema", dependencies=[Depends(check_csrf)])
