@@ -556,7 +556,10 @@ def test_revoked_anliegen_permissions_block_direct_case_access():
         row.permissions = ""
         db.commit()
     revoked = login("anliegen-revoked@example.org", "test-anliegen-pass")
-    assert revoked.get("/anliegen").status_code == 403
-    assert revoked.get(f"/anliegen/{case_id}").status_code == 403
+    # Old reports remain readable; no general create/management authority remains.
+    assert revoked.get("/anliegen?view=reported").status_code == 200
+    assert revoked.get(f"/anliegen/{case_id}").status_code == 200
+    assert revoked.get("/anliegen/neu").status_code == 403
+    assert revoked.get("/anliegen?view=all").status_code == 403
     assert revoked.post(f"/anliegen/{case_id}/status", data={
         "csrf": csrf_of(revoked.get("/").text), "status": "done"}).status_code == 403
