@@ -7,6 +7,7 @@
     {% if writable_calendars or closure_units %}<button type="button" class="btn btn-primary" data-planning-open-editor="#event-editor"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neuer Termin</button>{% endif %}
     <a class="btn btn-outline-primary" href="/urlaub">Urlaub & Verfügbarkeit</a>
     <a class="btn btn-outline-secondary" href="/kalender/geraete">Gerät verbinden</a>
+    <a class="btn btn-outline-secondary" href="/kalender/geburtstage"><i class="fa-solid fa-cake-candles me-1" aria-hidden="true"></i>Geburtstage</a>
     <a class="btn btn-outline-secondary" href="/kalender/abos">Lesend abonnieren</a>
 {% endcall %}
 <section class="planning-context" aria-label="Arbeitsbereich und Anzeige" data-ui-preferences data-csrf="{{csrf}}">
@@ -32,6 +33,7 @@
       <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-calendar-week"></i></span>
       <span><strong>Termine &amp; Monat</strong><small>Einzeltermine, Woche und Tagesansicht</small></span>
     </a>
+    <a class="calendar-mode-choice calendar-mode-secondary" href="/kalender/geburtstage"><span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-cake-candles"></i></span><span><strong>Geburtstage</strong><small>Freigegebene Geburtstage und Altersangaben</small></span></a>
     {% if units %}<a class="calendar-mode-choice calendar-mode-secondary" href="/urlaub/planer?unit={{selected_org_unit}}">
       <span class="calendar-mode-icon" aria-hidden="true"><i class="fa-solid fa-people-group"></i></span>
       <span><strong>Teamabwesenheiten</strong><small>Personenplan und Besetzung prüfen</small></span>
