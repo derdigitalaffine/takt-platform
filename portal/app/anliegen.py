@@ -29,6 +29,22 @@ def seed(db):
                                    position=position))
 
 
+def migrate_confidential_payload(db):
+    """Idempotently protect legacy confidential rows during startup.
+
+    No plaintext remains in the historical title/description columns after
+    successful migration. A failed encryption aborts startup transaction.
+    """
+    from .security import encrypt
+    for row in db.scalars(select(Anliegen).where(Anliegen.confidential.is_(True))):
+        if not row.title_enc:
+            row.title_enc = encrypt(row.title or "Vertrauliches Anliegen")
+        if not row.description_enc:
+            row.description_enc = encrypt(row.description or "")
+        row.title = "Vertrauliches Anliegen"
+        row.description = ""
+
+
 def category(db, category_id, *, enabled=False):
     row = db.get(AnliegenCategory, category_id)
     if row is None or (enabled and not row.enabled):
@@ -152,9 +168,14 @@ def create(db, user, cat, title, description):
         raise HTTPException(422, "Titel (3–200 Zeichen) und Beschreibung (5–10.000 Zeichen) erforderlich.")
     org_id = primary_org(db, user.id)
     assignee_id = recipient(db, user, cat, org_id)
+    from .security import encrypt
+    confidential = bool(cat.confidential)
     row = Anliegen(category_id=cat.id, reporter_id=user.id, org_id=org_id,
-                   assignee_id=assignee_id, confidential=cat.confidential,
-                   title=title, description=description,
+                   assignee_id=assignee_id, confidential=confidential,
+                   title="Vertrauliches Anliegen" if confidential else title,
+                   description="" if confidential else description,
+                   title_enc=encrypt(title) if confidential else None,
+                   description_enc=encrypt(description) if confidential else None,
                    status="open" if assignee_id else "unassigned")
     db.add(row)
     db.flush()
