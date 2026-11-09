@@ -1,0 +1,41 @@
+<div class="takt-agent-root" data-takt-agent>
+  <button type="button" class="btn btn-sm btn-outline-primary takt-agent-launch" data-agent-open
+          aria-controls="takt-agent-panel" aria-expanded="false" title="TAKT Agent öffnen">
+    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">TAKT Agent</span>
+  </button>
+  <div class="takt-agent-shade" data-agent-shade hidden></div>
+  <section class="takt-agent-panel" id="takt-agent-panel" role="dialog" aria-modal="true"
+           aria-labelledby="takt-agent-title" aria-hidden="true" tabindex="-1" hidden>
+    <header class="takt-agent-head">
+      <div><h2 class="h6 mb-1" id="takt-agent-title"><i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>TAKT Agent <span class="badge text-bg-secondary ms-1">PoC</span></h2>
+      <p class="small text-secondary mb-0">Aufgaben und Anliegen mit KI bedienen</p></div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" data-agent-close aria-label="Agent schließen"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+    <div class="takt-agent-messages" data-agent-messages role="log" aria-live="polite" aria-relevant="additions">
+      <div class="takt-agent-message is-agent">Was soll ich für Sie erledigen? Ich kann Aufgaben und interne Anliegen suchen, neue Vorgänge vorbereiten oder bestehende bearbeiten. Vor jeder Änderung frage ich nach Ihrer Freigabe.</div>
+      <div class="takt-agent-samples">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-agent-sample="Zeige mir meine überfälligen Aufgaben.">Überfällige Aufgaben</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-agent-sample="Erstelle eine Aufgabe: Rückmeldung zur Büroausstattung einholen.">Aufgabe erstellen</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-agent-sample="Zeige meine zugewiesenen internen Anliegen.">Meine Anliegen</button>
+      </div>
+    </div>
+    <div class="takt-agent-confirm" data-agent-confirm hidden>
+      <strong>Änderungen zur Freigabe</strong>
+      <ol data-agent-proposals></ol>
+      <div class="d-flex gap-2 mt-2">
+        <button type="button" class="btn btn-primary btn-sm" data-agent-approve>Änderungen ausführen</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-agent-reject>Verwerfen</button>
+      </div>
+      <p class="small text-secondary mt-2 mb-0">Erst nach Ihrer Bestätigung werden die genannten Änderungen gespeichert.</p>
+    </div>
+    <form class="takt-agent-composer" data-agent-form>
+      <label for="takt-agent-input" class="visually-hidden">Anweisung an TAKT Agent</label>
+      <textarea class="form-control" id="takt-agent-input" rows="2" maxlength="3000"
+                placeholder="Was soll TAKT für Sie tun?" required></textarea>
+      <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
+        <span class="small text-secondary" data-agent-status role="status">Enter senden · Shift+Enter Zeilenumbruch</span>
+        <button class="btn btn-primary btn-sm" type="submit" data-agent-send><i class="fa-solid fa-arrow-up me-1" aria-hidden="true"></i>Senden</button>
+      </div>
+    </form>
+  </section>
+</div>
