@@ -136,10 +136,11 @@
           <input class="form-control" name="model_id" id="vector-model" maxlength="200" value="{{ cfg.ai_vector_model_id }}" placeholder="text-embedding-3-small"></div>
         <div class="col-md-4">
           <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="enabled" value="1" {% if cfg.ai_vector_enabled == '1' %}checked{% endif %}> <span class="form-check-label">Semantische Suche aktivieren</span></label>
+          <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="auto_index" value="1" {% if cfg.ai_vector_auto_index == '1' %}checked{% endif %}> <span class="form-check-label">Neue und geänderte Einträge automatisch indizieren</span></label>
           <button type="submit" class="btn btn-outline-primary">Vektorsuche speichern</button>
         </div>
       </form>
-      <p class="form-text mb-0">Neue und bearbeitete Einträge bei Bedarf unten einzeln indizieren. Veraltete Indizes werden automatisch ausgeschlossen. Modellwechsel erfordert Neuindizierung. Kein externer Vektordienst erforderlich.</p>
+      <p class="form-text mb-0">Bei aktivierter Automatik prüft der TAKT-Hintergrunddienst etwa alle fünf Minuten auf neue und geänderte freigegebene Einträge, verarbeitet maximal zwei je Durchlauf und wiederholt fehlgeschlagene Jobs mit Wartezeit. Berechtigungsentzug wirkt sofort. Ein manueller Neuaufbau ist weiterhin möglich.</p>
     </div>
   </details>
   <div class="row g-3">
