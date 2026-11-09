@@ -126,7 +126,7 @@ PERMISSIONS = {
     "processes": ("Prozesse", "fa-diagram-project", "Bearbeitungsprozesse für Online-Anträge im Prozesseditor gestalten und veröffentlichen"),
     "app_create": ("Online-Anträge einrichten", "fa-file-signature", "Formulare zu Online-Anträgen machen (Aktenzeichen, Frist, Zuständigkeit) und wieder zurückstellen"),
     "maps_admin": ("Kartenlayer & Geocoding", "fa-layer-group", "Kartenlayer, Kartenstandard und die Adresssuche (Nominatim) einrichten"),
-    "ai_chat": ("KI-Chat verwenden", "fa-brain", "Persönliche KI-Unterhaltungen mit freigegebenen Sprachmodellen"),
+    "ai_chat": ("TAKT Agent verwenden", "fa-wand-magic-sparkles", "Zentraler KI-Chat und geprüfte Fachvorschläge mit freigegebenen Sprachmodellen"),
     "ai_knowledge": ("KI-Wissensrecherche", "fa-book-open", "Freigegebene interne Wissensbestände bei KI-Fragen verwenden"),
     "ai_vision": ("KI-Bildanalyse", "fa-image", "Eigene Bilder an freigegebene multimodale Modelle übermitteln"),
     "ai_web": ("KI-Websuche", "fa-globe", "Öffentliche Webquellen auf ausdrücklichen Wunsch recherchieren"),

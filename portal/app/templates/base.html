@@ -121,7 +121,7 @@
           <ul class="nav flex-column app-nav" id="app-nav" data-csrf="{{ csrf }}">
             {{ m.nav_item('/', 'fa-house', 'Mein Überblick', path == '/') }}
             {{ m.nav_item('/module', 'fa-puzzle-piece', 'Module entdecken', path == '/module') }}
-            {% if nav_menu.ai_chat_available %}{{ m.nav_item('/ki', 'fa-brain', 'KI-Chat', path == '/ki' or path.startswith('/ki/')) }}{% endif %}
+            {% if nav_menu.ai_chat_available %}{{ m.nav_item('/agent', 'fa-wand-magic-sparkles', 'TAKT Agent', path == '/agent' or path.startswith('/agent/') or path == '/ki' or path.startswith('/ki/')) }}{% endif %}
             <li class="nav-group nav-favs is-open" data-group="fav" {% if not nav_menu.favorites %}hidden{% endif %}>
               <div class="nav-group-title"><i class="fa-solid fa-star" aria-hidden="true"></i><span>Favoriten</span></div>
               <ul class="nav flex-column" id="nav-favs">{% for it in nav_menu.favorites %}{{ m.nav_entry(it, 'fav') }}{% endfor %}</ul>
@@ -179,7 +179,7 @@
 <script src="/static/vendor/sweetalert2/sweetalert2.min.js"></script>
 <script src="/static/vendor/coloris/coloris.min.js"></script>
 <script src="/static/app.js"></script>
-<script src="/static/agent.js" defer></script>
+<script src="/static/agent-drafts.js" defer></script>
 <script src="/static/date-picker.js"></script>
 <script src="/static/nav.js"></script>
 <script src="/static/law-ref.js" defer></script>

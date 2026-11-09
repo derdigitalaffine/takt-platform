@@ -21,7 +21,7 @@ MODULE_SETTINGS = ("module_ai", "module_tasks", "module_anliegen", "module_forms
 # Delete only records created by these tests, in FK dependency order.
 MODELS = (AgentAudit, CalendarAudit, CalendarGrant, CalendarEvent, Calendar, AIDmsSource,
           DmsLog, DmsRecord, DmsAccess, DmsArea, AnliegenEvent, Anliegen, TaskActivity,
-          Task, Form, Process, AIProvider)
+          Task, AnliegenCategory, Form, Process, AIProvider)
 
 
 @pytest.fixture(autouse=True)

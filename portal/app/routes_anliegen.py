@@ -92,8 +92,23 @@ def new_anliegen(request: Request, user: User = Depends(current_user), db: Sessi
     _submit(user)
     categories = list(db.scalars(select(AnliegenCategory).where(
         AnliegenCategory.enabled.is_(True)).order_by(AnliegenCategory.position, AnliegenCategory.title)))
-    return render(request, "anliegen_new.html", user, categories=categories,
-                  ai_available=("ai" in enabled_modules() and user.can("ai_chat")))
+    draft_values = {}
+    nonce = request.query_params.get("agent_private")
+    if nonce:
+        import secrets
+        from .main import stash_get
+        private = stash_get(request, "takt-agent-private-intake")
+        if (not private or private.get("user_id") != user.id or not secrets.compare_digest(nonce, private.get("nonce", ""))):
+            raise HTTPException(409, "Dieser geschützte Vorschlag ist abgelaufen.")
+        cat = service.category(db, private["category_id"], enabled=True)
+        if not cat.confidential:
+            raise HTTPException(409, "Die geschützte Kategorie hat sich geändert.")
+        draft_values = dict(title="Vertrauliches Anliegen", description=private["description"], category_id=cat.id)
+    response = render(request, "anliegen_new.html", user, categories=categories, draft_values=draft_values,
+                      ai_available=(not draft_values and "ai" in enabled_modules() and user.can("ai_chat")))
+    if nonce:
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 

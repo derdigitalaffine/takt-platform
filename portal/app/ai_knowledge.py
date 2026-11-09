@@ -168,6 +168,11 @@ def sources_accessible(db, user, sources: list[dict]) -> bool:
     for source in sources:
         if not isinstance(source, dict):
             return False
+        if source.get("kind") == "agent":
+            from . import agent
+            if not agent.reference_accessible(db, user, source):
+                return False
+            continue
         path = source.get("url", "")
         if source.get("kind") == "web":
             if not ai_web.available(db, user) or not ai_web.public_url(path):

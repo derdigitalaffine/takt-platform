@@ -93,11 +93,11 @@ def test_user_chat_persistence_and_cross_account_isolation(monkeypatch):
     c = login("ai-one@example.org", "passwort-123")
     page = c.get("/ki")
     csrf = csrf_of(page.text)
-    assert page.status_code == 200 and "KI-Chat" in page.text
+    assert page.status_code == 200 and "TAKT Agent" in page.text
     created = c.post("/ki/new", data={"csrf": csrf})
     assert created.status_code == 303
     url = created.headers["location"]
-    assert url.startswith("/ki?chat=")
+    assert url.startswith("/agent?chat=")
     chat_id = int(url.split("=")[1])
     sent = c.post(f"/ki/{chat_id}/message", data={
         "csrf": csrf, "message": "Wie geht es dir?",

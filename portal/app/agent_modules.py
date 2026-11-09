@@ -9,26 +9,30 @@ from itertools import islice
 from fastapi import HTTPException
 from sqlalchemy import select, or_, func
 
-from . import ai_dms, calendars, dms, forms as fm
+from . import ai_dms, calendars, dms, forms as fm, agent_anliegen
 from .ai_models import AIDmsSource
 from .calendar_models import Calendar, CalendarEvent
-from .db import DmsArea, DmsRecord, Form, Process
+from .anliegen_models import AnliegenCategory
+from .db import DmsArea, DmsRecord, Form, Process, get_settings
 
 READ = {
+    "search_anliegen_categories": "anliegen",
     "search_calendars": "calendars", "search_events": "calendars",
     "search_forms": "forms", "search_processes": "processes",
     "search_dms": "dms", "search_dms_areas": "dms",
 }
 WRITE = {
+    "configure_anliegen_category": "anliegen",
     "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
 }
 LABELS = {
+    "search_anliegen_categories": "Anliegen-Kategorien",
     "search_calendars": "Kalendern", "search_events": "Terminen",
     "search_forms": "Formularen", "search_processes": "Prozessen",
     "search_dms": "freigegebenen DMS-Wissensakten", "search_dms_areas": "DMS-Zielbereichen",
 }
-KINDS = {"create_event": "calendar", "copy_form": "form", "move_dms": "dms"}
-MODELS = {"create_event": Calendar, "copy_form": Form, "move_dms": DmsRecord}
+KINDS = {"configure_anliegen_category": "anliegen_category", "create_event": "calendar", "copy_form": "form", "move_dms": "dms"}
+MODELS = {"configure_anliegen_category": AnliegenCategory, "create_event": Calendar, "copy_form": Form, "move_dms": DmsRecord}
 
 
 def enabled(user, module):
@@ -52,6 +56,13 @@ def search(db, user, spec):
     require(user, READ[tool])
     phrase = _term(spec.get("query"))
     pattern = _like(phrase)
+    if tool == "search_anliegen_categories":
+        query = select(AnliegenCategory).where(AnliegenCategory.confidential.is_(False), or_(AnliegenCategory.title.ilike(pattern, escape="\\"), AnliegenCategory.key.ilike(pattern, escape="\\")))
+        if not user.is_admin:
+            query = query.where(AnliegenCategory.enabled.is_(True))
+        return [dict(type="anliegen_category", id=c.id, title=c.title, key=c.key, routing=c.routing,
+                     assignee_id=c.assignee_id, enabled=c.enabled, description=c.description,
+                     url="/anliegen/kategorien" if user.is_admin else "/anliegen/neu") for c in db.scalars(query.order_by(AnliegenCategory.position).limit(20))]
     if tool == "search_calendars":
         rows = db.scalars(select(Calendar).where(Calendar.title.ilike(pattern, escape="\\")).order_by(Calendar.id))
         return list(islice((dict(type="calendar", id=r.id, title=r.title, writable=calendars.access(db, user, r, True),
@@ -88,15 +99,19 @@ def search(db, user, spec):
         return [dict(type="dms_area", id=r.id, title=r.name) for r in dms.areas(db)
                 if levels.get(r.id, 0) >= dms.WRITE and phrase.casefold() in r.name.casefold()][:20]
     if tool == "search_dms":
-        rows = db.scalars(select(DmsRecord).join(AIDmsSource).where(
-            or_(DmsRecord.title.ilike(pattern, escape="\\"), DmsRecord.ref_no.ilike(pattern, escape="\\"))
-        ).order_by(DmsRecord.id))
+        query = select(DmsRecord).where(
+            or_(DmsRecord.title.ilike(pattern, escape="\\"), DmsRecord.ref_no.ilike(pattern, escape="\\")))
+        if get_settings(db).get("ai_dms_include_all") != "1":
+            query = query.join(AIDmsSource)
+        rows = db.scalars(query.order_by(DmsRecord.id))
         return list(islice((dict(type="dms", id=r.id, title=r.title[:200], area_id=r.area_id,
                      url=f"/dms/r/{r.id}") for r in rows if ai_dms.authorized(db, user, r.id)), 20))
     raise ValueError("Unbekanntes Suchwerkzeug")
 
 
 def version(row):
+    if isinstance(row, AnliegenCategory):
+        return agent_anliegen.version(row)
     return row.version if isinstance(row, Calendar) else row.updated_at.isoformat()
 
 
@@ -104,6 +119,8 @@ def target(db, user, action):
     from .agent import require
     tool = action["tool"]
     require(user, WRITE[tool])
+    if tool == "configure_anliegen_category":
+        return agent_anliegen.validate(db, user, action)
     row = db.get(MODELS[tool], action["id"])
     if row is None:
         raise HTTPException(404, "Vorgang nicht gefunden.")
@@ -124,6 +141,10 @@ def target(db, user, action):
 
 def normalize(db, user, raw, findings):
     tool = raw["tool"]
+    if tool == "configure_anliegen_category":
+        from .agent import require
+        require(user, "anliegen")
+        return agent_anliegen.normalize(db, user, raw, findings)
     def found(key, kind):
         value = raw.get(key)
         if type(value) is not int or not any(r.get("type") == kind and r["id"] == value for r in findings):
@@ -163,6 +184,8 @@ def normalize(db, user, raw, findings):
 
 
 def preview(db, action):
+    if action["tool"] == "configure_anliegen_category":
+        return agent_anliegen.preview(db, action)
     row = db.get(MODELS[action["tool"]], action["id"])
     if action["tool"] == "create_event":
         return (f"Termin erstellen in Kalender „{row.title}“: {action['title']}\n"
@@ -175,6 +198,10 @@ def preview(db, action):
 
 
 def execute(db, user, action):
+    if action["tool"] == "configure_anliegen_category":
+        from .agent import require
+        require(user, "anliegen")
+        return agent_anliegen.execute(db, user, action)
     row = target(db, user, action)
     if version(row) != action["version"]:
         raise HTTPException(409, "Der Vorgang hat sich geändert. Bitte neu planen.")

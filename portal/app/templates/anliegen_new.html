@@ -33,7 +33,7 @@
       </div>
     </section>
     {% else %}
-    <div class="alert alert-light border mb-3"><i class="fa-solid fa-pen me-2" aria-hidden="true"></i>KI-Unterstützung ist nicht freigeschaltet. Sie können Ihr Anliegen direkt manuell erfassen.</div>
+    <div class="alert alert-light border mb-3"><i class="fa-solid fa-pen me-2" aria-hidden="true"></i>{% if draft_values %}Geschützter Vorschlag aus dem TAKT-Agenten. Ihre Eingabe wurde nicht an einen KI-Provider gesendet. Bitte manuell prüfen.{% else %}KI-Unterstützung ist nicht freigeschaltet. Sie können Ihr Anliegen direkt manuell erfassen.{% endif %}</div>
     <textarea id="anliegen-description" name="description" hidden></textarea>
     {% endif %}
 
@@ -54,14 +54,14 @@
           <div class="col-12">
             <label class="form-label fw-semibold" for="anliegen-title">Titel <span class="text-danger" aria-hidden="true">*</span></label>
             <input type="text" class="form-control" id="anliegen-title" name="title"
-                   minlength="3" maxlength="200" placeholder="Worum geht es kurz zusammengefasst?" required>
+                   minlength="3" maxlength="200" value="{{draft_values.get('title', '')}}" placeholder="Worum geht es kurz zusammengefasst?" required>
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold" for="anliegen-category">Kategorie <span class="text-danger" aria-hidden="true">*</span></label>
             <select id="anliegen-category" name="category_id" class="form-select" required>
               {% for cat in categories %}
               <option value="{{ cat.id }}" data-confidential="{{ '1' if cat.confidential else '0' }}"
-                      {% if cat.key == 'other' %}selected{% endif %}>{{ cat.title }}</option>
+                      {% if draft_values.get('category_id') == cat.id or (not draft_values and cat.key == 'other') %}selected{% endif %}>{{ cat.title }}</option>
               {% endfor %}
             </select>
           </div>
@@ -69,7 +69,7 @@
             <label class="form-label fw-semibold" for="anliegen-final-description">Beschreibung <span class="text-danger" aria-hidden="true">*</span></label>
             <textarea id="anliegen-final-description" name="description_final"
                       class="form-control" rows="7" minlength="5" maxlength="10000"
-                      placeholder="Beschreiben Sie, was gebraucht wird oder was passiert ist." required></textarea>
+                      placeholder="Beschreiben Sie, was gebraucht wird oder was passiert ist." required>{{draft_values.get('description', '')}}</textarea>
             <div class="form-text">Alles ist editierbar – auch ein KI-Vorschlag.</div>
           </div>
         </div>

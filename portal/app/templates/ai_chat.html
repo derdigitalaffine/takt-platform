@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}KI-Chat{% endblock %}
+{% block title %}TAKT Agent{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/ai-chat.css">{% endblock %}
 {% block content %}
-<h1 class="visually-hidden">TAKT KI-Chat</h1>
+<h1 class="visually-hidden">TAKT TAKT Agent</h1>
 
 <div class="row g-2 ai-chat-layout" data-ai-workspace>
   <aside class="col-12 col-xl-3 ai-chat-sidebar" aria-label="Persönliche KI-Unterhaltungen">
     <details class="card ai-chat-conversations" open>
       <summary class="card-header ai-chat-sidebar-heading"><i class="fa-regular fa-comments me-2" aria-hidden="true"></i>Unterhaltungen <i class="fa-solid fa-chevron-down ms-auto ai-sidebar-toggle" aria-hidden="true"></i></summary>
       <div class="card-body ai-chat-conversation-body">
-        <form method="post" action="/ki/new" class="mb-3">
+        <form method="post" action="/agent/new" class="mb-3">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <label class="visually-hidden" for="ai-new-provider">Modell für neue Unterhaltung</label>
           <select class="form-select mb-2" id="ai-new-provider" name="provider_id" {% if not providers %}disabled{% endif %}>
@@ -18,7 +18,7 @@
           </select>
           <button class="btn btn-primary w-100" type="submit" {% if not providers %}disabled{% endif %}><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neuer Chat</button>
         </form>
-        <a href="/ki/temporary" class="btn btn-sm w-100 mb-2 {{ 'btn-outline-primary active' if temporary else 'btn-outline-secondary' }}" {% if temporary %}aria-current="page"{% endif %}>
+        <a href="/agent/temporary" class="btn btn-sm w-100 mb-2 {{ 'btn-outline-primary active' if temporary else 'btn-outline-secondary' }}" {% if temporary %}aria-current="page"{% endif %}>
           <i class="fa-solid fa-user-shield me-1" aria-hidden="true"></i>Temporärer Chat
         </a>
         {% if not providers %}
@@ -26,7 +26,7 @@
         {% endif %}
         <div class="list-group list-group-flush" role="list">
           {% for chat in chats %}
-          <a href="/ki?chat={{ chat.id }}" class="list-group-item list-group-item-action {{ 'active' if current and current.id == chat.id }}" {% if current and current.id == chat.id %}aria-current="page" data-ai-current-link{% endif %}>{{ chat.title }}</a>
+          <a href="/agent?chat={{ chat.id }}" class="list-group-item list-group-item-action {{ 'active' if current and current.id == chat.id }}" {% if current and current.id == chat.id %}aria-current="page" data-ai-current-link{% endif %}>{{ chat.title }}</a>
           {% else %}<p class="text-secondary small">Noch keine Unterhaltungen vorhanden.</p>{% endfor %}
         </div>
       </div>
@@ -48,15 +48,15 @@
             {% endfor %}
           </select>
           {% else %}
-          <a class="btn btn-sm btn-outline-secondary" href="/ki/{{ current.id }}/export" aria-label="Chat exportieren" title="Chat exportieren"><i class="fa-solid fa-file-export" aria-hidden="true"></i></a>
+          <a class="btn btn-sm btn-outline-secondary" href="/agent/{{ current.id }}/export" aria-label="Chat exportieren" title="Chat exportieren"><i class="fa-solid fa-file-export" aria-hidden="true"></i></a>
           <details class="ai-chat-management">
             <summary class="btn btn-sm btn-outline-secondary" aria-label="Chat verwalten" title="Chat verwalten"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></summary>
-            <form method="post" action="/ki/{{ current.id }}/rename" class="my-2 d-flex gap-2">
+            <form method="post" action="/agent/{{ current.id }}/rename" class="my-2 d-flex gap-2">
               <input type="hidden" name="csrf" value="{{ csrf }}">
               <input type="text" name="title" class="form-control form-control-sm" maxlength="160" value="{{ current.title }}" aria-label="Unterhaltung umbenennen" required>
               <button class="btn btn-sm btn-primary" type="submit">Speichern</button>
             </form>
-            <form method="post" action="/ki/{{ current.id }}/model" class="my-2 ai-model-switch">
+            <form method="post" action="/agent/{{ current.id }}/model" class="my-2 ai-model-switch">
               <input type="hidden" name="csrf" value="{{ csrf }}">
               <label class="form-label small mb-1" for="ai-current-model">Modell für nächste Antworten</label>
               <div class="input-group input-group-sm">
@@ -69,7 +69,7 @@
               </div>
             </form>
             <p class="small text-secondary mb-2 ai-context-note">Für Folgefragen nutzt TAKT maximal die letzten 14 Nachrichten und 20.000 Zeichen. Ältere Nachrichten werden nicht automatisch zusammengefasst; Antworten mit gesperrten Wissensquellen werden ausgeschlossen.</p>
-            <form method="post" action="/ki/{{ current.id }}/delete">
+            <form method="post" action="/agent/{{ current.id }}/delete">
               <input type="hidden" name="csrf" value="{{ csrf }}">
               <button class="btn btn-sm btn-outline-danger" type="submit">Unterhaltung löschen</button>
             </form>
@@ -84,7 +84,7 @@
           <li class="ai-message {{ 'ai-message--user' if item.role == 'user' else 'ai-message--assistant' }}" data-ai-message>
             <div class="ai-message-avatar" aria-hidden="true"><i class="fa-solid {{ 'fa-user' if item.role == 'user' else 'fa-brain' }}"></i></div>
             <div class="ai-message-bubble">
-              <div class="ai-message-label">{{ 'Sie' if item.role == 'user' else 'KI-Assistent' }}</div>
+              <div class="ai-message-label">{{ 'Sie' if item.role == 'user' else 'TAKT Agent' }}</div>
               {% if item.role == 'assistant' %}<div class="ai-message-text ai-message-markdown text-break" data-ai-message-text>{{ item.html }}</div>{% else %}<div class="ai-message-text text-break" data-ai-message-text>{{ item.content }}</div>{% endif %}
               {% if item.sources %}
               <div class="ai-message-sources">
@@ -96,7 +96,7 @@
               {% endif %}
               {% if item.model %}<div class="ai-message-model">Modell: {{ item.model }}</div>{% endif %}
               {% if item.forkable and item.id %}
-              <form method="post" action="/ki/{{ current.id }}/fork" class="ai-fork-action mt-2">
+              <form method="post" action="/agent/{{ current.id }}/fork" class="ai-fork-action mt-2">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 <input type="hidden" name="message_id" value="{{ item.id }}">
                 <button type="submit" class="btn btn-sm btn-link text-secondary px-1 py-0" title="Neuen, unabhängigen Chat ab hier erstellen"><i class="fa-solid fa-code-branch me-1" aria-hidden="true"></i>Ab hier verzweigen</button>
@@ -111,14 +111,19 @@
         </div>
         <button class="btn btn-sm btn-outline-secondary ai-jump-to-latest" type="button" data-ai-jump hidden><i class="fa-solid fa-arrow-down me-1" aria-hidden="true"></i>Zur neuesten Nachricht</button>
       </div>
-        <form class="ai-chat-composer" method="post" action="{{ '/ki/temporary/message' if temporary else '/ki/' ~ current.id ~ '/message' }}" data-ai-chat-form data-stream-action="{{ '/ki/temporary/updates' if temporary else '/ki/' ~ current.id ~ '/message/updates' }}" {% if not temporary %}data-ai-fork-action="/ki/{{ current.id }}/fork"{% endif %} data-ai-temporary="{{ '1' if temporary else '0' }}" data-ai-has-messages="{{ '1' if temporary or chat_messages else '0' }}" {% if temporary %}id="ai-temporary-composer"{% endif %} enctype="multipart/form-data">
+        <form class="ai-chat-composer" method="post" action="{{ '/agent/temporary/message' if temporary else '/agent/' ~ current.id ~ '/message' }}" data-ai-chat-form data-stream-action="{{ '/agent/temporary/updates' if temporary else '/agent/' ~ current.id ~ '/message/updates' }}" {% if not temporary %}data-ai-fork-action="/agent/{{ current.id }}/fork"{% endif %} data-ai-temporary="{{ '1' if temporary else '0' }}" data-ai-has-messages="{{ '1' if temporary or chat_messages else '0' }}" {% if temporary %}id="ai-temporary-composer"{% endif %} enctype="multipart/form-data">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           {% if temporary %}
           <p class="small text-secondary mb-2" role="note"><i class="fa-solid fa-clock-rotate-left me-1" aria-hidden="true"></i>Nur während diese Seite geöffnet ist. Beim Neuladen ist der Gesprächsverlauf verloren. Keine Anhänge oder Wissensrecherche. Der ausgewählte KI-Provider verarbeitet die Nachricht weiterhin.</p>
           {% endif %}
+          {% if not temporary %}
+          <input type="hidden" name="chat_id" value="{{ current.id }}">
+          <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="use_agent" value="1" checked><span class="form-check-label">TAKT unterstützen · passende Bereiche finden und Vorschläge vorausfüllen</span></label>
+          <p class="small text-secondary">Antworten und Wissen bleiben hier. Schreibvorschläge öffnen eine ausgefüllte Fachmaske und werden dort geprüft und bestätigt. Ohne Bedienunterstützung steht der reine Antwortmodus mit Streaming bereit.</p>
+          {% endif %}
           <div class="ai-chat-compose-main">
             <label class="visually-hidden" for="ai-prompt">Ihre Nachricht</label>
-            <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Nachricht an TAKT-KI …" required></textarea>
+            <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Frage oder Auftrag an TAKT Agent …" required></textarea>
           </div>
           {% if knowledge_available or vision_available or web_available %}
           <details class="ai-chat-options"><summary><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Weitere Optionen</summary>
@@ -156,7 +161,7 @@
       {% else %}
       <div class="card-body py-5 text-center">
         <i class="fa-solid fa-brain fa-2x text-secondary mb-3" aria-hidden="true"></i>
-        <h2 class="h5">Ihr persönlicher KI-Arbeitsplatz</h2>
+        <h2 class="h5">Ihr TAKT-Agent-Arbeitsplatz</h2>
         <p class="text-secondary">Starten Sie links eine neue Unterhaltung.</p>
         <p class="small text-secondary mb-0">KI-Antworten können fehlerhaft sein. Prüfen Sie wichtige Angaben anhand der Originalquelle.</p>
       </div>

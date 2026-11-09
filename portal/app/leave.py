@@ -206,6 +206,10 @@ def lock(db):
 def save(db, actor, data, request_id=None):
     lock(db)
     row = db.get(LeaveRequest, request_id) if request_id else None
+    if row:
+        from .leave_admin import removed_ids
+        if db.scalar(select(LeaveRequest.id).where(LeaveRequest.id == row.id, LeaveRequest.id.in_(removed_ids()))) is not None:
+            raise HTTPException(409, "Administrativ gelöschter Urlaub darf nicht wieder verändert werden.")
     if request_id and not row:
         raise HTTPException(404)
     try:
@@ -279,6 +283,9 @@ def command(db, actor, request_id, action, version, reason=""):
     row = db.get(LeaveRequest, request_id)
     if not row:
         raise HTTPException(404)
+    from .leave_admin import removed_ids
+    if db.scalar(select(LeaveRequest.id).where(LeaveRequest.id == row.id, LeaveRequest.id.in_(removed_ids()))) is not None:
+        raise HTTPException(409, "Administrativ gelöschter Urlaub darf nicht verändert werden.")
     if str(row.version) != str(version):
         raise HTTPException(
             409, "Der Urlaub wurde inzwischen geändert. Bitte neu laden."

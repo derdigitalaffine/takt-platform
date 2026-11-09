@@ -50,7 +50,7 @@ def test_model_change_preserves_past_answers_and_only_affects_future(monkeypatch
     c.post(f"/ki/{cid}/message", data={"csrf": csrf, "message": "Zweite Frage"})
     assert seen == ["model-a", "model-b"]
     page = c.get(f"/ki?chat={cid}").text
-    assert 'action="/ki/' + str(cid) + '/model"' in page
+    assert 'action="/agent/' + str(cid) + '/model"' in page
     assert "Ab hier verzweigen" in page
     with SessionLocal() as db:
         chat = db.get(AIConversation, cid)

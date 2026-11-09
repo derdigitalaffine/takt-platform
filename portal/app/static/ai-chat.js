@@ -218,11 +218,63 @@
     else submit.click();
   });
 
+  async function runAgent(question) {
+    const body = new FormData(form);
+    body.set('prompt', question);
+    messages.querySelector('[data-ai-empty]')?.remove();
+    const userBubble = messageBubble('user', question);
+    const assistantBubble = messageBubble('assistant', '');
+    const progress = progressText(assistantBubble.bubble);
+    controller = new AbortController();
+    submit.disabled = true; stop.disabled = false; stop.hidden = false;
+    status.textContent = 'TAKT Agent prüft Bereiche und plant …';
+    hint.textContent = '';
+    scrollToLatest();
+    try {
+      const response = await fetch('/agent/plan', {method: 'POST', body,
+        credentials: 'same-origin', cache: 'no-store', signal: controller.signal});
+      const data = await response.json();
+      if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Der Agent konnte den Auftrag nicht verarbeiten.');
+      prompt.value = '';
+      assistantBubble.content.textContent = data.message || '';
+      if (typeof data.html === 'string') {
+        assistantBubble.content.classList.add('ai-message-markdown');
+        assistantBubble.content.innerHTML = data.html;
+      }
+      addAnswerMetadata(assistantBubble.bubble, data);
+      const list = document.createElement('ul');
+      for (const result of data.results || []) {
+        if (!/^\/(?:(?:aufgaben|anliegen|forms|processes)\/\d+|dms\/r\/\d+|kalender\?ansicht=termine)$/.test(result.url || '')) continue;
+        const li = document.createElement('li'); const link = document.createElement('a');
+        link.href = result.url; link.textContent = result.title || result.name || 'TAKT-Bereich';
+        li.appendChild(link); list.appendChild(li);
+      }
+      if (list.children.length) assistantBubble.bubble.appendChild(list);
+      progress.remove();
+      status.textContent = data.open_url ? 'Der ausgefüllte Vorschlag wird im Programmbereich geöffnet …' : 'Antwort gespeichert.';
+      updateTitle(question); scrollToLatest();
+      if (data.open_url && /^\/(?:aufgaben|anliegen|forms|dms|kalender)(?:[/?#]|$)/.test(data.open_url)
+          && !data.open_url.includes('\\')) {
+        window.location.assign(data.open_url);
+      }
+    } catch (error) {
+      progress.textContent = error.name === 'AbortError' ? 'Planung abgebrochen. Es wurde nichts gespeichert.' : error.message;
+      assistantBubble.item.classList.add('ai-message--error');
+      hint.textContent = progress.textContent;
+    } finally {
+      controller = null; submit.disabled = initiallyDisabled;
+      stop.disabled = true; stop.hidden = true; prompt.focus({preventScroll: true});
+    }
+  }
+
   form.addEventListener('submit', async function (event) {
     event.preventDefault();
     if (controller || initiallyDisabled) return;
     var question = prompt.value.trim();
     if (!question) { prompt.focus(); return; }
+    if (!temporary && form.elements.use_agent?.checked && !(imageInput?.files?.length)) {
+      await runAgent(question); return;
+    }
 
     // FormData must be captured before clearing anything (including an image).
     var body = new FormData(form);

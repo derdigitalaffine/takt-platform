@@ -1,58 +1,90 @@
-# TAKT Agent: freigegebene Modulabläufe
+# TAKT Agent: zentraler KI-Arbeitsplatz und ausgefüllte Fachvorschläge
 
-Der globale Agent benötigt ein aktives KI-Modul, `ai_chat` und mindestens einen
-freigeschalteten Bereich. Er nutzt ausschließlich fest registrierte Fachservices.
-Es gibt keinen Browser-Fernzugriff, keine frei wählbaren URLs und keine Codeausführung.
+`/agent` ist der maßgebliche LLM-Chat. Navigation, Modulkarte und globaler Einstieg
+führen dorthin. `/ki` und die bisherigen Chat-Endpunkte bleiben kompatible Aliase
+für denselben Arbeitsplatz; es gibt keinen zweiten Seitenpanel-Chat mehr.
+Modellwahl, persönliche Unterhaltungen, Export, sichere Markdown-Darstellung,
+freigegebenes Wissen, optionale Websuche sowie Text-/Bildanalyse bleiben erhalten. Auch Modellwechsel, Gesprächsverzweigungen und temporäre Chats ohne gespeicherten Verlauf stehen im selben Arbeitsplatz bereit. Temporäre Chats bleiben reine Antworten ohne Fachaktionen oder Wissensabruf.
 
-| Bereich | Lesen | Nach ausdrücklicher Freigabe schreiben |
-| --- | --- | --- |
-| Aufgaben | Sichtbare Aufgaben, Personen | Erstellen, zuweisen, Priorität und zulässigen Status ändern |
-| Interne Anliegen / Bestellungen | Sichtbare nicht vertrauliche Anliegen, erlaubte Folgestatus | Erstellen mit Routingvorschau, zuweisen, Status ändern; Lieferant, Bestellreferenz und Lieferdatum bei Bestellungen |
-| Kalender | Zugängliche Kalender und gespeicherte Einzel-/Serientermin-Metadaten mit Ereignisrechten | Einzeltermin in beschreibbarem freien Kalender anlegen, mit Beginn/Ende und expliziter Zeitzone |
-| Formulare | Metadaten eigener bzw. freigegebener Formulare, mit `forms`-Rolle | Geschlossene Kopie ohne Antworten, Einladungen oder öffentlichen Link; interne Grenze bleibt erhalten |
-| Prozesse | Prozessnamen und Veröffentlichungsstatus mit `processes`-Rolle | Weiterarbeit über den verlinkten Facheditor |
-| DMS | Nur explizit für KI freigegebene, weiterhin geeignete manuelle Wissensakten; beschreibbare Zielbereiche | Akte zwischen Bereichen mit Schreibrecht verschieben, Aufbewahrung über den bestehenden Fachservice |
+Die standardmäßig aktive Bedienunterstützung beantwortet Fragen und recherchiert
+in berechtigten Fachbereichen. Für reine Text-/Bildanalyse steht im selben Chat
+weiter der bisherige Antwortmodus mit Streaming zur Verfügung. Ein Bild wird nur
+über die bestehende berechtigungsgeprüfte Bildanalyse verarbeitet. Interne Quellen
+und Fachreferenzen im Verlauf werden vor Anzeige, Export **und erneuter Verwendung
+als LLM-Kontext** mit den aktuellen Rechten geprüft.
 
-DMS setzt zusätzlich `ai_knowledge`, aktivierte Wissensnutzung und Live-Bereichsrechte
-voraus. Keine Formularantworten, Anhänge, Bürger-/Personenakten oder Buchungsakten
-werden über diesen Adapter an den Provider übergeben. Prozessdefinitionen und
-Formularschemas werden ebenfalls nicht an die Planung übertragen.
+| Bereich | Fachunterstützung |
+| --- | --- |
+| Aufgaben | Suchen; neue Aufgaben vorbereiten; Zuständigkeit, Priorität und zulässigen Status vorschlagen |
+| Interne Anliegen | Eigene/zugewiesene/unzugewiesene Anliegen, Bestellungen, Kategorien und Folgestatus finden; Erfassung mit Routingvorschau; Zuweisung und Bearbeitung; Lieferant, Referenz und Lieferdatum |
+| Anliegenverwaltung | Für Administratoren: nicht vertrauliche Kategorien, Aktivierung und Personen-/Leitungsrouting; bestehende aktive Zuständigkeiten nur bei ausdrücklichem Auftrag übernehmen |
+| Geschützte Anliegen | Sensible Eingaben werden vor jedem LLM-/Verlaufsaufruf abgefangen und ausschließlich lokal im sitzungsgebundenen Server-Stash an das manuelle geschützte Formular übergeben. Kein Inhalt wird an das LLM oder den KI-Chatverlauf gesendet. |
+| Kalender | Zugängliche Kalender und gespeicherte Terminmetadaten finden; Einzeltermin in beschreibbarem freien Kalender mit expliziter Zeitzone vorbereiten |
+| Formulare | Metadaten eigener/freigegebener Formulare finden; geschlossene Kopie ohne Antworten, Einladungen und öffentlichen Link; interne Grenze bleibt erhalten |
+| Prozesse | Prozessnamen und Veröffentlichungsstatus mit passender Rolle finden; Weiterarbeit im verlinkten Facheditor |
+| DMS | Nur explizit für KI freigegebene geeignete manuelle Wissensakten finden; in Bereiche mit aktuellem Schreibrecht verschieben; Aufbewahrung über bestehenden Fachservice |
 
-## Beispielabläufe
+DMS erfordert zusätzlich aktivierte Wissensnutzung, `ai_knowledge`, die aktuell konfigurierte Quellenfreigabe (Einzelauswahl oder administrative Sammlung mit Ausnahmen)
+und Live-Bereichsrechte. Keine Bürger-, Personen-, Antrags- oder Buchungsakten,
+Anhänge, Formularantworten oder Prozessdefinitionen gelangen über den Adapter an
+die Planung. Geschützte Kategorien werden nicht über das LLM administriert.
 
-- „Suche meine Kalender. Plane eine Besprechung am 12.11.2026 von 9 bis 10 Uhr
-  in Berlin im Projektkalender und erstelle eine Aufgabe zur Vorbereitung.“
-- „Suche das Formular Raumanfrage und bereite eine geschlossene Kopie vor.“
-- „Suche die freigegebene Wissensakte Projektwissen und verschiebe sie nach Projektablage.“
-- „Setze meine Bestellung auf bestellt, Lieferant Büro GmbH, Referenz BEST-42,
-  erwartete Lieferung 20.11.2026.“
+## Übergabe an den Programmbereich
 
-Bis zu sechs lesende Suchen liefern belegte IDs. Höchstens vier Schreibschritte
-werden als geordneter Plan mit vollständigen zu speichernden Texten und Zielen
-vorgeschlagen. Unklare Angaben führen zu einer Rückfrage. Die letzten drei
-Benutzereingaben bleiben kurzzeitig serverseitig als Kontext, keine Suchresultate
-oder früheren Befehle als ausführbare Berechtigung. Vor jedem neuen Plan werden
-Datensätze erneut gesucht. „Neu beginnen“ löscht Kontext und offene Bestätigung.
+1. Bis zu sechs erlaubte Suchen liefern belegte IDs. Fehlende Angaben werden im
+   Chat geklärt; bis zu vier Schreibschritte werden sparsam vorgeschlagen.
+2. Der Agent öffnet unmittelbar den passenden Programmbereich mit vorausgefüllter
+   echter Fachmaske. Inhalte bleiben im Server-Stash; die URL enthält nur einen
+   zufälligen, sitzungs-/nutzergebundenen Planbezug. Öffnen speichert nichts.
+3. Die vom Werkzeug unterstützten Felder sind editierbar. Andere Felder sind für
+   diesen Vorschlag gesperrt. Änderungen werden vor jeder Übernahme erneut anhand
+   der aktuellen Fachservices, Rechte, Versionen und erlaubten Ziele normalisiert.
+4. „Vorschlag prüfen“ zeigt die endgültigen Werte **nach** den manuellen Änderungen.
+   Erst „Diesen Schritt verbindlich speichern“ schreibt, mit CSRF und einmaliger
+   Bestätigung. Der Schritt verwendet bestehende Services und deren Fach-Audit;
+   zusätzlich dokumentiert `agent_audit` Person, Werkzeug, Ziel-ID/-URL und Zeit.
+5. Weitere Schritte öffnen anschließend nacheinander ihre eigene Fachmaske. Jeder
+   Schritt ist eine eigene bestätigte Transaktion. Bereits gespeicherte Schritte
+   bleiben bestehen, wenn später verworfen wird. Die Plan-ID rotiert nach jedem
+   Speichern; alte Tabs oder alte Bestätigungen können keinen Schritt wiederholen.
 
-Schreibpläne bleiben ausschließlich serverseitig, sitzungs-/nutzergebunden,
-kurzlebig und einmalig. Ein neuer Planversuch entwertet den alten auch bei Fehlern.
-Alle Endpunkte verlangen CSRF. Bei Bestätigung werden Modul-/Rollenrechte,
-Datensatzrechte, Versionen, DMS-Freigaben, Zielbereiche und Routing erneut geprüft.
-Ein Fehler rollt den gesamten Plan einschließlich Fach-Audit zurück. Erfolgreiche
-Schritte erscheinen zusätzlich in `agent_audit` (Person, Werkzeug, Ziel-ID/-URL,
-Zeitpunkt; keine Prompt- oder Inhaltskopien).
+Ein neuer Planversuch, eine neue Unterhaltung oder das ausdrückliche Verwerfen
+entwertet offene Vorschläge. Bei geänderten Daten/Rechten ist ein neuer Plan nötig.
+Die kompatible API `/agent/execute` bestätigt unveränderte vollständige Pläne weiter
+atomar; nach einer manuellen Fachmaskenbearbeitung ist ausschließlich deren neue
+Einzelbestätigung gültig. Der bestehende kurzlebige prozesslokale Server-Stash
+bleibt eine PoC-Grenze; horizontale Ausführung benötigt einen gemeinsamen atomaren
+Bestätigungsspeicher.
 
-Es gibt keine automatische Veröffentlichung, Löschung, Genehmigung,
-Ressourcenbuchung, Einladungsmail oder Änderung einer Terminserie. Abhängigkeiten
-auf noch nicht angelegte IDs benötigen einen weiteren bestätigten Plan. Kalender
-mit Fachquellen behalten ihre eigenen Abläufe. Der bestehende kurzlebige
-Server-Stash bleibt für einen einzelnen Serverprozess ausgelegt; für horizontalen
-Betrieb ist ein gemeinsamer atomarer Bestätigungsspeicher erforderlich.
+Es gibt keine Browser-Fernsteuerung, frei wählbaren Tool-URLs, Codeausführung,
+autonome Veröffentlichung, Löschung, Genehmigung, Ressourcenbuchung oder Änderung
+einer Terminserie. Eine administrative Kategorie-Routingänderung übernimmt dieselben
+Fachgrenzen wie die native Verwaltung (maximal 300 Vorgänge je Fachlauf).
+
+## Administrative Korrektur von Urlaubsabwesenheiten
+
+Administratoren können im Urlaubsplaner einen eingetragenen Urlaub oder eine
+unabhängige manuelle Abwesenheit über „… löschen“ öffnen. Die Vorschau nennt Person,
+Zeitraum und Auswirkungen; Begründung und Bestätigungsfeld sind Pflicht. Beim
+Speichern werden Administratorrecht, CSRF und der gelesene Datenstand erneut
+geprüft. Aktiver Urlaub, seine eigene Abwesenheitskopie und die wirksame
+Urlaubskontoanrechnung werden aufgehoben; fremde Zeiträume bleiben erhalten.
+
+Der Urlaub bleibt ausschließlich als stornierter Nachweis mit `admin_delete`-Audit
+und zusätzlichem `leave_admin_removals`-Korrekturprotokoll erhalten. Er erscheint
+nicht mehr in aktiven Listen oder Kalenderdaten und kann nicht über normale
+Urlaubsbefehle wieder aktiviert werden. Manuelle Abwesenheiten werden mit eigenem
+Korrekturprotokoll entfernt. Das funktioniert auch nach einem Organisationswechsel;
+die normale Genehmigung und ihre Vier-Augen-Regeln werden nicht verändert. Diese
+administrative Löschung erfolgt bewusst manuell, nicht durch ein LLM-Werkzeug.
 
 ## Prüfung
 
-`pytest -q tests/test_agent.py tests/test_agent_modules.py` prüft Bestätigung,
-Wiederholungsschutz, CSRF, Sitzungsbindung, Daten-/Rechterevokation, DMS-Opt-in,
-Bestellregeln und transaktionale Rücknahme. `python tests/browser/agent_ui_smoke.py`
-prüft den realen Ablauf mit deterministischem Provider, Links, Freigabe, Verwerfen,
-Neustart, Tastatur und mobiler Ansicht. Beide laufen in der Portal-CI.
+Die Agenten-/KI-/Urlaubstests prüfen Rollen, Datensätze, CSRF, Sitzungsbindung,
+Rechteentzug, geänderte Daten, Routing, bearbeitete Vorschauen, Wiederholungsschutz,
+Verlaufsrechte und administrative Entfernung samt Abwesenheitskopie und Audit.
+`python tests/browser/agent_ui_smoke.py` prüft mit deterministischem Provider alle
+umgesetzten Fachübergaben, aufeinanderfolgende Bestätigungen, geschützte Erfassung,
+Chatverlauf, mobile Ansichten und die administrative Urlaubskorrektur. Die Prüfung
+läuft in der Portal-CI; kein echter LLM-Dienst und keine Produktionsdaten werden
+in den Tests verwendet.

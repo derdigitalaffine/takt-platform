@@ -4,11 +4,17 @@ from task_ui_app import app
 from app import ai_provider
 from app.ai_models import AIProvider, AIDmsSource
 from app.calendar_models import Calendar
-from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, set_setting
+from app.anliegen_models import AnliegenCategory, Anliegen
+from app.task_models import Task
+from app.security import hash_password
+from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, Organization, set_setting
+from app.org_models import OrgMembership
+from app.leave_models import LeavePolicy
+from app import leave
 from sqlalchemy import select
 
 with SessionLocal() as db:
-    for module in ('ai', 'calendars', 'forms', 'dms'):
+    for module in ('ai', 'calendars', 'forms', 'dms', 'anliegen'):
         set_setting(db, 'module_' + module, '1')
     set_setting(db, 'ai_knowledge_enabled', '1')
     user = db.scalar(select(User).where(User.email == 'browser@example.org'))
@@ -21,12 +27,54 @@ with SessionLocal() as db:
     record = DmsRecord(area_id=source.id, title='Projektwissen', note='Freigegeben', kind='manuell')
     db.add(record); db.flush()
     db.add_all([AIDmsSource(record_id=record.id), AIProvider(name='Fixture', base_url='https://llm.invalid', model_id='fixture', active=True)])
-    db.commit()
+    cat = AnliegenCategory(key='browser_agent', title='Agent IT Anliegen', routing='person', assignee_id=user.id, enabled=True)
+    colleague = User(name='Alex Agent', email='agent-colleague@example.org', password_hash=hash_password('browser-colleague-password'), permissions='tasks,anliegen_submit', active=True)
+    db.add_all([cat, colleague]); db.commit()
+    unit = Organization(name='Agent Urlaubsbereich', kind='fachbereich')
+    db.add(unit); db.flush()
+    db.add(OrgMembership(user_id=user.id, org_id=unit.id, is_primary=True, counts_staff=True))
+    db.add(LeavePolicy(org_id=unit.id, workflow='planning', sync_absence=True)); db.commit()
+    vacation = leave.save(db, user, dict(starts_on='2030-12-02', ends_on='2030-12-03')); db.commit()
+    leave.command(db, user, vacation.id, 'bind', vacation.version); db.commit()
     ids = cal.id, form.id, record.id, dest.id
+    cat_id, colleague_id = cat.id, colleague.id
 
 
 async def complete(provider, messages, **kwargs):
-    if '"searches"' in messages[0]['content']:
+    searching = '"searches"' in messages[0]['content']
+    content = messages[-1]['content']
+    prompt = content if searching else json.loads(content)['auftrag']
+    searches, actions = None, None
+    with SessionLocal() as db:
+        case = db.scalar(select(Anliegen).where(Anliegen.title == 'Browser Anliegen'))
+        task = db.scalar(select(Task).where(Task.title == 'Browser Aufgabe'))
+        if prompt.startswith('Internes Anliegen'):
+            searches = []
+            actions = [dict(tool='create_anliegen', category_id=cat_id, title='Browser Anliegen', description='Zwei Bürostühle für Raum 1 prüfen')]
+        elif prompt.startswith('Anliegen bearbeiten'):
+            searches = [dict(tool='search_anliegen', query='Browser Anliegen')]
+            actions = [dict(tool='set_anliegen_status', id=case.id, status='in_progress')]
+        elif prompt.startswith('Anliegen zuweisen'):
+            searches = [dict(tool='search_anliegen', query='Browser Anliegen'), dict(tool='search_people', query='Alex Agent')]
+            actions = [dict(tool='assign_anliegen', id=case.id, assignee_id=colleague_id)]
+        elif prompt.startswith('Routing ändern'):
+            searches = [dict(tool='search_anliegen_categories', query='Agent IT Anliegen'), dict(tool='search_people', query='Alex Agent')]
+            actions = [dict(tool='configure_anliegen_category', id=cat_id, title='Agent IT Anliegen Team', routing='person', assignee_id=colleague_id, enabled=True, apply_open=False)]
+        elif prompt.startswith('Aufgabe vorbereiten'):
+            searches = []
+            actions = [dict(tool='create_task', title='Browser Aufgabe', description='Unterlagen prüfen')]
+        elif prompt.startswith('Aufgabe zuweisen'):
+            searches = [dict(tool='search_tasks', query='Browser Aufgabe'), dict(tool='search_people', query='Alex Agent')]
+            actions = [dict(tool='assign_task', id=task.id, assignee_id=colleague_id)]
+        elif prompt.startswith('Aufgabe priorisieren'):
+            searches = [dict(tool='search_tasks', query='Browser Aufgabe')]
+            actions = [dict(tool='set_task_priority', id=task.id, priority='high')]
+        elif prompt.startswith('Aufgabe starten'):
+            searches = [dict(tool='search_tasks', query='Browser Aufgabe')]
+            actions = [dict(tool='set_task_status', id=task.id, status='in_progress')]
+    if searches is not None:
+        return json.dumps(dict(searches=searches) if searching else dict(message='Vorschlag im Fachbereich prüfen.', actions=actions))
+    if searching:
         return json.dumps(dict(searches=[dict(tool=t, query='') for t in
             ('search_calendars', 'search_forms', 'search_dms', 'search_dms_areas')]))
     return json.dumps(dict(message='Drei Schritte zur Prüfung. Noch nichts gespeichert.', actions=[

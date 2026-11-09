@@ -181,7 +181,7 @@ templates.env.filters["local"] = lambda dt, fmt="%d.%m.%Y, %H:%M": to_local(dt).
 
 # Modul: (Einstellung, Rechte-Schlüssel, Pfad-Präfixe)
 MODULES = {
-    "ai": ("KI-Chat", "module_ai", ("/ki",)),
+    "ai": ("TAKT Agent", "module_ai", ("/ki", "/agent")),
     "anliegen": ("Interne Anliegen", "module_anliegen", ("/anliegen",)),
     "calendars": ("Kalender & Urlaub", "module_calendars", ("/kalender", "/urlaub", "/caldav", "/.well-known/caldav")),
     "tasks": ("Aufgaben & Zusammenarbeit", "module_tasks", ("/aufgaben",)),

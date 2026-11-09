@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Urlaubsabwesenheit löschen{% endblock %}
+{% block content %}
+<div class="card mx-auto" style="max-width:750px"><div class="card-body">
+<h1 class="h4">Eingetragene Abwesenheit löschen</h1>
+<p><strong>{{person.name if person else 'Ehemaliges Benutzerkonto'}}</strong> · {{row.starts_on}} bis {{row.ends_on}}</p>
+<p>Der aktive Zeitraum wird aus Urlaubsplanung und Kalender entfernt. Bei Urlaub werden eine verknüpfte Abwesenheit und die Anrechnung auf das interne Urlaubskonto aufgehoben. Unabhängig eingetragene Zeiträume bleiben bestehen. Begründung und Nachweis bleiben erhalten.</p>
+<form method="post" action="{{ '/urlaub/' ~ row.id ~ '/loeschen' if kind == 'leave' else '/urlaub/abwesenheit/' ~ row.id ~ '/loeschen' }}">
+<input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{version}}">
+<label class="form-label" for="delete-reason">Begründung der administrativen Korrektur</label>
+<textarea class="form-control mb-3" id="delete-reason" name="reason" minlength="5" maxlength="2000" required></textarea>
+<label class="form-check mb-3"><input class="form-check-input" type="checkbox" name="confirm" value="1" required><span class="form-check-label">Ich habe Person und Zeitraum geprüft und bestätige die Löschung.</span></label>
+<button class="btn btn-danger" type="submit">Abwesenheit jetzt löschen</button>
+<a href="/urlaub/planer" class="btn btn-outline-secondary">Abbrechen</a>
+</form></div></div>
+{% endblock %}
