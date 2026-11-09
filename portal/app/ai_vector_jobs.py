@@ -62,15 +62,27 @@ def reconcile(db) -> dict[str, int]:
         AIKnowledgeVector.source_hash).distinct()).all())
     jobs = {job.knowledge_id: job for job in db.scalars(select(AIIndexJob))}
     now = utcnow()
+    from . import ai_qdrant
     for doc in docs:
         job = jobs.get(doc.id)
         if not doc.enabled or not (doc.body_md or "").strip():
             # Prompt revocation always takes effect on read; purge copies as well.
-            db.execute(delete(AIKnowledgeVector).where(AIKnowledgeVector.knowledge_id == doc.id))
+            purged = db.execute(delete(AIKnowledgeVector).where(
+                AIKnowledgeVector.knowledge_id == doc.id))
+            if purged.rowcount:
+                ai_qdrant.invalidate(db)
             if job:
                 db.delete(job)
             continue
         fingerprint = ai_vector.source_hash(doc.body_md or "")
+        # The SQLite index contains text chunks; scrub outdated copies, not
+        # just hide them from the search result. Keep the newest live model.
+        purged = db.execute(delete(AIKnowledgeVector).where(
+            AIKnowledgeVector.knowledge_id == doc.id,
+            or_(AIKnowledgeVector.model_id != model_id,
+                AIKnowledgeVector.source_hash != fingerprint)))
+        if purged.rowcount:
+            ai_qdrant.invalidate(db)
         is_current = (doc.id, model_id, fingerprint) in indexed
         if job is None and not is_current:
             db.add(AIIndexJob(knowledge_id=doc.id, model_id=model_id,
@@ -93,6 +105,48 @@ def reconcile(db) -> dict[str, int]:
             job.updated_at = now
     db.commit()
     return counts(db)
+
+
+def retry_failed(db, *, doc_id: int | None = None) -> int:
+    """Administrator-requested retry without bypassing the automatic ACL checks.
+
+    Reconciliation first removes stale/disabled sources. The scheduled worker
+    handles embedding calls separately, avoiding long-running admin POSTs.
+    """
+    if not active(db):
+        return 0
+    reconcile(db)
+    query = select(AIIndexJob).where(AIIndexJob.status == "failed")
+    if doc_id is not None:
+        query = query.where(AIIndexJob.knowledge_id == doc_id)
+    jobs = list(db.scalars(query.order_by(AIIndexJob.id).limit(100)))
+    for job in jobs:
+        job.status = "pending"
+        job.attempts = 0
+        job.next_attempt_at = utcnow()
+        job.lease_until = None
+        job.updated_at = utcnow()
+    db.commit()
+    return len(jobs)
+
+
+async def sync_qdrant_if_needed() -> int:
+    """Bounded, explicitly opted-in cache repair after indexing has settled."""
+    from . import ai_qdrant
+    with SessionLocal() as db:
+        cfg = get_settings(db)
+        if cfg.get("ai_qdrant_auto_sync") != "1" or not ai_qdrant.configured(db):
+            return 0
+        if ai_qdrant.active(db):
+            return 0
+        active_jobs = db.scalar(select(AIIndexJob.id).where(
+            AIIndexJob.status.in_(("pending", "running"))).limit(1))
+        if active_jobs is not None:
+            return 0
+        try:
+            return await ai_qdrant.rebuild(db)
+        except ai_qdrant.QdrantError:
+            return 0  # Qdrant is optional; local search stays available.
 
 
 def counts(db) -> dict[str, int]:
@@ -186,6 +240,7 @@ async def run_forever() -> None:
     while True:
         try:
             await tick()
+            await sync_qdrant_if_needed()
         except Exception:  # noqa: BLE001 - never log source text or provider secrets
             log.warning("RAG-Indexlauf fehlgeschlagen; erneuter Versuch beim nächsten Intervall.")
         await asyncio.sleep(300)
