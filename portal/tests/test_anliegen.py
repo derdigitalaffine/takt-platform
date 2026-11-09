@@ -1,5 +1,6 @@
 """Internal Anliegen: routing, task linkage, confidentiality and opt-in AI tests."""
-from sqlalchemy import select
+from sqlalchemy import select, delete
+import pytest
 
 from app import ai_provider
 from app.anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
@@ -8,6 +9,54 @@ from app.org_models import OrgMembership, OrgRoleGrant
 from app.security import hash_password
 from app.task_models import Task
 from conftest import login, csrf_of, settings
+
+
+@pytest.fixture(autouse=True)
+def _isolate_anliegen_tests():
+    """Reset feature switches, routing and native tasks after every Anliegen test."""
+    from app import main
+    from app.db import get_settings, set_setting, Organization
+    from app.task_models import TaskActivity
+    from app.ai_models import AIProvider
+    from app.org_models import OrgMembership, OrgRoleGrant
+    with SessionLocal() as db:
+        settings_before = get_settings(db)
+        original = {key: settings_before[key]
+                    for key in ("module_anliegen", "module_tasks", "module_ai")}
+        original_categories = {
+            cat.id: (cat.title, cat.routing, cat.assignee_id, cat.enabled)
+            for cat in db.scalars(select(AnliegenCategory))
+        }
+        existing_cases = set(db.scalars(select(Anliegen.id)))
+        existing_orgs = set(db.scalars(select(Organization.id)))
+    yield
+    with SessionLocal() as db:
+        new_cases = [row for row in db.scalars(select(Anliegen))
+                     if row.id not in existing_cases]
+        native_ids = [row.task_id for row in new_cases if row.task_id]
+        for row in new_cases:
+            db.execute(delete(AnliegenEvent).where(AnliegenEvent.anliegen_id == row.id))
+            db.delete(row)
+        db.flush()
+        for tid in native_ids:
+            db.execute(delete(TaskActivity).where(TaskActivity.task_id == tid))
+            task = db.get(Task, tid)
+            if task is not None:
+                db.delete(task)
+        db.execute(delete(AIProvider).where(AIProvider.name == "Anliegen AI Fake"))
+        for category_id, values in original_categories.items():
+            cat = db.get(AnliegenCategory, category_id)
+            if cat:
+                cat.title, cat.routing, cat.assignee_id, cat.enabled = values
+        for org in list(db.scalars(select(Organization))):
+            if org.id not in existing_orgs and org.name == "Anliegen Testorganisation":
+                db.execute(delete(OrgRoleGrant).where(OrgRoleGrant.org_id == org.id))
+                db.execute(delete(OrgMembership).where(OrgMembership.org_id == org.id))
+                db.delete(org)
+        for key, value in original.items():
+            set_setting(db, key, value)
+        db.commit()
+    main._module_cache["at"] = 0.0
 
 ADMIN = ("admin@example.org", "admin-passwort-123")
 
