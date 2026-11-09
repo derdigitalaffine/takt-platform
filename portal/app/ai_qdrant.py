@@ -163,6 +163,13 @@ async def query(db, model_id: str, query_vector: list[float], *,
                               not_found_ok=True)
     except QdrantError:
         return []  # Local cosine search remains authoritative.
+    if data is None:
+        # The RAM-only collection disappeared (e.g. after a container
+        # restart). Mark the cache stale so optional background resync
+        # can restore it; never trust stale remote IDs in the meantime.
+        invalidate(db)
+        db.commit()
+        return []
     result = data.get("result") if isinstance(data, dict) else None
     points = result.get("points", []) if isinstance(result, dict) else []
     if not isinstance(points, list):

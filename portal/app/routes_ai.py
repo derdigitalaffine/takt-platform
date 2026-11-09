@@ -232,14 +232,28 @@ async def admin_ai_vector_reindex(
     return redirect(f"/admin/ai#knowledge-{doc_id}")
 
 
+@app.post("/admin/ai/vector/retry", dependencies=[Depends(check_csrf)])
+def admin_ai_vector_retry(
+    request: Request, user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    rate_limit(request, "ai-vector-retry", limit=3, window=300, key=str(user.id))
+    if not ai_vector_jobs.active(db):
+        raise HTTPException(400, "Automatische Indexierung ist nicht aktiviert.")
+    count = ai_vector_jobs.retry_failed(db)
+    flash(request, f"{count} fehlgeschlagene Indexaufträge erneut eingereiht.")
+    return redirect("/admin/ai#knowledge")
+
+
 @app.post("/admin/ai/qdrant/settings", dependencies=[Depends(check_csrf)])
 def admin_ai_qdrant_settings(
-    request: Request, enabled: str = Form(""),
+    request: Request, enabled: str = Form(""), auto_sync: str = Form(""),
     user: User = Depends(admin_user), db: Session = Depends(get_db),
 ):
     if enabled == "1" and ai_vector._settings(db) is None:
         raise HTTPException(400, "Zuerst semantische Vektorsuche und Embedding-Modell aktivieren.")
     set_setting(db, "ai_qdrant_enabled", "1" if enabled == "1" else "0")
+    set_setting(db, "ai_qdrant_auto_sync", "1" if enabled == "1" and auto_sync == "1" else "0")
     db.commit()
     flash(request, "Qdrant-Cache aktualisiert. Freigabe und Synchronisierung sind getrennt.")
     return redirect("/admin/ai#knowledge")

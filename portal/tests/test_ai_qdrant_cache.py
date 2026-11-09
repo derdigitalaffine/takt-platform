@@ -96,3 +96,17 @@ def test_qdrant_container_is_private_and_requires_explicit_profile():
     assert "internal: true" in compose
     assert "/qdrant/storage:size=" in compose
     assert "docker compose --profile rag up -d qdrant" in compose
+
+
+def test_missing_volatile_collection_invalidates_synced_revision(monkeypatch):
+    _setup()
+    settings(ai_qdrant_revision="5", ai_qdrant_synced_revision="5")
+    async def missing(method, path, payload=None, *, not_found_ok=False):
+        assert method == "POST" and path.endswith("/points/query")
+        assert not_found_ok
+        return None
+    monkeypatch.setattr(ai_qdrant, "_request", missing)
+    with SessionLocal() as db:
+        assert ai_qdrant.active(db)
+        assert asyncio.run(ai_qdrant.query(db, "cache-test-model", [1.0, 0.0])) == []
+        assert not ai_qdrant.active(db)

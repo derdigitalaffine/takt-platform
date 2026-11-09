@@ -2776,6 +2776,7 @@ DEFAULT_SETTINGS = {
     "ai_vector_enabled": "0",
     "ai_vector_auto_index": "0",
     "ai_qdrant_enabled": "0",
+    "ai_qdrant_auto_sync": "0",
     "ai_qdrant_revision": "0",
     "ai_qdrant_synced_revision": "-1",
     "ai_vector_provider_id": "0",
