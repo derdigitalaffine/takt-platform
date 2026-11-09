@@ -29,6 +29,7 @@ class AnliegenProcessRule(Base):
         ForeignKey("process_versions.id", ondelete="RESTRICT"), nullable=True, index=True)
     created_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    state_version: Mapped[int] = mapped_column(Integer, default=0)
     approved_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
