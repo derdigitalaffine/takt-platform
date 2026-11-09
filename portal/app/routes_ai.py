@@ -940,7 +940,6 @@ def _image_data(data: bytes) -> str:
     return "data:" + mime + ";base64," + base64.b64encode(payload).decode("ascii")
 
 
-@app.post("/agent/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
 async def _internal_ai_sources(db: Session, user: User, message: str) -> list[dict]:
     """Blend lexical, paragraph-semantic and curated semantic evidence.
 
@@ -965,6 +964,7 @@ async def _internal_ai_sources(db: Session, user: User, message: str) -> list[di
     return result
 
 
+@app.post("/agent/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
 @app.post("/ki/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
 async def ai_send_message(
     request: Request, chat_id: int, message: str = Form(""), use_knowledge: str = Form(""),
