@@ -3110,6 +3110,7 @@ def init_db() -> None:
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
     from . import anliegen_models  # noqa: F401 – register additive internal request tables
+    from . import anliegen_process_models  # noqa: F401 – register opt-in process binding tables
     Base.metadata.create_all(engine)
     _migrate()
     # Idempotently re-encrypt confidential complaints created before this update.
