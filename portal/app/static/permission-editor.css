@@ -1,0 +1,41 @@
+/* TAKT user permissions editor: independent of module themes and color scheme. */
+.perm-editor { border: 1px solid var(--bs-border-color); border-radius: .75rem; background: var(--bs-body-bg); overflow: hidden; }
+.perm-editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; padding: .85rem 1rem; background: var(--bs-tertiary-bg); border-bottom: 1px solid var(--bs-border-color); }
+.perm-editor-search { flex: 1 1 16rem; position: relative; min-width: 0; margin: 0; }
+.perm-editor-search > i { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); color: var(--bs-secondary-color); pointer-events: none; }
+.perm-editor-search input { padding-left: 2.2rem; background: var(--bs-body-bg); }
+.perm-editor-total { font-size: .82rem; color: var(--bs-primary); background: var(--bs-primary-bg-subtle); border-radius: 999px; font-weight: 600; padding: .35rem .7rem; white-space: nowrap; }
+.perm-editor-sections { padding: .35rem .75rem .75rem; }
+.perm-editor-group { border: 1px solid var(--bs-border-color); border-radius: .6rem; margin-top: .5rem; overflow: hidden; }
+.perm-editor-group summary { display: flex; align-items: center; gap: .65rem; padding: .85rem 1rem; font-weight: 600; cursor: pointer; list-style: none; background: var(--bs-body-bg); }
+.perm-editor-group summary::-webkit-details-marker { display:none; }
+.perm-editor-group summary::after { content: "\f078"; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: .75rem; color: var(--bs-secondary-color); }
+.perm-editor-group[open] summary { border-bottom: 1px solid var(--bs-border-color); background: var(--bs-tertiary-bg); }
+.perm-editor-group[open] summary::after { transform: rotate(180deg); }
+.perm-editor-group summary:hover { background: var(--bs-tertiary-bg); }
+.perm-editor-group summary:focus-visible, .perm-editor-option:focus-within { outline: 3px solid var(--bs-primary); outline-offset: -3px; }
+.perm-editor-group-icon { color: var(--bs-primary); width: 1.5rem; text-align: center; }
+.perm-editor-group-heading { flex: 1; min-width: 0; }
+.perm-editor-group-count { font-size: .8rem; font-weight: 500; color: var(--bs-secondary-color); white-space: nowrap; }
+.perm-editor-group-body { padding: .75rem; }
+.perm-editor-group-tools { border-bottom: 1px solid var(--bs-border-color-translucent); margin-bottom: .75rem; padding-bottom: .5rem; }
+.perm-editor-group-tools .btn { text-decoration: none; }
+.perm-editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .6rem; }
+.perm-editor-option { display: flex; gap: .75rem; align-items: start; border: 1px solid var(--bs-border-color); border-radius: .55rem; padding: .75rem; background: var(--bs-body-bg); cursor: pointer; min-width: 0; }
+.perm-editor-option:hover { border-color: var(--bs-primary-border-subtle); background: var(--bs-tertiary-bg); }
+.perm-editor-option:has(input:checked) { border-color: var(--bs-primary-border-subtle); background: var(--bs-primary-bg-subtle); }
+.perm-editor-option .form-check-input { margin-top: .18rem; flex: none; }
+.perm-editor-option-content { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+.perm-editor-option-title { font-size: .9rem; font-weight: 600; color: var(--bs-body-color); }
+.perm-editor-option-title i { color: var(--bs-primary); }
+.perm-editor-option-help { font-size: .8rem; line-height: 1.4; color: var(--bs-secondary-color); overflow-wrap: anywhere; }
+.perm-editor-option[hidden], .perm-editor-group[hidden], .perm-editor [hidden] { display: none !important; }
+.perm-inline-details { position: relative; }
+.perm-inline-details summary { cursor: pointer; color: var(--bs-primary); }
+.perm-inline-details[open] > div { max-width: 25rem; }
+@media (max-width: 575.98px) {
+  .perm-editor-toolbar { padding: .75rem; }
+  .perm-editor-group summary { padding: .75rem; }
+  .perm-editor-group-body { padding: .5rem; }
+  .perm-editor-grid { grid-template-columns: 1fr; }
+}
