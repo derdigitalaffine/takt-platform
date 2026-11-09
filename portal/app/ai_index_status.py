@@ -29,14 +29,20 @@ def status(db, docs: list[AIKnowledge] | None = None) -> dict:
     doc_status = {}
     ready = 0
     missing = 0
+    chunks_total = 0
+    chunks_ready = 0
     for doc in docs:
+        expected = len(ai_vector.chunks(doc.body_md or "")) if doc.enabled and selection else 0
+        count = min(expected, stored.get((
+            doc.id, model, ai_vector.source_hash(doc.body_md or "")
+        ), 0)) if expected else 0
+        chunks_total += expected
+        chunks_ready += count
         if not doc.enabled:
             info = {"label": "Nicht freigegeben", "color": "secondary"}
         elif not selection:
             info = {"label": "Embeddings deaktiviert", "color": "secondary"}
         else:
-            expected = len(ai_vector.chunks(doc.body_md or ""))
-            count = stored.get((doc.id, model, ai_vector.source_hash(doc.body_md or "")), 0)
             if expected and count == expected:
                 info = {"label": f"{count} Chunks aktuell", "color": "success"}
                 ready += 1
@@ -49,7 +55,11 @@ def status(db, docs: list[AIKnowledge] | None = None) -> dict:
                     "failed": {"label": "Embedding fehlgeschlagen", "color": "danger"},
                 }.get(state, {"label": "Noch nicht indiziert" if count == 0 else "Index unvollständig",
                                "color": "secondary"})
+        info["chunks_ready"] = count
+        info["chunks_total"] = expected
+        info["percent"] = round(count * 100 / expected) if expected else 0
         doc_status[str(doc.id)] = info
+    percent = round(chunks_ready * 100 / chunks_total) if chunks_total else 0
     return {
         "active": bool(selection),
         "model": model,
@@ -58,6 +68,9 @@ def status(db, docs: list[AIKnowledge] | None = None) -> dict:
         "ready": ready,
         "missing": missing,
         "vectors": sum(stored.values()),
+        "chunks_total": chunks_total,
+        "chunks_ready": chunks_ready,
+        "percent": percent,
         "jobs": ai_vector_jobs.counts(db),
         "qdrant": "Aktuell" if ai_qdrant.active(db) else (
             "Neuaufbau nötig" if ai_qdrant.configured(db) else "Aus"),

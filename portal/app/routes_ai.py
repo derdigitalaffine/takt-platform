@@ -262,6 +262,55 @@ async def admin_ai_test(request: Request, provider_id: int = Form(...),
     return redirect("/admin/ai")
 
 
+@app.post("/admin/ai/diagnostics/llm", dependencies=[Depends(check_csrf)])
+async def admin_ai_diagnostic_llm(
+    request: Request, provider_id: int = Form(...), prompt: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    """Admin-only live LLM smoke test. No chat, source or trace is persisted."""
+    rate_limit(request, "ai-admin-diagnostics", limit=8, window=60, key=str(user.id))
+    prompt = prompt.strip()
+    if not prompt or len(prompt) > 1200:
+        raise HTTPException(400, "Bitte einen Testtext mit maximal 1.200 Zeichen eingeben.")
+    provider = _provider(db, provider_id, active=True)
+    started = time.monotonic()
+    try:
+        reply = await ai_provider.complete(provider, [
+            {"role": "system", "content": "Antworte kurz und verständlich auf Deutsch."},
+            {"role": "user", "content": prompt},
+        ], max_tokens=200)
+    except ai_provider.AIProviderError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return JSONResponse({
+        "ok": True, "provider": provider.name, "model": provider.model_id,
+        "reply": reply[:3000], "duration_ms": round((time.monotonic() - started) * 1000),
+    }, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/ai/diagnostics/embedding", dependencies=[Depends(check_csrf)])
+async def admin_ai_diagnostic_embedding(
+    request: Request, provider_id: int = Form(...), model_id: str = Form(""),
+    user: User = Depends(admin_user), db: Session = Depends(get_db),
+):
+    """Test a synthetic embedding without exposing vectors or indexing documents."""
+    rate_limit(request, "ai-admin-diagnostics", limit=8, window=60, key=str(user.id))
+    model_id = model_id.strip()
+    if not model_id or len(model_id) > 200:
+        raise HTTPException(400, "Bitte eine gültige Embedding-Modell-ID eingeben.")
+    provider = _provider(db, provider_id, active=True)
+    started = time.monotonic()
+    try:
+        vector = (await ai_provider.embed(
+            provider, ["TAKT Embedding-Verbindungstest mit synthetischen Daten."], model_id
+        ))[0]
+    except ai_provider.AIProviderError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return JSONResponse({
+        "ok": True, "provider": provider.name, "model": model_id,
+        "dimensions": len(vector), "duration_ms": round((time.monotonic() - started) * 1000),
+    }, headers={"Cache-Control": "no-store"})
+
+
 @app.post("/admin/ai/knowledge/settings", dependencies=[Depends(check_csrf)])
 def admin_ai_knowledge_settings(request: Request, enabled: str = Form(""), retention: int = Form(90),
                                 user: User = Depends(admin_user), db: Session = Depends(get_db)):
