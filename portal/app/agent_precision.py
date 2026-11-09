@@ -39,6 +39,7 @@ def focus_modules(prompt):
         'anliegen': r'anliegen|mangel|mängel|büromaterial|büromöbel|bürost[üu]hl|druckerpapier|kopierpapier|toner|störung|defekt',
         'forms': r'formular', 'calendars': r'kalender|termin',
         'dms': r'\bdms\b|wissensakte', 'processes': r'prozess',
+        'leave': r'urlaub|urlaubsantrag|urlaubsplanung',
     }
     return {key for key, pattern in patterns.items() if re.search(pattern, prompt, re.I)} or None
 
