@@ -100,7 +100,8 @@ def search(db, user, spec):
                  "category": r.category.key, "assignee_id": r.assignee_id,
                  "url": f"/anliegen/{r.id}"} for r in records]
     if tool == "search_people":
-        require(user, "tasks")
+        if not (allowed(user, "tasks") or (allowed(user, "anliegen") and user.can("anliegen_manage"))):
+            raise HTTPException(403)
         if len(phrase) < 2:
             return []
         people = list(db.scalars(select(User).where(User.active.is_(True),
@@ -129,6 +130,8 @@ def search_instructions(user):
                       "search_people(query) für Zuweisungen"])
     if allowed(user, "anliegen"):
         kinds.append("search_anliegen(query,scope=all|assigned|reported,status?)")
+        if user.can("anliegen_manage") and not allowed(user, "tasks"):
+            kinds.append("search_people(query) für Zuständigkeitsänderungen")
     return [
         {"role": "system", "content": (
             "Du bist TAKT Agent. Antworte nur als JSON-Objekt: "
@@ -152,7 +155,7 @@ def parse_searches(reply, user):
     for s in specs[:3]:
         if not isinstance(s, dict) or s.get("tool") not in READ_TOOLS:
             continue
-        module = "anliegen" if s["tool"] == "search_anliegen" else "tasks"
+        module = "anliegen" if (s["tool"] == "search_anliegen" or (s["tool"] == "search_people" and not allowed(user, "tasks"))) else "tasks"
         if not allowed(user, module):
             continue
         valid.append({"tool": s["tool"], "query": _term(s.get("query")),
@@ -346,7 +349,7 @@ def preview(db, actions):
             elif tool == "set_task_priority":
                 label += " → Priorität " + ts.PRIORITIES[action["priority"]]
             elif tool == "set_task_status":
-                label += " → " + ts.STATUSES[action["status"]]
+                label += " → " + ("Zur Freigabe einreichen" if action["status"] == "done" and row.requires_review else ts.STATUSES[action["status"]]
             else:
                 label += " → " + issues.STATUSES[action["status"]]
         descriptions.append(label)
