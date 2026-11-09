@@ -190,7 +190,7 @@ def admin_ai_knowledge_settings(request: Request, enabled: str = Form(""), reten
 
 @app.post("/admin/ai/vector/settings", dependencies=[Depends(check_csrf)])
 def admin_ai_vector_settings(
-    request: Request, enabled: str = Form(""),
+    request: Request, enabled: str = Form(""), auto_index: str = Form(""),
     provider_id: int = Form(0), model_id: str = Form(""),
     user: User = Depends(admin_user), db: Session = Depends(get_db),
 ):
@@ -200,6 +200,7 @@ def admin_ai_vector_settings(
             raise HTTPException(400, "Ein Embedding-Modell wird benötigt.")
         _provider(db, provider_id, active=True)
     set_setting(db, "ai_vector_enabled", "1" if enabled == "1" else "0")
+    set_setting(db, "ai_vector_auto_index", "1" if enabled == "1" and auto_index == "1" else "0")
     set_setting(db, "ai_vector_provider_id", str(provider_id) if enabled == "1" else "0")
     set_setting(db, "ai_vector_model_id", model_id[:200] if enabled == "1" else "")
     db.commit()
