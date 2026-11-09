@@ -12,6 +12,7 @@ DEFAULT_CATEGORIES = (
     ("defect", "Mangel melden", "Defekte, Schäden und Störungen", "fa-screwdriver-wrench", "person", False),
     ("complaint", "Vertrauliche Beschwerde", "Vertrauliche Meldung an die zuständige Leitung", "fa-shield-halved", "lead", True),
     ("improvement", "Verbesserungsvorschlag", "Ideen und Verbesserungen des Arbeitsalltags", "fa-lightbulb", "person", False),
+    ("platform_feedback", "TAKT verbessern", "Fehler, Bedienbarkeit, fehlende Funktionen und Verbesserungsvorschläge zur TAKT-Plattform", "fa-wand-magic-sparkles", "person", False),
     ("other", "Sonstiges Anliegen", "Andere interne Anliegen", "fa-inbox", "person", False),
 )
 STATUSES = {"unassigned": "Zuständigkeit offen", "open": "Offen",
@@ -112,7 +113,8 @@ def recipient(db, reporter, cat, org_id):
     if cat.routing == "lead":
         return supervisor(db, reporter, org_id)
     person = db.get(User, cat.assignee_id) if cat.assignee_id else None
-    return person.id if person and person.active and person.id != reporter.id else None
+    # A department owner can legitimately file and process their own request.
+    return person.id if person and person.active else None
 
 
 def record(db, case, actor, kind, note=""):
@@ -143,6 +145,10 @@ def task_for(db, case):
     case.task_id = task.id
     reporter = db.get(User, case.reporter_id)
     tasks.audit(db, task, reporter, "created", "Aus einem internen Anliegen erstellt.")
+    if task.assignee_id != case.reporter_id:
+        tasks.ping(db, task, [task.assignee_id], "Neues internes Anliegen")
+    from . import task_rules
+    task_rules.emit(db, task, "created", f"anliegen-created:{task.id}")
     return task
 
 
@@ -162,3 +168,47 @@ def create(db, user, cat, title, description):
            "Zuständige Person ermittelt." if assignee_id else "Noch keine eindeutige Zuständigkeit.")
     task_for(db, row)
     return row
+
+
+def reroute_unassigned(db, category_row, actor=None):
+    """Re-evaluate only unresolved cases after an administrator saves a rule.
+
+    Historical assignments never change silently. Confidential cases remain
+    private and are not promoted into the general task management module.
+    """
+    cases = list(db.scalars(select(Anliegen).where(
+        Anliegen.category_id == category_row.id,
+        Anliegen.status == "unassigned",
+        Anliegen.assignee_id.is_(None),
+    ).order_by(Anliegen.id).limit(300)))
+    count = 0
+    if not category_row.enabled:
+        return count
+    for case in cases:
+        reporter = db.get(User, case.reporter_id)
+        if not reporter or not reporter.active:
+            continue
+        receiver = recipient(db, reporter, category_row, case.org_id)
+        if not receiver:
+            continue
+        case.assignee_id = receiver
+        case.status = "open"
+        record(db, case, actor, "routing", "Zuständigkeit nach Aktualisierung der Kategorie ermittelt.")
+        task_for(db, case)
+        count += 1
+    return count
+
+
+def routing_preview(db, user, cat):
+    """Resolve routing without side effects; used before submission."""
+    org_id = primary_org(db, user.id)
+    uid = recipient(db, user, cat, org_id)
+    person = db.get(User, uid) if uid is not None else None
+    if person is not None and person.active:
+        return {"ready": True, "recipient": person.name,
+                "message": ("Die Leitung Ihrer Organisation" if cat.routing == "lead"
+                            else "Die festgelegte zuständige Person")}
+    return {"ready": False, "recipient": None,
+            "message": ("Keine eindeutige Leitung für Ihre primäre Organisation gefunden."
+                        if cat.routing == "lead"
+                        else "Noch keine aktive zuständige Person für diese Kategorie hinterlegt.")}
