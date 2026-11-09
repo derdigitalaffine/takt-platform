@@ -206,12 +206,16 @@ async def tick(law_id: int | None = None) -> int:
             (AILawIndexJob.status == "failed") & (
                 AILawIndexJob.next_attempt_at <= now),
             (AILawIndexJob.status == "running") & (
-                AILawIndexJob.lease_until <= now),
+                (AILawIndexJob.lease_until.is_(None)) |
+                (AILawIndexJob.lease_until <= now)),
         )
         queue = select(AILawIndexJob.id).where(due)
         if law_id is not None:
             queue = queue.where(AILawIndexJob.law_id == law_id)
-        chosen = db.scalar(queue.order_by(AILawIndexJob.id).limit(1))
+        # Round-robin across large laws: do not block newer legal sources
+        # until all paragraphs of the oldest law have been embedded.
+        chosen = db.scalar(queue.order_by(
+            AILawIndexJob.next_attempt_at, AILawIndexJob.id).limit(1))
         if chosen is None:
             return 0
         claimed = db.execute(update(AILawIndexJob).where(
