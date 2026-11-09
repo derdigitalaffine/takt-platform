@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}KI-Verwaltung{% endblock %}
+{% block title %}KI-Verwaltung<script src="/static/ai-admin-knowledge.js" defer></script>
+{% endblock %}
 {% block content %}
 {{ m.page_head('KI & Sprachmodelle', 'OpenAI-kompatible Provider serverseitig verwalten. Zugangsdaten werden verschlüsselt gespeichert und nicht an Browser oder Fachmodule weitergereicht.') }}
 
