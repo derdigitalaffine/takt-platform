@@ -121,8 +121,28 @@
     </div>
     <div class="card-footer small text-secondary">Persönliche Unterhaltungen, die länger nicht genutzt wurden, werden durch den TAKT-Hintergrunddienst stündlich nach dieser Frist gelöscht. Backup-Aufbewahrung wird separat geregelt.</div>
   </form>
+  <div class="card mb-3" data-ai-index-overview>
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <strong><i class="fa-solid fa-chart-simple me-1" aria-hidden="true"></i>Aktueller Embedding- und Indexstatus</strong>
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-ai-index-refresh><i class="fa-solid fa-rotate me-1" aria-hidden="true"></i>Status aktualisieren</button>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-sm-4"><div class="small text-secondary">Eigene Wissenseinträge indiziert</div>
+          <div class="h4 mb-0"><span data-ai-index-ready>{{ index_health.ready }}</span> / <span data-ai-index-total>{{ index_health.total }}</span></div>
+          <div class="small text-secondary"><span data-ai-index-missing>{{ index_health.missing }}</span> noch nicht aktuell</div></div>
+        <div class="col-sm-4"><div class="small text-secondary">Index-Warteschlange</div>
+          <div class="fw-semibold"><span data-ai-index-pending>{{ index_health.jobs.pending }}</span> wartend · <span data-ai-index-running>{{ index_health.jobs.running }}</span> laufend</div>
+          <div class="small text-secondary"><span data-ai-index-failed>{{ index_health.jobs.failed }}</span> fehlgeschlagen</div></div>
+        <div class="col-sm-4"><div class="small text-secondary">Embedding-Provider / Qdrant</div>
+          <div class="fw-semibold text-break" data-ai-index-model>{{ index_health.provider if index_health.active else 'Nicht konfiguriert' }}{% if index_health.active %} · {{ index_health.model }}{% endif %}</div>
+          <div class="small text-secondary">Qdrant: <span data-ai-index-qdrant>{{ index_health.qdrant }}</span></div></div>
+      </div>
+      <div class="small mt-3 text-secondary">Die Zahlen betreffen aktuell <strong>eigene, freigegebene Wissenseinträge</strong>. Rechtstexte und DMS-Notizen sind in der Wissensrecherche per <strong>Textsuche</strong> verfügbar, aber besitzen derzeit <strong>keine eigenen Embeddings</strong>. Dieser Status ist kein externer Provider-Verbindungstest.</div>
+    </div>
+  </div>
   <details class="card mb-3">
-    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-magnifying-glass me-2" aria-hidden="true"></i>Semantische Vektorsuche · {{ vector_count }} indizierte Abschnitte</summary>
+    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-magnifying-glass me-2" aria-hidden="true"></i>Embedding-Einstellungen · <span data-ai-index-vectors>{{ vector_count }}</span> Vektorabschnitte</summary>
     <div class="card-body">
       <p class="small text-secondary">Optionaler lokaler Vektorindex für freigegebene Wissenseinträge. Für Embeddings werden ausgewählte Textabschnitte und Suchfragen an den konfigurierten Provider übertragen. Nicht freigegebene Quellen werden nicht indiziert. Ohne Index bleibt die bestehende Volltextsuche verfügbar.</p>
       <form method="post" action="/admin/ai/vector/settings" class="row g-2 align-items-end">
@@ -202,7 +222,7 @@
       <div class="card h-100"><div class="card-header">Vorhandenes Wissen</div><div class="card-body">
         {% for doc in docs %}
         <details class="border-bottom pb-2 mb-2" id="knowledge-{{ doc.id }}">
-          <summary class="fw-semibold">{{ doc.title }} <span class="badge text-bg-{{ 'success' if doc.enabled else 'secondary' }}">{{ 'Freigegeben' if doc.enabled else 'Inaktiv' }}</span></summary>
+          <summary class="fw-semibold">{{ doc.title }} <span class="badge text-bg-{{ 'success' if doc.enabled else 'secondary' }}">{{ 'Freigegeben' if doc.enabled else 'Inaktiv' }}</span> <span class="badge text-bg-{{ index_health.documents[doc.id|string].color }} ms-1" data-ai-index-doc="{{ doc.id }}">{{ index_health.documents[doc.id|string].label }}</span></summary>
           <form method="post" action="/admin/ai/knowledge" class="pt-3">
             <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="doc_id" value="{{ doc.id }}">
             <label class="form-label" for="ai-kt-{{ doc.id }}">Titel</label>
@@ -225,47 +245,122 @@
 </section>
 
 <section id="dms-sources" class="mt-4">
-  <details class="card">
-    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-folder-open me-2" aria-hidden="true"></i>KI-Wissensquellen aus der Ablage (DMS) · {{ allowed_dms|length }} ausdrücklich freigegeben</summary>
+  <details class="card" open>
+    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-folder-open me-2" aria-hidden="true"></i>Ablage (DMS) als KI-Wissen · {% if cfg.ai_dms_include_all == '1' %}Automatik aktiv{% else %}Einzelauswahl{% endif %}</summary>
     <div class="card-body">
-      <p class="small text-secondary">Hier werden nur <strong>manuell angelegte</strong> Einträge ohne Antragsteller-, Personen-, Buchungs- oder Vorgangsverknüpfung angeboten. Ausschließlich Titel und manuelle Notiz kommen als KI-Wissen infrage; Anhänge und Anträge bleiben ausgeschlossen. Die Freigabe berechtigt niemals über die ursprünglichen DMS-Bereichsrechte hinaus.</p>
-      <div class="list-group">
+      <p class="small text-secondary">Es werden nur <strong>geeignete, manuell erstellte</strong> Einträge ohne Personen-, Antragsteller-, Buchungs- oder Vorgangsbezug berücksichtigt – ausschließlich Titel und manuelle Notiz. Anhänge, Anträge und archivierte Einträge sind ausgeschlossen. Bestehende DMS-Bereichsrechte bleiben bei jeder Anfrage maßgeblich.</p>
+      <form method="post" action="/admin/ai/dms/settings" class="rounded border p-3 mb-3">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch" id="ai-dms-all" name="include_all" value="1" {% if cfg.ai_dms_include_all == '1' %}checked{% endif %}>
+          <label class="form-check-label fw-semibold" for="ai-dms-all">Alle geeigneten DMS-Einträge automatisch integrieren</label>
+        </div>
+        <p class="small text-secondary mb-2">{{ dms_eligible_count }} geeignete Einträge sind aktuell vorhanden. Neue passende Notizen werden ebenfalls berücksichtigt. Ausnahmen greifen sofort.</p>
+        <details class="border rounded p-2 mb-3">
+          <summary class="small fw-semibold" style="cursor:pointer">Erweiterte Ausnahmen: Ganze Ablagebereiche ausschließen ({{ dms_excluded_areas|length }})</summary>
+          <div class="small text-secondary mt-2 mb-2">Ein ausgeschlossener Bereich schließt auch seine Unterbereiche aus – unabhängig von der Einzelauswahl. Fachberechtigungen können dadurch niemals erweitert werden.</div>
+          <div class="row g-2" style="max-height:16rem;overflow-y:auto">
+            {% for area in dms_areas %}
+            <div class="col-12 col-md-6"><label class="form-check border rounded p-2 ps-4 m-0 h-100">
+              <input class="form-check-input" type="checkbox" name="exclude_area" value="{{ area.id }}" {% if area.id in dms_excluded_areas %}checked{% endif %}>
+              <span class="form-check-label small">{{ area.code }} {{ area.name }}</span>
+            </label></div>
+            {% else %}<div class="small text-secondary">Noch keine Ablagebereiche vorhanden.</div>{% endfor %}
+          </div>
+        </details>
+        <button type="submit" class="btn btn-primary btn-sm">DMS-Freigaben und Bereichsausnahmen speichern</button>
+      </form>
+      <div class="d-flex justify-content-between gap-2 align-items-center flex-wrap mb-2">
+        <div class="small fw-semibold">{% if cfg.ai_dms_include_all == '1' %}Einzelne Einträge ausnehmen{% else %}Einzelne Einträge freigeben{% endif %}</div>
+        <span class="badge text-bg-secondary">Textsuche · keine Embeddings</span>
+      </div>
+      <form method="get" action="/admin/ai#dms-sources" class="input-group input-group-sm mb-2" role="search">
+        <label class="visually-hidden" for="ai-dms-search">DMS-Einträge durchsuchen</label>
+        <input class="form-control" id="ai-dms-search" type="search" name="dms_q" value="{{ dms_q }}" placeholder="Nach Titel oder Notiz suchen, auch ältere Einträge">
+        <button class="btn btn-outline-primary" type="submit">Suchen</button>
+        {% if dms_q %}<a class="btn btn-outline-secondary" href="/admin/ai#dms-sources">Zurücksetzen</a>{% endif %}
+      </form>
+      <div class="list-group" style="max-height:26rem;overflow-y:auto">
       {% for record in dms_candidates %}
         <div class="list-group-item d-flex align-items-center justify-content-between gap-2 flex-wrap">
-          <span><a href="/dms/r/{{ record.id }}">{{ record.title }}</a>
-            {% if record.id in allowed_dms %}<span class="badge text-bg-success ms-1">Für KI freigegeben</span>{% endif %}</span>
+          <span class="small"><a href="/dms/r/{{ record.id }}">{{ record.title }}</a>
+            {% if record.id in blocked_dms_areas %}<span class="badge text-bg-secondary ms-1">Bereich ausgeschlossen</span>
+            {% elif record.id in effective_dms %}<span class="badge text-bg-success ms-1">Einbezogen</span>
+            {% else %}<span class="badge text-bg-secondary ms-1">Nicht einbezogen</span>{% endif %}</span>
+          {% if record.id in blocked_dms_areas %}
+            <small class="text-secondary">Ausnahme in den Bereichseinstellungen ändern</small>
+          {% else %}
           <form method="post" action="/admin/ai/dms/{{ record.id }}/source" class="m-0">
             <input type="hidden" name="csrf" value="{{ csrf }}">
-            {% if record.id in allowed_dms %}
-              <button type="submit" class="btn btn-sm btn-outline-danger">KI-Freigabe entziehen</button>
+            {% if record.id in effective_dms %}
+              <button type="submit" class="btn btn-sm btn-outline-secondary">{% if cfg.ai_dms_include_all == '1' %}Als Ausnahme ausschließen{% else %}Freigabe entziehen{% endif %}</button>
             {% else %}
-              <button type="submit" name="allowed" value="1" class="btn btn-sm btn-outline-primary">Als KI-Quelle freigeben</button>
+              <button type="submit" name="allowed" value="1" class="btn btn-sm btn-outline-primary">{% if cfg.ai_dms_include_all == '1' %}Ausnahme aufheben{% else %}Einzeln freigeben{% endif %}</button>
             {% endif %}
           </form>
+          {% endif %}
         </div>
       {% else %}
-        <p class="text-secondary small mb-0">Keine geeigneten manuellen Ablageeinträge mit Textnotiz vorhanden.</p>
+        <p class="text-secondary small mb-0 p-2">Keine geeigneten manuellen Ablageeinträge gefunden.</p>
       {% endfor %}
       </div>
+      <p class="form-text">Maximal 120 Treffer werden angezeigt. Die Suche findet auch ältere Einträge; die automatische Sammlung ist nicht auf diese Ansicht beschränkt. Nach dem Umschalten auf „Alle“ bleiben vorhandene Einzelauswahlen erhalten, bis die Automatik wieder deaktiviert wird.</p>
     </div>
   </details>
 </section>
 
 <section id="laws" class="mt-4">
-  {{ m.page_head('Rechtstexte als KI-Wissen', 'Aktuell nur ausdrücklich gewählte veröffentlichte Rechtstexte. Geschützte und unveröffentlichte Entwürfe werden nicht automatisch übernommen.') }}
-  <div class="card"><div class="card-body">
-    <form method="post" action="/admin/ai/laws">
-      <input type="hidden" name="csrf" value="{{ csrf }}">
-      <div class="row g-2" style="max-height:24rem;overflow-y:auto">
-        {% for law in laws %}
-        <div class="col-12 col-lg-6"><label class="form-check border rounded p-2 ps-4 h-100">
-          <input class="form-check-input" type="checkbox" name="law" value="{{ law.id }}" {% if law.id in allowed_laws %}checked{% endif %}>
-          <span class="form-check-label">{{ law.title }}{% if law.internal %} <span class="badge text-bg-secondary">Intern</span>{% endif %}</span>
-        </label></div>
-        {% else %}<p class="text-secondary">Keine veröffentlichten Rechtstexte vorhanden.</p>{% endfor %}
+  <details class="card" open>
+    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-scale-balanced me-2" aria-hidden="true"></i>Rechtstexte als KI-Wissen · {{ law_effective_count }} von {{ laws|length }} veröffentlichten Quellen</summary>
+    <div class="card-body">
+      <p class="small text-secondary">Automatisch berücksichtigt werden ausschließlich <strong>veröffentlichte</strong> Rechtstexte, einschließlich neuer Veröffentlichungen. Interne Texte bleiben zusätzlich auf Personen mit Rechtsmodul-Berechtigung beschränkt; unveröffentlichte Entwürfe gelangen nie in den KI-Kontext.</p>
+      <form method="post" action="/admin/ai/laws/mode" class="border rounded p-3 mb-3">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch" id="ai-laws-all" name="include_all" value="1" {% if cfg.ai_laws_include_all == '1' %}checked{% endif %}>
+          <span class="form-check-label fw-semibold">Alle veröffentlichten Rechtstexte automatisch integrieren</span>
+        </label>
+        <button type="submit" class="btn btn-sm btn-primary">Automatische Auswahl speichern</button>
+      </form>
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div class="small fw-semibold">{% if cfg.ai_laws_include_all == '1' %}Ausnahmen festlegen ({{ law_excluded|length }}){% else %}Einzelauswahl freigeben{% endif %}</div>
+        <span class="badge text-bg-secondary">Paragraphensuche · keine Embeddings</span>
       </div>
-      <button class="btn btn-primary mt-3" type="submit">Freigabeauswahl speichern</button>
-    </form>
-  </div></div>
+      <label class="visually-hidden" for="ai-laws-filter">Rechtstexte filtern</label>
+      <input id="ai-laws-filter" type="search" class="form-control form-control-sm mb-2" placeholder="Rechtstexte nach Titel filtern …" data-ai-filter-laws>
+      {% if cfg.ai_laws_include_all == '1' %}
+      <div class="list-group" style="max-height:27rem;overflow-y:auto">
+        {% for law in laws %}
+        <div class="list-group-item d-flex align-items-center justify-content-between gap-2 flex-wrap" data-ai-law-entry>
+          <span class="small"><a href="/recht/{{ law.slug }}">{{ law.title }}</a>{% if law.internal %} <span class="badge text-bg-secondary">Intern</span>{% endif %}
+          {% if law.id in law_excluded %}<span class="badge text-bg-warning ms-1">Ausgenommen</span>{% else %}<span class="badge text-bg-success ms-1">Automatisch einbezogen</span>{% endif %}</span>
+          <form method="post" action="/admin/ai/laws/{{ law.id }}/source" class="m-0">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            {% if law.id in law_excluded %}
+              <button class="btn btn-sm btn-outline-primary" type="submit" name="allowed" value="1">Ausnahme aufheben</button>
+            {% else %}
+              <button class="btn btn-sm btn-outline-secondary" type="submit">Als Ausnahme ausschließen</button>
+            {% endif %}
+          </form>
+        </div>
+        {% else %}<div class="small text-secondary p-2">Noch keine veröffentlichten Rechtstexte vorhanden.</div>{% endfor %}
+      </div>
+      {% else %}
+      <form method="post" action="/admin/ai/laws">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="row g-2" style="max-height:27rem;overflow-y:auto">
+          {% for law in laws %}
+          <div class="col-12 col-lg-6" data-ai-law-entry><label class="form-check border rounded p-2 ps-4 h-100">
+            <input class="form-check-input" type="checkbox" name="law" value="{{ law.id }}" {% if law.id in allowed_laws %}checked{% endif %}>
+            <span class="form-check-label">{{ law.title }}{% if law.internal %} <span class="badge text-bg-secondary">Intern</span>{% endif %}</span>
+          </label></div>
+          {% else %}<p class="text-secondary">Keine veröffentlichten Rechtstexte vorhanden.</p>{% endfor %}
+        </div>
+        <button class="btn btn-primary mt-3" type="submit">Einzelne Freigaben speichern</button>
+      </form>
+      {% endif %}
+      <p class="form-text mt-2">Ausnahmen gelten auch für die Zitate im Chatverlauf. Neu veröffentlichte Rechtsquellen werden nur bei aktiver Automatik einbezogen. Historische Fassungen werden anhand des angefragten Geltungsdatums ausgewählt.</p>
+    </div>
+  </details>
 </section>
 {% endblock %}
