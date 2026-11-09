@@ -6,6 +6,7 @@ the server and use TLS verification, no redirects and no environment proxies.
 import asyncio
 import ipaddress
 import json
+import math
 import socket
 from urllib.parse import urlsplit
 
@@ -211,3 +212,34 @@ async def stream_completion(provider, messages: list[dict], *, image: bool = Fal
         raise
     except (httpx.TimeoutException, httpx.TransportError) as exc:
         raise AIProviderError("Der KI-Provider ist nicht erreichbar oder antwortet zu langsam.") from exc
+
+
+async def embed(provider, texts: list[str], model_id: str) -> list[list[float]]:
+    """OpenAI-compatible embeddings; reject malformed dimensions and non-finite values.
+
+    Admin-configured provider and model only; no URL from untrusted documents.
+    """
+    if not texts or len(texts) > 16 or any(not isinstance(t, str) or not t or len(t) > 4000 for t in texts):
+        raise AIProviderError("Ungültige Embedding-Eingaben.")
+    if not model_id or len(model_id) > 200:
+        raise AIProviderError("Bitte ein Embedding-Modell konfigurieren.")
+    result = await _request(provider, "embeddings", provider.text_key_enc,
+                            payload={"model": model_id, "input": texts})
+    items = result.get("data")
+    if not isinstance(items, list) or len(items) != len(texts):
+        raise AIProviderError("Der Embedding-Provider lieferte eine unvollständige Antwort.")
+    vectors = [None] * len(texts)
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("index"), int):
+            raise AIProviderError("Ungültiger Embedding-Index.")
+        pos = item["index"]
+        values = item.get("embedding")
+        if pos < 0 or pos >= len(vectors) or vectors[pos] is not None or not isinstance(values, list):
+            raise AIProviderError("Ungültige Embedding-Daten.")
+        if not 2 <= len(values) <= 4096 or not all(
+                isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) for x in values):
+            raise AIProviderError("Embedding-Dimension oder Zahlenwerte ungültig.")
+        vectors[pos] = [float(x) for x in values]
+    if any(v is None for v in vectors) or len({len(v) for v in vectors}) != 1:
+        raise AIProviderError("Die Embedding-Dimensionen stimmen nicht überein.")
+    return vectors
