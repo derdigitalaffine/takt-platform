@@ -139,10 +139,11 @@ async def sync_qdrant_if_needed() -> int:
             return 0
         if ai_qdrant.active(db):
             return 0
-        active_jobs = db.scalar(select(AIIndexJob.id).where(
-            AIIndexJob.status.in_(("pending", "running"))).limit(1))
-        if active_jobs is not None:
-            return 0
+        if active(db):
+            active_jobs = db.scalar(select(AIIndexJob.id).where(
+                AIIndexJob.status.in_(("pending", "running"))).limit(1))
+            if active_jobs is not None:
+                return 0
         try:
             return await ai_qdrant.rebuild(db)
         except ai_qdrant.QdrantError:
