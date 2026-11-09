@@ -74,3 +74,22 @@ class AILawSource(Base):
     law_id: Mapped[int] = mapped_column(
         ForeignKey("law_texts.id", ondelete="CASCADE"), primary_key=True,
     )
+
+
+class AIKnowledgeVector(Base):
+    """Local, optional vector cache for explicitly approved AIKnowledge sources.
+
+    Source ACLs and content fingerprints are checked against live objects
+    before results are returned; cache entries alone grant no access.
+    """
+    __tablename__ = "ai_knowledge_vectors"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    knowledge_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_knowledge.id", ondelete="CASCADE"), index=True)
+    chunk_no: Mapped[int] = mapped_column(Integer)
+    model_id: Mapped[str] = mapped_column(String(200))
+    source_hash: Mapped[str] = mapped_column(String(64))
+    chunk_text: Mapped[str] = mapped_column(Text)
+    vector_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
