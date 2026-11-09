@@ -178,6 +178,7 @@ MODULES = {
     "ai": ("KI-Chat", "module_ai", ("/ki",)),
     "calendars": ("Kalender & Urlaub", "module_calendars", ("/kalender", "/urlaub", "/caldav", "/.well-known/caldav")),
     "tasks": ("Aufgaben & Zusammenarbeit", "module_tasks", ("/aufgaben",)),
+    "concerns": ("Interne Anliegen", "module_concerns", ("/anliegen",)),
     "seminars": ("Seminare & Lehrgänge", "module_seminars", ("/seminare",)),
     "shortlinks": ("Kurzlinks & QR-Codes", "module_shortlinks", ("/shortlinks", "/s/", "/s")),
     "forms": ("Formulare", "module_forms", ("/forms", "/f/")),
@@ -201,7 +202,9 @@ def enabled_modules() -> set[str]:
             cfg = get_settings(db)
         enabled = {key for key, (_, setting, _) in MODULES.items() if cfg.get(setting, "1") == "1"}
         if "forms" not in enabled:
-            enabled.discard("applications")   # Anträge bauen auf dem Formularserver auf
+            enabled.discard("applications")
+        if "tasks" not in enabled:
+            enabled.discard("concerns")  # Anliegen erzeugen native Aufgaben.   # Anträge bauen auf dem Formularserver auf
         _module_cache["enabled"] = enabled
         _module_cache["at"] = time.monotonic()
     return _module_cache["enabled"]
@@ -2953,6 +2956,7 @@ from . import routes_oidc  # noqa: E402,F401
 from . import routes_seminar_planning, routes_seminar_hybrid  # noqa: E402,F401
 
 from . import routes_tasks  # noqa: E402,F401
+from . import routes_concerns  # noqa: E402,F401
 
 from . import routes_seminar_operations  # noqa: E402,F401
 
