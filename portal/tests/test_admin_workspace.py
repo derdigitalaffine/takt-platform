@@ -86,5 +86,5 @@ def test_organization_workflows_have_visible_sections_and_search():
     assert 'id="org-structure"' in page.text
     assert 'aria-label="Organisation verwalten"' in page.text
     assert 'data-org-member-search' in page.text
-    assert 'data-org-member-row' in page.text or "Keine Organisationseinheit freigegeben." in page.text
+    assert 'data-org-member-list' in page.text or "Keine Organisationseinheit freigegeben." in page.text
     assert 'data-org-role-search' in page.text or 'id="org-roles"' in page.text
