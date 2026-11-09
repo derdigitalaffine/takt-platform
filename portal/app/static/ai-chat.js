@@ -20,6 +20,21 @@
   if (!messages || !scroller || !jump || !status || !hint || !submit || !stop || !prompt) return;
 
   var controller = null;
+  var workspace = document.querySelector('[data-ai-workspace]');
+  var conversations = document.querySelector('.ai-chat-conversations');
+  function resizeWorkspace() {
+    if (!workspace) return;
+    var viewHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    var available = Math.floor(viewHeight - workspace.getBoundingClientRect().top - 12);
+    workspace.style.height = Math.max(260, available) + 'px';
+  }
+  if (conversations && window.matchMedia('(max-width: 1199.98px)').matches) {
+    conversations.open = false;
+  }
+  resizeWorkspace();
+  window.addEventListener('resize', resizeWorkspace);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeWorkspace);
+
   var initiallyDisabled = submit.disabled;
 
   function isAtBottom() {
@@ -222,7 +237,8 @@
           } else if (eventData.kind === 'delta') {
             var chunk = String(eventData.value.text || '');
             var follow = isAtBottom();
-            // No innerHTML: streamed model output must remain inert text.
+            // Raw deltas always remain inert. Only Markdown HTML generated
+            // by the server's locked-down renderer may become markup.
             assistantBubble.content.appendChild(document.createTextNode(chunk));
             if (!receivedText) {
               receivedText = true;
@@ -231,6 +247,13 @@
             }
             if (follow) scrollToLatest();
             else updateJump();
+          } else if (eventData.kind === 'render') {
+            if (typeof eventData.value.html === 'string') {
+              var followRender = isAtBottom();
+              assistantBubble.content.classList.add('ai-message-markdown');
+              assistantBubble.content.innerHTML = eventData.value.html;
+              if (followRender) scrollToLatest();
+            }
           } else if (eventData.kind === 'error') {
             serverError = String(eventData.value.message || 'Die Anfrage ist fehlgeschlagen.');
           } else if (eventData.kind === 'done') {
@@ -243,6 +266,10 @@
       if (!finished) throw new Error('Die Verbindung wurde vor Ende der Antwort unterbrochen.');
 
       assistantBubble.item.classList.remove('ai-message--streaming');
+      if (doneData && typeof doneData.html === 'string') {
+        assistantBubble.content.classList.add('ai-message-markdown');
+        assistantBubble.content.innerHTML = doneData.html;
+      }
       progress.remove();
       addAnswerMetadata(assistantBubble.bubble, doneData);
       // The server has persisted the user message and the complete answer.
