@@ -102,3 +102,28 @@ def needs_tools(prompt: str) -> bool:
     ) and not value.endswith("?"):
         return True
     return False
+
+
+def navigation_link(user, prompt: str) -> str:
+    """Offer a link only when the user explicitly requested opening a module.
+
+    The actual page enforces its own roles; this whitelist is also checked
+    against the same feature/permission gate used by the agent's tool registry.
+    """
+    value = (prompt or "").strip().casefold()
+    if not re.search(r"\b(?:öffne|öffnen|zeig|zeige|bringe|bring|"
+                     r"navigiere|gehe|leite)\b", value):
+        return ""
+    from . import agent
+    targets = (
+        ("tasks", r"\baufgab\w*\b", "/aufgaben"),
+        ("anliegen", r"\banliegen\b|\bbestellung\w*\b", "/anliegen"),
+        ("forms", r"\bformular\w*\b", "/forms"),
+        ("calendars", r"\bkalender\b|\btermin\w*\b", "/kalender?ansicht=termine"),
+        ("processes", r"\bprozess\w*\b", "/processes"),
+        ("dms", r"\bdms\b|\bakte\w*\b", "/dms"),
+    )
+    for module, pattern, url in targets:
+        if re.search(pattern, value) and agent.allowed(user, module):
+            return url
+    return ""
