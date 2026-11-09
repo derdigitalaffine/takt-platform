@@ -62,7 +62,10 @@ _NAV_MODULES = (
 def classify(prompt: str, *, has_work_context: bool = False) -> str:
     """'chat', 'navigate' or 'operate'; false positives must stay in chat."""
     value = (prompt or "").strip()
-    if _FOLLOWUP.fullmatch(value):
+    if _FOLLOWUP.fullmatch(value) or re.fullmatch(
+        r"(?:ja|ja\s+bitte|genau|passt|einverstanden|okay|ok|mach\s+(?:das|es)|bitte\s+so)",
+        value, re.I
+    ):
         return "operate" if has_work_context else "chat"
     if _NAV.search(value) and _DOMAIN.search(value):
         return "navigate"
