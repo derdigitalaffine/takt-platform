@@ -162,7 +162,11 @@ def test_confidential_complaint_goes_only_to_explicit_org_lead_without_native_ta
     manager_id = _user("anliegen-global-manager@example.org", "anliegen_submit,anliegen_manage,tasks_manage")
     manager = login("anliegen-global-manager@example.org", "test-anliegen-pass")
     assert manager.get(f"/anliegen/{cid}").status_code == 404
-    assert "Vertrauliche Beschwerde" not in manager.get("/anliegen").text
+    # The complaint category remains selectable for everyone; only this specific
+    # confidential case and its narrative must be invisible to the global manager.
+    overview = manager.get("/anliegen").text
+    assert f"/anliegen/{cid}" not in overview
+    assert "Ich benötige ein vertrauliches Gespräch." not in overview
     # Administrators must not gain automatic read access to complaint narratives.
     admin = login(*ADMIN)
     assert admin.get(f"/anliegen/{cid}").status_code == 404
