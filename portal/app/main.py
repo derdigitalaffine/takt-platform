@@ -2188,7 +2188,9 @@ def admin_group_editor(request: Request, gid: int, user: User = Depends(users_ma
     members = db.scalars(select(User).order_by(User.name, User.id)).all()
     if group:
         db.refresh(group, ["members"])
+    selected_member_ids = {u.id for u in group.members} if group else set()
     return render(request, "_admin_group_editor.html", user, group=group,
+                  selected_member_ids=selected_member_ids,
                   members=members, action="/admin/groups/" + str(gid) if gid else "/admin/groups",
                   org_group_roles=set(db.scalars(select(organization.OrgRoleGrant.group_id)
                     .where(organization.OrgRoleGrant.group_id.is_not(None)))))
@@ -2311,10 +2313,10 @@ async def admin_users_update(request: Request, uid: int, action: str = Form(...)
     if not _can_manage(user, target):
         flash(request, "Konten von Administrator:innen und Konten mit Rechten, die Sie selbst nicht haben, kann "
                        "nur ein Admin ändern.", "error")
-        return redirect("/admin/users")
+        return redirect("/admin/users" + ("?" + request.url.query if request.url.query else ""))
     if target.id == user.id and action in ("toggle_admin", "toggle_active", "delete"):
         flash(request, "Das eigene Konto lässt sich hier nicht ändern.", "error")
-        return redirect("/admin/users")
+        return redirect("/admin/users" + ("?" + request.url.query if request.url.query else ""))
     if action == "toggle_admin":
         if not user.is_admin:
             raise HTTPException(403)
@@ -2342,7 +2344,7 @@ async def admin_users_update(request: Request, uid: int, action: str = Form(...)
         db.commit()
         worker.wake()
         flash_link_result(request, target, link, queued)
-        return redirect("/admin/users")
+        return redirect("/admin/users" + ("?" + request.url.query if request.url.query else ""))
     elif action == "delete":
         for meeting in target.meetings:
             for rec in meeting.recordings:
@@ -2353,7 +2355,7 @@ async def admin_users_update(request: Request, uid: int, action: str = Form(...)
         flash(request, f"{target.email} gelöscht.")
     db.commit()
     access.sync(db)
-    return redirect("/admin/users")
+    return redirect("/admin/users" + ("?" + request.url.query if request.url.query else ""))
 
 
 def _release_owned(db: Session, target: User) -> None:
