@@ -22,6 +22,33 @@ def active(db) -> bool:
             and ai_vector._settings(db) is not None)
 
 
+def enqueue_document(db, doc: AIKnowledge) -> bool:
+    """Mark any administratively changed opt-in document for indexing.
+
+    Runs inside the caller's transaction so creating/editing a document and
+    scheduling its index update commit together. Source content stays in
+    AIKnowledge, never in job metadata.
+    """
+    if not active(db) or not doc.enabled or not (doc.body_md or "").strip():
+        return False
+    _provider, model_id = ai_vector._settings(db)
+    db.flush()
+    fingerprint = ai_vector.source_hash(doc.body_md or "")
+    job = db.scalar(select(AIIndexJob).where(AIIndexJob.knowledge_id == doc.id))
+    if job is None:
+        db.add(AIIndexJob(knowledge_id=doc.id, model_id=model_id,
+                          desired_hash=fingerprint, status="pending",
+                          attempts=0, next_attempt_at=utcnow(), updated_at=utcnow()))
+    else:
+        job.model_id, job.desired_hash = model_id, fingerprint
+        job.status = "pending"
+        job.attempts = 0
+        job.next_attempt_at = utcnow()
+        job.lease_until = None
+        job.updated_at = utcnow()
+    return True
+
+
 def reconcile(db) -> dict[str, int]:
     """Diff curated source state against the live index; enqueue only mismatches."""
     if not active(db):
