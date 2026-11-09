@@ -134,6 +134,10 @@ def test_complaint_routes_to_direct_org_lead_with_neutral_task():
         item = db.get(Concern, item_id)
         task = db.get(Task, item.task_id)
         assert item.confidential and item.assignee_id == leader_id
+        from app.security import decrypt
+        assert "personelle Abläufe" not in item.title + item.description
+        assert item.title_enc and item.description_enc
+        assert "personelle Abläufe" in decrypt(item.description_enc)
         assert task.creator_id == leader_id
         assert "personelle Abläufe" not in task.title + task.description
         assert "concerns-complaint-reporter@example.org" not in task.title + task.description
