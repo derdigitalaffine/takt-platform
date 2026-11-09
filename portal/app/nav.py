@@ -346,7 +346,7 @@ def build(c: Ctx) -> dict:
     for it in items:
         if it.group == "admin":
             entries[it.id]["active"] = False
-    return {"groups": groups, "breadcrumb": breadcrumb, "admin_active": admin_active, "admin_available": any(it.group == "admin" for it in items), "favorites": favorites, "hidden": hidden, "closed": p["closed"], "context": [dict(it, active=it["id"] == active_id) for it in context]}
+    return {"ai_chat_available": "ai" in entries, "groups": groups, "breadcrumb": breadcrumb, "admin_active": admin_active, "admin_available": any(it.group == "admin" for it in items), "favorites": favorites, "hidden": hidden, "closed": p["closed"], "context": [dict(it, active=it["id"] == active_id) for it in context]}
 
 
 def options(c: Ctx) -> list[dict]:
