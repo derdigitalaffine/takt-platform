@@ -20,6 +20,8 @@
   if (!messages || !scroller || !jump || !status || !hint || !submit || !stop || !prompt) return;
 
   var controller = null;
+  var temporary = form.dataset.aiTemporary === '1';
+  var transientHistory = []; // Never written to localStorage or to the TAKT database.
   var startedAt = 0;
   var ticker = null;
   var baseStatus = '';
@@ -214,6 +216,7 @@
 
     // FormData must be captured before clearing anything (including an image).
     var body = new FormData(form);
+    if (temporary) body.set('history', JSON.stringify(transientHistory));
     var hasImage = !!(imageInput && imageInput.files && imageInput.files.length);
     var empty = messages.querySelector('[data-ai-empty]');
     if (empty) empty.remove();
@@ -243,6 +246,7 @@
     var doneData = null;
     var serverError = '';
     var receivedText = false;
+    var rawTemporaryAnswer = '';
 
     try {
       var response = await fetch(form.dataset.streamAction, {
@@ -287,6 +291,7 @@
             status.textContent = 'KI verarbeitet die Anfrage …';
           } else if (eventData.kind === 'delta') {
             var chunk = String(eventData.value.text || '');
+            if (temporary) rawTemporaryAnswer += chunk;
             var follow = isAtBottom();
             // Raw deltas always remain inert. Only Markdown HTML generated
             // by the server's locked-down renderer may become markup.
@@ -331,9 +336,30 @@
         addForkAction(userBubble.bubble, doneData.user_message_id);
         addForkAction(assistantBubble.bubble, doneData.assistant_message_id);
       }
-      // The server has persisted the user message and the complete answer.
-      status.textContent = 'Antwort gespeichert.';
-      hint.textContent = '';
+      if (temporary) {
+        // Persist neither the user prompt nor the model answer. Only the
+        // current tab's JS memory supplies context on subsequent requests.
+        if (rawTemporaryAnswer && rawTemporaryAnswer.length <= 8000) {
+          transientHistory.push(
+            {role: 'user', content: question},
+            {role: 'assistant', content: rawTemporaryAnswer}
+          );
+          // Bound the context explicitly; omit oldest complete question/answer
+          // pairs instead of fabricating a model summary.
+          while (transientHistory.length > 12 ||
+                 transientHistory.reduce(function (n, row) { return n + row.content.length; }, 0) > 16000) {
+            transientHistory.splice(0, 2);
+          }
+          hint.textContent = '';
+        } else {
+          transientHistory.length = 0;
+          hint.textContent = 'Die letzte Antwort ist für die temporäre Kontextübernahme zu lang. Frühere Nachrichten werden nicht erneut gesendet.';
+        }
+        status.textContent = 'Nur im Browser-Tab – nicht gespeichert.';
+      } else {
+        status.textContent = 'Antwort gespeichert.';
+        hint.textContent = '';
+      }
       updateJump();
       prompt.focus({preventScroll: true});
     } catch (error) {
