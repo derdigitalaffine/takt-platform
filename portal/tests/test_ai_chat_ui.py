@@ -40,6 +40,9 @@ def test_chat_page_contains_inline_streaming_controls():
     assert 'data-ai-stop' in html
     assert 'data-ai-jump' in html
     assert 'data-ai-has-messages="0"' in html
+    assert 'data-ai-workspace' in html
+    assert 'ai-chat-options' in html
+    assert 'aria-label="Nachricht senden"' in html
     assert '/static/ai-chat.css' in html
     assert '/static/ai-chat.js' in html
     assert 'data-ai-live' not in html
@@ -52,9 +55,17 @@ def test_chat_client_keeps_safe_incremental_output_without_reload():
     assert "new FormData(form)" in js
     assert "new URL(source.url, window.location.origin)" in js
     assert "window.location.assign(" not in js
-    assert ".innerHTML" not in js
+    assert "eventData.kind === 'render'" in js
+    assert "assistantBubble.content.innerHTML = eventData.value.html" in js
+    assert "assistantBubble.content.innerHTML = doneData.html" in js
+    assert "window.addEventListener('resize', resizeWorkspace)" in js
+    assert "data-ai-workspace" in js
+    assert "Only Markdown HTML generated" in js
     assert "ai-message--streaming" in js
     assert "data-ai-current-link" in js
     assert ".ai-chat-history" in css
     assert ".ai-chat-composer" in css
+    assert "body:has([data-ai-workspace]) { overflow: hidden; }" in css
+    assert "height: auto; min-height: 0;" in css
+    assert ".ai-message-markdown" in css
     assert "@media (max-width: 767.98px)" in css
