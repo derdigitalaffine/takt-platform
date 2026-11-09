@@ -21,6 +21,8 @@ def _categories(db: Session):
 
 
 def _check_task_module():
+    if "concerns" not in enabled_modules():
+        raise HTTPException(404, "Das Modul für interne Anliegen ist nicht eingeschaltet.")
     if "tasks" not in enabled_modules():
         raise HTTPException(503, "Die Aufgabenverwaltung muss für interne Anliegen aktiviert sein.")
 
