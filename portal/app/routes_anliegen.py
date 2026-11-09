@@ -30,14 +30,45 @@ def _read(user):
 
 
 @app.get("/anliegen")
-def list_anliegen(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_anliegen(request: Request, scope: str = "assigned", category_id: int = 0,
+                 status: str = "all", q: str = "",
+                 user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _read(user)
-    cases = list(db.scalars(service.visible_query(user).order_by(Anliegen.updated_at.desc()).limit(250)))
+    from sqlalchemy import func
+    scope = scope if scope in {"assigned", "reported", "all", "orders"} else "assigned"
+    if status != "all" and status not in service.STATUSES:
+        status = "all"
+    q = q.strip()[:100]
+    visible = service.visible_query(user)
+    assigned_count = db.scalar(select(func.count()).select_from(
+        service.visible_query(user).where(Anliegen.assignee_id == user.id).subquery())) or 0
+    reported_count = db.scalar(select(func.count()).select_from(
+        service.visible_query(user).where(Anliegen.reporter_id == user.id).subquery())) or 0
+    if scope == "assigned":
+        visible = visible.where(Anliegen.assignee_id == user.id)
+    elif scope == "reported":
+        visible = visible.where(Anliegen.reporter_id == user.id)
+    elif scope == "orders":
+        procurement_ids = select(AnliegenCategory.id).where(AnliegenCategory.procurement.is_(True))
+        visible = visible.where(Anliegen.category_id.in_(procurement_ids),
+                                Anliegen.assignee_id == user.id)
+    if category_id:
+        visible = visible.where(Anliegen.category_id == category_id)
+    if status != "all":
+        visible = visible.where(Anliegen.status == status)
+    if q:
+        safe = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        visible = visible.where(Anliegen.title.ilike("%" + safe + "%", escape="\\"))
+    cases = list(db.scalars(visible.order_by(Anliegen.updated_at.desc()).limit(250)))
+    categories = list(db.scalars(select(AnliegenCategory).order_by(
+        AnliegenCategory.position, AnliegenCategory.title)))
     return render(request, "anliegen_list.html", user,
-                  cases=cases, statuses=service.STATUSES,
-                  manage=user.can("anliegen_manage"))
-
+                  cases=cases, statuses=service.STATUSES, categories=categories,
+                  scope=scope, selected_category=category_id, selected_status=status,
+                  query=q, assigned_count=assigned_count, reported_count=reported_count,
+                  manage=user.can("anliegen_manage"),
+                  may_submit=user.can("anliegen_submit"))
 
 @app.get("/anliegen/neu")
 def new_anliegen(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
@@ -82,34 +113,26 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
         not case.confidential and user.can("anliegen_manage")) else []
     return render(request, "anliegen_detail.html", user, case=case, events=events,
                   statuses=service.STATUSES,
-                  choices=service.NEXT.get(case.status, set()),
+                  choices=service.choices(case),
                   can_handle=service.can_handle(user, case), people=people,
                   tasks_enabled=("tasks" in enabled_modules()))
 
 
 @app.post("/anliegen/{case_id:int}/status", dependencies=[Depends(check_csrf)])
 def update_anliegen(request: Request, case_id: int, status: str = Form(...),
+                   supplier_name: str = Form(""), order_reference: str = Form(""),
+                   return_to: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _read(user)
     case = service.get(db, user, case_id)
     if not service.can_handle(user, case):
         raise HTTPException(403)
-    if status not in service.NEXT.get(case.status, set()) or (
-        status != "closed" and not case.assignee_id):
-        raise HTTPException(422, "Dieser Statuswechsel ist nicht zulässig.")
-    case.status = status
-    service.record(db, case, user, "status", f"Status: {service.STATUSES[status]}")
-    if case.task_id:
-        from . import tasks
-        from .task_models import Task
-        task = db.get(Task, case.task_id)
-        if task:
-            task.status = "done" if status in ("done", "closed") else status
-            tasks.audit(db, task, user, "status", "Status aus internen Anliegen aktualisiert.")
+    service.set_status(db, case, user, status, supplier=supplier_name,
+                       reference=order_reference)
     db.commit()
-    flash(request, "Bearbeitungsstatus aktualisiert.")
-    return redirect(f"/anliegen/{case.id}")
+    flash(request, "Status auf „" + service.STATUSES[status] + "“ geändert.")
+    return redirect("/anliegen?scope=assigned" if return_to == "list" else f"/anliegen/{case.id}")
 
 
 @app.post("/anliegen/{case_id:int}/assign", dependencies=[Depends(check_csrf)])
