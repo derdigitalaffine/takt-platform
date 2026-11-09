@@ -81,3 +81,19 @@ def test_admin_approval_and_prohibition_for_citizen_application():
     assert revoked.status_code == 303
     with SessionLocal() as db:
         assert db.get(AIDmsSource, doc_id) is None
+
+
+def test_cited_dms_note_expires_when_approved_content_changes():
+    doc_id, _citizen_id, reader_id, _hidden_id, _other = _setup('revision')
+    with SessionLocal() as db:
+        db.add(AIDmsSource(record_id=doc_id))
+        db.commit()
+        reader = db.get(User, reader_id)
+        result = ai_dms.retrieve(db, reader, "Feuerschutz")
+        assert result and result[0].get("revision")
+        source = {"url": result[0]["url"], "title": result[0]["title"],
+                  "kind": "dms", "revision": result[0]["revision"]}
+        assert ai_knowledge.sources_accessible(db, reader, [source])
+        db.get(DmsRecord, doc_id).note = "Die Feuerschutz-Auflage hat sich geändert."
+        db.commit()
+        assert not ai_knowledge.sources_accessible(db, reader, [source])
