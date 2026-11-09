@@ -23,7 +23,7 @@ _DOMAIN = re.compile(
     re.I,
 )
 _ACTION = re.compile(
-    r"\b(?:erstell\w*|anleg\w*|lege\s+\w+\s+an|"
+    r"\b(?:erstell\w*|anleg\w*|lege\b|leg\b|"
     r"trag\w*\s+ein|eintragen|änder\w*|bearbeit\w*|"
     r"setz\w*|weise\w*|zuweis\w*|verschieb\w*|"
     r"kopier\w*|lösch\w*|meld\w*|erfass\w*|"
@@ -39,7 +39,7 @@ _READ = re.compile(
     re.I,
 )
 _NAV = re.compile(
-    r"^\s*(?:(?:bitte\s+)?(?:öffne|zeig\s+mir|bringe?\s+mich\s+zu|"
+    r"^\s*(?:(?:bitte\s+)?(?:öffne|bringe?\s+mich\s+zu|"
     r"navigiere\s+zu|geh(?:e)?\s+zu|wechsle\s+(?:zu|in))\s+)",
     re.I,
 )
