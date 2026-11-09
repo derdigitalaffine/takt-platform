@@ -105,6 +105,7 @@ PERMISSIONS = {
     "calendar_publish": ("Kalender veröffentlichen", "fa-globe", "Eigene Kalender intern oder öffentlich veröffentlichen"),
     "tasks": ("Aufgaben erstellen", "fa-list-check", "Eigene Aufgaben erfassen, zuweisen und bearbeiten"),
     "tasks_manage": ("Aufgaben verwalten", "fa-user-gear", "Alle nativen Aufgaben sehen und verwalten"),
+    "concerns_manage": ("Interne Anliegen verwalten", "fa-inbox", "Anliegenkategorien, Zuständigkeiten und nicht vertrauliche Anliegen verwalten"),
     "seminars": ("Seminare planen", "fa-chalkboard-user", "Seminare und Lehrgänge mit Terminen, Einladungen und Unterlagen planen"),
     "seminars_manage": ("Seminare verwalten", "fa-user-gear", "Alle Seminare und Teilnahmen verwalten"),
     "circulations_create": ("Umläufe erstellen", "fa-folder-open", "Aushänge und Sammelmappen als Entwurf erstellen"),
@@ -2766,6 +2767,7 @@ def seed_orgs(db) -> None:
 
 DEFAULT_SETTINGS = {
     "module_ai": "0",  # Optional; disabled until explicitly activated.
+    "module_concerns": "0",  # Interne Anliegen, only with native tasks.
     "ai_knowledge_enabled": "0",
     "ai_retention_days": "90",
     "module_tasks": "0",
@@ -3079,12 +3081,15 @@ def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
+    from . import concern_models  # noqa: F401 – register additive internal concern tables
     Base.metadata.create_all(engine)
     _migrate()
     with SessionLocal() as db:
         for key, value in DEFAULT_SETTINGS.items():
             if db.get(Setting, key) is None:
                 db.add(Setting(key=key, value=value))
+        from .concern_models import seed_categories
+        seed_categories(db)
         seed_law_levels(db)
         seed_orgs(db)
         from .organization import seed as seed_organization
