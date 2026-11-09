@@ -85,9 +85,15 @@ def create(db, reporter: User, category: ConcernCategory, title: str, descriptio
         raise HTTPException(422, "Bitte einen Titel mit 5–240 und eine Beschreibung mit 10–12.000 Zeichen eingeben.")
     assignee = destination(db, reporter, category)
     confidential = bool(category.confidential or category.kind == "complaint")
+    from .security import encrypt
     concern = Concern(
         category_id=category.id, reporter_id=reporter.id, assignee_id=assignee.id,
-        org_id=primary_org(db, reporter), title=title, description=description,
+        org_id=primary_org(db, reporter),
+        # Store only a neutral label/blank narrative in plaintext for complaints.
+        title="Vertrauliches Anliegen" if confidential else title,
+        description="" if confidential else description,
+        title_enc=encrypt(title) if confidential else None,
+        description_enc=encrypt(description) if confidential else None,
         confidential=confidential,
     )
     db.add(concern)
