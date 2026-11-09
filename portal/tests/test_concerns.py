@@ -142,6 +142,16 @@ def test_complaint_routes_to_direct_org_lead_with_neutral_task():
     assert unrelated.get(f"/anliegen/{item_id}").status_code == 404
     leader = login("concerns-complaint-lead@example.org", "intern-passwort-123")
     assert "personelle Abläufe" in leader.get(f"/anliegen/{item_id}").text
+    # Reassigning the native task revokes the previous recipient's access.
+    successor_id = _staff("concerns-complaint-successor@example.org")
+    with SessionLocal() as db:
+        task = db.get(Task, db.get(Concern, item_id).task_id)
+        task.assignee_id = successor_id
+        db.commit()
+    assert leader.get(f"/anliegen/{item_id}").status_code == 404
+    assert "/anliegen/" not in leader.get("/anliegen").text or "Vorgesetztenbeschwerde Test" not in leader.get("/anliegen").text
+    successor = login("concerns-complaint-successor@example.org", "intern-passwort-123")
+    assert "personelle Abläufe" in successor.get(f"/anliegen/{item_id}").text
 
 
 def test_complaint_without_defined_supervisor_remains_unsubmitted():
