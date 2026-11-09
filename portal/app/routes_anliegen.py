@@ -35,7 +35,6 @@ def list_anliegen(request: Request, view: str = "mine", category_id: int = 0,
                  status: str = "", q: str = "",
                  user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
     if view not in ("mine", "assigned", "reported", "unassigned", "all", "orders"):
         raise HTTPException(422, "Unbekannte Ansicht.")
     if status and status not in service.STATUSES:
@@ -119,7 +118,6 @@ def create_anliegen(request: Request, category_id: int = Form(...),
 def detail_anliegen(request: Request, case_id: int, user: User = Depends(current_user),
                    db: Session = Depends(get_db)):
     _module()
-    _read(user)
     case = service.get(db, user, case_id)
     events = list(db.scalars(select(AnliegenEvent).where(AnliegenEvent.anliegen_id == case.id)
                              .order_by(AnliegenEvent.id)))
@@ -139,7 +137,6 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
                    expected_delivery: str = Form(""), back: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
     case = service.get(db, user, case_id)
     if not service.can_handle(user, case):
         raise HTTPException(403)
@@ -163,7 +160,6 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
 def assign_anliegen(request: Request, case_id: int, assignee_id: int = Form(...),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
-    _read(user)
     case = service.get(db, user, case_id)
     if case.confidential or not user.can("anliegen_manage"):
         raise HTTPException(403, "Vertrauliche Beschwerden dürfen nicht allgemein zugewiesen werden.")
