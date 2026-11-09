@@ -1,18 +1,24 @@
 /* Modern TAKT workspace shell — scoped to the authenticated navigation.
    Keeps all server-driven permissions, routes, favorites and collapse state intact. */
 .app-navbar {
-  min-height: 4rem;
+  min-height: 3.125rem;
+  padding-block: .25rem;
   border-bottom: 1px solid color-mix(in srgb, var(--app-nav-fg) 15%, transparent);
   box-shadow: 0 1px 12px rgba(0,0,0,.045);
   backdrop-filter: blur(14px);
 }
-.app-navbar > .container-fluid { padding-inline: clamp(.8rem,1.8vw,1.7rem); }
-.app-navbar .navbar-brand { gap: .8rem; font-weight: 750; letter-spacing: -.025em; }
+.app-navbar > .container-fluid { padding-inline: clamp(.7rem,1.6vw,1.4rem); }
+.app-navbar .brand-logo { max-height: 2.25rem; width: auto; object-fit: contain; }
+.app-navbar .navbar-brand { font-size: .94rem; line-height: 1.05; }
+.app-navbar .navbar-brand small { font-size: .67rem; line-height: 1.15; }
+.app-navbar .dropdown > .btn-link { padding-inline: .45rem; }
+.app-navbar .dropdown > .btn-link > span:last-child { max-width: min(18rem, 30vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .84rem; }
+.app-navbar .navbar-brand { gap: .55rem; font-weight: 750; letter-spacing: -.025em; }
 .app-navbar .navbar-brand small { letter-spacing: .01em; opacity: .8; }
 .app-navbar .brand-dot { width: .76rem; height: .76rem; box-shadow: 0 0 0 5px color-mix(in srgb, #ff5a4d 18%,transparent); }
-.app-navbar .btn-link { border-radius: .7rem; min-height: 2.7rem; min-width: 2.7rem; justify-content: center; }
+.app-navbar .btn-link { border-radius: .62rem; min-height: 2.35rem; min-width: 2.35rem; justify-content: center; padding-block: .33rem; }
 .app-navbar .btn-link:hover { background: color-mix(in srgb,var(--app-nav-fg) 10%,transparent); }
-.app-navbar .avatar { width: 2rem; height: 2rem; font-weight: 750; }
+.app-navbar .avatar { width: 1.75rem; height: 1.75rem; font-size: .72rem; font-weight: 750; }
 .app-navbar .dropdown-menu { padding: .4rem; border-radius: .85rem; box-shadow: 0 1rem 2.5rem rgba(0,0,0,.12); }
 .app-navbar .dropdown-menu .dropdown-item { border-radius: .5rem; padding: .65rem .8rem; }
 
@@ -118,8 +124,8 @@
 @media (min-width: 992px) {
   .app-aside { flex: 0 0 17rem; width: 17rem; max-width: 17rem; }
   .app-sidebar {
-    top: 4.65rem;
-    height: calc(100dvh - 5.45rem);
+    top: 3.75rem;
+    height: calc(100dvh - 4.55rem);
     margin: .7rem .3rem .7rem .7rem;
     overflow: hidden;
     border: 1px solid var(--bs-border-color);
