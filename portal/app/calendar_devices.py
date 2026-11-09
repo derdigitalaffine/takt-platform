@@ -10,6 +10,7 @@ from . import calendars
 
 
 def create(db, user, name, choices):
+    from . import birthdays
     if not user or not user.active:
         raise HTTPException(403)
     if (
@@ -36,6 +37,7 @@ def create(db, user, name, choices):
         cal = db.get(Calendar, cid)
         if (
             not cal
+            or (cal.source == "birthdays" and not birthdays.external_allowed(db, user, "caldav"))
             or not calendars.access(db, user, cal)
             or write
             and not calendars.access(db, user, cal, True)
@@ -91,9 +93,11 @@ def authenticate(db, username, password):
 def allowed(db, device, user, cid, write=False):
     scope = db.get(CalendarDeviceScope, (device.id, cid))
     cal = db.get(Calendar, cid)
+    from . import birthdays
     return (
         cal
         if scope
+        and (cal.source != "birthdays" or birthdays.external_allowed(db, user, "caldav"))
         and cal
         and (not write or scope.can_write)
         and calendars.access(db, user, cal, write)
