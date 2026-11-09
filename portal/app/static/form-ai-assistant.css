@@ -1,0 +1,16 @@
+/* Orientiert sich am bestehenden TAKT-/Bootstrap-Designsystem. */
+.form-ai-panel > summary { cursor: pointer; list-style: none; }
+.form-ai-panel > summary::-webkit-details-marker { display: none; }
+.form-ai-panel > summary::after { content: "▾"; margin-left: .5rem; color: var(--bs-secondary-color); }
+.form-ai-panel[open] > summary::after { content: "▴"; }
+.form-ai-panel > summary:focus-visible { outline: 2px solid var(--bs-primary); outline-offset: -2px; }
+.form-ai-preview { padding: 1rem; border: 1px solid var(--bs-border-color); border-radius: var(--bs-border-radius); background: var(--bs-tertiary-bg); }
+.form-ai-item-list { margin: .75rem 0 1rem; padding-left: 1.75rem; max-height: 21rem; overflow-y: auto; }
+.form-ai-item-list li { padding: .45rem .3rem; border-bottom: 1px solid var(--bs-border-color); overflow-wrap: anywhere; }
+.form-ai-item-list li:last-child { border-bottom: 0; }
+.form-ai-examples button { white-space: normal; text-align: left; }
+.form-ai-panel [hidden] { display: none !important; }
+@media (max-width: 575.98px) {
+  .form-ai-panel > summary .ms-auto { display: none; }
+  .form-ai-preview { padding: .75rem; }
+}

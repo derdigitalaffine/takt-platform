@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}{{ form.title }} · Formulare{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/form-ai-assistant.css">{% endblock %}
 {% block content %}
 {% include "_form_head.html" %}
 
@@ -37,6 +38,76 @@
         <input class="form-control form-control-lg fw-semibold mb-2 border-0 border-bottom rounded-0 px-0" name="title" value="{{ form.title }}" maxlength="255" required aria-label="Titel des Formulars" placeholder="Titel des Formulars">
         <textarea class="form-control border-0 px-0" name="description" rows="2" maxlength="5000" placeholder="Beschreibung (optional). Links werden anklickbar, **fett** wird fett, [[HStS § 4]] verlinkt einen Paragrafen." aria-label="Beschreibung">{{ form.description }}</textarea>
       </div></div>
+      {% if ai_allowed %}
+      <details class="card mb-3 form-ai-panel" id="form-ai-panel" data-endpoint="/forms/{{ form.id }}/ai-draft">
+        <summary class="card-header d-flex gap-2 align-items-center">
+          <i class="fa-solid fa-wand-magic-sparkles text-primary" aria-hidden="true"></i>
+          <span class="fw-semibold">KI-Formularassistent</span>
+          <span class="small text-secondary ms-auto">Aus einer Beschreibung zum bearbeitbaren Entwurf</span>
+        </summary>
+        <div class="card-body">
+          {% if ai_providers %}
+          <p class="small text-secondary mb-3">Beschreiben Sie Ihr Formular in eigenen Worten. Der Assistent berücksichtigt die bestehenden TAKT-Feldtypen, Bedingungen und Datenblöcke. Der Vorschlag erscheint zuerst zur Prüfung und wird <strong>nicht automatisch gespeichert</strong>.</p>
+          <label class="form-label" for="form-ai-prompt">Was soll Ihr Formular können?</label>
+          <textarea id="form-ai-prompt" class="form-control" rows="4" maxlength="6000"
+                    placeholder="Beispiel: Erstelle einen Antrag mit persönlichen Angaben, einer Adresse, Standort auf der Karte, Foto-Upload und einer bedingten Begründung."></textarea>
+          <div class="d-flex flex-wrap gap-2 mt-2 mb-3 form-ai-examples">
+            <span class="small text-secondary align-self-center">Beispiele:</span>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-form-ai-example="Ein Antrag auf Sondernutzung mit Kontaktdaten, vollständiger Adresse, Zeitraum, Karte für den Standort, Dateianhängen und verbindlicher Bestätigung.">Antrag</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-form-ai-example="Eine interne Schadensmeldung mit Kategorie-Auswahl, bedingten Rückfragen, GPS-Standort auf der Karte und mehreren Fotos.">Schadensmeldung</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-form-ai-example="Eine Reisekostenabrechnung mit Zeitraum, Fahrtstrecke, wiederholbaren Kostenpositionen, berechneter Summe und Bestätigung.">Reisekosten</button>
+          </div>
+          <div class="row g-3 align-items-end">
+            <div class="col-sm-5">
+              <label for="form-ai-mode" class="form-label small">Entwurf übernehmen als</label>
+              <select id="form-ai-mode" class="form-select">
+                <option value="append">Bestehendes Formular ergänzen</option>
+                <option value="replace">Komplett neu entwerfen</option>
+              </select>
+            </div>
+            <div class="col-sm-5">
+              <label for="form-ai-provider" class="form-label small">KI-Modell</label>
+              <select id="form-ai-provider" class="form-select">
+                {% for p in ai_providers %}<option value="{{ p.id }}">{{ p.name }} · {{ p.model_id }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-sm-2 d-grid">
+              <button id="form-ai-generate" type="button" class="btn btn-primary"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Erstellen</button>
+            </div>
+          </div>
+          {% if ai_knowledge_allowed %}
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" id="form-ai-knowledge">
+            <label class="form-check-label small" for="form-ai-knowledge">Freigegebene TAKT-Wissensquellen für den Entwurf hinzuziehen</label>
+          </div>
+          {% endif %}
+          <div class="small text-secondary mt-2">Die Beschreibung und der aktuelle Formularaufbau werden an den ausgewählten KI-Provider übertragen. Keine Einsendungen oder personenbezogenen Antworten. KI-Vorschläge können Fehler enthalten.</div>
+          <div class="mt-3 d-flex align-items-center gap-2" id="form-ai-progress" hidden>
+            <span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>
+            <span class="small" role="status">KI erstellt einen Formularvorschlag …</span>
+            <button class="btn btn-sm btn-link ms-auto" type="button" id="form-ai-cancel">Abbrechen</button>
+          </div>
+          <div id="form-ai-error" class="alert alert-danger mt-3 mb-0" role="alert" hidden></div>
+          <section id="form-ai-preview" class="form-ai-preview mt-3" aria-label="Vorschau des KI-Entwurfs" hidden>
+            <div class="d-flex justify-content-between gap-2 flex-wrap align-items-center mb-2">
+              <div><h3 class="h6 mb-1" id="form-ai-preview-title"></h3><p class="small text-secondary mb-0" id="form-ai-preview-description"></p></div>
+              <span id="form-ai-preview-count" class="small text-secondary"></span>
+            </div>
+            <ol id="form-ai-preview-items" class="form-ai-item-list"></ol>
+            <ul id="form-ai-preview-notes" class="small text-secondary mb-3" hidden></ul>
+            <div id="form-ai-preview-sources" class="small mb-2" hidden></div>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <button id="form-ai-apply" type="button" class="btn btn-primary"><i class="fa-solid fa-check me-1"></i>Entwurf in Baukasten übernehmen</button>
+              <button id="form-ai-dismiss" type="button" class="btn btn-outline-secondary">Verwerfen</button>
+              <span class="small text-secondary">Danach wie gewohnt bearbeiten, prüfen und speichern.</span>
+            </div>
+          </section>
+          {% else %}
+          <div class="alert alert-secondary mb-0">Kein aktiver KI-Provider mit Textmodell und API-Schlüssel eingerichtet. {% if user.is_admin %}<a href="/admin/ai">KI-Verwaltung öffnen</a>{% endif %}</div>
+          {% endif %}
+        </div>
+      </details>
+      {% endif %}
       <div id="builder-items" class="d-flex flex-column gap-3"></div>
       <div class="text-center text-secondary py-4 d-none" id="builder-empty"><i class="fa-solid fa-hand-pointer fa-2x mb-2"></i><p>Noch leer – fügen Sie rechts Bausteine hinzu.</p></div>
     </div>
@@ -52,4 +123,5 @@
 {% block scripts %}
 <script src="/static/vendor/sortablejs/Sortable.min.js"></script>
 <script src="/static/calculation-editor.js"></script><script src="/static/form-builder.js"></script>
+{% if ai_allowed and ai_providers %}<script src="/static/form-ai-assistant.js"></script>{% endif %}
 {% endblock %}

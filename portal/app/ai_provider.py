@@ -114,7 +114,7 @@ async def complete(provider, messages: list[dict], *, image: bool = False, max_t
     payload = {
         "model": provider.model_id,
         "stream": False,  # OpenWebUI/Gemma profiles may require this.
-        "max_tokens": max(64, min(int(max_tokens), 2048)),
+        "max_tokens": max(64, min(int(max_tokens), 4096)),
         "messages": messages,
     }
     result = await _request(provider, "chat/completions",
