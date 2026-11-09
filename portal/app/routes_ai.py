@@ -286,12 +286,24 @@ def _image_data(data: bytes) -> str:
         with Image.open(io.BytesIO(data)) as img:
             if img.format not in ("JPEG", "PNG", "WEBP"):
                 raise HTTPException(400, "Nur JPEG, PNG oder WebP werden unterstützt.")
+            if img.width * img.height > 12_000_000:
+                raise HTTPException(400, "Das Bild hat zu viele Pixel.")
             fmt = img.format
-            img.verify()
+            # Do not forward EXIF/GPS/private metadata to the LLM provider.
+            safe = io.BytesIO()
+            if fmt == "PNG":
+                img.convert("RGBA").save(safe, format="PNG", optimize=True)
+            elif fmt == "WEBP":
+                img.convert("RGB").save(safe, format="WEBP", quality=85)
+            else:
+                img.convert("RGB").save(safe, format="JPEG", quality=88)
+            payload = safe.getvalue()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise HTTPException(400, "Keine gültige Bilddatei.") from exc
+    if len(payload) > _MAX_IMAGE:
+        raise HTTPException(400, "Die Bilddaten sind nach der Bereinigung zu groß.")
     mime = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}[fmt]
-    return "data:" + mime + ";base64," + base64.b64encode(data).decode("ascii")
+    return "data:" + mime + ";base64," + base64.b64encode(payload).decode("ascii")
 
 
 @app.post("/ki/{chat_id:int}/message", dependencies=[Depends(check_csrf)])
