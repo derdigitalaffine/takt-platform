@@ -175,6 +175,10 @@ ITEMS: list[Item] = [
     Item("trash", "admin", "/admin/loeschen", "fa-trash-can", "Löschen & Papierkorb", lambda c: c.admin,
          _pre("/admin/loeschen")),
 ]
+ITEMS.append(Item("ai", "know", "/ki", "fa-brain", "KI-Chat",
+                  lambda c: "ai" in c.modules and c.can("ai_chat"), _pre("/ki")))
+ITEMS.append(Item("ai_admin", "admin", "/admin/ai", "fa-brain", "KI & Sprachmodelle",
+                  lambda c: c.admin, _pre("/admin/ai")))
 ITEMS.append(Item("oidc", "admin", "/admin/oidc", "fa-key", "Nextcloud / OIDC-Anmeldung", lambda c: c.admin, _pre("/admin/oidc")))
 ITEMS.append(Item("seminars", "schedule", "/seminare", "fa-chalkboard-user", "Seminare & Lehrgänge", lambda c: "seminars" in c.modules, _pre("/seminare")))
 ITEMS.append(Item("circulation_reports", "work", "/umlaeufe/auswertung", "fa-chart-column", "Meine Umläufe & Rückmeldungen", lambda c: "circulations" in c.modules, _pre("/umlaeufe/auswertung")))
@@ -189,7 +193,7 @@ FAMILIES = [
     ("meetings", "meeting_plan"), ("seminars",),
     ("resources", "res_planner", "res_bookings"), ("bookings",),
     ("forms", "inbox", "blocks", "locations"), ("app_inbox",), ("processes",),
-    ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"),
+    ("ai",), ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"),
     ("absences",), ("krank_me", "krank_mine", "krank_staff"),
 ]
 CONTEXTS = [family for family in FAMILIES if len(family) > 1 and family[0] not in {"surveys", "resources"}]
@@ -198,10 +202,11 @@ ADMIN_SECTIONS = {
     "Menschen & Organisation": ["users", "orgs"],
     "Finanzen": ["payments", "expense_rules", "pay_settings"],
     "Inhalte & Fachkonfiguration": ["map_layers", "recordings"],
-    "Integrationen & Versand": ["oidc", "notifications", "mail_templates", "speechmind"],
+    "Integrationen & Versand": ["oidc", "notifications", "mail_templates", "speechmind", "ai_admin"],
     "Portal & Betrieb": ["modules", "design", "public_nav", "sessions", "https", "domains", "trash"],
 }
 DESCRIPTIONS = {
+    "ai": ("Stellen Sie Fragen an freigegebene Sprachmodelle und durchsuchen Sie zugelassene interne TAKT-Wissensquellen.", "Persönlichen KI-Chat öffnen · Wissen recherchieren", "KI LLM AI Chat Gemma Wissen"),
     "tasks": ("Sehen Sie, was Sie als Nächstes erledigen können. Eigene Aufgaben und Aufgaben aus Ihren Fachbereichen an einem Ort.", "Aufgaben bearbeiten · Zuständigkeiten prüfen", "Aufgaben Arbeitsplatz"),
     "kanban": ("Organisieren Sie gemeinsame Arbeit in übersichtlichen Spalten. Verknüpfte Aufgaben und Umfragen zeigen ihren aktuellen Status.", "Boards öffnen · Arbeit organisieren", "Board Projekt"),
     "circulations": ("Teilen Sie Informationen und verfolgen Sie Rückmeldungen und Kenntnisnahmen.", "Aushänge lesen · Rückmeldungen geben", "Umlauf Sammelmappe Kenntnisnahme"),
