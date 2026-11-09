@@ -5,10 +5,9 @@
 {% block head %}<link rel="stylesheet" href="/static/tasks.css"><link rel="stylesheet" href="/static/task-modern.css">{% endblock %}
 {% block content %}<div class="task-page">
 {% set form_url='/aufgaben/neu?back=' ~ (back|urlencode) %}
-<div class="task-hero">
+<div class="task-hero task-hero-compact">
   <div class="task-hero-content">
-    <div class="task-hero-eyebrow"><span class="task-hero-signal" aria-hidden="true"></span> Mein digitaler Arbeitsplatz</div>
-{% call m.page_header('Meine Aufgaben', 'Alles, was jetzt wichtig ist – fokussiert, übersichtlich und mit wenigen Klicks erledigt.', form_url if native_on and may_create and not capture else '', 'Mit Formular anlegen', 'fa-plus') %}
+{% call m.page_header('Meine Aufgaben', 'Aufgaben im Blick behalten, priorisieren und schnell erledigen.', form_url if native_on and may_create and not capture else '', 'Mit Formular anlegen', 'fa-plus') %}
 {% if native_on and may_create and capture %}<a class="btn btn-outline-secondary" href="{{form_url}}"><i class="fa-regular fa-pen-to-square me-1" aria-hidden="true"></i>Mit Formular anlegen</a>{% endif %}
 {% if anliegen_on %}
   {% if user.can('anliegen_submit') %}<a class="btn btn-outline-primary" href="/anliegen/neu"><i class="fa-solid fa-inbox me-1" aria-hidden="true"></i>Internes Anliegen erfassen</a>{% endif %}
@@ -17,18 +16,6 @@
 {% endif %}
 {% if apps_on or circulations_on or resources_on or (native_on and user.can('tasks_manage')) %}{% call m.action_menu() %}{% if native_on and user.can('tasks_manage') %}<a class="btn btn-outline-secondary" href="/aufgaben/regeln">Aufgabenregeln</a>{% endif %}{% if apps_on %}<a class="btn btn-outline-secondary" href="/forms/applications">Antragseingang</a>{% endif %}{% if circulations_on %}<a class="btn btn-outline-secondary" href="/umlaeufe?tab=open">Umläufe</a>{% endif %}{% if resources_on %}<a class="btn btn-outline-secondary" href="/resources/bookings">Buchungen</a>{% endif %}{% endcall %}{% endif %}
 {% endcall %}
-  </div>
-  <div class="task-hero-aside" aria-hidden="true">
-    <div class="task-hero-art">
-      <span class="task-hero-art-tile"><i class="fa-solid fa-list-check"></i></span>
-      <span class="task-hero-art-tile"><i class="fa-regular fa-calendar-check"></i></span>
-      <span class="task-hero-art-tile"><i class="fa-solid fa-people-group"></i></span>
-      <span class="task-hero-art-tile"><i class="fa-solid fa-bolt"></i></span>
-    </div>
-    <div class="task-hero-quickstats">
-      <div><strong>{{work.count}}</strong><span>jetzt anstehend</span></div>
-      <div><strong>{{work.overdue}}</strong><span>überfällig</span></div>
-    </div>
   </div>
 </div>
 <section class="task-summary" aria-label="Aufgabenstatus">
