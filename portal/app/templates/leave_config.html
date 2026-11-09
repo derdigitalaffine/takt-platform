@@ -10,9 +10,10 @@
         {% for notice in notices %}
             <div class="d-flex gap-3 justify-content-between border-bottom py-2">
                 <span>{% if notice.request_id and notice.request_id not in removed_notice_requests %}<a href="/urlaub/vorgang/{{ notice.request_id }}">{{ notice.title }}</a>{% else %}{{ notice.title }}{% endif %}</span>
-                <form method="post" action="/urlaub/konfiguration">
-                    {{ meta("notice_read") }}<input type="hidden" name="notice_id" value="{{ notice.id }}">
-                    <button class="btn btn-sm btn-outline-secondary">Gelesen</button>
+                <form method="post" action="/urlaub/hinweise/{{ notice.id }}/lesen">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <input type="hidden" name="back" value="leave">
+                    <button class="btn btn-sm btn-outline-secondary">Als gelesen markieren</button>
                 </form>
             </div>
         {% endfor %}
