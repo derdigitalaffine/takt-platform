@@ -48,8 +48,9 @@ with tempfile.TemporaryDirectory(prefix='takt-navigation-') as root:
                 p.locator('#app-nav a[href="/meetings/plan"]').click()
                 expect(p.get_by_label('Ende',exact=True)).to_be_visible()
                 p.goto(BASE+'/')
-                # KI is discoverable even when the knowledge group is collapsed.
-                expect(p.locator('#app-nav > li.nav-item > a[href="/ki"]')).to_be_visible()
+                # This fixture has the KI module disabled; the shortcut must be hidden.
+                # test_ai_ui_hotfix verifies the enabled/authorized counterpart.
+                expect(p.locator('#app-nav > li.nav-item > a[href="/ki"]')).to_have_count(0)
                 task = p.locator('#app-nav [data-nav-id="tasks"] > a.nav-link').first
                 expect(task).to_be_visible()
                 before = task.evaluate('el => ({height: el.getBoundingClientRect().height, lines: getComputedStyle(el.querySelector(".nav-label")).whiteSpace})')
