@@ -149,6 +149,30 @@
       <p class="form-text mb-0">Bei aktivierter Automatik prüft der TAKT-Hintergrunddienst etwa alle fünf Minuten auf neue und geänderte freigegebene Einträge, verarbeitet maximal zwei je Durchlauf und wiederholt fehlgeschlagene Jobs mit Wartezeit. Berechtigungsentzug wirkt sofort. Ein manueller Neuaufbau ist weiterhin möglich.</p>
     </div>
   </details>
+  <details class="card mb-3">
+    <summary class="card-header" style="cursor:pointer"><i class="fa-solid fa-database me-2" aria-hidden="true"></i>Optionaler Qdrant-Cache (lokales, isoliertes Netzwerk) {% if cfg.ai_qdrant_enabled == '1' %}· aktiv{% else %}· aus{% endif %}</summary>
+    <div class="card-body">
+      <p class="small text-secondary">Qdrant ist ein optionaler Ranking-Beschleuniger: Originaltexte, API-Schlüssel, Benutzerdaten und Quellrechte verbleiben ausschließlich in TAKT. Der Cache erhält nur numerische IDs und Embedding-Vektoren. Jede zurückgelieferte ID wird mit dem aktuellen SQLite-Index und den Quellfreigaben verglichen; ohne Qdrant bleibt die lokale Vektorsuche voll funktionsfähig.</p>
+      <p class="small">Start des optionalen, nicht öffentlich erreichbaren Containers: <code>docker compose --profile rag up -d qdrant</code>. Der Cache liegt nur im flüchtigen Arbeitsspeicher und muss nach Neustart sowie nach Quelländerungen erneut synchronisiert werden.</p>
+      <div class="d-flex flex-wrap gap-3">
+        <form method="post" action="/admin/ai/qdrant/settings" class="d-flex align-items-center gap-2 flex-wrap">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="form-check mb-0"><input class="form-check-input" type="checkbox" name="enabled" value="1" {% if cfg.ai_qdrant_enabled == '1' %}checked{% endif %}> <span class="form-check-label">Qdrant-Ranking freigeben</span></label>
+          <button class="btn btn-outline-primary btn-sm" type="submit">Einstellung speichern</button>
+        </form>
+        {% if cfg.ai_qdrant_enabled == '1' %}
+        <form method="post" action="/admin/ai/qdrant/rebuild">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-arrows-rotate me-1" aria-hidden="true"></i>Qdrant-Cache neu aufbauen</button>
+        </form>
+        {% endif %}
+      </div>
+      {% if cfg.ai_qdrant_enabled == '1' and cfg.ai_qdrant_revision != cfg.ai_qdrant_synced_revision %}
+      <p class="small text-warning-emphasis mt-2 mb-1"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Der Qdrant-Cache muss neu aufgebaut werden. Bis dahin nutzt TAKT ausschließlich den aktuellen lokalen Vektorindex.</p>
+      {% endif %}
+      <p class="form-text mb-0">Bei Widerruf oder Änderung einer Quellfreigabe sperrt TAKT betroffene Ergebnisse sofort. Der nächste manuelle Cache-Neuaufbau entfernt auch die zugehörigen alten Vektoren aus Qdrant. Qdrant kann keine Zugriffsbefugnisse verleihen.</p>
+    </div>
+  </details>
   <div class="row g-3">
     <div class="col-lg-6">
       <div class="card h-100"><div class="card-header">Wissenseintrag erstellen</div><div class="card-body">

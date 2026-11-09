@@ -168,6 +168,24 @@ services:
     depends_on:
       - jicofo
 
+  # Optional semantische Beschleunigung: nur Portal-Zugriff im isolierten Netz.
+  # Kein Port am Host, kein öffentliches API, Vektoren nur flüchtig im tmpfs.
+  # docker compose --profile rag up -d qdrant
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    profiles: ["rag"]
+    restart: ${RESTART_POLICY:-unless-stopped}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    expose:
+      - "6333"
+    tmpfs:
+      - /qdrant/storage:size=536870912
+    networks:
+      rag_private:
+
   portal:
     build: ./portal
     image: ${PORTAL_IMAGE:-jitsi-speechmind-portal:local}
@@ -211,6 +229,9 @@ services:
       - ${CONFIG}/recordings:/recordings
     networks:
       meet.jitsi:
+      rag_private:
 
 networks:
   meet.jitsi:
+  rag_private:
+    internal: true
