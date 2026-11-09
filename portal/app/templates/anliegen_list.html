@@ -41,7 +41,7 @@
     <tbody>{% for case in cases %}
       <tr>
         <td class="text-nowrap small">ANL-{{'%06d'|format(case.id)}}</td>
-        <td><a class="fw-semibold text-decoration-none" href="/anliegen/{{case.id}}">{{case.title}}</a>
+        <td><a class="fw-semibold text-decoration-none" href="/anliegen/{{case.id}}">{{case.display_title}}</a>
           {% if case.confidential %}<span class="badge text-bg-secondary ms-1"><i class="fa-solid fa-lock"></i> Vertraulich</span>{% endif %}
           <div class="small text-secondary">{{case.updated_at|local('%d.%m.%Y %H:%M')}}</div></td>
         <td><i class="fa-solid {{case.category.icon}} me-1 text-secondary"></i>{{case.category.title}}</td>
