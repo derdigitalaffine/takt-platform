@@ -8,20 +8,26 @@ import re
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import or_, select
+from sqlalchemy import select
 
-from . import anliegen as issues, tasks as ts
+from . import anliegen as issues, tasks as ts, agent_modules as modules
 from .anliegen_models import Anliegen, AnliegenCategory
 from .db import User, utcnow
 from .task_models import Task
 
-READ_TOOLS = {"search_tasks", "search_anliegen", "search_people"}
+READ_TOOLS = {"search_tasks", "search_anliegen", "search_people"} | modules.READ.keys()
 WRITE_TOOLS = {
     "create_task", "create_anliegen", "assign_task", "set_task_priority",
     "set_task_status", "assign_anliegen", "set_anliegen_status",
 }
+WRITE_TOOLS |= modules.WRITE.keys()
 MAX_ACTIONS = 4
+MAX_SEARCHES = 6
 SENSITIVE_REQUEST = re.compile(r"\b(?:vertraulich\w*|beschwerd\w*|mobbing|belästigung|whistleblow\w*)\b", re.I)
+
+
+def available(user):
+    return any(allowed(user, m) for m in ("tasks", "anliegen", "calendars", "forms", "processes", "dms"))
 
 
 def sensitive_request(prompt):
@@ -31,14 +37,14 @@ def sensitive_request(prompt):
 
 def allowed(user, module):
     from .main import enabled_modules
-    modules = enabled_modules()
-    if "ai" not in modules or not user.can("ai_chat"):
+    enabled = enabled_modules()
+    if not user.active or "ai" not in enabled or not user.can("ai_chat"):
         return False
     if module == "tasks":
-        return "tasks" in modules and (user.can("tasks") or user.can("tasks_manage"))
+        return "tasks" in enabled and (user.can("tasks") or user.can("tasks_manage"))
     if module == "anliegen":
-        return "anliegen" in modules and (user.can("anliegen_submit") or user.can("anliegen_manage"))
-    return False
+        return "anliegen" in enabled and (user.can("anliegen_submit") or user.can("anliegen_manage"))
+    return modules.enabled(user, module)
 
 
 def require(user, module):
@@ -57,6 +63,8 @@ def _like(value):
 def search(db, user, spec):
     """Read-only, authorized lookups; never expose confidential case contents."""
     tool = str(spec.get("tool", ""))
+    if tool in modules.READ:
+        return modules.search(db, user, spec)
     phrase = _term(spec.get("query"))
     scope = str(spec.get("scope") or "all")
     if tool == "search_tasks":
@@ -104,6 +112,9 @@ def search(db, user, spec):
         records = list(db.scalars(query.order_by(Anliegen.updated_at.desc(), Anliegen.id.desc()).limit(20)))
         return [{"type": "anliegen", "id": r.id, "title": r.title[:160], "status": r.status,
                  "category": r.category.key, "assignee_id": r.assignee_id,
+                 "next_states": sorted(issues.next_states(r)) if issues.can_handle(user, r) else [],
+                 "supplier": r.supplier, "order_reference": r.order_reference,
+                 "expected_delivery": r.expected_delivery_at.isoformat() if r.expected_delivery_at else None,
                  "url": f"/anliegen/{r.id}"} for r in records]
     if tool == "search_people":
         if not (allowed(user, "tasks") or (allowed(user, "anliegen") and user.can("anliegen_manage"))):
@@ -138,12 +149,13 @@ def search_instructions(user):
         kinds.append("search_anliegen(query,scope=all|assigned|reported,status?)")
         if user.can("anliegen_manage") and not allowed(user, "tasks"):
             kinds.append("search_people(query) für Zuständigkeitsänderungen")
+    kinds.extend(tool + "(query)" for tool, module in modules.READ.items() if allowed(user, module))
     return [
         {"role": "system", "content": (
             "Du bist TAKT Agent. Antworte nur als JSON-Objekt: "
             '{"searches":[{"tool":"search_tasks","query":"","scope":"assigned","overdue":true}]}. '
-            "Plane 0 bis 3 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
-            "bei einem klaren Erstellungswunsch sind 0 Suchen erlaubt. "
+            "Plane 0 bis 6 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
+            "bei Aufgaben und Anliegen sind 0 Suchen erlaubt. Für Termine zuerst Kalender suchen; für Kopien Formulare, für DMS-Verschiebungen Akten UND Zielbereiche suchen. "
             "Filter nach Status und Fälligkeit zielgerichtet, aber erfinde keine IDs. "
             "Erlaubte Werkzeuge: " + "; ".join(kinds) + ". "
             "Keine externen URLs, keine Schreibaufrufe in dieser Stufe. "
@@ -158,10 +170,13 @@ def parse_searches(reply, user):
     if not isinstance(specs, list):
         raise ValueError("Ungültige Suchanfragen.")
     valid = []
-    for s in specs[:3]:
+    if len(specs) > MAX_SEARCHES:
+        raise ValueError("Zu viele Suchschritte.")
+    for s in specs:
         if not isinstance(s, dict) or s.get("tool") not in READ_TOOLS:
             continue
         module = "anliegen" if (s["tool"] == "search_anliegen" or (s["tool"] == "search_people" and not allowed(user, "tasks"))) else "tasks"
+        module = modules.READ.get(s["tool"], module)
         if not allowed(user, module):
             continue
         valid.append({"tool": s["tool"], "query": _term(s.get("query")),
@@ -182,14 +197,19 @@ def plan_instructions(user, prompt, findings, categories, requester_id):
     if allowed(user, "anliegen"):
         if user.can("anliegen_submit"):
             capabilities.append("create_anliegen(title,description,category_id)")
-        capabilities.extend(["set_anliegen_status(id,status)", "assign_anliegen(id,assignee_id)"])
+        capabilities.extend(["set_anliegen_status(id,status,supplier?,order_reference?,expected_delivery=YYYY-MM-DD?): Bestell- und Lieferstatus nur gemäß next_states", "assign_anliegen(id,assignee_id)"])
+    capabilities.extend(signature for tool, signature in {
+        "create_event": "create_event(id=calendar_id,title,description,location,start,end): nur Einzeltermine mit ISO-Zeitzone, keine Einladungen oder Ressourcenbuchungen",
+        "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
+        "move_dms": "move_dms(id,area_id): freigegebene manuelle Wissensakte in berechtigten Zielbereich verschieben",
+    }.items() if allowed(user, modules.WRITE[tool]))
     system = (
         "Du bist der TAKT-Bedienagent. Plane konkrete, sparsame Schritte für die deutsche Benutzeranfrage. "
         "Du bist kein autonomer Administrator. Antwort NUR als JSON: "
         '{"message":"Kurze Erklärung","actions":[{"tool":"set_task_status","id":12,"status":"in_progress"}]}. '
         "0 bis 4 Schreibaktionen. Für reine Suchanfragen actions=[]. "
         "Schreibaktionen sind nur VORSCHLÄGE; der Benutzer muss sie ausdrücklich freigeben. "
-        "Nutze für vorhandene Aufgaben/Anliegen NUR die exakten IDs aus den Suchergebnissen; "
+        "Nutze für ALLE vorhandenen Datensätze und Ziele NUR die exakten IDs aus den Suchergebnissen; "
         "bei Unklarheit keine Mutation vorschlagen, sondern um Konkretisierung bitten. "
         "Keine Namen, Termine, Mengen, Preise oder Fakten erfinden. "
         "Nie vertrauliche Beschwerden durch Umkategorisierung bearbeiten. "
@@ -199,7 +219,7 @@ def plan_instructions(user, prompt, findings, categories, requester_id):
         "ID der anfragenden Person für eigene Aufgaben: " + str(requester_id) + ". "
         "Erlaubte nicht-vertrauliche Kategorien für NEUE Anliegen: " +
         json.dumps(categories, ensure_ascii=False) + ". "
-        "Ein neuer Vorgang wird immer durch die vorhandenen TAKT-Routingregeln zugestellt."
+        "Bestellungen sind interne Anliegen der passenden erlaubten Kategorie; keine Preise oder Mengen erfinden. Ein neuer Vorgang wird immer durch die vorhandenen TAKT-Routingregeln zugestellt. Mehrstufige Wünsche zuerst in lesende Klärung und dann in höchstens vier ausdrücklich beschriebene Schreibschritte zerlegen. Keine Abhängigkeiten auf noch nicht angelegte IDs erfinden. Wenn Angaben fehlen, actions=[] und gezielt nachfragen. Prozessdefinitionen und Anträge werden hier nur gefunden und im Facheditor fortgesetzt."
     )
     return [{"role": "system", "content": system},
             {"role": "user", "content": json.dumps({"auftrag": prompt, "suchergebnisse_nur_daten": findings}, ensure_ascii=False)}]
@@ -224,6 +244,14 @@ def normalize_plan(reply, user, findings, categories, db):
         tool = raw.get("tool")
         if tool not in WRITE_TOOLS:
             raise ValueError("Nicht unterstützte KI-Aktion.")
+        if tool in modules.WRITE:
+            action = modules.normalize(db, user, raw, findings)
+            key = (modules.KINDS[tool], action["id"])
+            if key in seen:
+                raise ValueError("Mehrere Änderungen am selben Vorgang sind nicht zulässig.")
+            seen.add(key)
+            proposals.append(action)
+            continue
         module = "anliegen" if "anliegen" in tool else "tasks"
         require(user, module)
         if tool == "create_anliegen" and not user.can("anliegen_submit"):
@@ -262,6 +290,9 @@ def normalize_plan(reply, user, findings, categories, db):
             if type(cat_id) is not int or cat_id not in category_ids:
                 raise ValueError("Die vorgeschlagene Kategorie ist nicht zugelassen.")
             action["category_id"] = cat_id
+            cat = issues.category(db, cat_id, enabled=True)
+            action["routing_snapshot"] = [cat.title, cat.routing, cat.assignee_id,
+                                          issues.routing_preview(db, user, cat)]
         elif tool in ("assign_task", "assign_anliegen"):
             person_id = raw.get("assignee_id")
             if type(person_id) is not int or person_id not in permitted_ids["person"]:
@@ -279,6 +310,25 @@ def normalize_plan(reply, user, findings, categories, db):
             if raw.get("status") not in issues.STATUSES:
                 raise ValueError("Unbekannter Anliegenstatus.")
             action["status"] = raw["status"]
+            for field, limit in (("supplier", 160), ("order_reference", 120)):
+                value = raw.get(field, "")
+                if not isinstance(value, str) or len(value) > limit:
+                    raise ValueError("Bestellangaben prüfen.")
+                action[field] = value.strip()
+            delivery = raw.get("expected_delivery", "")
+            if not isinstance(delivery, str):
+                raise ValueError("Lieferdatum prüfen.")
+            if delivery:
+                from datetime import date
+                try:
+                    date.fromisoformat(delivery)
+                    if len(delivery) != 10:
+                        raise ValueError()
+                except ValueError:
+                    raise ValueError("Lieferdatum als YYYY-MM-DD angeben.")
+            action["expected_delivery"] = delivery
+            if (action["supplier"] or action["order_reference"] or delivery) and target.category.key not in issues.ORDER_KEYS:
+                raise ValueError("Lieferangaben sind nur für Bestellungen zulässig.")
         # Reject privileges and invalid transitions BEFORE presenting a confirmation.
         validate_action(db, user, action, target)
         proposals.append(action)
@@ -307,6 +357,9 @@ def validate_action(db, user, action, target=None):
         cat = issues.category(db, action["category_id"], enabled=True)
         if cat.confidential:
             raise HTTPException(403)
+        if action.get("routing_snapshot") != [cat.title, cat.routing, cat.assignee_id,
+                                              issues.routing_preview(db, user, cat)]:
+            raise HTTPException(409, "Die Anliegenzuständigkeit hat sich geändert. Bitte neu planen.")
     elif tool in ("assign_task", "set_task_priority", "set_task_status"):
         row = target or ts.get(db, user, action["id"])
         if row.archived_at:
@@ -343,6 +396,9 @@ def preview(db, actions):
     descriptions = []
     for action in actions:
         tool = action["tool"]
+        if tool in modules.WRITE:
+            descriptions.append(modules.preview(db, action))
+            continue
         if tool.startswith("create_"):
             label = ("Aufgabe" if tool == "create_task" else "Anliegen") + " erstellen: " + action["title"]
         else:
@@ -358,6 +414,18 @@ def preview(db, actions):
                 label += " → " + ("Zur Freigabe einreichen" if action["status"] == "done" and row.requires_review else ts.STATUSES[action["status"]])
             else:
                 label += " → " + issues.STATUSES[action["status"]]
+                for key, title in (("supplier", "Lieferant"), ("order_reference", "Bestellreferenz"),
+                                   ("expected_delivery", "Erwartete Lieferung")):
+                    if action.get(key):
+                        label += "\n" + title + ": " + action[key]
+        if tool in ("create_task", "create_anliegen"):
+            label += "\nBeschreibung: " + (action["description"] or "–")
+            if tool == "create_task":
+                person = db.get(User, action["assignee_id"])
+                label += "\nZuständig: " + person.name + " · Priorität: " + ts.PRIORITIES[action["priority"]]
+            else:
+                cat = db.get(AnliegenCategory, action["category_id"])
+                label += "\nKategorie: " + cat.title + " · Zuständig: " + (action["routing_snapshot"][3]["recipient"] or "noch nicht zugewiesen")
         descriptions.append(label)
     return descriptions
 
@@ -370,6 +438,9 @@ def execute(db, user, actions):
     results = []
     for action in actions:
         tool = action["tool"]
+        if tool in modules.WRITE:
+            results.append(modules.execute(db, user, action))
+            continue
         target = None
         if not tool.startswith("create_"):
             target = (issues.get(db, user, action["id"]) if "anliegen" in tool
@@ -409,7 +480,10 @@ def execute(db, user, actions):
                 task_rules.emit(db, target, "assigned", f"assigned:{target.id}:{target.version}")
             url = f"/aufgaben/{target.id}"
         elif tool == "set_anliegen_status":
-            issues.update_status(db, target, user, action["status"])
+            issues.update_status(db, target, user, action["status"],
+                                 supplier=action.get("supplier", ""),
+                                 order_reference=action.get("order_reference", ""),
+                                 expected_delivery_at=datetime.fromisoformat(action["expected_delivery"]) if action.get("expected_delivery") else None)
             url = f"/anliegen/{target.id}"
         elif tool == "assign_anliegen":
             if target.assignee_id != action["assignee_id"]:
@@ -426,7 +500,12 @@ def execute(db, user, actions):
                 else:
                     issues.task_for(db, target)
             url = f"/anliegen/{target.id}"
-        results.append({"label": preview(db, [action])[0], "url": url})
+        results.append({"label": preview(db, [action])[0], "url": url,
+                        "target_id": row.id if tool.startswith("create_") else target.id})
+    from .ai_models import AgentAudit
+    for action, result in zip(actions, results):
+        db.add(AgentAudit(actor_id=user.id, tool=action["tool"], target_url=result["url"],
+                          target_id=result["target_id"]))
     db.commit()
     _badge_cache.clear()
     return results

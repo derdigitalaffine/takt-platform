@@ -18,6 +18,7 @@
   const reject = root.querySelector('[data-agent-reject]');
   if (![launch, shade, panel, close, messages, form, input, send, status, confirm, proposals, approve, reject].every(Boolean)) return;
   const csrf = document.querySelector('meta[name="csrf"]')?.content || '';
+  const reset = root.querySelector('[data-agent-reset]');
   let pending = '';
   let busy = false;
 
@@ -42,6 +43,8 @@
     send.disabled = value;
     approve.disabled = value;
     input.disabled = value;
+    reject.disabled = value;
+    if (reset) reset.disabled = value;
     if (label) status.textContent = label;
     else status.textContent = 'Enter senden · Shift+Enter Zeilenumbruch';
   }
@@ -58,7 +61,7 @@
     const el = document.createElement('ul');
     el.className = 'takt-agent-links';
     items.slice(0, max || 12).forEach(function (item) {
-      if (!item || !/^\/(?:aufgaben|anliegen)\/\d+$/.test(item.url || '')) return;
+      if (!item || !/^\/(?:(?:aufgaben|anliegen|forms|processes)\/\d+|dms\/r\/\d+|kalender\?ansicht=termine)$/.test(item.url || '')) return;
       const li = document.createElement('li');
       const a = document.createElement('a');
       a.href = item.url;
@@ -125,6 +128,7 @@
           li.textContent = label;
           proposals.appendChild(li);
         });
+        confirm.scrollTop = 0;
         confirm.hidden = false;
         bubble('Bitte bestätigen Sie die vorbereiteten Änderungen oder verwerfen Sie sie.', 'agent');
       }
@@ -153,11 +157,34 @@
       setBusy(false);
     }
   }
+  if (reset) reset.addEventListener('click', async function () {
+    if (busy) return;
+    setBusy(true, 'Kontext wird zurückgesetzt …');
+    try {
+      await post('/agent/reset', {});
+      clearProposal();
+      messages.replaceChildren();
+      bubble('Neuer Auftrag. Der vorherige Kontext und offene Vorschläge wurden verworfen.');
+    } catch (error) { bubble(error.message, 'error'); }
+    finally { setBusy(false); }
+  });
   launch.addEventListener('click', open);
   shade.addEventListener('click', hide);
   close.addEventListener('click', hide);
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && !panel.hidden) hide();
+    if (panel.hidden) return;
+    if (event.key === 'Escape') hide();
+    if (event.key === 'Tab') {
+      const controls = Array.from(panel.querySelectorAll('button, textarea, a[href], [tabindex="0"]'))
+        .filter(el => !el.disabled && el.getClientRects().length);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    }
   });
   root.querySelectorAll('[data-agent-sample]').forEach(function (button) {
     button.addEventListener('click', function () {

@@ -53,6 +53,8 @@ jobs:
         run: node tests/test_task_create_client.js
       - name: Exercise task UI in Chromium
         run: python tests/browser/task_ui_smoke.py
+      - name: Exercise agent confirmation across modules
+        run: python tests/browser/agent_ui_smoke.py
       - name: Save browser screenshots and server log
         if: always()
         uses: actions/upload-artifact@v4

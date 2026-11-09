@@ -50,7 +50,7 @@
       </a>
     </div>
     <div class="d-flex align-items-center gap-1">
-      {% if user and 'ai' in modules and user.can('ai_chat') and (('tasks' in modules and (user.can('tasks') or user.can('tasks_manage'))) or ('anliegen' in modules and (user.can('anliegen_submit') or user.can('anliegen_manage'))) ) %}
+      {% if user and takt_agent_available(user) %}
       {% include '_agent_panel.html' %}
       {% endif %}
       {% include '_theme_switch.html' %}
