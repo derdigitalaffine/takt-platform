@@ -135,7 +135,7 @@ async def retrieve(db, user, question: str, *, limit: int = 3) -> list[dict]:
     # Optional Qdrant is only a ranking accelerator; never a source of
     # credentials, text or authorization. All its point IDs must resolve to
     # source-hash-checked current SQLite rows.
-    from . import ai_qdrant
+    from . import ai_qdrant, ai_knowledge
     if ai_qdrant.active(db):
         scores = await ai_qdrant.query(db, model_id, query_vector)
         by_id = {row.id: (score, row, doc) for score, row, doc in hits}
@@ -153,7 +153,8 @@ async def retrieve(db, user, question: str, *, limit: int = 3) -> list[dict]:
         if not doc.enabled or row.source_hash != source_hash(doc.body_md or ""):
             continue
         result.append({"title": doc.title, "url": f"/ki/wissen/{doc.id}",
-                       "text": row.chunk_text[:1800], "kind": "Internes Wissen"})
+                       "text": row.chunk_text[:1800], "kind": "Internes Wissen",
+                       "revision": ai_knowledge.knowledge_revision(doc)})
         used.add(doc.id)
         if len(result) >= limit:
             break
