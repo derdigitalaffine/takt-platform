@@ -155,10 +155,12 @@
   }
 
   prompt.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {
-      event.preventDefault();
-      if (typeof form.requestSubmit === 'function') form.requestSubmit();
-    }
+    // Enter sends; Shift+Enter inserts a newline. Keep IME composition intact.
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    if (controller || initiallyDisabled) return;
+    if (typeof form.requestSubmit === 'function') form.requestSubmit(submit);
+    else submit.click();
   });
 
   form.addEventListener('submit', async function (event) {
