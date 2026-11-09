@@ -1,10 +1,11 @@
 """TAKT internal Anliegen: private complaint intake, routing and task integration."""
 import json
 import re
+from datetime import datetime
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import Session
 
 from .anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
@@ -30,13 +31,49 @@ def _read(user):
 
 
 @app.get("/anliegen")
-def list_anliegen(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_anliegen(request: Request, view: str = "mine", category_id: int = 0,
+                 status: str = "", q: str = "",
+                 user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _read(user)
-    cases = list(db.scalars(service.visible_query(user).order_by(Anliegen.updated_at.desc()).limit(250)))
-    return render(request, "anliegen_list.html", user,
-                  cases=cases, statuses=service.STATUSES,
-                  manage=user.can("anliegen_manage"))
+    if view not in ("mine", "assigned", "reported", "unassigned", "all", "orders"):
+        raise HTTPException(422, "Unbekannte Ansicht.")
+    if status and status not in service.STATUSES:
+        raise HTTPException(422, "Unbekannter Status.")
+    query = service.visible_query(user)
+    if view in ("mine", "assigned"):
+        query = query.where(Anliegen.assignee_id == user.id)
+    elif view == "reported":
+        query = query.where(Anliegen.reporter_id == user.id)
+    elif view == "unassigned":
+        if not user.can("anliegen_manage"):
+            raise HTTPException(403)
+        query = query.where(Anliegen.confidential.is_(False),
+                            Anliegen.assignee_id.is_(None))
+    elif view == "all" and not user.can("anliegen_manage"):
+        raise HTTPException(403)
+    elif view == "orders":
+        query = query.join(AnliegenCategory).where(
+            AnliegenCategory.key.in_(service.ORDER_KEYS))
+    if category_id:
+        query = query.where(Anliegen.category_id == category_id)
+    if status:
+        query = query.where(Anliegen.status == status)
+    if q.strip():
+        phrase = "%" + q.strip()[:100].replace("%", r"\%").replace("_", r"\_") + "%"
+        query = query.where(
+            Anliegen.confidential.is_(False),
+            or_(Anliegen.title.ilike(phrase, escape="\\"),
+                Anliegen.description.ilike(phrase, escape="\\")))
+    cases = list(db.scalars(query.order_by(Anliegen.updated_at.desc(), Anliegen.id.desc()).limit(250)))
+    categories = list(db.scalars(select(AnliegenCategory).order_by(AnliegenCategory.position)))
+    return render(request, "anliegen_list.html", user, cases=cases,
+                  statuses=service.STATUSES, next_states=service.next_states,
+                  categories=categories, order_keys=service.ORDER_KEYS,
+                  view=view, selected_category=category_id,
+                  selected_status=status, query_text=q[:100],
+                  manage=user.can("anliegen_manage"),
+                  can_submit=user.can("anliegen_submit"))
 
 
 @app.get("/anliegen/neu")
@@ -89,33 +126,35 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
         not case.confidential and user.can("anliegen_manage")) else []
     return render(request, "anliegen_detail.html", user, case=case, events=events,
                   statuses=service.STATUSES,
-                  choices=service.NEXT.get(case.status, set()),
+                  choices=service.next_states(case),
                   can_handle=service.can_handle(user, case), people=people,
-                  tasks_enabled=("tasks" in enabled_modules()))
+                  tasks_enabled=("tasks" in enabled_modules()),
+                  is_order=case.category.key in service.ORDER_KEYS)
 
 
 @app.post("/anliegen/{case_id:int}/status", dependencies=[Depends(check_csrf)])
 def update_anliegen(request: Request, case_id: int, status: str = Form(...),
+                   supplier: str = Form(""), order_reference: str = Form(""),
+                   expected_delivery: str = Form(""), back: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _read(user)
     case = service.get(db, user, case_id)
     if not service.can_handle(user, case):
         raise HTTPException(403)
-    if status not in service.NEXT.get(case.status, set()) or (
-        status != "closed" and not case.assignee_id):
-        raise HTTPException(422, "Dieser Statuswechsel ist nicht zulässig.")
-    case.status = status
-    service.record(db, case, user, "status", f"Status: {service.STATUSES[status]}")
-    if case.task_id:
-        from . import tasks
-        from .task_models import Task
-        task = db.get(Task, case.task_id)
-        if task:
-            task.status = "done" if status in ("done", "closed") else status
-            tasks.audit(db, task, user, "status", "Status aus internen Anliegen aktualisiert.")
+    delivery_at = None
+    if expected_delivery.strip():
+        try:
+            delivery_at = datetime.fromisoformat(expected_delivery.strip())
+        except ValueError as exc:
+            raise HTTPException(422, "Ungültiger Liefertermin.") from exc
+    service.update_status(db, case, user, status, supplier=supplier,
+                          order_reference=order_reference,
+                          expected_delivery_at=delivery_at)
     db.commit()
-    flash(request, "Bearbeitungsstatus aktualisiert.")
+    flash(request, f"Anliegen: {service.STATUSES[status]}.")
+    if back in ("mine", "assigned", "reported", "unassigned", "all", "orders"):
+        return redirect(f"/anliegen?view={back}")
     return redirect(f"/anliegen/{case.id}")
 
 
