@@ -2108,7 +2108,7 @@ def _set_groups(db: Session, target: User, group_ids: list[str], actor: User) ->
 
 @app.get("/admin/users")
 def admin_users(request: Request, q: str = "", status: str = "all", role: str = "all",
-                group: int | None = None, sort: str = "name", page: int = 1,
+                group: str = "", sort: str = "name", page: int = 1,
                 per_page: int = 25, user: User = Depends(users_manager), db: Session = Depends(get_db)):
     """Server-filtered directory: render a bounded page instead of every user/editor."""
     from . import absence, organization
@@ -2120,7 +2120,8 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
     per_page = per_page if per_page in (25, 50, 100) else 25
     page = max(1, page)
     groups = db.scalars(select(Group).options(joinedload(Group.members)).order_by(Group.name)).unique().all()
-    group = group if any(g.id == group for g in groups) else None
+    selected_group = int(group) if group.isdecimal() else None
+    group = selected_group if any(g.id == selected_group for g in groups) else None
     conditions = []
     if q:
         conditions.append(or_(User.name.ilike(f"%{q}%"), User.email.ilike(f"%{q}%")))
