@@ -60,6 +60,18 @@ def _validate_base_url(url: str) -> str:
     return url
 
 
+def _message_view(db: Session, user: User, row: AIMessage) -> dict:
+    try:
+        sources = json.loads(row.sources_json or "[]")
+    except (TypeError, ValueError):
+        sources = [{"url": "", "title": "Ungültige Quellenreferenz"}]
+    if not isinstance(sources, list) or not ai_knowledge.sources_accessible(db, user, sources):
+        return {"role": row.role, "content": "[Antwort aufgrund geänderter Wissensrechte ausgeblendet.]",
+                "sources": [], "model": row.model_id}
+    return {"role": row.role, "content": row.content,
+            "sources": sources, "model": row.model_id}
+
+
 @app.get("/admin/ai")
 def admin_ai(request: Request, edit: int | None = None, user: User = Depends(admin_user),
              db: Session = Depends(get_db)):
@@ -216,9 +228,8 @@ def ai_chat(request: Request, chat: int | None = None, user: User = Depends(chat
     providers = list(db.scalars(select(AIProvider).where(AIProvider.active.is_(True))
                                 .order_by(AIProvider.name)))
     return render(request, "ai_chat.html", user, chats=conversations, current=selected,
-                  chat_messages=[{"role": row.role, "content": row.content,
-                                  "model": row.model_id, "sources": json.loads(row.sources_json or "[]")}
-                                 for row in selected.messages] if selected else [], providers=providers,
+                  chat_messages=[_message_view(db, user, row) for row in selected.messages]
+                  if selected else [], providers=providers,
                   knowledge_available=(get_settings(db).get("ai_knowledge_enabled") == "1"
                                        and user.can("ai_knowledge")),
                   vision_available=user.can("ai_vision"))
@@ -342,8 +353,7 @@ def ai_export_chat(chat_id: int, user: User = Depends(chat_user),
                    db: Session = Depends(get_db)):
     convo = _conversation(db, chat_id, user)
     data = {"title": convo.title, "messages": [
-        {"role": x.role, "content": x.content, "model": x.model_id,
-         "sources": json.loads(x.sources_json or "[]"), "created_at": x.created_at.isoformat()}
+        {**_message_view(db, user, x), "created_at": x.created_at.isoformat()}
         for x in convo.messages
     ]}
     return JSONResponse(data, headers={
