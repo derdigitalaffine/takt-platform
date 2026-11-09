@@ -65,8 +65,8 @@ def calendar_page(
     source_choices = [
         dict(key=kind, label=meta[0],
              suggested=(kind in (
-                 {"holidays", "closures", "seminars", "leave"} if year_mode
-                 else {"meetings", "seminars", "tasks", "leave", "holidays", "closures"}
+                 {"holidays", "closures", "seminars", "leave", "birthdays"} if year_mode
+                 else {"meetings", "seminars", "tasks", "leave", "holidays", "closures", "birthdays"}
              )))
         for kind, meta in calendar_sources.SOURCES.items()
         if calendar_sources.enabled(db, kind) and kind not in attached
@@ -431,6 +431,10 @@ async def attach_source(
     lock(db)
     if not enabled(db, kind):
         raise HTTPException(422)
+    if kind == "birthdays":
+        from . import birthdays
+        if not (birthdays.external_allowed(db, user, "caldav") or birthdays.external_allowed(db, user, "ics")):
+            raise HTTPException(403)
     if not db.scalar(
         select(Calendar.id).where(Calendar.owner_id == user.id, Calendar.source == kind)
     ):
