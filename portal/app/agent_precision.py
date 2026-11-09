@@ -77,7 +77,7 @@ _ACTION_REQUEST = re.compile(
     r"\b(?:bitte|kannst du|könntest du|würdest du|ich möchte|ich will|"
     r"ich brauche|wir brauchen|hilf mir|mach|machst du)\b", re.I)
 _EXPLANATION = re.compile(
-    r"^\\s*(?:was|wer|wie|warum|wieso|weshalb|woher|wofür|"
+    r"^\s*(?:was|wer|wie|warum|wieso|weshalb|woher|wofür|"
     r"bedeutet|erkläre|erklär|definiere|beschreibe|"
     r"ist|sind|kann man|darf man)\b", re.I)
 
