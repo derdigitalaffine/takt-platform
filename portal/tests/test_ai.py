@@ -202,3 +202,51 @@ def test_image_upload_rejects_unknown_payload():
     import pytest
     with pytest.raises(HTTPException):
         _image_data(b"not an image")
+
+
+def test_openai_adapter_non_streaming_parses_response(monkeypatch):
+    from types import SimpleNamespace
+    provider = SimpleNamespace(model_id="example-model", text_key_enc="dummy",
+                               image_key_enc="other-dummy")
+
+    async def fake_request(p, operation, key_enc, *, payload=None):
+        assert p is provider
+        assert operation == "chat/completions"
+        assert key_enc == "dummy"
+        assert payload["stream"] is False and payload["model"] == "example-model"
+        return {"choices": [{"message": {"content": "VERBUNDEN"}}]}
+
+    monkeypatch.setattr(ai_provider, "_request", fake_request)
+    result = asyncio.run(ai_provider.complete(provider, [{"role": "user", "content": "Test"}]))
+    assert result == "VERBUNDEN"
+
+
+def test_chat_retention_deletes_expired_data():
+    from datetime import timedelta
+    from app import ai_lifecycle
+    from app.db import utcnow
+
+    _enable()
+    uid = _user("ai-old-chat@example.org")
+    with SessionLocal() as db:
+        old = AIConversation(owner_id=uid, title="Zu alt", updated_at=utcnow() - timedelta(days=400))
+        db.add(old)
+        db.flush()
+        cid = old.id
+        db.add(AIMessage(conversation_id=cid, role="user", content="Testdaten"))
+        db.commit()
+    settings(ai_retention_days="30")
+    assert ai_lifecycle.purge_expired() >= 1
+    with SessionLocal() as db:
+        assert db.get(AIConversation, cid) is None
+        assert db.scalar(select(AIMessage.id).where(AIMessage.conversation_id == cid)) is None
+
+
+def test_image_part_format_is_compatible():
+    import io
+    from PIL import Image
+    from app.routes_ai import _image_data
+    stream = io.BytesIO()
+    Image.new("RGB", (2, 2), (255, 0, 0)).save(stream, format="PNG")
+    uri = _image_data(stream.getvalue())
+    assert uri.startswith("data:image/png;base64,")
