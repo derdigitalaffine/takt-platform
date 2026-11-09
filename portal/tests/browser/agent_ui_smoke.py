@@ -30,6 +30,12 @@ def exercise(page):
     command = 'Termin am 12.11.2026 von 9 bis 10 Uhr in Raum 1 zur Projektbesprechung mit Tagesordnung prüfen; Projektformular kopieren und Projektwissen in Projektablage verschieben.'
     page.locator('#ai-prompt').fill(command)
     page.get_by_role('button', name='Nachricht senden', exact=True).click()
+    # The agent must never navigate automatically on receiving a model URL.
+    expect(page).to_have_url(re.compile(r'/agent\?chat='))
+    expect(page.locator('.ai-agent-destination')).to_contain_text(
+        'Über den Link gelangst du zur Prüfung'
+    )
+    page.locator('.ai-agent-destination a').click()
     expect(page).to_have_url(re.compile(r'/kalender\?ansicht=termine&agent_plan='))
     expect(page.locator('[data-agent-draft]')).to_contain_text('Die Fachmaske ist ausgefüllt')
     form = page.locator('#calendar-event-form')
@@ -61,6 +67,8 @@ def exercise(page):
         page.goto(chat_url)
         page.locator('#ai-prompt').fill(command)
         page.get_by_role('button', name='Nachricht senden', exact=True).click()
+        expect(page).to_have_url(re.compile(r'/agent\?chat='))
+        page.locator('.ai-agent-destination a').click()
         expect(page).to_have_url(re.compile(expected_path))
         expect(page.locator('[data-agent-draft]')).to_contain_text('Die Fachmaske ist ausgefüllt')
         if field:
@@ -80,6 +88,8 @@ def exercise(page):
     page.goto(chat_url)
     page.locator('#ai-prompt').fill('Vertrauliche Beschwerde wegen Mobbing bitte manuell erfassen')
     page.get_by_role('button', name='Nachricht senden', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/agent\?chat='))
+    page.locator('.ai-agent-destination a').click()
     expect(page).to_have_url(re.compile(r'/anliegen/neu\?agent_private='))
     expect(page.locator('#anliegen-review')).to_have_attribute('open', '')
     expect(page.locator('#anliegen-final-description')).to_have_value(re.compile('Mobbing'))
