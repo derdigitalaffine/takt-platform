@@ -11,9 +11,13 @@
     const day = Number(parsed[3]), month = Number(parsed[2]);
     const display = day + "." + month + ".";
     if (visibility === "date") {preview.textContent = display + " · Geburtstag ohne Altersangabe."; return;}
-    const now = new Date(), year = now.getFullYear();
+    const now = new Date();
+    let year = now.getFullYear();
+    const today = (now.getMonth() + 1) * 100 + now.getDate();
+    if (month * 100 + day < today) year++;
     const age = year - Number(parsed[1]);
-    preview.textContent = display + " · Am nächsten Geburtstag wird das Alter angezeigt (z. B. " + age + " im Jahr " + year + ").";
+    const leapNote = month === 2 && day === 29 ? " (in Nicht-Schaltjahren gemäß Organisationsregel)" : "";
+    preview.textContent = display + leapNote + " · Im Jahr " + year + " wird im Kalender „wird " + age + "“ angezeigt.";
   };
   date.addEventListener("change", update);
   date.addEventListener("input", update);
