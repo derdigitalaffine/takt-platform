@@ -112,7 +112,7 @@ def test_central_chat_retains_conversation_and_filters_revoked_module_history(mo
     new = c.post("/agent/new", data=dict(csrf=csrf))
     cid = int(new.headers["location"].split("chat=")[1])
     fake(monkeypatch, [dict(tool="search_tasks", query="Modulgeheimnis")], [])
-    first = c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="Zeige meine Modulgeheimnis Aufgabe"))
+    first = c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="/takt Zeige meine Modulgeheimnis Aufgabe"))
     assert first.status_code == 200, first.text
     with SessionLocal() as db:
         rows = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == cid)))
@@ -126,7 +126,7 @@ def test_central_chat_retains_conversation_and_filters_revoked_module_history(mo
     result = c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="Welche Funktionen gibt es?"))
     assert result.status_code == 200, result.text
     assert "Antwort mit Modulgeheimnis" not in str(captured)
-    assert 'name="use_agent"' in page.text
+    assert 'data-ai-mode' in page.text and 'name="use_agent"' not in page.text
     with SessionLocal() as db:
         db.query(AIMessage).filter(AIMessage.conversation_id == cid).delete()
         db.delete(db.get(AIConversation, cid)); db.commit()
@@ -170,7 +170,7 @@ def test_derived_agent_answer_keeps_module_source_revision(monkeypatch):
     cid = int(created.headers["location"].split("chat=")[1])
     try:
         fake(monkeypatch, [dict(tool="search_tasks", query="Abgeleitete Information")], [])
-        assert c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="Zeige die Aufgabe Abgeleitete Information")).status_code == 200
+        assert c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="/takt Zeige die Aufgabe Abgeleitete Information")).status_code == 200
         fake(monkeypatch, [], [])
         assert c.post("/agent/plan", data=dict(csrf=csrf, chat_id=cid, prompt="Fasse die vorherige Antwort zusammen")).status_code == 200
         with SessionLocal() as db:

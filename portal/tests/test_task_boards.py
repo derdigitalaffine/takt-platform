@@ -291,3 +291,98 @@ def test_duplicate_status_columns_honor_selected_destination(db,task_people):
     db.refresh(t)
     assert post(c,db,b,'move',card=card.id,version=t.version,column=duplicate.id).status_code==200
     db.refresh(card);assert card.column_id==duplicate.id
+
+
+def test_card_presentation_is_board_local_and_validated(db,task_people):
+    a=task_people[0];b=board(db,a);other=board(db,a,'Andere Ansicht');t=make(db,task_people)
+    card=attach(db,b,t,a);second=attach(db,other,t,a);c=client_for(a)
+    assert post(c,db,b,'edit',card=card.id,version=t.version,card_type='idea',cover_color='grape').status_code==200
+    db.refresh(card);db.refresh(second);db.refresh(t)
+    assert (card.card_type,card.cover_color)==('idea','grape')
+    assert (second.card_type,second.cover_color)==('task','') and t.status=='open'
+    title=t.title
+    assert post(c,db,b,'edit',card=card.id,version=t.version,title='Nicht speichern',card_type='bad').status_code==422
+    db.refresh(t);db.refresh(card)
+    assert t.title==title and card.card_type=='idea'
+    # A stale board rejects presentation changes as well.
+    db.refresh(b);version=b.version;token=csrf_of(c.get(f'/tasks/boards/{b.id}').text)
+    assert post(c,db,b,'edit',card=card.id,version=t.version,cover_color='teal').status_code==200
+    response=c.post(f'/tasks/boards/{b.id}/action',data=dict(csrf=token,board_version=version,action='edit',card=card.id,version=t.version,cover_color='pink'),headers={'Accept':'application/json'})
+    assert response.status_code==409
+    db.refresh(card);assert card.cover_color=='teal'
+
+
+def test_card_type_create_and_filter(db,task_people):
+    a=task_people[0];b=board(db,a);c=client_for(a);col=kb.columns(db,b)[0]
+    for kind in kb.CARD_TYPES:
+        assert post(c,db,b,'create',column=col.id,title='Karte '+kind,card_type=kind).status_code==200
+    cards=list(db.scalars(select(TaskBoardCard).where(TaskBoardCard.board_id==b.id)))
+    assert {card.card_type for card in cards}==set(kb.CARD_TYPES)
+    assert 'Karte idea' in c.get(f'/tasks/boards/{b.id}?kind=idea').text
+    assert c.get(f'/tasks/boards/{b.id}?kind=idea').text.count('data-card-json=')==1
+    assert post(c,db,b,'create',column=col.id,title='Ungültige Karte',card_type='invalid').status_code==422
+    assert not db.scalar(select(Task.id).where(Task.title=='Ungültige Karte'))
+
+
+def test_card_json_badges_and_access(db,task_people):
+    from app.db import utcnow
+    from app.task_models import TaskComment,TaskAttachment
+    a,_,reader,outsider=task_people;b=board(db,a);t=make(db,task_people);card=attach(db,b,t,a)
+    membership=member(db,b,reader,1)
+    db.add_all([TaskCheck(task_id=t.id,title='Offen'),TaskCheck(task_id=t.id,title='Fertig',done=True),
+        TaskComment(task_id=t.id,author_id=a.id,body='Kommentar **fett** <script>alert(1)</script>'),TaskComment(task_id=t.id,author_id=a.id,body='Entfernt',removed_at=utcnow()),
+        TaskAttachment(task_id=t.id,name='plan.txt',storage_key='a'*64,size=5,mime='text/plain',uploaded_by=a.id)])
+    db.commit();c=client_for(reader);url=f'/tasks/boards/{b.id}/cards/{card.id}'
+    response=c.get(url,headers={'Accept':'application/json'});assert response.status_code==200
+    data=response.json();assert data['level']==1
+    assert (data['card']['checks'],data['card']['checked'],data['card']['comments'],data['card']['files'])==(2,1,1,1)
+    assert [item['body'] for item in data['comments']]==['Kommentar **fett** <script>alert(1)</script>']
+    assert '<strong>fett</strong>' in data['comments'][0]['html']
+    assert '<script>' not in data['comments'][0]['html']
+    assert data['files'][0]['name']=='plan.txt'
+    assert client_for(outsider).get(url,headers={'Accept':'application/json'}).status_code==404
+    db.delete(membership);db.commit()
+    assert c.get(url,headers={'Accept':'application/json'}).status_code==404
+
+
+def test_source_preview_rechecks_original_access(db,task_people,monkeypatch):
+    a,_,reader,_=task_people;b=board(db,a,mode='free');member(db,b,reader,1)
+    key='application:synthetic'
+    monkeypatch.setattr(kb,'source_items',lambda db,u:{key:dict(title='Fachinhalt',href='/synthetic',source='application',source_label='Antrag',detail='Prüfen',due=None)} if u.id==a.id else {})
+    c=client_for(a);assert post(c,db,b,'attach',column=kb.columns(db,b)[0].id,source=key).status_code==200
+    card=db.scalar(select(TaskBoardCard).where(TaskBoardCard.board_id==b.id));url=f'/tasks/boards/{b.id}/cards/{card.id}'
+    assert c.get(url,headers={'Accept':'application/json'}).json()['card']['title']=='Fachinhalt'
+    assert client_for(reader).get(url,headers={'Accept':'application/json'}).status_code==404
+    monkeypatch.setattr(kb,'source_items',lambda db,u:{})
+    assert c.get(url,headers={'Accept':'application/json'}).status_code==404
+
+
+def test_old_card_schema_adds_presentation_defaults_without_rewriting_rows(tmp_path,monkeypatch):
+    from sqlalchemy import create_engine,text
+    from app import db as database
+    engine=create_engine('sqlite:///'+str(tmp_path/'old-board.sqlite'))
+    database.Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('ALTER TABLE task_board_cards DROP COLUMN card_type'))
+        connection.execute(text('ALTER TABLE task_board_cards DROP COLUMN cover_color'))
+        connection.execute(text('INSERT INTO task_board_cards (id,board_id,column_id,task_id,position,shareable) VALUES (1,9,7,5,3,1)'))
+    monkeypatch.setattr(database,'engine',engine)
+    database._migrate();database._migrate()
+    with engine.connect() as connection:
+        row=connection.execute(text('SELECT board_id,column_id,task_id,position,shareable,card_type,cover_color FROM task_board_cards')).one()
+        assert tuple(row)==(9,7,5,3,1,'task','')
+    engine.dispose()
+
+
+def test_badge_counts_use_batched_queries(db,task_people):
+    from sqlalchemy import event
+    a=task_people[0];b=board(db,a)
+    for i in range(12):attach(db,b,make(db,task_people),a)
+    visible=kb.visible_cards(db,a,b);queries=[]
+    def count(*args):queries.append(args[2])
+    event.listen(db.bind,'before_cursor_execute',count)
+    try:
+        stats=kb.card_statistics(db,visible)
+        summaries=[kb.card_summary(db,item,stats) for item in visible]
+    finally:event.remove(db.bind,'before_cursor_execute',count)
+    assert len(summaries)==12 and len(queries)==3

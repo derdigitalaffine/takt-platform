@@ -80,7 +80,7 @@ def test_delete_is_previewed_confirmed_audited_and_cannot_replay(monkeypatch):
         row=event(db,db.get(User,uid),cid);rid,uid_event=row.id,row.uid
     fake(monkeypatch,[dict(tool='search_events',query=f'#{rid}')],[dict(tool='delete_event',id=rid)])
     c=login(*ADMIN);csrf=csrf_of(c.get('/').text)
-    result=c.post('/agent/plan',data=dict(csrf=csrf,prompt='Lösche den Kalendertermin'))
+    result=c.post('/agent/plan',data=dict(csrf=csrf,prompt='/takt Lösche den Kalendertermin'))
     assert result.status_code==200,result.text
     assert 'endgültig löschen' in result.json()['proposals'][0]
     nonce=result.json()['plan_id']

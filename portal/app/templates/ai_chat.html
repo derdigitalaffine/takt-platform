@@ -94,7 +94,7 @@
           <li class="ai-message {{ 'ai-message--user' if item.role == 'user' else 'ai-message--assistant' }}" data-ai-message>
             <div class="ai-message-avatar" aria-hidden="true"><i class="fa-solid {{ 'fa-user' if item.role == 'user' else 'fa-brain' }}"></i></div>
             <div class="ai-message-bubble">
-              <div class="ai-message-label">{{ 'Du' if item.role == 'user' else 'TAKT Agent' }}</div>
+              <div class="ai-message-label">{{ 'Du · Portalauftrag' if item.role == 'user' and item.content.lower().startswith('/takt ') else 'Du' if item.role == 'user' else 'TAKT Agent' }}</div>
               {% if item.role == 'assistant' %}<div class="ai-message-text ai-message-markdown text-break" data-ai-message-text>{{ item.html }}</div>{% else %}<div class="ai-message-text text-break" data-ai-message-text>{{ item.content }}</div>{% endif %}
               {% if item.sources %}
               <div class="ai-message-sources">
@@ -115,7 +115,7 @@
             </div>
           </li>
           {% else %}
-          <li class="ai-chat-empty" data-ai-empty><i class="fa-solid fa-brain fa-2x mb-3" aria-hidden="true"></i><p class="mb-1 fw-semibold">Was möchtest du wissen?</p><p class="small mb-0">Frag mich etwas oder sag mir, wobei ich dir in TAKT helfen kann.</p></li>
+          <li class="ai-chat-empty" data-ai-empty><span class="ai-welcome-mark"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></span><p class="ai-welcome-title">Wie kann ich dir helfen?</p><p class="ai-welcome-copy">Fragen, Texte und Ideen im Chat.<br>Portalaufträge startest du mit <kbd>/takt</kbd>.</p>{% if not temporary %}<div class="ai-welcome-actions"><button type="button" data-ai-compose="/takt Erstelle eine Aufgabe: "><i class="fa-regular fa-square-check" aria-hidden="true"></i>Aufgabe vorbereiten</button><button type="button" data-ai-compose="/takt Melde einen internen Mangel: "><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>Mangel melden</button></div>{% endif %}</li>
           {% endfor %}
         </ol>
         </div>
@@ -128,18 +128,18 @@
           {% endif %}
           {% if not temporary %}
           <input type="hidden" name="chat_id" value="{{ current.id }}">
-          <label class="form-check mb-2 ai-agent-mode-toggle">
-            <input class="form-check-input" type="checkbox" name="use_agent" value="1" checked>
-            <span class="form-check-label"><strong>Automatisch erkennen:</strong> Frage beantworten oder TAKT-Auftrag vorbereiten</span>
-          </label>
-          <p class="small text-secondary ai-agent-mode-hint">Du kannst ganz normal fragen. Nur bei einem konkreten TAKT-Arbeitsauftrag plane ich Schritte. Ich öffne nie ungefragt einen anderen Bereich – du bekommst einen Link und entscheidest selbst. Für reinen Live-Chat kannst du die Automatik ausschalten.</p>
+          <div class="ai-command-bar">
+            <span class="ai-mode-badge" data-ai-mode aria-live="polite"><i class="fa-regular fa-comment" aria-hidden="true"></i> Chat</span>
+            <button class="ai-command-shortcut" type="button" data-ai-compose="/takt " title="Portalauftrag beginnen"><span>/takt</span> Portalauftrag</button>
+          </div>
+          <p class="ai-command-caption" data-ai-mode-help>Hier chattest du. Mit <kbd>/takt</kbd> am Anfang bereitest du einen Portalauftrag vor.</p>
           {% endif %}
           <div class="ai-chat-compose-main">
             <label class="visually-hidden" for="ai-prompt">Deine Nachricht</label>
-            <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Frag mich etwas oder beschreibe, was ich in TAKT für dich vorbereiten soll …" required></textarea>
+            <textarea class="form-control ai-chat-input" id="ai-prompt" name="message" rows="2" maxlength="8000" placeholder="Nachricht schreiben … oder /takt für einen Portalauftrag" required></textarea>
           </div>
           {% if knowledge_available or vision_available or web_available %}
-          <details class="ai-chat-options"><summary><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Weitere Optionen</summary>
+          <details class="ai-chat-options"><summary><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Quellen & Anhänge</summary>
           {% endif %}
           {% if web_available %}
           <div class="form-check mb-2">

@@ -2996,7 +2996,7 @@ _NEW_COLUMNS = {
     "ai_providers": {"stream_enabled": "BOOLEAN NOT NULL DEFAULT 0"},
     "leave_policies": {"holiday_state": "VARCHAR(8) NOT NULL DEFAULT 'inherit'",
                        "external_attestation": "BOOLEAN NOT NULL DEFAULT 0"},
-    "task_board_cards": {"shareable": "BOOLEAN NOT NULL DEFAULT 0"},
+    "task_board_cards": {"shareable": "BOOLEAN NOT NULL DEFAULT 0", "card_type": "VARCHAR(20) NOT NULL DEFAULT 'task'", "cover_color": "VARCHAR(20) NOT NULL DEFAULT ''"},
     "seminar_subscriptions": {"standing": "BOOLEAN NOT NULL DEFAULT 0"},
     "seminar_attendance": {"source": "VARCHAR(20) NOT NULL DEFAULT 'staff'"},
     "circulation_bundles": {"archived": "BOOLEAN NOT NULL DEFAULT 0"},

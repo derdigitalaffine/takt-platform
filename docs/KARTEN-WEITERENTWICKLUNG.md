@@ -1,6 +1,6 @@
 # Karten: Quellenbibliothek und nächste Produktentscheidungen
 
-Stand: 10. November 2026. Grundlage: Repository-main und Interview mit dem Auftraggeber.
+Stand: 10. November 2026. Grundlage: Repository-main (`22cf746`) und Interview mit dem Auftraggeber.
 
 ## Zielbild
 
@@ -37,7 +37,7 @@ Ein Teil der Funktionen ist regional spezialisiert oder ein Add-on mit eigenen V
 
 ## Oberfläche
 
-„Mein Überblick“ und „Aufgaben“ sind die vereinbarten Referenzen: gemeinsamer kompakter Seitenkopf, klare Typografie, ruhige Kartenflächen und einheitliche Aktionen. Auch diese Module beruhen im geprüften main auf Bootstrap/Jinja. Die Quellenbibliothek nutzt vorhandene Komponenten und Themevariablen. Eine Mantine-Umstellung ist noch nicht implementiert.
+„Mein Überblick“ und „Aufgaben“ sind die vereinbarten Referenzen: gemeinsamer kompakter Seitenkopf, klare Typografie, ruhige Kartenflächen und einheitliche Aktionen. Der Portalrahmen sowie die Übersicht und Aufgabenliste beruhen auf Bootstrap/Jinja; die Aufgabenboards verwenden inzwischen React und Mantine 9.8.0 (`portal/ui/board.jsx`). Deren Provider übernimmt die Portalschrift und reagiert auf den globalen Hell-/Dunkelmodus. Diese Anbindung ist die konkrete Vorlage für weitere Mantine-Flächen. Die Quellenbibliothek nutzt vorhandene Komponenten und Themevariablen. Eine Mantine-Umstellung des Kartenmoduls ist noch nicht implementiert.
 
 Für den späteren Kartenarbeitsplatz empfehlen sich getrennte Bereiche „Suchen“, „Ebenen“, „Messen & Zeichnen“ und „Sammlung“ mit einer gemeinsamen Objektinformation. Auf Mobilgeräten arbeitet dieselbe Struktur in einer unteren, vergrößerbaren Ablage. Mantine würde die Bedienoberfläche liefern; die eigentliche Kartenfläche kann weiterhin MapLibre rendern. Schrift, Farben, Abstände, Fokus und Dialogverhalten müssen produktweit zusammenpassen.
 

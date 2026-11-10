@@ -7,8 +7,9 @@
 
   var allowed = ['14', '16', '18', '20'];
   var key = 'takt-ai-reading-size';
+  var fallback = window.self !== window.top ? '14' : '16';
   function apply(value) {
-    var safe = allowed.indexOf(String(value)) === -1 ? '16' : String(value);
+    var safe = allowed.indexOf(String(value)) === -1 ? fallback : String(value);
     select.value = safe;
     workspace.style.setProperty('--ai-reading-size', safe + 'px');
     // The embedded dock shares the setting through same-origin storage.
@@ -17,7 +18,7 @@
   try {
     apply(window.localStorage.getItem(key));
   } catch (_) {
-    apply('16');
+    apply(fallback);
   }
   select.addEventListener('change', function () {
     var safe = apply(select.value);

@@ -26,11 +26,24 @@ def exercise(page):
     page.goto(BASE + '/agent')
     page.get_by_role('button', name='Neuer Chat', exact=True).click()
     chat_url = page.url
-    expect(page.locator('[name="use_agent"]')).to_be_checked()
+    expect(page.locator('[name="use_agent"]')).to_have_count(0)
+    expect(page.locator('[data-ai-mode]')).to_have_text('Chat')
     command = 'Termin am 12.11.2026 von 9 bis 10 Uhr in Raum 1 zur Projektbesprechung mit Tagesordnung prüfen; Projektformular kopieren und Projektwissen in Projektablage verschieben.'
     if page.locator('[data-ai-chat-form]').get_attribute('data-ai-ready') != '1':
         raise AssertionError('Chat JS did not initialize: ' + str(errors) + '; streaming=' + str(page.evaluate('!!window.ReadableStream')))
-    page.locator('#ai-prompt').fill(command)
+    calls = []
+    page.on('request', lambda req: calls.append(req.url) if req.method == 'POST' else None)
+    page.screenshot(path=str(OUTPUT / 'agent-explicit-welcome.png'))
+    page.locator('#ai-prompt').fill('Erstelle eine Aufgabe ohne Präfix')
+    page.get_by_role('button', name='Nachricht senden', exact=True).click()
+    expect(page.locator('[data-ai-messages]')).to_contain_text('Das ist eine Chat-Antwort.')
+    expect(page).to_have_url(re.compile(r'/agent\?chat='))
+    expect(page.locator('.ai-agent-destination')).to_have_count(0)
+    assert not any(url.endswith('/agent/plan') for url in calls)
+    page.locator('[data-ai-compose="/takt "]').click()
+    expect(page.locator('#ai-prompt')).to_have_value('/takt ')
+    expect(page.locator('[data-ai-mode]')).to_have_text('/takt · Portalauftrag')
+    page.locator('#ai-prompt').fill('/takt ' + command)
     page.get_by_role('button', name='Nachricht senden', exact=True).click()
     # The agent must never navigate automatically on receiving a model URL.
     expect(page).to_have_url(re.compile(r'/agent\?chat='))
@@ -74,7 +87,7 @@ def exercise(page):
     expect(page.locator('[data-ai-messages]')).to_contain_text(re.compile('Drei Schritte zur Prüfung|Wissensrechte ausgeblendet'))
     def handoff(command, expected_path, field=None, value=None):
         page.goto(chat_url)
-        page.locator('#ai-prompt').fill(command)
+        page.locator('#ai-prompt').fill('/takt ' + command)
         page.get_by_role('button', name='Nachricht senden', exact=True).click()
         expect(page).to_have_url(re.compile(r'/agent\?chat='))
         page.locator('.ai-agent-destination a').click()
@@ -98,7 +111,7 @@ def exercise(page):
     handoff('Erstelle einen ganztägigen Kalendertermin Agent Ganztägig am 04.12.2026 im Projektkalender', r'/kalender\?ansicht=termine&agent_plan=', 'end', '2026-12-04')
     handoff('Lösche den Kalendertermin Agent Ganztägig', r'/kalender\?ansicht=termine&agent_plan=')
     page.goto(chat_url)
-    page.locator('#ai-prompt').fill('Vertrauliche Beschwerde wegen Mobbing bitte manuell erfassen')
+    page.locator('#ai-prompt').fill('/takt Vertrauliche Beschwerde wegen Mobbing bitte manuell erfassen')
     page.get_by_role('button', name='Nachricht senden', exact=True).click()
     expect(page).to_have_url(re.compile(r'/agent\?chat='))
     page.locator('.ai-agent-destination a').click()
@@ -124,7 +137,7 @@ def exercise(page):
     handoff('Markiere meinen Urlaub vom 9. Dezember 2030 verbindlich', r'/urlaub/planer\?unit=[0-9]+&agent_plan=', 'reason', '')
     handoff('Ändere meinen Urlaub vom 9. Dezember auf den 16. bis 18. Dezember 2030', r'/urlaub/planer\?unit=[0-9]+&agent_plan=', 'starts_on', '2030-12-16')
     page.goto(chat_url)
-    page.locator('#ai-prompt').fill('Melde eine eAU seit 2026-11-09 bis 2026-11-10 festgestellt am 2026-11-09 bei Agent Health Employer')
+    page.locator('#ai-prompt').fill('/takt Melde eine eAU seit 2026-11-09 bis 2026-11-10 festgestellt am 2026-11-09 bei Agent Health Employer')
     page.get_by_role('button', name='Nachricht senden', exact=True).click()
     page.locator('.ai-agent-destination a').click()
     expect(page).to_have_url(re.compile(r'/krank/eau\?agent_health='))
@@ -156,7 +169,12 @@ def exercise(page):
     chat = page.frame_locator('[data-agent-frame]')
     chat.locator('.agent-embedded-tools').get_by_role('button', name='Neuer Chat', exact=True).click()
     expect(chat.locator('[name="chat_id"]')).not_to_have_value('1')
-    chat.locator('#ai-prompt').fill('Erstelle mir ein Formular mit dem ich die Geburtstage der Belegschaft abfragen kann')
+    expect(chat.locator('[data-ai-font-size]')).to_have_value('14')
+    page.screenshot(path=str(OUTPUT / 'agent-explicit-dock-desktop.png'))
+    page.set_viewport_size(dict(width=390, height=844))
+    page.screenshot(path=str(OUTPUT / 'agent-explicit-dock-mobile.png'))
+    page.set_viewport_size(dict(width=1440, height=1000))
+    chat.locator('#ai-prompt').fill('/takt Erstelle mir ein Formular mit dem ich die Geburtstage der Belegschaft abfragen kann')
     frame = next(f for f in page.frames if '/agent?chat=' in f.url)
     frame.evaluate("""() => {
       const list = document.querySelector('[data-ai-messages]');

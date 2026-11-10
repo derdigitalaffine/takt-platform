@@ -14,3 +14,6 @@ portal/dev-recordings/
 .idea/
 .vscode/
 .DS_Store
+
+# Frontend build dependencies
+node_modules/

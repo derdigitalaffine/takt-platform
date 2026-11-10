@@ -112,8 +112,8 @@ def test_native_review_edits_confirmation_replay_and_csrf(db, people, monkeypatc
     fake(monkeypatch, [], [raw])
     c = login(owner.email, 'task-passwort-123')
     csrf = csrf_of(c.get('/').text)
-    assert c.post('/agent/plan', data=dict(prompt='Plane meinen Urlaub')).status_code == 400
-    r = c.post('/agent/plan', data=dict(csrf=csrf, prompt='Plane meinen Urlaub'))
+    assert c.post('/agent/plan', data=dict(prompt='/takt Plane meinen Urlaub')).status_code == 400
+    r = c.post('/agent/plan', data=dict(csrf=csrf, prompt='/takt Plane meinen Urlaub'))
     assert r.status_code == 200, r.text
     data = r.json(); nonce = data['plan_id']
     assert data['open_url'].startswith('/urlaub/planer?unit=')
