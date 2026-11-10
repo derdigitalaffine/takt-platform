@@ -183,9 +183,44 @@
     </div>
   </section>
   {% endif %}
-  <section class="card mt-3"><div class="card-header">Bearbeitungsverlauf</div><div class="card-body">
-    <ol class="list-unstyled mb-0">{% for event in events %}<li class="border-bottom pb-2 mb-2 small"><strong>{{event.kind}}</strong> – {{event.note}}<div class="text-secondary">{{event.created_at|local('%d.%m.%Y %H:%M')}}</div></li>{% else %}<li>Keine Einträge.</li>{% endfor %}</ol>
-  </div></section>
+  <section class="card mt-3 ap-activity" id="anliegen-chronik">
+    <div class="card-header d-flex justify-content-between flex-wrap gap-2 align-items-center">
+      <span><i class="fa-solid fa-clock-rotate-left text-primary me-2" aria-hidden="true"></i>Bearbeitungsverlauf & Prozesschronik</span>
+      <span class="small text-secondary">Berechtigungsgefiltert</span>
+    </div>
+    <div class="card-body">
+      <ol class="list-unstyled mb-0 ap-timeline">
+        {% for item in process_timeline %}
+        <li class="ap-timeline-item">
+          <div class="d-flex gap-2 justify-content-between flex-wrap mb-1">
+            <strong class="small">{{item.title}}</strong>
+            <span class="small text-secondary">{{item.when|local('%d.%m.%Y %H:%M')}}</span>
+          </div>
+          <div class="small text-secondary text-break" style="white-space:pre-wrap">{{item.detail}}</div>
+          {% if item.href %}<a class="small" href="{{item.href}}">Zum Ursprung</a>{% endif %}
+        </li>
+        {% else %}
+        <li class="small text-secondary">Noch keine Einträge vorhanden.</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </section>
+  {% if process_documents and process_private %}
+  <section class="card mt-3 ap-documents">
+    <div class="card-header"><i class="fa-regular fa-file-lines text-primary me-2" aria-hidden="true"></i>Verknüpfte Dokumente</div>
+    <div class="card-body">
+      <p class="small text-secondary">Anhänge bleiben beim Original. Die Berechtigung wird beim Öffnen erneut geprüft.</p>
+      <ul class="list-unstyled mb-0">
+      {% for document in process_documents %}
+        <li class="d-flex align-items-center justify-content-between gap-2 border-bottom py-2">
+          <a class="text-break" href="{{document.href}}"><i class="fa-solid fa-paperclip me-1" aria-hidden="true"></i>{{document.name}}</a>
+          <span class="small text-secondary">{{document.when|local('%d.%m.%Y')}}</span>
+        </li>
+      {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
 </div><div class="col-12 col-xl-4">
   {% if can_handle %}
   <div class="card mb-3"><div class="card-header">Bearbeitung</div><div class="card-body">
@@ -193,7 +228,7 @@
     <p class="small text-secondary">Häufige Schritte direkt bestätigen:</p>
     <div class="d-flex flex-wrap gap-2 mb-3">
       {% for code,label in [('in_progress','Bearbeitung starten'),('ordered','Bei Lieferant bestellt'),('partially_delivered','Teilweise geliefert'),('delivered','Geliefert'),('done','Erledigen')] %}
-      {% if code in choices %}
+      {% if code in choices and not (code == 'done' and process_aggregate.needs_override) %}
       <form method="post" action="/anliegen/{{case.id}}/status">
         <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="status" value="{{code}}">
         <button class="btn btn-sm {{'btn-primary' if code=='ordered' else 'btn-outline-primary'}}" type="submit">{{label}}</button>
@@ -225,6 +260,17 @@
       <select class="form-select mb-2" id="anliegen-next" name="status">
         {% for code in choices|sort %}<option value="{{code}}">{{statuses[code]}}</option>{% endfor %}
       </select>
+      {% if process_aggregate.needs_override %}
+      <div class="alert alert-warning small mt-3 mb-2">
+        <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>
+        Mindestens ein verknüpfter Prozess ist nicht erfolgreich abgeschlossen.
+        Erledigen oder Schließen erfordert eine dokumentierte Begründung.
+      </div>
+      <label class="form-label small" for="anliegen-override-reason">Begründung für einen vorzeitigen Abschluss (nur intern sichtbar)</label>
+      <textarea class="form-control mb-2" id="anliegen-override-reason"
+                name="override_reason" rows="2" maxlength="1000"
+                placeholder="Nur für vorzeitiges Erledigen oder Schließen erforderlich"></textarea>
+      {% endif %}
       <button class="btn btn-outline-primary" type="submit">Status übernehmen</button>
     </form>
     {% else %}<p class="text-secondary small">Keine weiteren Statuswechsel.</p>{% endif %}
