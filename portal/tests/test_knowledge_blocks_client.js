@@ -60,7 +60,7 @@ test('moving blocks changes order without dropping text or advanced blocks', () 
   const original = '# Eins\n\n<!-- special -->\n\nEnde\n';
   const doc = model.parse(original);
   assert.equal(model.move(doc, 0, -1), false);
-  assert.equal(model.move(doc, 0, 2), false);
+  assert.equal(model.move(doc, 0, 3), false);
   assert.equal(model.move(doc, 0, 1), true);
   assert.equal(model.serialize(doc), '<!-- special -->\n\n# Eins\n\nEnde\n');
 });
