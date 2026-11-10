@@ -175,7 +175,7 @@ def test_agent_plan_searches_only_own_leave_without_mutations(leave_people, monk
     client = login("agent-leave-owner@example.org", "test-leave-pass123")
     csrf = csrf_of(client.get("/agent").text)
     response = client.post("/agent/plan", data={
-        "csrf": csrf, "prompt": "Zeige meine Urlaubsanträge",
+        "csrf": csrf, "prompt": "/takt Zeige meine Urlaubsanträge",
     })
     assert response.status_code == 200, response.text
     payload = response.json()

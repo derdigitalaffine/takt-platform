@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block title %}TAKT · Portalauftrag{% endblock %}
+{% block content %}<section class="card mx-auto" style="max-width:760px"><div class="card-body">
+<span class="badge text-bg-primary mb-3">/takt · Portalauftrag</span><h1 class="h4">Dein Portalauftrag</h1>
+<p>{{result.message}}</p>{% for proposal in result.proposals %}<p class="alert alert-light border" style="white-space:pre-wrap">{{proposal}}</p>{% endfor %}
+{% if result.open_url %}<a class="btn btn-primary" href="{{result.open_url}}">{{'Vorschlag im Fachbereich prüfen' if result.proposals else 'Bereich öffnen'}}</a>{% endif %}
+<a class="btn btn-outline-secondary" href="/agent?chat={{chat_id}}">Zurück zum Chat</a>
+</div></section>{% endblock %}

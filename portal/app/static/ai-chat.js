@@ -19,6 +19,26 @@
   var imageInput = form.querySelector('[name="image"]');
   if (!messages || !scroller || !jump || !status || !hint || !submit || !stop || !prompt) return;
 
+  function syncCommandMode() {
+    const active = /^\/takt(?:\s|$)/i.test(prompt.value.trimStart());
+    form.classList.toggle('ai-chat-composer--command', active);
+    const badge = form.querySelector('[data-ai-mode]');
+    if (badge) badge.textContent = active ? '/takt · Portalauftrag' : 'Chat';
+    const help = form.querySelector('[data-ai-mode-help]');
+    if (help) help.textContent = active ? 'Du prüfst den Vorschlag im Fachbereich und bestätigst jede Änderung.' : 'Hier chattest du. /takt am Anfang startet einen Portalauftrag.';
+  }
+  document.addEventListener('click', function (event) {
+    const choice = event.target.closest('[data-ai-compose]');
+    if (!choice) return;
+    const text = choice.dataset.aiCompose;
+    if (text === '/takt ') {
+      if (!/^\/takt(?:\s|$)/i.test(prompt.value.trimStart())) prompt.value = '/takt ' + prompt.value;
+    } else prompt.value = text;
+    syncCommandMode(); prompt.focus(); prompt.setSelectionRange(prompt.value.length, prompt.value.length);
+  });
+  prompt.addEventListener('input', syncCommandMode);
+  syncCommandMode();
+
   var controller = null;
   var temporary = form.dataset.aiTemporary === '1';
   var transientHistory = []; // Browser-memory only; never persisted by TAKT.
@@ -81,6 +101,7 @@
   function messageBubble(role, text) {
     var item = document.createElement('li');
     item.className = 'ai-message ai-message--' + role;
+    if (role === 'user' && /^\/takt(?:\s|$)/i.test(text)) item.classList.add('ai-message--command');
     item.setAttribute('data-ai-message', '');
 
     var avatar = document.createElement('div');
@@ -94,7 +115,7 @@
     bubble.className = 'ai-message-bubble';
     var label = document.createElement('div');
     label.className = 'ai-message-label';
-    label.textContent = role === 'user' ? 'Du' : 'TAKT Agent';
+    label.textContent = role === 'user' ? (/^\/takt(?:\s|$)/i.test(text) ? 'Du · Portalauftrag' : 'Du') : 'TAKT Agent';
     var content = document.createElement('div');
     content.className = 'ai-message-text text-break';
     content.setAttribute('data-ai-message-text', '');
@@ -241,7 +262,7 @@
     assistantBubble.item.classList.add('ai-message--streaming');
     controller = new AbortController();
     submit.disabled = true; stop.disabled = false; stop.hidden = false;
-    status.textContent = 'Ich schaue mir deine Nachricht an …';
+    status.textContent = 'Portalauftrag wird vorbereitet …';
     hint.textContent = '';
     scrollToLatest();
     try {
@@ -253,7 +274,7 @@
         throw new Error(response.redirected ? 'Sitzung abgelaufen. Bitte erneut anmelden.' : 'Der Server hat keine gültige Agentenantwort geliefert (HTTP ' + response.status + '). Bitte erneut versuchen.');
       }
       if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Der Agent konnte den Auftrag nicht verarbeiten.');
-      prompt.value = '';
+      prompt.value = ''; syncCommandMode();
       assistantBubble.content.textContent = data.message || '';
       if (typeof data.html === 'string') {
         assistantBubble.content.classList.add('ai-message-markdown');
@@ -310,7 +331,9 @@
     if (controller || initiallyDisabled) return;
     var question = prompt.value.trim();
     if (!question) { prompt.focus(); return; }
-    if (!temporary && form.elements.use_agent?.checked && !(imageInput?.files?.length)) {
+    if (/^\/takt(?:\s|$)/i.test(question)) {
+      if (temporary) { hint.textContent = 'Portalaufträge sind im normalen Chat verfügbar. Öffne dafür eine gespeicherte Unterhaltung.'; return; }
+      if (imageInput?.files?.length) { hint.textContent = 'Sende den Portalauftrag ohne Bild. Bilder kannst du im normalen Chat besprechen.'; return; }
       await runAgent(question); return;
     }
 
@@ -364,7 +387,7 @@
       updateTitle(question);
       // The server has saved the question before starting the stream. Clear it now
       // so a later provider error cannot accidentally resend the same message.
-      prompt.value = '';
+      prompt.value = ''; syncCommandMode();
       if (imageInput) imageInput.value = '';
       if (!response.body) throw new Error('Streaming-Antwort wird vom Browser nicht unterstützt.');
 

@@ -24,12 +24,22 @@ für denselben Arbeitsplatz; es gibt keinen zweiten Seitenpanel-Chat mehr.
 Modellwahl, persönliche Unterhaltungen, Export, sichere Markdown-Darstellung,
 freigegebenes Wissen, optionale Websuche sowie Text-/Bildanalyse bleiben erhalten. Auch Modellwechsel, Gesprächsverzweigungen und temporäre Chats ohne gespeicherten Verlauf stehen im selben Arbeitsplatz bereit. Temporäre Chats bleiben reine Antworten ohne Fachaktionen oder Wissensabruf.
 
-Die standardmäßig aktive Bedienunterstützung beantwortet Fragen und recherchiert
-in berechtigten Fachbereichen. Für reine Text-/Bildanalyse steht im selben Chat
-weiter der bisherige Antwortmodus mit Streaming zur Verfügung. Ein Bild wird nur
-über die bestehende berechtigungsgeprüfte Bildanalyse verarbeitet. Interne Quellen
-und Fachreferenzen im Verlauf werden vor Anzeige, Export **und erneuter Verwendung
-als LLM-Kontext** mit den aktuellen Rechten geprüft.
+Portalaufträge beginnen ausdrücklich mit `/takt`, zum Beispiel
+`/takt Erstelle eine Aufgabe für die Inventur`. Alle anderen Nachrichten bleiben
+Chat mit Streaming; die Formulierung einer Nachricht und frühere Aufträge schalten
+keine Portalwerkzeuge ein. Auch `ja` ist ohne Präfix nur Chat. Der Modusschalter der
+früheren automatischen Erkennung wurde entfernt. Eine Schaltfläche setzt `/takt`
+in die Eingabe ein, sendet aber nichts automatisch. Der aktive Eingabemodus ist
+sichtbar. Jede Änderung im Portal benötigt weiterhin Fachmaskenvorschau und
+Bestätigung. Ein leerer `/takt`-Befehl zeigt Hilfe, ohne einen Plan oder Modellaufruf.
+
+Bildanalyse bleibt im normalen Chat verfügbar. Portalaufträge mit Bild und
+Portalaufträge im temporären Chat werden ausdrücklich abgefangen. Ohne JavaScript
+führt ein `/takt`-Formularauftrag über denselben geprüften Planer zu einer Seite mit
+dem Fachbereichslink. Der Streaming-Endpunkt führt keine Portalaufträge aus.
+Interne Quellen und Fachreferenzen werden vor Anzeige, Export und erneuter
+Verwendung mit den aktuellen Rechten geprüft. Neue Chatnachrichten entwerten offene
+Portalvorschläge; eine Chatantwort kann keine Bestätigung ersetzen.
 
 | Bereich | Fachunterstützung |
 | --- | --- |
@@ -102,11 +112,11 @@ sind eigene Fachabläufe und werden nicht als freie Kalendertermine ausgegeben.
 
 ## Geschützter Krankmelder
 
-Krankmeldeanfragen werden vor Provider-, Wissens- und Gesprächsverarbeitung lokal
+Mit `/takt` gestartete Krankmeldeaufträge werden vor Provider-, Wissens- und Gesprächsverarbeitung lokal
 abgefangen. Originaltexte und medizinische Daten werden nicht in den KI-Verlauf
 übernommen. Ältere Gesundheitsturns aus dem bisherigen Chat werden nicht erneut als
 Modellkontext verwendet. Ein reiner Text-/Bildanalysemodus bleibt eine gesonderte,
-bewusst gewählte Funktion; die automatische Bedienunterstützung nutzt diese
+bewusst gewählte Funktion; der ausdrücklich gestartete Portalauftrag nutzt diese
 lokale Krankmeldergrenze.
 
 Der Adapter übernimmt nur eindeutig benannte vollständige Datumsangaben bzw.

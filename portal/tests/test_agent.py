@@ -80,7 +80,7 @@ def _fake(monkeypatch, *answers):
 
 def _plan(client, command):
     csrf = csrf_of(client.get("/").text)
-    response = client.post("/agent/plan", data={"csrf": csrf, "prompt": command})
+    response = client.post("/agent/plan", data={"csrf": csrf, "prompt": "/takt " + command})
     return response, csrf
 
 

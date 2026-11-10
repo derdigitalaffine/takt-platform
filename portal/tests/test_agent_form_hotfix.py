@@ -12,7 +12,7 @@ def test_agent_errors_are_json_even_with_default_fetch_accept(monkeypatch):
     async def invalid(*args, **kwargs):
         return 'Kein JSON vom Modell'
     monkeypatch.setattr(ai_provider, 'complete', invalid)
-    result = c.post('/agent/plan', data=dict(csrf=csrf, prompt='Erstelle ein Formular'), headers={'Accept': '*/*'})
+    result = c.post('/agent/plan', data=dict(csrf=csrf, prompt='/takt Erstelle ein Formular'), headers={'Accept': '*/*'})
     # Invalid model JSON must not create a tool plan or produce a cryptic error.
     assert result.status_code == 200
     assert result.headers['content-type'].startswith('application/json')
@@ -20,8 +20,8 @@ def test_agent_errors_are_json_even_with_default_fetch_accept(monkeypatch):
     assert result.json()['plan_id'] == ''
     assert 'keinen sicheren TAKT-Vorschlag' in result.json()['message']
     assert result.headers['cache-control'] == 'no-store'
-    assert c.post('/agent/plan', data=dict(prompt='ja')).status_code == 400
-    expired = client().post('/agent/plan', data=dict(prompt='ja'))
+    assert c.post('/agent/plan', data=dict(prompt='/takt ja')).status_code == 400
+    expired = client().post('/agent/plan', data=dict(prompt='/takt ja'))
     assert expired.headers['content-type'].startswith('application/json')
     assert expired.status_code in (400, 401)
 
@@ -29,12 +29,12 @@ def test_agent_errors_are_json_even_with_default_fetch_accept(monkeypatch):
 def test_birthday_form_and_short_confirmation_open_real_closed_draft(monkeypatch):
     c = login(*ADMIN); csrf = csrf_of(c.get('/').text)
     fake(monkeypatch, [], [])
-    response = c.post('/agent/plan', data=dict(csrf=csrf, prompt='Erstelle ein Formular für die Geburtstage der Belegschaft'))
+    response = c.post('/agent/plan', data=dict(csrf=csrf, prompt='/takt Erstelle ein Formular für die Geburtstage der Belegschaft'))
     assert response.status_code == 200
     proposal = dict(tool='create_form', title='Geburtstage der Belegschaft', fields=[
         dict(type='short', title='Name', required=True), dict(type='date', title='Geburtstag', required=False)])
     fake(monkeypatch, [], [proposal])
-    response = c.post('/agent/plan', data=dict(csrf=csrf, prompt='ja'))
+    response = c.post('/agent/plan', data=dict(csrf=csrf, prompt='/takt ja'))
     assert response.status_code == 200, response.text
     assert response.json()['open_url'].startswith('/forms?agent_plan=')
     assert 'Geburtstag' in response.json()['proposals'][0]
