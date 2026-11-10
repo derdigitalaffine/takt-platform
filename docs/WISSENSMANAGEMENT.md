@@ -31,9 +31,25 @@ Die Berechtigung wird bei jeder Listen-/Detail-/Schreiboperation neu geprüft.
 Der Modulgate sperrt auch bestehende Links nach Deaktivierung. Bereits gespeicherte
 Inhalte bleiben dabei erhalten.
 
-Im ersten Bauabschnitt erfolgt **ACL-Bearbeitung nur durch globale Admins**.
-Delegierte Managementrechte, erweiterte Rechtevorschau, fachliche Rollen und
-Wissensräume ohne Organisationshierarchie bleiben spätere Teilaufgaben von #298.
+Im dritten Bauabschnitt erfolgt **delegierte Raumverwaltung**: Ein Nutzer mit
+dem **globalen** Recht `knowledge_manage` und einer aktuellen, ausdrücklich
+erteilten Raum-Verwaltungsfreigabe (oder als Raum-Eigentümer) darf den eigenen
+Bereich verwalten. Die Fachadministration darf **ausschließlich Lesen und
+Bearbeiten** für aktive Personen mit **direkter** Mitgliedschaft in genau dieser
+Organisationseinheit freigeben, sperren oder zurücknehmen. Sie darf weder
+Fachfreigaben, KI-Rechte noch andere Verwalter vergeben; auch keine
+Gruppen-, Organisations- oder Artikelregeln ändern. Die zentrale Administration
+behält die weitreichende Kontrolle und die Wiederherstellung nach Sperren.
+Der Zugriff ist serverseitig abgesichert; bloße UI-Ausblendung reicht nie.
+
+Die Rechtevorschau `/wissen/raum/<id>/verwaltung` erklärt die zum
+Abfragezeitpunkt wirksamen Raumrechte für jeweils sichtbare Personen;
+die verbindliche Entscheidung trifft immer dieselbe `knowledge.allowed()`-
+Logik. Artikel können zusätzliche Sperren, Entwurfs- und Freigaberegeln haben.
+Globale Benutzer- und Gruppenverzeichnisse dürfen delegierte Redakteure
+nicht durchsuchen. Erweiterte Artikelrechte und eine artikelspezifische
+Rechtevorschau bleiben der zentralen Administration bzw. einem Folgeausbau
+vorbehalten.
 Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfolgen.
 
 ## Redaktionsprozess in P1
@@ -116,3 +132,25 @@ sein, bevor ein PR gemergt wird.
   Quellverknüpfungen sind weiterhin offene Teile des P2-Issues. Die hier
   enthaltene Formatierungsleiste ist ausdrücklich ein Markdown-Editor,
   kein vollwertiger WYSIWYG-Blockeditor.
+
+
+## P2 – delegierte Fachredaktion und Prüfungsübersicht
+
+- Der Wissensraum zeigt einen **Rechte verwalten**-Einstieg nur bei
+  berechtigtem Managementzugriff. Statt numerischer Personen-IDs gibt es
+  eine Suche und Auswahlliste mit maximal 120 Treffern pro Suchlauf,
+  auf direkte Mitglieder des Fachbereichs begrenzt.
+- Ein zweites, getrenntes Verfahren ermöglicht Admins die Vergabe an
+  Gruppen und andere Organisationseinheiten. Die entsprechenden globalen
+  Rechte bleiben zusätzlich erforderlich.
+- `/wissen/pruefungen` stellt berechtigten Personen mit
+  `knowledge_publish` eine **aktuell ACL-geprüfte** Übersicht zur
+  Verfügung: neue Beiträge in Prüfung, Änderungsentwürfe, fällige und
+  innerhalb von 30 Tagen anstehende Reviews. Beiträge, die die
+  prüfende Person selbst fachlich verfasst hat, werden nicht als
+  freigebbar angeboten.
+- Keine automatischen E-Mails oder Intervieweinladungen; Reminder-
+  Automatisierung ist ein **separater späterer Schritt**. Keine
+  personenbezogenen Leistungskennzahlen.
+- **Tests:** Organisationsisolierung, Rechteentzugswirkung, verbotene
+  delegierte Rechteausweitung, CSRF, Review-Filter und Modulabschaltung.

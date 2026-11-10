@@ -78,3 +78,36 @@
 .knowledge-compare-history{overflow-wrap:anywhere}
 .knowledge-diff{font-size:.78rem}
 @media(max-width:800px){.knowledge-compare{grid-template-columns:1fr}.knowledge-compare-pane{max-height:none}}
+
+
+/* P2 delegated administration and scoped editorial inbox. */
+.knowledge-head-actions{display:flex;flex-wrap:wrap;gap:.65rem;align-items:center}
+.knowledge-info-note{border:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);border-radius:12px;padding:.9rem 1.1rem;font-size:.85rem;margin-bottom:1.25rem;line-height:1.55}
+.knowledge-people-search,.knowledge-person-picker .d-flex{display:flex;gap:.65rem;align-items:center}
+.knowledge-people-search .form-control,.knowledge-person-picker .form-select{min-width:150px}
+.knowledge-reason-list{border:1px solid var(--bs-border-color);border-radius:12px;overflow:hidden}
+.knowledge-reason-row{display:grid;grid-template-columns:120px 90px minmax(0,1fr);gap:.6rem 1rem;align-items:center;padding:.85rem 1rem;border-bottom:1px solid var(--bs-border-color);font-size:.84rem}
+.knowledge-reason-row:last-child{border-bottom:0}
+.knowledge-reason-text{color:var(--bs-secondary-color)}
+.knowledge-reason-state{font-weight:650;font-size:.76rem}
+.knowledge-reason-yes{color:var(--bs-success-text-emphasis)}
+.knowledge-reason-no{color:var(--bs-danger-text-emphasis)}
+.knowledge-grant-list{display:flex;flex-direction:column}
+.knowledge-grant-line{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem 0;border-bottom:1px solid var(--bs-border-color)}
+.knowledge-grant-line:last-child{border:0}
+.knowledge-grant-line strong{display:block}
+.knowledge-grant-line small{display:block;color:var(--bs-secondary-color)}
+.knowledge-manage-teaser{display:flex;justify-content:space-between;gap:1rem;align-items:center}
+.knowledge-review-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.85rem}
+.knowledge-review-summary>div{background:var(--bs-body-bg);border:1px solid var(--bs-border-color);padding:1rem 1.25rem;border-radius:14px}
+.knowledge-review-summary span{display:block;color:var(--bs-secondary-color);font-size:.78rem}
+.knowledge-review-summary strong{font-size:1.7rem;font-weight:750;letter-spacing:-.02em}
+.knowledge-review-overdue{border-color:var(--bs-danger-border-subtle);background:var(--bs-danger-bg-subtle);color:var(--bs-danger-text-emphasis)}
+@media(max-width:720px){
+ .knowledge-review-summary{grid-template-columns:1fr}
+ .knowledge-reason-row{grid-template-columns:1fr auto}
+ .knowledge-reason-text{grid-column:1/-1}
+ .knowledge-manage-teaser,.knowledge-grant-line{align-items:stretch;flex-direction:column}
+ .knowledge-people-search,.knowledge-person-picker .d-flex{flex-wrap:wrap}
+ .knowledge-people-search .form-control,.knowledge-person-picker .form-select{flex:1 1 100%}
+}
