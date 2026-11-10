@@ -249,7 +249,7 @@ async def case_process_task(request: Request, case_id: int, run_id: int,
                             db: Session = Depends(get_db)):
     _module()
     case = cases.get(db, user, case_id)
-    if not user.can("anliegen_process_work") or not cases.can_handle(user, case):
+    if not hub.private_access(db, user, case):
         raise HTTPException(403)
     run = _get_run(db, run_id)
     task = db.get(AnliegenProcessTask, task_id)
@@ -285,7 +285,7 @@ def case_process_control(request: Request, case_id: int, run_id: int,
                          user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     case = cases.get(db, user, case_id)
-    if not user.can("anliegen_process_start") or not cases.can_handle(user, case):
+    if not user.can("anliegen_process_start") or not hub.private_access(db, user, case):
         raise HTTPException(403)
     run = _get_run(db, run_id)
     if run.anliegen_id != case.id:
@@ -320,7 +320,7 @@ def accept_case_process_completion(request: Request, case_id: int,
     """
     _module()
     case = cases.get(db, user, case_id)
-    if not user.can("anliegen_process_work") or not cases.can_handle(user, case):
+    if not hub.private_access(db, user, case):
         raise HTTPException(403)
     rate_limit(request, "anliegen-process-finish", limit=20, window=3600,
                key=str(user.id))
