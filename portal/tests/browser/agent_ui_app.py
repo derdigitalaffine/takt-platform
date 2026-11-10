@@ -7,18 +7,20 @@ from app.calendar_models import Calendar
 from app.anliegen_models import AnliegenCategory, Anliegen
 from app.task_models import Task
 from app.security import hash_password
-from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, Organization, set_setting
+from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, Organization, KrankEmployer, set_setting
 from app.org_models import OrgMembership
 from app.leave_models import LeavePolicy, LeaveRequest
 from app import leave
 from sqlalchemy import select
 
 with SessionLocal() as db:
-    for module in ('ai', 'calendars', 'forms', 'dms', 'anliegen'):
+    for module in ('ai', 'calendars', 'forms', 'dms', 'anliegen', 'krank'):
         set_setting(db, 'module_' + module, '1')
     set_setting(db, 'ai_knowledge_enabled', '1')
     user = db.scalar(select(User).where(User.email == 'browser@example.org'))
     user.permissions += ',ai_chat,ai_knowledge,forms'
+    db.add(KrankEmployer(name='Agent Health Employer', active=True))
+    set_setting(db, 'krank_kinds', 'simple,au,eau,child')
     user.is_admin = True  # Fixture exercises all three adapters in one confirmation.
     cal = Calendar(owner_id=user.id, title='Projektkalender', source='free')
     form = Form(owner_id=user.id, title='Projektformular', internal=True, active=False)

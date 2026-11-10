@@ -275,7 +275,7 @@ def normalize_plan(reply, user, findings, categories, db):
             if tool in ("create_form", "create_leave"):
                 proposals.append(action)
                 continue
-            key = ("leave" if tool in ("edit_leave", "leave_command") else modules.KINDS[tool], action["id"])
+            key = ("krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else modules.KINDS[tool], action["id"])
             if key in seen:
                 raise ValueError("Mehrere Änderungen am selben Vorgang sind nicht zulässig.")
             seen.add(key)

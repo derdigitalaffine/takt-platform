@@ -15,6 +15,8 @@ from .db import DmsArea, LOCAL_TZ
 
 def destination(action):
     tool = action["tool"]
+    if tool in ("set_krank_status", "add_krank_note", "send_krank_message"):
+        return f"/krankmelder/{action['id']}"
     if tool in ("create_leave", "edit_leave", "leave_command"):
         return "/urlaub/planer?unit=" + str(action["display_unit"])
     if tool == "configure_anliegen_category":
@@ -56,6 +58,10 @@ def load(request, user, nonce, step):
 
 
 def validate(db, user, action):
+    from . import agent_krank
+    if action["tool"] in agent_krank.TOOLS:
+        agent_krank.target(db, user, action)
+        return
     from . import agent_leave
     if action["tool"] in agent_leave.TOOLS:
         agent_leave.validate(db, user, action)
@@ -114,6 +120,7 @@ def edited(db, user, original, data):
     tool = raw["tool"]
     allowed = {
         "create_form": ("title",),
+        "set_krank_status": ("note",), "add_krank_note": ("text",), "send_krank_message": ("text",),
         "create_leave": ("starts_on", "ends_on", "start_half", "end_half"),
         "edit_leave": ("starts_on", "ends_on", "start_half", "end_half"),
         "leave_command": ("reason",),
@@ -153,7 +160,7 @@ def edited(db, user, original, data):
     # module ACL is still checked by normalize/validate, including the new target.
     findings = []
     if "id" in raw:
-        kind = "leave" if tool in ("edit_leave", "leave_command") else agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
+        kind = "krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
         findings.append(dict(type=kind, id=raw["id"]))
     if "assignee_id" in raw:
         findings.append(dict(type="person", id=raw["assignee_id"]))

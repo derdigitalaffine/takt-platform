@@ -49,7 +49,8 @@ async def _conversational_answer(
                 AIMessage.conversation_id == convo.id,
             ).order_by(AIMessage.id.desc()).limit(14)
         ))
-        history = _model_history(db, user, list(reversed(rows)))
+        from .agent_krank import safe_history
+        history = safe_history(_model_history(db, user, list(reversed(rows))))
     messages = [{
         "role": "system",
         "content": (
@@ -145,9 +146,15 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     _access(user)
     # Even a failed replacement request invalidates any previous confirmation.
     stash_get(request, "takt-agent-plan", pop=True)
+    from . import agent_krank
+    stash_get(request, "takt-agent-krank", pop=True)
     prompt = prompt.strip()
     if not 1 <= len(prompt) <= 8000:
         raise HTTPException(422, "Bitte eine Anweisung mit 1 bis 8.000 Zeichen eingeben.")
+    if agent_krank.SIGNAL.search(prompt):
+        stash_get(request, "takt-agent-context", pop=True)
+        rate_limit(request, "takt-agent-health", limit=24, window=60, key=str(user.id))
+        return _response(agent_krank.prepare(request, db, user, prompt))
     previous_context = stash_get(request, "takt-agent-context") or {}
     prior = (previous_context.get("prompts", [])
              if previous_context.get("user_id") == user.id else [])
@@ -195,7 +202,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
         if convo:
             from .routes_ai import _model_history
             rows = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == convo.id).order_by(AIMessage.id.desc()).limit(10)))
-            context = _model_history(db, user, list(reversed(rows)))
+            context = agent_krank.safe_history(_model_history(db, user, list(reversed(rows))))
         from . import ai_knowledge
         from .routes_ai import _web_sources, _source_meta, _internal_ai_sources
         # All TAKT chat paths share the same live-ACL RAG adapters, including
@@ -338,6 +345,7 @@ def takt_agent_execute(request: Request, plan_id: str = Form(...),
 def takt_agent_reset(request: Request, user: User = Depends(current_user)):
     _access(user)
     stash_get(request, "takt-agent-plan", pop=True)
+    stash_get(request, "takt-agent-krank", pop=True)
     stash_get(request, "takt-agent-context", pop=True)
     stash_get(request, "takt-agent-private-intake", pop=True)
     return _response({"reset": True})
@@ -349,7 +357,13 @@ def takt_agent_draft(request: Request, plan_id: str, step: int = 0,
     from . import agent_drafts
     _access(user)
     plan, _ = agent_drafts.load(request, user, plan_id, step)
-    return _response(agent_drafts.view(db, user, plan, step))
+    data = agent_drafts.view(db, user, plan, step)
+    from . import agent_krank, krank
+    if data["tool"] in agent_krank.TOOLS:
+        row = agent_krank.target(db, user, plan["actions"][step])
+        krank.audit(db, user, row, "agent_preview")
+        db.commit()
+    return _response(data)
 
 
 @app.post("/agent/draft/review", dependencies=[Depends(check_csrf)])
