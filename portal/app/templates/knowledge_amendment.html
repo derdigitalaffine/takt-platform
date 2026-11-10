@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Änderungsentwurf · {{item.title}}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/knowledge.css">{% endblock %}
+{% block content %}
+<div class="knowledge-ui">
+  <nav class="knowledge-breadcrumb" aria-label="Pfad"><a href="/wissen">Wissen</a><i class="fa-solid fa-chevron-right"></i><a href="/wissen/raum/{{space.id}}">{{space.title}}</a><i class="fa-solid fa-chevron-right"></i><a href="/wissen/artikel/{{item.id}}">{{item.title}}</a><i class="fa-solid fa-chevron-right"></i><span>Änderungsentwurf</span></nav>
+  <header class="knowledge-head">
+    <div><span class="knowledge-eyebrow">REDAKTION · FREIGEGEBENE FASSUNG {{item.version}}</span>
+    <h1>Änderungen an {{item.title}}</h1>
+    <p>Der aktuelle Artikel bleibt für Leser unverändert. Erst eine andere, berechtigte Person kann diesen Vorschlag veröffentlichen.</p></div>
+    <span class="knowledge-status knowledge-status-{{proposal.status}}">{{"Zur fachlichen Prüfung" if proposal.status=="review" else "Unveröffentlichter Entwurf"}}</span>
+  </header>
+  <div class="knowledge-compare">
+    <section class="knowledge-compare-pane" aria-labelledby="published-title">
+      <div class="knowledge-compare-head"><h2 id="published-title">Veröffentlichte Fassung</h2><span>Version {{item.version}}</span></div>
+      <p class="fw-semibold">{{item.title}}</p>
+      <div class="knowledge-markdown">{{item.body_md|knowledge_markdown}}</div>
+    </section>
+    <section class="knowledge-compare-pane" aria-labelledby="proposed-title">
+      <div class="knowledge-compare-head"><h2 id="proposed-title">Änderungsentwurf</h2><span>Stand {{proposal.version}}</span></div>
+      <p class="fw-semibold">{{proposal.title}}</p>
+      <div class="knowledge-markdown">{{proposal.body_md|knowledge_markdown}}</div>
+    </section>
+  </div>
+  {% if proposal.status == "draft" and can_edit %}
+  <details class="knowledge-form-card mt-4" open>
+    <summary><i class="fa-solid fa-pen me-2"></i>Entwurf weiterbearbeiten</summary>
+    <form method="post" action="/wissen/artikel/{{item.id}}/entwurf/save" data-knowledge-editor class="row g-3 pt-3">
+      <input type="hidden" name="csrf" value="{{csrf}}">
+      <input type="hidden" name="article_id" value="{{item.id}}">
+      <input type="hidden" name="version" value="{{proposal.version}}">
+      <div class="col-md-8"><label class="form-label" for="proposal-title">Titel</label><input class="form-control" name="title" id="proposal-title" required maxlength="200" value="{{proposal.title}}"></div>
+      <div class="col-md-4"><label class="form-label" for="proposal-kind">Art</label><select class="form-select" id="proposal-kind" name="kind">{% for kind,label in kinds.items() %}<option value="{{kind}}" {{'selected' if proposal.kind==kind}}>{{label}}</option>{% endfor %}</select></div>
+      <div class="col-12"><label class="form-label" for="proposal-body">Inhalt</label><textarea class="form-control" id="proposal-body" name="body_md" rows="14" maxlength="60000" data-knowledge-markdown>{{proposal.body_md}}</textarea></div>
+      <div><button class="btn btn-primary" type="submit">Änderungsentwurf speichern</button></div>
+    </form>
+  </details>
+  {% endif %}
+  <div class="knowledge-status-actions" aria-label="Freigabe des Entwurfs">
+    {% if proposal.status=="draft" and can_edit %}
+    <form method="post" action="/wissen/artikel/{{item.id}}/entwurf/status"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{proposal.version}}"><input type="hidden" name="status" value="review"><button class="btn btn-outline-primary" type="submit"><i class="fa-solid fa-arrow-right me-1"></i>Zur Prüfung einreichen</button></form>
+    {% endif %}
+    {% if proposal.status=="review" and (can_edit or can_publish) %}
+    <form method="post" action="/wissen/artikel/{{item.id}}/entwurf/status"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{proposal.version}}"><input type="hidden" name="status" value="draft"><button class="btn btn-outline-secondary" type="submit">Zur Überarbeitung zurückgeben</button></form>
+    {% endif %}
+    {% if proposal.status=="review" and can_publish %}
+    <form method="post" action="/wissen/artikel/{{item.id}}/entwurf/status"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{proposal.version}}"><input type="hidden" name="status" value="published"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-check me-1"></i>Neue Fassung freigeben</button></form>
+    {% endif %}
+  </div>
+  <details class="knowledge-form-card mt-4"><summary>Änderungen nachvollziehen</summary>
+    <div class="knowledge-compare-history"><p class="text-secondary small mt-3">Vergleich zwischen bisher veröffentlichter Fassung und aktuellem Entwurf:</p><pre class="knowledge-diff">{{difference or "Keine Unterschiede im Textkörper."}}</pre>
+    <h3 class="h6 mt-3">Bearbeitungsschritte</h3><ol>{% for rev in history %}<li>Version {{rev.version}} – {{rev.status}} · {{rev.created_at|local}}</li>{% endfor %}</ol></div>
+  </details>
+  <p class="knowledge-footnote"><i class="fa-solid fa-lock me-1"></i>Änderungen, Zwischenfassungen und der Vergleich sind ausschließlich für berechtigte Redaktion und Prüfung sichtbar. Die KI-Indizierung bleibt gesondert deaktiviert.</p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/knowledge-editor.js" defer></script>{% endblock %}

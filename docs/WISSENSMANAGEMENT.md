@@ -2,7 +2,7 @@
 
 **Status:** Umsetzung in Phasen. Interviewentscheidungen 1–16 und empfohlene technische
 Fortsetzung: [Epic #296](https://github.com/derdigitalaffine/takt-platform/issues/296).
-Dies ist der **erste vertikale Grundbaustein**, nicht die fertige Prozess-/KI-Suite.
+Die P2-Redaktionsausbaustufe ergänzt den Grundbaustein. Die geplante Prozess- und KI-Suite ist weiterhin nicht vollständig umgesetzt.
 
 ## Aktivierung
 
@@ -33,7 +33,7 @@ Inhalte bleiben dabei erhalten.
 
 Im ersten Bauabschnitt erfolgt **ACL-Bearbeitung nur durch globale Admins**.
 Delegierte Managementrechte, erweiterte Rechtevorschau, fachliche Rollen und
-Wissensräume ohne Organisationshierarchie werden im nächsten PR ergänzt.
+Wissensräume ohne Organisationshierarchie bleiben spätere Teilaufgaben von #298.
 Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfolgen.
 
 ## Redaktionsprozess in P1
@@ -42,9 +42,9 @@ Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfol
 2. Der Artikel startet als Entwurf. Änderungen erzeugen eine versionierte Momentaufnahme.
 3. Die Redaktion reicht ihn zur Prüfung ein; Rückgabe zum Entwurf ist möglich.
 4. Nur eine **andere** Person mit Veröffentlichungsrecht darf den geprüften
-   Beitrag freigeben. Ein publizierter Stand kann in P1 noch nicht direkt
-   überschrieben werden; sichere Änderungsentwürfe für veröffentlichte Fassungen
-   folgen mit dem mehrstufigen Redaktionsworkflow in P2.
+   Beitrag freigeben. Veröffentlichte Beiträge werden nicht direkt überschrieben: Ein separater,
+   berechtigungsgeschützter Änderungsentwurf wird bearbeitet, verglichen und
+   erst nach unabhängiger Freigabe zur neuen veröffentlichten Fassung.
 5. Änderungen von Zugriffsrechten werden als metadatenbasierte Ereignisse protokolliert.
    Es gibt keinen öffentlichen Zugriff und keinen automatischen KI-Export.
 
@@ -56,9 +56,11 @@ Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfol
   #196, #219). Die bloße Anzeige von „KI-Freigabe“ ist **keine Indexierung**.
 - **Prozessnotationen:** BPMN/CMMN/DMN/EPK und Prozessrekonstruktion sind
   geplante Ausbaustufen (#300, #301), noch keine Editoren.
-- **Governance:** Rollen, Wiedervorlagen, Revisionen mit separaten Freigabe-
-  fassungen, verknüpfte Dienstanweisungen/Umläufe und Wissenstransfer folgen
-  in #298, #302.
+- **Governance:** P2 enthält voneinander getrennte Änderungsentwürfe,
+  revisionsbezogene Historie, einen Prüftermin und eingeschränkte fachliche
+  Qualitätsstufen. Delegierte Rollen, konfigurierbare mehrstufige Freigaben,
+  Erinnerungs-Worker, verknüpfte Dienstanweisungen/Umläufe und Wissenstransfer
+  bleiben Aufgaben von #298 / #302.
 - **Suche:** Der Einstieg verwendet berechtigungsgefiltertes SQL-Textmatching
   mit begrenzter Kandidatenanzahl. Später folgen FTS/Hybrid-Vektor und
   indizierte Zugriffsfilter für große Datenbestände.
@@ -66,9 +68,15 @@ Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfol
   Mitarbeiterinterviews. Vor einer Aktivierung solcher Funktionen sind
   Datenschutz, Personalvertretung, Dienstvereinbarung und Aufbewahrungsfristen
   gesondert zu prüfen.
-- **Inhaltspflege:** Veröffentlichung ist zunächst final; bestehende Beiträge
-  sind ohne Lösch-/Überschreibfunktion bewusst geschützt. Vollständige
-  Revisions- und Aufbewahrungsregeln einschließlich Export/Backup folgen.
+- **Inhaltspflege:** Freigegebene Texte bleiben während einer Überarbeitung
+  unverändert. Nach fachlicher Freigabe wird eine neue Fassung angelegt;
+  frühere Versions-Snapshots bleiben erhalten. Einfache Prüfbestätigungen
+  ändern nur geprüfte Metadaten. Löschen/Exportieren ist bewusst weiterhin
+  nicht implementiert; Aufbewahrungsregeln und Backup-/Restore-Gates folgen.
+- **Regelwerksverbindlichkeit:** Die Stufen „offiziell freigegeben“ und
+  „verbindliche Regelung“ sind vorbereitet, bleiben in dieser Phase jedoch
+  über das Wissensformular gesperrt. Es entsteht keine Dienstanweisung ohne
+  einen gesonderten, zuständigen Regelwerksfreigabeprozess.
 
 ## Tests
 
@@ -76,3 +84,35 @@ Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfol
 isolation, Entwurfsvertraulichkeit, expliziten Entzug, Vier-Augen-Freigabe,
 Versionskonflikte und CSRF-Sperre. Der Gesamtportal-Testlauf muss ebenfalls grün
 sein, bevor ein PR gemergt wird.
+
+
+## P2 – sichere Redaktionsfortsetzung, Vorlagen und Wiedervorlagen
+
+- **Dokumenteditor:** Markdown-Formatierungsleiste und typbezogene Vorlagen
+  (Artikel, Prozess, FAQ, Checkliste, Erfahrungswissen) als optionale
+  JavaScript-Verbesserung; das Formular bleibt ohne JavaScript verwendbar.
+  Der vorhandene Markdown-Renderer wird serverseitig mit deaktiviertem rohem
+  HTML ausgeführt; auch die Vorschau prüft CSRF, Fachrechte und den Modulschalter.
+- **Veröffentlichte Fassungen:** Die Tabelle `knowledge_amendments` hält
+  pro Artikel den aktuellen Änderungsentwurf. `knowledge_amendment_revisions`
+  enthält jede Entwurfs-/Statusänderung. Leser sehen weiterhin ausschließlich
+  `knowledge_articles`; Änderungsentwürfe und Textvergleiche sind ausschließlich
+  für jeweils berechtigte Bearbeiter/Freigebende erreichbar.
+- **Freigabe:** Nur eine andere berechtigte Person als Entwurfsverfasser
+  **und** letzte Bearbeitung darf den eingereichten Vorschlag freigeben.
+  Versionsabgleich verhindert, dass ein veralteter Entwurf eine parallel
+  publizierte Fassung überschreibt. Veröffentlichung erzeugt eine neue
+  `knowledge_revisions`-Momentaufnahme und behält vorherige Fassungen.
+- **Wissensqualität:** `authority`, `review_due_on`, `last_reviewed_at`
+  und `published_at` werden mit einer idempotenten, additiven Migration
+  nachgerüstet. Prüfrechte gelten je Objekt. Für neu veröffentlichte Artikel
+  wird ein Standard-Prüftermin ein Jahr später vorgeschlagen. Ein berechtigter,
+  unabhängiger Prüfer kann Stufe und Termin später erneut bestätigen.
+  Verbindliche Dienstanweisungen werden dadurch nicht eigenmächtig erlassen.
+- **Datenfluss:** Aus Wissensartikeln erfolgt weiterhin **keine** automatische
+  Übernahme in KI-/RAG-Indizes, kein externer API-Aufruf, keine Mitarbeiteransprache.
+- **Abgrenzung:** Visueller Blockeditor mit frei sortierbaren Elementen,
+  automatisierte Erinnerungen, rollenbasierte ACL-Delegation und
+  Quellverknüpfungen sind weiterhin offene Teile des P2-Issues. Die hier
+  enthaltene Formatierungsleiste ist ausdrücklich ein Markdown-Editor,
+  kein vollwertiger WYSIWYG-Blockeditor.

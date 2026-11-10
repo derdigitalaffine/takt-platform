@@ -4,7 +4,7 @@ Content and history stay in the authoritative portal database; vector search
 never acts as a permission boundary. No source is indexed automatically.
 """
 from sqlalchemy import (
-    Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text,
+    Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -46,8 +46,65 @@ class KnowledgeArticle(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     version: Mapped[int] = mapped_column(Integer, default=1)
+    authority: Mapped[str] = mapped_column(String(20), default="unconfirmed")
+    review_due_on: Mapped[object | None] = mapped_column(Date, nullable=True)
+    last_reviewed_at: Mapped[object | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[object | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class KnowledgeAmendment(Base):
+    """A working proposal; published content stays untouched until approval.
+
+    One proposal per article; applied proposals are reused for future changes.
+    All proposal versions are retained in KnowledgeAmendmentRevision.
+    """
+    __tablename__ = "knowledge_amendments"
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'review', 'applied')"),
+        CheckConstraint("kind IN ('article', 'process', 'checklist', 'faq', 'experience')"),
+        UniqueConstraint("article_id"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_articles.id", ondelete="CASCADE"), index=True
+    )
+    base_version: Mapped[int] = mapped_column(Integer)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    cycle_start_version: Mapped[int] = mapped_column(Integer, default=1)
+    title: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(20))
+    body_md: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="draft")
+    creator_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    last_editor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
+
+
+class KnowledgeAmendmentRevision(Base):
+    """Immutable evidence for every amendment state/content transition."""
+    __tablename__ = "knowledge_amendment_revisions"
+    __table_args__ = (UniqueConstraint("article_id", "version"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_articles.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    base_version: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(20))
+    body_md: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16))
+    action: Mapped[str] = mapped_column(String(16), default="edit")
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
 
 
 class KnowledgeGrant(Base):
@@ -84,6 +141,8 @@ class KnowledgeRevision(Base):
     title: Mapped[str] = mapped_column(String(200))
     body_md: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20))
+    authority: Mapped[str] = mapped_column(String(20), default="unconfirmed")
+    review_due_on: Mapped[object | None] = mapped_column(Date, nullable=True)
     editor_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

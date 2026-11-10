@@ -165,3 +165,150 @@ def test_csrf_required_for_writes(sample):
     assert author.post(f"/wissen/raum/{space_id}/artikel", data={
         "title": "Ohne Schutz", "kind": "article",
     }).status_code == 400
+
+
+
+def _publish_sample(sample):
+    """Use a real two-person approval; fixture itself starts unpublished."""
+    _, _, article_id, *_ = sample
+    author = login("wissen-reader@example.org", "knowledge-test-123")
+    reviewer = login("wissen-checker@example.org", "knowledge-test-123")
+    assert author.post(f"/wissen/artikel/{article_id}/status", data={
+        "csrf": csrf_of(author.get(f"/wissen/artikel/{article_id}").text),
+        "status": "review", "version": 1,
+    }).status_code == 303
+    assert reviewer.post(f"/wissen/artikel/{article_id}/status", data={
+        "csrf": csrf_of(reviewer.get(f"/wissen/artikel/{article_id}").text),
+        "status": "published", "version": 2,
+    }).status_code == 303
+    return author, reviewer
+
+
+def test_published_amendment_stays_private_until_second_approval(sample):
+    _, space_id, article_id, _, outsider_id, _ = sample
+    author, reviewer = _publish_sample(sample)
+    outsider = login("wissen-outsider@example.org", "knowledge-test-123")
+    # Explicit read-only article share: outsider can see released content, never drafts.
+    with SessionLocal() as db:
+        db.add(KnowledgeGrant(resource_kind="article", resource_id=article_id,
+                              principal_kind="user", principal_id=outsider_id,
+                              capability="read", effect="allow"))
+        db.commit()
+    assert outsider.get(f"/wissen/artikel/{article_id}").status_code == 200
+    author_csrf = csrf_of(author.get(f"/wissen/artikel/{article_id}").text)
+    assert author.post(f"/wissen/artikel/{article_id}/entwurf/start", data={
+        "csrf": author_csrf, "version": 3,
+    }).status_code == 303
+    assert outsider.get(f"/wissen/artikel/{article_id}/entwurf").status_code == 403
+    text = outsider.get(f"/wissen/artikel/{article_id}").text
+    assert "Interne Abläufe" in text
+    assert "Änderungsentwurf prüfen" not in text
+    amendment = author.get(f"/wissen/artikel/{article_id}/entwurf")
+    assert amendment.status_code == 200
+    assert "data-knowledge-editor" in amendment.text
+    assert "Veröffentlichte Fassung" in amendment.text
+    assert author.post(f"/wissen/artikel/{article_id}/entwurf/save", data={
+        "csrf": author_csrf, "title": "Beschaffung und Ausgabe",
+        "kind": "process", "body_md": "## Neuer Ablauf\n\n<script>alert(1)</script>",
+        "version": 1,
+    }).status_code == 303
+    assert author.post(f"/wissen/artikel/{article_id}/entwurf/save", data={
+        "csrf": author_csrf, "title": "Veraltet",
+        "kind": "process", "body_md": "Kein Datenverlust", "version": 1,
+    }).status_code == 409
+    assert "Neuer Ablauf" not in outsider.get(f"/wissen/artikel/{article_id}").text
+    assert outsider.post("/wissen/vorschau", data={
+        "csrf": csrf_of(outsider.get(f"/wissen/artikel/{article_id}").text),
+        "article_id": article_id, "body_md": "unberechtigt",
+    }).status_code == 403
+    preview = author.post("/wissen/vorschau", data={
+        "csrf": author_csrf, "article_id": article_id,
+        "body_md": "## Titel\n\n<script>alert(1)</script>\n\n[unsicher](javascript:alert(1))",
+    })
+    assert preview.status_code == 200
+    assert "<h2>" in preview.json()["html"]
+    assert "<script>" not in preview.json()["html"]
+    assert 'href="javascript:' not in preview.json()["html"]
+
+    assert author.post(f"/wissen/artikel/{article_id}/entwurf/status", data={
+        "csrf": author_csrf, "status": "review", "version": 2,
+    }).status_code == 303
+    assert author.post(f"/wissen/artikel/{article_id}/entwurf/status", data={
+        "csrf": author_csrf, "status": "published", "version": 3,
+    }).status_code == 403
+    reviewer_csrf = csrf_of(reviewer.get(f"/wissen/artikel/{article_id}/entwurf").text)
+    assert reviewer.post(f"/wissen/artikel/{article_id}/entwurf/status", data={
+        "csrf": reviewer_csrf, "status": "published", "version": 3,
+    }).status_code == 303
+    from app.knowledge_models import KnowledgeAmendment, KnowledgeRevision
+    with SessionLocal() as db:
+        item = db.get(KnowledgeArticle, article_id)
+        assert item.version == 4 and item.title == "Beschaffung und Ausgabe"
+        assert item.kind == "process" and "Neuer Ablauf" in item.body_md
+        assert item.authority == "verified" and item.last_reviewed_at is not None
+        assert item.review_due_on is not None
+        assert len(list(db.scalars(select(KnowledgeRevision).where(
+            KnowledgeRevision.article_id == article_id)))) >= 3
+        proposal = db.scalar(select(KnowledgeAmendment).where(
+            KnowledgeAmendment.article_id == article_id))
+        assert proposal.status == "applied"
+    assert "Neuer Ablauf" in outsider.get(f"/wissen/artikel/{article_id}").text
+    assert "<script>" not in outsider.get(f"/wissen/artikel/{article_id}").text
+    assert author.get(f"/wissen/artikel/{article_id}/entwurf").status_code == 404
+
+
+def test_amendment_revocation_and_disabled_module_fail_closed(sample):
+    _, space_id, article_id, reader_id, *_ = sample
+    author, reviewer = _publish_sample(sample)
+    admin = login(*ADMIN)
+    token = csrf_of(author.get(f"/wissen/artikel/{article_id}").text)
+    assert author.post(f"/wissen/artikel/{article_id}/entwurf/start",
+                       data={"csrf": token, "version": 3}).status_code == 303
+    assert author.get(f"/wissen/artikel/{article_id}/entwurf").status_code == 200
+    admin_csrf = csrf_of(admin.get(f"/wissen/raum/{space_id}").text)
+    assert admin.post(f"/wissen/space/{space_id}/rechte", data={
+        "csrf": admin_csrf, "principal_kind": "user", "principal_id": reader_id,
+        "capability": "read", "effect": "deny",
+    }).status_code == 303
+    assert author.get(f"/wissen/artikel/{article_id}/entwurf").status_code == 403
+    assert author.post(f"/wissen/artikel/{article_id}/entwurf/save", data={
+        "csrf": token, "title": "Versuch", "kind": "article",
+        "body_md": "Versuch", "version": 1,
+    }).status_code == 403
+    settings(module_knowledge="0")
+    assert admin.get(f"/wissen/artikel/{article_id}/entwurf").status_code == 404
+    assert admin.post("/wissen/vorschau", data={
+        "csrf": admin_csrf, "article_id": article_id, "body_md": "Aus",
+    }).status_code == 404
+
+
+def test_review_due_date_authority_and_version_conflict(sample):
+    _, _, article_id, *_ = sample
+    author, reviewer = _publish_sample(sample)
+    reviewer_csrf = csrf_of(reviewer.get(f"/wissen/artikel/{article_id}").text)
+    url = f"/wissen/artikel/{article_id}/pruefung"
+    assert reviewer.post(url, data={
+        "csrf": reviewer_csrf, "authority": "binding",
+        "review_due_on": "2030-10-01", "version": 3,
+    }).status_code == 422
+    assert reviewer.post(url, data={
+        "csrf": reviewer_csrf, "authority": "verified",
+        "review_due_on": "not-a-date", "version": 3,
+    }).status_code == 422
+    assert author.post(url, data={
+        "csrf": csrf_of(author.get(f"/wissen/artikel/{article_id}").text),
+        "authority": "verified", "review_due_on": "2030-10-01", "version": 3,
+    }).status_code == 403
+    assert reviewer.post(url, data={
+        "csrf": reviewer_csrf, "authority": "experience",
+        "review_due_on": "2030-10-01", "version": 3,
+    }).status_code == 303
+    assert reviewer.post(url, data={
+        "csrf": reviewer_csrf, "authority": "experience",
+        "review_due_on": "2031-10-01", "version": 3,
+    }).status_code == 409
+    with SessionLocal() as db:
+        item = db.get(KnowledgeArticle, article_id)
+        assert item.authority == "experience"
+        assert item.review_due_on.isoformat() == "2030-10-01"
+        assert item.version == 4
