@@ -79,6 +79,17 @@
         <div id="anliegen-recipient-preview" class="anliegen-recipient-preview small mt-3" role="status" aria-live="polite">
           Zuständigkeit wird geprüft …
         </div>
+        {% if process_options %}
+        <div class="border rounded-3 p-3 mt-3" id="anliegen-process-option">
+          <label for="anliegen-process-select" class="form-label fw-semibold"><i class="fa-solid fa-diagram-project me-1" aria-hidden="true"></i>Optional einen Prozess starten</label>
+          <select class="form-select" id="anliegen-process-select" name="process_rule_id">
+            <option value="0">Kein Prozess beim Einreichen</option>
+            {% for item in process_options %}<option value="{{item.rule.id}}" data-category="{{item.category.id}}">{{item.process.name}} · {{item.category.title}}</option>{% endfor %}
+          </select>
+          <input type="hidden" name="process_token" value="{{process_token}}">
+          <div class="form-text">Nur passende, freigegebene Prozesse werden angeboten. Bei vorgeschriebener Freigabe beginnt die Bearbeitung erst nach Genehmigung.</div>
+        </div>
+        {% endif %}
         <div class="anliegen-submit-bar mt-4">
           <p class="small text-secondary mb-3"><i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>Erst mit dem folgenden Klick wird Ihr Anliegen erstellt und weitergeleitet.</p>
           <button type="submit" class="btn btn-primary btn-lg">
