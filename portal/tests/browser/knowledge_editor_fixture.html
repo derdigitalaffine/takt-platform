@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de" data-bs-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TAKT Wissen – Blockeditor Browser-Smoke</title>
+  <link rel="stylesheet" href="/app/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/app/static/vendor/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/app/static/knowledge.css">
+</head>
+<body>
+  <main class="container py-4 knowledge-ui">
+    <h1>Wissenseditor</h1>
+    <form method="post" action="/wissen/raum/10/artikel" data-knowledge-editor class="row g-3">
+      <input type="hidden" name="csrf" value="browser-csrf-test">
+      <input type="hidden" name="space_id" value="10">
+      <div class="col-12"><label for="block-test-kind">Art</label>
+        <select name="kind" id="block-test-kind"><option value="article" selected>Artikel</option><option value="process">Prozess</option></select>
+      </div>
+      <div class="col-12"><label for="block-test-md">Wissen</label>
+        <textarea id="block-test-md" name="body_md" rows="10" maxlength="60000" data-knowledge-markdown>## Titel
+
+Der &lt;img src=x onerror=alert(1)&gt; bleibt Text.
+
+- [ ] Kontrolle A
+- [x] Kontrolle B
+
+| Feld | Wert |
+| --- | --- |
+| Bestand | 1 |
+
+&lt;custom-tag&gt;Unbekannte Erweiterung&lt;/custom-tag&gt;</textarea>
+      </div>
+      <div class="col-12"><button type="submit" class="btn btn-primary">Speichern</button></div>
+    </form>
+  </main>
+  <script>
+    window.testSubmissions = [];
+    document.querySelector('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      window.testSubmissions.push(document.querySelector('[data-knowledge-markdown]').value);
+    });
+  </script>
+  <script defer src="/app/static/knowledge-editor.js"></script>
+  <script defer src="/app/static/knowledge-blocks.js"></script>
+  <script defer src="/app/static/knowledge-visual-editor.js"></script>
+</body>
+</html>

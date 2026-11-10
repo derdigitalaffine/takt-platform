@@ -99,6 +99,10 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Check file-picker feedback
         run: node tests/test_task_create_client.js
+      - name: Verify visual knowledge-block Markdown round trips
+        run: node tests/test_knowledge_blocks_client.js
+      - name: Exercise knowledge block editor in Chromium
+        run: python tests/browser/knowledge_blocks_smoke.py
       - name: Exercise task UI in Chromium
         run: python tests/browser/task_ui_smoke.py
       - name: Exercise agent confirmation across modules
