@@ -40,7 +40,7 @@ def prepared(db):
     reviewer = User(
         email=f"process-reviewer-{uuid4().hex}@example.org",
         name="Prozessprüfer", password_hash="not-used",
-        active=True, is_admin=False, permissions="anliegen_manage")
+        active=True, is_admin=False, permissions="anliegen_manage,anliegen_process_work")
     outsider = User(
         email=f"process-outsider-{uuid4().hex}@example.org",
         name="Unbeteiligt", password_hash="not-used",
