@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Anliegen ANL-{{'%06d'|format(case.id)}}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/anliegen-processes.css">{% endblock %}
 {% block content %}
 {{m.page_head('Anliegen ANL-' ~ ('%06d'|format(case.id)), 'Interner Vorgang mit Zuständigkeits- und Bearbeitungsnachweis.')}}
 <p class="mb-3"><a href="/anliegen"><i class="fa-solid fa-arrow-left me-1"></i>Zurück zu meinen Anliegen</a></p>
@@ -23,6 +24,127 @@
       {% if case.task_id and tasks_enabled %}<dt class="col-sm-4">TAKT-Aufgabe</dt><dd class="col-sm-8"><a href="/aufgaben/{{case.task_id}}">Aufgabe #{{case.task_id}} öffnen</a></dd>{% endif %}
     </dl>
   </div></article>
+  {% if process_enabled or process_cards %}
+  <section class="card mt-3 anliegen-process-overview" id="anliegen-processes">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span><i class="fa-solid fa-diagram-project me-2 text-primary" aria-hidden="true"></i>Verknüpfte Prozesse</span>
+      <span class="badge text-bg-light border text-body">{{process_cards|length}} Läufe</span>
+    </div>
+    <div class="card-body">
+      {% if not process_enabled %}
+      <p class="alert alert-light border small">Die Prozessanbindung ist derzeit abgeschaltet. Bereits gespeicherte Prozessläufe bleiben weiterhin nachvollziehbar.</p>
+      {% endif %}
+      {% if process_rules and process_enabled %}
+      <form method="post" action="/anliegen/{{case.id}}/prozess-start" class="mb-4">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <input type="hidden" name="token" value="{{process_token}}">
+        <label class="form-label fw-semibold" for="anliegen-start-process">Freigegebenen Prozess starten</label>
+        <div class="d-flex gap-2 flex-wrap">
+          <select class="form-select flex-grow-1" id="anliegen-start-process" name="rule_id" required>
+            {% for rule in process_rules %}
+              <option value="{{rule.id}}">{{process_names.get(rule.id, 'Prozess')}} · Regelrevision {{rule.revision}}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-play me-1" aria-hidden="true"></i>Starten</button>
+        </div>
+        <div class="form-text">Jeder Start wird der veröffentlichten Prozessversion zugeordnet. Eine Freigabe kann erforderlich sein.</div>
+      </form>
+      {% endif %}
+      {% for card in process_cards %}
+      {% set run = card.run %}
+      <article class="ap-run">
+        <div class="ap-run-header mb-2">
+          <div>
+            <div class="small text-secondary">Lauf #{{run.id}} · Start {{run.created_at|local('%d.%m.%Y %H:%M')}}</div>
+            <strong>{{(card.process.name if card.process else 'Archivierter Prozess') if card.can_view_details else 'Interner Bearbeitungsprozess'}}</strong>
+          </div>
+          <span class="badge {{'text-bg-success' if run.state == 'done' else 'text-bg-warning' if run.state in ('requested','blocked') else 'text-bg-danger' if run.state in ('rejected','cancelled') else 'text-bg-secondary'}}">
+            {{ {'requested':'Startfreigabe ausstehend', 'running':'In Bearbeitung', 'done':'Abgeschlossen', 'rejected':'Abgelehnt', 'paused':'Pausiert', 'cancelled':'Abgebrochen', 'blocked':'Blockiert'}.get(run.state,run.state) }}
+          </span>
+        </div>
+        <div class="small text-secondary mb-2">Veröffentlichte Version #{{run.process_version_id}} · Startart {{ {'submit':'Einreichen','handler':'Bearbeitung','auto':'Kategorieautomatik'}.get(run.origin,run.origin) }}</div>
+        {% if run.error_code %}<p class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Prozess wartet auf Klärung: {{run.error_code}}</p>{% endif %}
+        {% if card.can_approve and run.state == 'requested' %}
+        <form method="post" action="/anliegen/prozessfreigaben/{{run.id}}" class="mb-3">
+          <input type="hidden" name="csrf" value="{{csrf}}">
+          <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-stamp me-1" aria-hidden="true"></i>Prozessstart freigeben</button>
+        </form>
+        {% endif %}
+        {% if card.tasks and card.can_view_details %}
+        <ol class="list-unstyled mb-2">
+        {% for item in card.tasks %}
+          {% set task = item.task %}
+          {% set step = item.step %}
+          <li class="ap-task">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <strong class="small">{{task.name}}</strong>
+              <span class="badge {{'text-bg-success' if task.state == 'done' else 'text-bg-secondary' if task.state == 'skipped' else 'text-bg-warning'}}">{{{'done':'Erledigt','open':'Offen','skipped':'Übersprungen','cancelled':'Abgebrochen'}.get(task.state, task.state)}}</span>
+            </div>
+            {% if task.due_at %}<div class="small text-secondary">Frist {{task.due_at|local('%d.%m.%Y')}}</div>{% endif %}
+            {% if item.can_act %}
+            <form class="ap-form" method="post" action="/anliegen/{{case.id}}/prozesse/{{run.id}}/aufgabe/{{task.id}}">
+              <input type="hidden" name="csrf" value="{{csrf}}">
+              {% if step.get('description') %}<p class="small mb-2">{{step.description}}</p>{% endif %}
+              {% if task.kind == 'task' %}
+                {% for point in step.get('checklist',[]) %}
+                <label class="form-check mb-1">
+                  <input class="form-check-input" type="checkbox" name="checks" value="{{point}}" required>
+                  <span class="form-check-label small">{{point}}</span>
+                </label>
+                {% endfor %}
+                {% for field in step.get('fields',[]) %}
+                <div class="mb-2">
+                  <label class="form-label small fw-semibold" for="ap-field-{{task.id}}-{{field.key}}">{{field.label}}</label>
+                  {% if field.type == 'select' %}
+                    <select class="form-select form-select-sm" id="ap-field-{{task.id}}-{{field.key}}" name="field_{{field.key}}" {% if field.required %}required{% endif %}>
+                      <option value="">Bitte auswählen</option>
+                      {% for opt in field.options %}<option value="{{opt}}">{{opt}}</option>{% endfor %}
+                    </select>
+                  {% elif field.type == 'yesno' %}
+                    <select class="form-select form-select-sm" id="ap-field-{{task.id}}-{{field.key}}" name="field_{{field.key}}" {% if field.required %}required{% endif %}>
+                      <option value="">Bitte auswählen</option><option>Ja</option><option>Nein</option>
+                    </select>
+                  {% elif field.type == 'textarea' %}
+                    <textarea class="form-control form-control-sm" rows="2" maxlength="5000" id="ap-field-{{task.id}}-{{field.key}}" name="field_{{field.key}}" {% if field.required %}required{% endif %}></textarea>
+                  {% else %}
+                    <input class="form-control form-control-sm" id="ap-field-{{task.id}}-{{field.key}}" name="field_{{field.key}}" {% if field.required %}required{% endif %} maxlength="5000" type="{{'number' if field.type in ('money','number') else 'date' if field.type == 'date' else 'text'}}" {% if field.type in ('money','number') %}step="any"{% endif %}>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              {% endif %}
+              <label class="form-label small" for="ap-comment-{{task.id}}">Kommentar{% if task.kind == 'approval' %} (bei Ablehnung verpflichtend){% endif %}</label>
+              <textarea class="form-control form-control-sm mb-2" rows="2" id="ap-comment-{{task.id}}" name="comment" maxlength="10000"></textarea>
+              <div class="d-flex flex-wrap gap-2">
+                {% if task.kind == 'approval' %}
+                  <button class="btn btn-sm btn-primary" name="outcome" value="approved" type="submit">Genehmigen</button>
+                  <button class="btn btn-sm btn-outline-danger" name="outcome" value="rejected" type="submit">Ablehnen</button>
+                {% else %}
+                  <button class="btn btn-sm btn-primary" name="outcome" value="done" type="submit">Schritt abschließen</button>
+                {% endif %}
+              </div>
+            </form>
+            {% endif %}
+          </li>
+        {% endfor %}
+        </ol>
+        {% endif %}
+        {% if card.can_control and run.state in ('running','blocked','paused','requested') %}
+        <div class="ap-actions">
+          {% if run.state in ('running','blocked') %}
+          <form method="post" action="/anliegen/{{case.id}}/prozesse/{{run.id}}/steuern"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="pause"><button class="btn btn-sm btn-outline-secondary">Pausieren</button></form>
+          {% elif run.state == 'paused' %}
+          <form method="post" action="/anliegen/{{case.id}}/prozesse/{{run.id}}/steuern"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="resume"><button class="btn btn-sm btn-outline-primary">Fortsetzen</button></form>
+          {% endif %}
+          <form method="post" action="/anliegen/{{case.id}}/prozesse/{{run.id}}/steuern"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="action" value="cancel"><button class="btn btn-sm btn-outline-danger">Abbrechen</button></form>
+        </div>
+        {% endif %}
+      </article>
+      {% else %}
+      <p class="small text-secondary mb-0">Für dieses Anliegen wurden noch keine Prozesse gestartet.</p>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
   <section class="card mt-3"><div class="card-header">Bearbeitungsverlauf</div><div class="card-body">
     <ol class="list-unstyled mb-0">{% for event in events %}<li class="border-bottom pb-2 mb-2 small"><strong>{{event.kind}}</strong> – {{event.note}}<div class="text-secondary">{{event.created_at|local('%d.%m.%Y %H:%M')}}</div></li>{% else %}<li>Keine Einträge.</li>{% endfor %}</ol>
   </div></section>

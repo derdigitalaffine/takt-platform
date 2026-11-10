@@ -176,3 +176,22 @@
     if (controller) controller.abort();
   });
 }());
+
+/* Category-bound optional internal process choice (independent of the AI draft). */
+(() => {
+  const category = document.getElementById("anliegen-category");
+  const process = document.getElementById("anliegen-process-select");
+  if (!category || !process) return;
+  const sync = () => {
+    const chosen = String(category.value);
+    for (const option of process.options) {
+      if (option.value === "0") continue;
+      const allowed = option.dataset.category === chosen;
+      option.disabled = !allowed;
+      option.hidden = !allowed;
+    }
+    if (process.selectedOptions[0]?.disabled) process.value = "0";
+  };
+  category.addEventListener("change", sync);
+  sync();
+})();

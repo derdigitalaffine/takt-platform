@@ -11,6 +11,12 @@ from sqlalchemy.orm import Session
 
 from .anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
 from . import anliegen as service
+from . import anliegen_process_config as process_config
+from . import anliegen_processes as process_policies
+from . import anliegen_process_engine as process_engine
+from .anliegen_process_models import AnliegenProcessRule, AnliegenProcessRun, AnliegenProcessTask
+from .db import Process
+
 from .db import User, get_settings, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
                    flash, get_db, rate_limit, redirect, render)
@@ -114,8 +120,18 @@ def new_anliegen(request: Request, user: User = Depends(current_user), db: Sessi
         if not cat.confidential:
             raise HTTPException(409, "Die geschützte Kategorie hat sich geändert.")
         draft_values = dict(title="Vertrauliches Anliegen", description=private["description"], category_id=cat.id)
-    response = render(request, "anliegen_new.html", user, categories=categories, draft_values=draft_values,
-                      ai_available=(not draft_values and "ai" in enabled_modules() and user.can("ai_chat")))
+    process_options = []
+    if process_policies.integration_enabled(db):
+        org_id = service.primary_org(db, user.id)
+        for cat in categories:
+            for rule in process_config.allowed_for_submit(db, cat.id, org_id, user):
+                proc = db.get(Process, rule.process_id)
+                if proc:
+                    process_options.append(dict(rule=rule, category=cat, process=proc))
+    response = render(request, "anliegen_new.html", user, categories=categories,
+                      draft_values=draft_values,
+                      ai_available=(not draft_values and "ai" in enabled_modules() and user.can("ai_chat")),
+                      process_options=process_options, process_token=uuid4().hex)
     if nonce:
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -137,12 +153,18 @@ def anliegen_recipient_preview(category_id: int, user: User = Depends(current_us
 def create_anliegen(request: Request, category_id: int = Form(...),
                    title: str = Form(...), description: str = Form(""),
                    description_final: str = Form(""),
+                   process_rule_id: int = Form(0), process_token: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _submit(user)
     rate_limit(request, "anliegen-submit", limit=12, window=3600, key=str(user.id))
     cat = service.category(db, category_id, enabled=True)
     case = service.create(db, user, cat, title, description_final.strip() or description)
+    if process_rule_id:
+        # A forbidden process selection rolls back the entire intake transaction.
+        process_config.launch(db, case, process_rule_id, user, origin="submit",
+                              token=process_token)
+    process_config.start_auto(db, case, user)
     db.commit()
     flash(request, "Anliegen ANL-%06d eingereicht. %s" % (
         case.id, "Zuständigkeit noch nicht eindeutig konfiguriert." if not case.assignee_id
@@ -160,12 +182,54 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
                              .order_by(AnliegenEvent.id)))
     people = list(db.scalars(select(User).where(User.active.is_(True)).order_by(User.name))) if (
         not case.confidential and user.can("anliegen_manage")) else []
+    process_enabled = process_policies.integration_enabled(db)
+    process_rules = process_config.allowed_for_handler(db, case, user)
+    case_runs = list(db.scalars(select(AnliegenProcessRun).where(
+        AnliegenProcessRun.anliegen_id == case.id).order_by(
+        AnliegenProcessRun.id.desc()).limit(100)))
+    from . import absence
+    acting_users = set(absence.acting_ids(db, user)) if process_enabled else set()
+    acting_groups = set(absence.acting_group_ids(db, user)) if process_enabled else set()
+    cards = []
+    for run in case_runs:
+        rule = db.get(AnliegenProcessRule, run.rule_id)
+        proc = db.get(Process, rule.process_id) if rule else None
+        tasks = list(db.scalars(select(AnliegenProcessTask).where(
+            AnliegenProcessTask.run_id == run.id).order_by(
+            AnliegenProcessTask.ordinal)))
+        try:
+            steps = process_engine._definition(db, run)
+        except process_engine.ProcessEngineError:
+            steps = []
+        cards.append(dict(run=run, process=proc, rule=rule,
+                          can_view_details=(service.can_handle(user, case)
+                                            and user.can("anliegen_process_work")),
+                          can_approve=(process_enabled
+                            and process_config.can_approve_run(db, user, case)
+                            and run.requested_by_id != user.id),
+                          can_control=(process_enabled and service.can_handle(user, case)
+                                       and user.can("anliegen_process_start")),
+                          tasks=[dict(task=task, step=steps[task.step_index]
+                                       if 0 <= task.step_index < len(steps) else {},
+                                      can_act=(process_enabled and user.can("anliegen_process_work")
+                                               and service.can_handle(user, case)
+                                               and run.state == "running" and task.state == "open"
+                                               and (task.assignee_id in acting_users
+                                                    or (task.group_id is not None
+                                                        and task.group_id in acting_groups))))
+                                 for task in tasks]))
+    process_names = {rule.id: (db.get(Process, rule.process_id).name
+                               if db.get(Process, rule.process_id) else "Unbekannter Prozess")
+                     for rule in process_rules}
     return render(request, "anliegen_detail.html", user, case=case, events=events,
                   statuses=service.STATUSES,
                   choices=service.next_states(case),
                   can_handle=service.can_handle(user, case), people=people,
                   tasks_enabled=("tasks" in enabled_modules()),
-                  is_order=case.category.key in service.ORDER_KEYS)
+                  is_order=case.category.key in service.ORDER_KEYS,
+                  process_enabled=process_enabled, process_rules=process_rules,
+                  process_cards=cards, process_token=uuid4().hex,
+                  process_names=process_names)
 
 
 @app.post("/anliegen/{case_id:int}/status", dependencies=[Depends(check_csrf)])
