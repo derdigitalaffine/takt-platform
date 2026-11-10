@@ -1,11 +1,14 @@
 """Manual, organization-scoped TAKT Wissen UI; no implicit AI/RAG ingestion."""
+from datetime import datetime, timedelta
+
 from fastapi import Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import knowledge as km
-from .db import Organization, User, utcnow
-from .knowledge_models import KnowledgeArticle, KnowledgeGrant, KnowledgeSpace, KnowledgeRevision
+from .db import LOCAL_TZ, Organization, User, utcnow
+from .knowledge_models import (KnowledgeAmendment, KnowledgeArticle, KnowledgeGrant,
+                               KnowledgeSpace, KnowledgeRevision)
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
 
 
@@ -147,12 +150,20 @@ def knowledge_article(request: Request, article_id: int,
     grants = list(db.scalars(select(KnowledgeGrant).where(
         KnowledgeGrant.resource_kind == "article", KnowledgeGrant.resource_id == item.id
     ))) if user.is_admin else []
+    can_edit = km.allowed(db, user, space, "edit", item)
+    can_publish = km.allowed(db, user, space, "publish", item)
+    # Editors/reviewers only: the existence of pending drafts is itself sensitive.
+    proposal = db.scalar(select(KnowledgeAmendment).where(
+        KnowledgeAmendment.article_id == item.id
+    )) if (item.status == "published" and (can_edit or can_publish)) else None
+    if proposal and proposal.status == "applied":
+        proposal = None
+    today = datetime.now(LOCAL_TZ).date()
     return render(request, "knowledge_article.html", user, space=space,
-                  item=item, history=history, grants=grants,
-                  kinds=km.KINDS, statuses=km.STATUSES,
-                  can_edit=km.allowed(db, user, space, "edit", item),
-                  can_publish=km.allowed(db, user, space, "publish", item),
-                  can_manage=user.is_admin)
+                  item=item, history=history, grants=grants, proposal=proposal,
+                  kinds=km.KINDS, statuses=km.STATUSES, authorities=km.AUTHORITIES,
+                  can_edit=can_edit, can_publish=can_publish,
+                  today=today, can_manage=user.is_admin)
 
 
 @app.post("/wissen/artikel/{article_id:int}/save", dependencies=[Depends(check_csrf)])
@@ -195,12 +206,22 @@ def knowledge_article_status(request: Request, article_id: int,
         cap = "edit"
     elif status == "published" and item.status == "review":
         cap = "publish"
-        if item.owner_id == user.id:
-            raise HTTPException(403, "Vier-Augen-Freigabe: Der Verfasser darf nicht selbst veröffentlichen.")
+        content_author = db.scalar(select(KnowledgeRevision.id).where(
+            KnowledgeRevision.article_id == item.id,
+            KnowledgeRevision.status == "draft",
+            KnowledgeRevision.editor_id == user.id,
+        ).limit(1))
+        if item.owner_id == user.id or content_author is not None:
+            raise HTTPException(403, "Vier-Augen-Freigabe: Wer die aktuelle Fassung bearbeitet hat, darf sie nicht selbst freigeben.")
     else:
         raise HTTPException(409, "Dieser Statuswechsel ist nicht zulässig.")
     if not km.allowed(db, user, space, cap, item):
         raise HTTPException(403)
+    if status == "published":
+        item.authority = "verified"
+        item.published_at = utcnow()
+        item.last_reviewed_at = utcnow()
+        item.review_due_on = datetime.now(LOCAL_TZ).date() + timedelta(days=365)
     km.change_status(db, item, user, status)
     db.commit()
     flash(request, "Wissensstatus aktualisiert.")

@@ -5,11 +5,13 @@ exposes an organization's knowledge; organization membership/explicit grants
 are additionally required. Excluded material never enters RAG by default.
 """
 from sqlalchemy import select
+from markdown_it import MarkdownIt
+from markupsafe import Markup
 
 from .db import Group, GroupMember, Organization, User, get_settings, utcnow
 from .knowledge_models import (
     KnowledgeArticle, KnowledgeAudit, KnowledgeGrant, KnowledgeRevision,
-    KnowledgeSpace,
+    KnowledgeSpace, KnowledgeAmendmentRevision,
 )
 from . import organization
 
@@ -28,6 +30,34 @@ KINDS = {
     "experience": "Erfahrungswissen",
 }
 STATUSES = {"draft": "Entwurf", "review": "In Prüfung", "published": "Freigegeben"}
+AUTHORITIES = {
+    "unconfirmed": "Unbestätigte Information",
+    "experience": "Erfahrungswissen",
+    "verified": "Fachlich geprüft",
+    "official": "Offiziell freigegeben",
+    "binding": "Verbindliche Regelung",
+}
+# In P2 official/binding classification is only possible through the existing
+# separate legal-text and circulation workflows; ordinary knowledge cannot
+# proclaim itself a binding administrative rule.
+EDITOR_AUTHORITIES = {"unconfirmed", "experience", "verified"}
+_MD = MarkdownIt("commonmark", {"html": False, "linkify": False})
+
+
+def render_markdown(raw: str | None) -> Markup:
+    """Render stored Markdown without ever treating embedded HTML as trusted."""
+    return Markup(_MD.render(raw or ""))
+
+
+def remember_amendment(db, proposal, actor_id: int, action: str) -> None:
+    """Keep a cycle-safe immutable trace of content edits versus workflow acts."""
+    db.add(KnowledgeAmendmentRevision(
+        article_id=proposal.article_id, version=proposal.version,
+        base_version=proposal.base_version, title=proposal.title,
+        kind=proposal.kind, body_md=proposal.body_md,
+        status=proposal.status, action=action, actor_id=actor_id,
+    ))
+
 
 
 def active(db) -> bool:
@@ -137,7 +167,9 @@ def can_create_space(db, user, org_id: int | None) -> bool:
 def record_revision(db, item: KnowledgeArticle, editor_id: int) -> None:
     db.add(KnowledgeRevision(
         article_id=item.id, version=item.version, title=item.title,
-        body_md=item.body_md, status=item.status, editor_id=editor_id,
+        body_md=item.body_md, status=item.status,
+        authority=item.authority, review_due_on=item.review_due_on,
+        editor_id=editor_id,
     ))
 
 

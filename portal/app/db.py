@@ -2962,6 +2962,18 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    # Additive, restart-safe knowledge governance columns; existing organizations
+    # and published article content are not rewritten by this migration.
+    "knowledge_articles": {
+        "authority": "VARCHAR(20) NOT NULL DEFAULT 'unconfirmed'",
+        "review_due_on": "DATE",
+        "last_reviewed_at": "DATETIME",
+        "published_at": "DATETIME",
+    },
+    "knowledge_revisions": {
+        "authority": "VARCHAR(20) NOT NULL DEFAULT 'unconfirmed'",
+        "review_due_on": "DATE",
+    },
     "anliegen_categories": {"tags": "TEXT NOT NULL DEFAULT ''"},
     "anliegen_process_rules": {
         "process_version_id": "INTEGER REFERENCES process_versions(id) ON DELETE RESTRICT",

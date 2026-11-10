@@ -6,16 +6,17 @@
   <nav class="knowledge-breadcrumb" aria-label="Pfad"><a href="/wissen">Wissen</a><i class="fa-solid fa-chevron-right"></i><a href="/wissen/raum/{{space.id}}">{{space.title}}</a><i class="fa-solid fa-chevron-right"></i><span>{{item.title}}</span></nav>
   <header class="knowledge-head">
     <div><span class="knowledge-eyebrow">{{kinds[item.kind]}} · Fassung {{item.version}}</span><h1>{{item.title}}</h1><p><span class="knowledge-status knowledge-status-{{item.status}}">{{statuses[item.status]}}</span> <span class="ms-2 small">Zugriff: {{'Einzeln eingeschränkt' if item.scope=='restricted' else 'Vom Wissensraum geerbt'}}</span></p></div>
-    {% if item.status=='draft' and can_edit %}<a class="btn btn-outline-primary" href="#wissen-editor"><i class="fa-solid fa-pen me-2"></i>Bearbeiten</a>{% endif %}
+    {% if item.status=='draft' and can_edit %}<a class="btn btn-outline-primary" href="#wissen-editor"><i class="fa-solid fa-pen me-2"></i>Bearbeiten</a>{% elif item.status=='published' and proposal %}<a class="btn btn-outline-primary" href="/wissen/artikel/{{item.id}}/entwurf"><i class="fa-solid fa-code-branch me-2"></i>Änderungsentwurf prüfen</a>{% elif item.status=='published' and can_edit %}<form method="post" action="/wissen/artikel/{{item.id}}/entwurf/start"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><button class="btn btn-outline-primary" type="submit"><i class="fa-solid fa-pen me-2"></i>Neue Fassung vorbereiten</button></form>{% endif %}
   </header>
-  <article class="knowledge-article-body">{{item.body_md|richtext if item.body_md else 'Noch kein Inhalt erfasst.'}}</article>
+  {% if item.status=='published' %}<div class="knowledge-meta-strip"><span><i class="fa-solid fa-circle-check me-1"></i>{{authorities.get(item.authority, 'Unbestätigt')}}</span>{% if item.review_due_on %}<span class="{{'knowledge-meta-due' if item.review_due_on < today}}"><i class="fa-regular fa-calendar me-1"></i>Nächste Prüfung: {{item.review_due_on.strftime('%d.%m.%Y')}}</span>{% endif %}{% if proposal %}<a href="/wissen/artikel/{{item.id}}/entwurf" class="knowledge-inline-link"><i class="fa-solid fa-code-branch me-1"></i>{{'Entwurf zur Prüfung' if proposal.status=='review' else 'Überarbeitung im Entwurf'}}</a>{% endif %}</div>{% endif %}
+  <article class="knowledge-article-body knowledge-markdown">{{item.body_md|knowledge_markdown if item.body_md else 'Noch kein Inhalt erfasst.'}}</article>
   {% if item.status=='draft' and can_edit %}
     <details class="knowledge-form-card mt-4" id="wissen-editor"><summary>Entwurf bearbeiten</summary>
-      <form action="/wissen/artikel/{{item.id}}/save" method="post" class="row g-3 pt-3">
-        <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}">
+      <form action="/wissen/artikel/{{item.id}}/save" method="post" data-knowledge-editor class="row g-3 pt-3">
+        <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="article_id" value="{{item.id}}">
         <div class="col-md-8"><label class="form-label" for="edit-title">Titel</label><input id="edit-title" name="title" maxlength="200" class="form-control" required value="{{item.title}}"></div>
         <div class="col-md-4"><label class="form-label" for="edit-kind">Art</label><select id="edit-kind" name="kind" class="form-select">{% for key,label in kinds.items() %}<option value="{{key}}" {{'selected' if item.kind==key}}>{{label}}</option>{% endfor %}</select></div>
-        <div class="col-12"><label class="form-label" for="edit-body">Inhalt</label><textarea id="edit-body" name="body_md" maxlength="60000" rows="12" class="form-control">{{item.body_md}}</textarea><p class="form-text">Text wird sicher formatiert angezeigt. KI ist nicht erforderlich.</p></div>
+        <div class="col-12"><label class="form-label" for="edit-body">Inhalt</label><textarea id="edit-body" name="body_md" maxlength="60000" rows="12" class="form-control" data-knowledge-markdown>{{item.body_md}}</textarea><p class="form-text">Text wird sicher formatiert angezeigt. KI ist nicht erforderlich.</p></div>
         <div><button class="btn btn-primary" type="submit">Neue Fassung speichern</button></div>
       </form>
     </details>
@@ -25,6 +26,17 @@
     {% if item.status=='review' and can_edit %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="draft"><button class="btn btn-outline-secondary">Zur Überarbeitung zurückgeben</button></form>{% endif %}
     {% if item.status=='review' and can_publish and item.owner_id != user.id %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="published"><button class="btn btn-primary">Fachlich freigeben</button></form>{% endif %}
   </div>
+  {% if item.status=='published' and can_publish and item.owner_id != user.id %}
+  <details class="knowledge-form-card mt-4">
+    <summary><i class="fa-solid fa-clipboard-check me-2"></i>Wissensqualität und Wiedervorlage</summary>
+    <p class="text-secondary small mt-3">Die nächste regelmäßige Prüfung veranlassen. Verbindliche Regelungen dürfen nicht durch eine einfache Wissensbestätigung entstehen.</p>
+    <form action="/wissen/artikel/{{item.id}}/pruefung" method="post" class="row g-3">
+      <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}">
+      <div class="col-md-6"><label for="wissen-authority" class="form-label">Verbindlichkeitsstufe</label><select id="wissen-authority" name="authority" class="form-select"><option value="unconfirmed" {{'selected' if item.authority=='unconfirmed'}}>Unbestätigte Information</option><option value="experience" {{'selected' if item.authority=='experience'}}>Erfahrungswissen</option><option value="verified" {{'selected' if item.authority=='verified'}}>Fachlich geprüft</option><option value="official" disabled>Offiziell freigegeben – Regelwerksverfahren</option><option value="binding" disabled>Verbindliche Regelung – Regelwerksverfahren</option></select></div>
+      <div class="col-md-6"><label for="wissen-next-review" class="form-label">Nächster Prüftermin</label><input class="form-control" id="wissen-next-review" name="review_due_on" type="date" value="{{item.review_due_on.isoformat() if item.review_due_on else ''}}"></div>
+      <div><button class="btn btn-outline-primary" type="submit">Prüfung bestätigen und Termin speichern</button></div>
+    </form>
+  </details>{% endif %}
   <details class="knowledge-form-card mt-4"><summary>Versionsverlauf</summary>
     <ol class="knowledge-revisions mt-3">{% for rev in history %}<li><strong>Fassung {{rev.version}}</strong> · {{statuses[rev.status]}} · {{rev.created_at|local}}</li>{% else %}<li>Keine Fassungen</li>{% endfor %}</ol>
   </details>
@@ -45,3 +57,5 @@
   <p class="knowledge-footnote"><i class="fa-solid fa-shield-halved me-1"></i>Die fachliche Freigabe ist von einer KI-Freigabe getrennt. Ungeprüfte Inhalte werden nicht öffentlich bereitgestellt.</p>
 </div>
 {% endblock %}
+
+{% block scripts %}<script src="/static/knowledge-editor.js" defer></script>{% endblock %}

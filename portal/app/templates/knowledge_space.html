@@ -13,11 +13,11 @@
   </div>
   {% if can_edit %}<details id="article-new" class="knowledge-form-card mt-4">
     <summary>Wissensbeitrag erstellen</summary>
-    <form action="/wissen/raum/{{space.id}}/artikel" method="post" class="row g-3 pt-3">
-      <input type="hidden" name="csrf" value="{{csrf}}">
+    <form action="/wissen/raum/{{space.id}}/artikel" method="post" class="row g-3 pt-3" data-knowledge-editor>
+      <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="space_id" value="{{space.id}}">
       <div class="col-md-7"><label class="form-label" for="ka-title">Titel</label><input id="ka-title" name="title" class="form-control" required maxlength="200"></div>
       <div class="col-md-5"><label class="form-label" for="ka-kind">Art</label><select id="ka-kind" name="kind" class="form-select">{% for kind,label in kinds.items() %}<option value="{{kind}}">{{label}}</option>{% endfor %}</select></div>
-      <div class="col-12"><label for="ka-body" class="form-label">Wissen / Schritte (Markdown möglich)</label><textarea id="ka-body" name="body_md" class="form-control" rows="8" maxlength="60000"></textarea></div>
+      <div class="col-12"><label for="ka-body" class="form-label">Wissen / Schritte (Markdown möglich)</label><textarea id="ka-body" name="body_md" class="form-control" rows="8" maxlength="60000" data-knowledge-markdown></textarea></div>
       <div><button type="submit" class="btn btn-primary">Entwurf erstellen</button></div>
     </form>
   </details>{% endif %}
@@ -38,3 +38,5 @@
   {% endif %}
 </div>
 {% endblock %}
+
+{% block scripts %}<script src="/static/knowledge-editor.js" defer></script>{% endblock %}

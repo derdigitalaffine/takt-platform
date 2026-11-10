@@ -25,11 +25,6 @@ class AnliegenProcessRule(Base):
     revision: Mapped[int] = mapped_column(Integer, default=1)
     state: Mapped[str] = mapped_column(String(16), default="draft")  # draft | review | active | retired
     policy_json: Mapped[str] = mapped_column(Text, default="{}")
-    process_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("process_versions.id", ondelete="RESTRICT"), nullable=True, index=True)
-    created_by_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    state_version: Mapped[int] = mapped_column(Integer, default=0)
     approved_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
@@ -100,19 +95,4 @@ class AnliegenProcessTask(Base):
     checks_enc: Mapped[str] = mapped_column(Text, default="")
     values_enc: Mapped[str] = mapped_column(Text, default="")
     comment_enc: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
-
-
-class AnliegenProcessRuleEvent(Base):
-    """Compact non-sensitive rule revision audit (no descriptions/policy payload)."""
-    __tablename__ = "anliegen_process_rule_events"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    rule_id: Mapped[int] = mapped_column(
-        ForeignKey("anliegen_process_rules.id", ondelete="CASCADE"), index=True)
-    actor_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    kind: Mapped[str] = mapped_column(String(32))
-    revision: Mapped[int] = mapped_column(Integer)
-    process_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("process_versions.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
