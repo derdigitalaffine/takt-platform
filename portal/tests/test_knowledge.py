@@ -339,7 +339,7 @@ def test_delegated_management_is_scoped_to_exact_org_and_read_edit_only(sample):
     # A manager with global right and a live grant may explain exact-unit rights.
     preview = reviewer.get(path + f"?person={author_id}")
     assert preview.status_code == 200
-    assert "Aktive Organisationszuordnung" in preview.text
+    assert "Eigentümer des Wissensraums" in preview.text
     assert "Globale TAKT-Berechtigung fehlt" in preview.text
 
     csrf = csrf_of(page.text)
