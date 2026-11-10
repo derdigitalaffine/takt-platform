@@ -1,6 +1,6 @@
 """Boards organize shared tasks; business-source access is rechecked at use time."""
 from sqlalchemy import select, or_, update
-from sqlalchemy.orm import object_session
+from sqlalchemy.orm import object_session, selectinload
 from fastapi import HTTPException
 from .db import GroupMember, utcnow
 from .task_models import TaskBoard,TaskBoardMember,TaskBoardColumn,TaskBoardCard,Task,TaskParticipant
@@ -78,8 +78,11 @@ def visible_cards(db,user,board):
     from . import tasks as ts
     sources=None;result=[];cols=columns(db,board)
     mapping={col.id:col for col in cols}
-    for card in db.scalars(select(TaskBoardCard).where(TaskBoardCard.board_id==board.id).order_by(TaskBoardCard.position,TaskBoardCard.id)):
-        task=db.get(Task,card.task_id) if card.task_id else None
+    board_cards=list(db.scalars(select(TaskBoardCard).where(TaskBoardCard.board_id==board.id).order_by(TaskBoardCard.position,TaskBoardCard.id)))
+    native_ids=[card.task_id for card in board_cards if card.task_id]
+    native={task.id:task for task in db.scalars(select(Task).options(selectinload(Task.assignee)).where(Task.id.in_(native_ids)))} if native_ids else {}
+    for card in board_cards:
+        task=native.get(card.task_id)
         if task:
             if task.archived_at:continue
             col=mapping.get(card.column_id)
@@ -126,3 +129,52 @@ def move(db,user,board,card,target,index=0):
     items=list(db.scalars(select(TaskBoardCard).where(TaskBoardCard.board_id==board.id,TaskBoardCard.column_id==target.id,TaskBoardCard.id!=card.id).order_by(TaskBoardCard.position,TaskBoardCard.id)))
     items.insert(max(0,min(index,len(items))),card)
     for pos,item in enumerate(items):item.position=pos
+
+
+# Card presentation belongs to the board, never to the underlying task workflow.
+CARD_TYPES = {'task': 'Aufgabe', 'checklist': 'Checkliste', 'idea': 'Idee',
+              'note': 'Notiz', 'decision': 'Entscheidung', 'milestone': 'Meilenstein'}
+COVER_COLORS = {'': 'Ohne Farbstreifen', 'blue': 'Blau', 'teal': 'Türkis',
+                'grape': 'Violett', 'orange': 'Orange', 'pink': 'Rosa', 'gray': 'Grau'}
+
+
+def presentation(card, data):
+    from . import tasks as ts
+    kind = str(data.get('card_type', card.card_type or 'task'))
+    color = str(data.get('cover_color', card.cover_color or ''))
+    if kind not in CARD_TYPES or color not in COVER_COLORS:
+        raise ts.Invalid('Bitte einen gültigen Kartentyp und eine Kartenfarbe wählen.')
+    card.card_type, card.cover_color = kind, color
+
+
+def card_statistics(db, items):
+    from .task_models import TaskCheck, TaskComment, TaskAttachment
+    from sqlalchemy import func, case
+    ids=[v['task'].id for v in items if v['task']]
+    result={tid:dict(checks=0,checked=0,comments=0,files=0) for tid in ids}
+    if not ids:return result
+    for tid,total,done in db.execute(select(TaskCheck.task_id,func.count(),func.sum(case((TaskCheck.done,1),else_=0))).where(TaskCheck.task_id.in_(ids)).group_by(TaskCheck.task_id)):
+        result[tid].update(checks=total,checked=int(done or 0))
+    for model,key in ((TaskComment,'comments'),(TaskAttachment,'files')):
+        for tid,total in db.execute(select(model.task_id,func.count()).where(model.task_id.in_(ids),model.removed_at.is_(None)).group_by(model.task_id)):
+            result[tid][key]=total
+    return result
+
+
+def card_summary(db, item, statistics=None):
+    from . import tasks as ts
+    card, task, source = item['card'], item['task'], item['source']
+    result = dict(id=card.id, column=str(item['column'].id), type=card.card_type or 'task',
+                  cover=card.cover_color or '', title=task.title if task else source['title'],
+                  native=bool(task))
+    if task:
+        stats=(statistics if statistics is not None else card_statistics(db,[item]))[task.id]
+        due = ts.to_local(task.due_at)
+        result.update(version=task.version, status=task.status, status_label=ts.STATUSES[task.status],
+            priority=task.priority, priority_label=ts.PRIORITIES[task.priority], responsible=task.responsible_name,
+            tags=[tag.strip() for tag in task.tags.split(',') if tag.strip()], description=bool(task.description),
+            due=due.strftime('%d.%m.') if due else '', overdue=bool(task.due_at and task.due_at < utcnow() and task.status not in {'done','cancelled'}),
+            **stats)
+    else:
+        result.update(type=source['source'], type_label=source['source_label'], status_label=source.get('status',source['detail']), href=source['href'])
+    return result

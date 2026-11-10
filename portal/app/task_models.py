@@ -205,6 +205,8 @@ class TaskBoardColumn(Base):
 
 
 class TaskBoardCard(Base):
+    card_type: Mapped[str] = mapped_column(String(20), default='task', server_default='task')
+    cover_color: Mapped[str] = mapped_column(String(20), default='', server_default='')
     shareable: Mapped[bool] = mapped_column(Boolean, default=True)
     __tablename__ = 'task_board_cards'
     id: Mapped[int] = mapped_column(primary_key=True)

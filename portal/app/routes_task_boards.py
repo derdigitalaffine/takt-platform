@@ -43,18 +43,16 @@ async def board_create(request:Request,user:User=Depends(current_user),db:Sessio
 def board_page(request:Request,bid:int,user:User=Depends(current_user),db:Session=Depends(get_db)):
     module_on();board=boards.get(db,user,bid);cols=boards.columns(db,board);cards=boards.visible_cards(db,user,board)
     kind=request.query_params.get('kind','')
-    if kind not in {'','task','survey','form','application','circulation','resource'}:kind=''
+    if kind not in {'','task','survey','form','application','circulation','resource',*boards.CARD_TYPES}:kind=''
     query=request.query_params.get('q','').strip().lower()[:200];sort=request.query_params.get('sort','manual')
     if sort not in {'manual','priority','due'}:sort='manual'
     priority=request.query_params.get('priority','');person=request.query_params.get('person','')
-    cards=[v for v in cards if (not query or query in (v['task'].title+' '+v['task'].description+' '+v['task'].tags if v['task'] else v['source']['title']+' '+v['source']['source_label']+' '+v['source'].get('status','')+' '+v['source']['detail']).lower()) and (not kind or (kind=='task' if v['task'] else v['source']['source']==kind)) and (not priority or v['task'] and v['task'].priority==priority) and (not person or v['task'] and str(v['task'].assignee_id)==person)]
+    cards=[v for v in cards if (not query or query in (v['task'].title+' '+v['task'].description+' '+v['task'].tags if v['task'] else v['source']['title']+' '+v['source']['source_label']+' '+v['source'].get('status','')+' '+v['source']['detail']).lower()) and (not kind or (kind=='task' or v['card'].card_type==kind if v['task'] else v['source']['source']==kind)) and (not priority or v['task'] and v['task'].priority==priority) and (not person or v['task'] and str(v['task'].assignee_id)==person)]
     if sort=='priority':cards.sort(key=lambda v:({'urgent':0,'high':1,'normal':2,'low':3}.get(v['task'].priority,2) if v['task'] else 4,v['card'].position,v['card'].id))
     elif sort=='due':cards.sort(key=lambda v:(v['task'].due_at if v['task'] else v['source'].get('due')) or datetime.max)
-    checks={}
-    for v in cards:
-        if v['task']:checks[v['task'].id]=list(db.scalars(select(TaskCheck).where(TaskCheck.task_id==v['task'].id).order_by(TaskCheck.position,TaskCheck.id)))
+    statistics=boards.card_statistics(db,cards)
     level=boards.level(db,user,board)
-    return render(request,'task_board.html',user,board=board,columns=cols,cards=cards,checks=checks,level=level,ts=ts,sort=sort,q=query,kind=kind,priority=priority,person=person,now=utcnow(),people=ts.users(db),groups=list(db.scalars(select(Group).order_by(Group.name))) if level==3 else [],members=list(db.scalars(select(TaskBoardMember).where(TaskBoardMember.board_id==bid))) if level==3 else [],
+    return render(request,'task_board.html',user,board=board,columns=cols,cards=cards,level=level,ts=ts,card_types=boards.CARD_TYPES,cover_colors=boards.COVER_COLORS,card_ui={v['card'].id:boards.card_summary(db,v,statistics) for v in cards},sort=sort,q=query,kind=kind,priority=priority,person=person,now=utcnow(),people=ts.users(db),groups=list(db.scalars(select(Group).order_by(Group.name))) if level==3 else [],members=list(db.scalars(select(TaskBoardMember).where(TaskBoardMember.board_id==bid))) if level==3 else [],
         candidates=list(db.scalars(ts.visible_query(user).where(Task.archived_at.is_(None)).order_by(Task.updated_at.desc()).limit(200))) if level>=2 else [],sources=boards.source_items(db,user) if level>=2 else {})
 
 
@@ -62,7 +60,27 @@ def board_page(request:Request,bid:int,user:User=Depends(current_user),db:Sessio
 def card_detail(request:Request,bid:int,cid:int,user:User=Depends(current_user),db:Session=Depends(get_db)):
     module_on();board=boards.get(db,user,bid)
     card=db.get(TaskBoardCard,cid)
-    if not card or card.board_id!=bid or not card.task_id:raise HTTPException(404)
+    if not card or card.board_id!=bid:raise HTTPException(404)
+    if request.headers.get('accept')=='application/json':
+        item=next((v for v in boards.visible_cards(db,user,board) if v['card'].id==cid),None)
+        if not item:raise HTTPException(404)
+        result=dict(card=boards.card_summary(db,item),level=boards.level(db,user,board),
+                    columns=[dict(value=str(c.id),label=c.title) for c in boards.columns(db,board)],
+                    types=boards.CARD_TYPES,colors=boards.COVER_COLORS)
+        if not item['task']:
+            result['source']=item['source']['detail']
+            return JSONResponse(result)
+        row=ts.get(db,user,card.task_id)
+        result.update(values=ts.form_values(row),description_html=str(ts.markdown(row.description)),people=[dict(value=str(p.id),label=p.name) for p in ts.users(db)],
+            priorities=ts.PRIORITIES,statuses=ts.status_choices(user,row),
+            checks=[dict(id=c.id,title=c.title,done=c.done) for c in db.scalars(select(TaskCheck).where(TaskCheck.task_id==row.id).order_by(TaskCheck.position,TaskCheck.id))],
+            comments=[dict(author=c.author_display,body=c.body,html=str(ts.markdown(c.body)),date=ts.to_local(c.created_at).strftime('%d.%m.%Y %H:%M')) for c in db.scalars(select(TaskComment).where(TaskComment.task_id==row.id,TaskComment.removed_at.is_(None)).order_by(TaskComment.created_at))],
+            files=[dict(id=f.id,name=f.name,mime=f.mime,size=f.size) for f in db.scalars(select(TaskAttachment).where(TaskAttachment.task_id==row.id,TaskAttachment.removed_at.is_(None)))],
+            activity=[dict(actor=a.actor_name,text=a.text,date=ts.to_local(a.created_at).strftime('%d.%m.%Y %H:%M')) for a in db.scalars(select(TaskActivity).where(TaskActivity.task_id==row.id).order_by(TaskActivity.id.desc()).limit(30))],
+            href=f'/aufgaben/{row.id}')
+        if row.status=='review' and ts.may_edit(user,row):result['statuses']['in_progress']='Zur Bearbeitung zurückgeben'
+        return JSONResponse(result)
+    if not card.task_id:raise HTTPException(404)
     row=ts.get(db,user,card.task_id)
     return render(request,'_task_board_detail.html',user,board=board,card=card,task=row,ts=ts,level=boards.level(db,user,board),people=ts.users(db),
         checks=list(db.scalars(select(TaskCheck).where(TaskCheck.task_id==row.id).order_by(TaskCheck.position,TaskCheck.id))),
@@ -141,7 +159,9 @@ async def board_action(request:Request,bid:int,user:User=Depends(current_user),d
                 if key not in boards.source_items(db,user):raise HTTPException(404)
                 if not db.scalar(select(TaskBoardCard.id).where(TaskBoardCard.board_id==bid,TaskBoardCard.source_key==key)):db.add(TaskBoardCard(board_id=bid,column_id=col.id,source_key=key,position=1000000))
                 row=None
-            if row:boards.add_native(db,user,board,col,row)
+            if row:
+                added=boards.add_native(db,user,board,col,row)
+                if action=='create':boards.presentation(added,data)
         elif action=='move' and card:
             if card.task_id:ts.check_version(ts.get(db,user,card.task_id),data)
             target=column(data.get('column'))
@@ -153,7 +173,9 @@ async def board_action(request:Request,bid:int,user:User=Depends(current_user),d
             db.delete(card)
         elif action in {'edit','status','check','check_add','check_remove','comment','upload'} and card and card.task_id:
             row=ts.get(db,user,card.task_id);ts.check_version(row,data)
-            if action=='edit':ts.update(db,user,row,{**ts.form_values(row),**dict(data)})
+            if action=='edit':
+                boards.presentation(card,data)
+                ts.update(db,user,row,{**ts.form_values(row),**dict(data)})
             elif action=='status':ts.transition(db,user,row,str(data.get('status','')),str(data.get('comment','')))
             elif action=='comment':ts.comment(db,user,row,data.get('comment',''))
             elif action=='upload':await ts.attach_files(db,user,row,data.getlist('files'),paths,required=True);ts.audit(db,row,user,'attachment','Dateien über Board hinzugefügt.')
