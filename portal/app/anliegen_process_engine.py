@@ -391,7 +391,9 @@ def _advance(db: Session, run: AnliegenProcessRun, case: Anliegen):
 
 def _authorize_task(db: Session, run: AnliegenProcessRun, task: AnliegenProcessTask,
                     actor: User, case: Anliegen):
-    _require_handler(actor, case)
+    from . import anliegen_process_hub as hub
+    if not hub.private_access(db, actor, case):
+        raise ProcessAccessDenied("Keine organisatorische Berechtigung zur Prozessbearbeitung.")
     if task.run_id != run.id or task.state != "open" or run.state != "running":
         raise ProcessConflict("Dieser Prozessschritt kann nicht bearbeitet werden.")
     from . import absence
