@@ -116,3 +116,17 @@ class AnliegenProcessRuleEvent(Base):
     process_version_id: Mapped[int | None] = mapped_column(
         ForeignKey("process_versions.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
+
+
+class AnliegenProcessOverride(Base):
+    """Encrypted audit for a deliberate manual case closure despite process state."""
+    __tablename__ = "anliegen_process_overrides"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    anliegen_id: Mapped[int] = mapped_column(
+        ForeignKey("anliegen.id", ondelete="CASCADE"), index=True)
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    from_status: Mapped[str] = mapped_column(String(24))
+    to_status: Mapped[str] = mapped_column(String(24))
+    reason_enc: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
