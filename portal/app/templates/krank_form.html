@@ -10,12 +10,15 @@
   <a class="small" href="{{ R }}{{ ('?k=' ~ ticket) if embed and ticket }}"><i class="fa-solid fa-arrow-left me-1"></i>Andere Meldung wählen</a>
   <h1 class="h3 mt-2 mb-1"><i class="fa-solid {{ kinds[kind][1] }} text-primary me-2"></i>{{ kinds[kind][0] }}</h1>
   <p class="text-secondary">{{ kinds[kind][2] }}</p>
+  {% if health_plan %}<section class="alert alert-info" data-agent-health><h2 class="h6">Geschützter TAKT-Agent-Vorschlag</h2><p>Die Fachmaske ist mit eindeutigen Angaben ausgefüllt. Ergänze fehlende Pflichtangaben. Prüfe anschließend die Vorschau und bestätige das Absenden. Es wurde noch nichts gespeichert; die Angaben werden nicht an das Sprachmodell oder den Chatverlauf übergeben.</p></section>{% endif %}
+  {% if health_error %}<div class="alert alert-danger">{{health_error}}</div>{% endif %}
   {% if error %}<div class="alert alert-danger d-flex gap-2"><i class="fa-solid fa-triangle-exclamation mt-1"></i><div>{{ error }}</div></div>{% endif %}
   {% if kind == 'simple' and not weekday_ok %}
   <div class="alert alert-warning">Die einfache Krankmeldung ist nur montags bis freitags für den aktuellen Tag möglich. Bitte nutzen Sie einen anderen Meldeweg oder melden Sie sich am nächsten Arbeitstag.</div>
   {% endif %}
   <form method="post" action="{{ R }}/{{ kind }}" enctype="multipart/form-data" class="card" id="krank-form" data-kind="{{ kind }}">
     {% if user and not embed %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endif %}
+    {% if health_plan %}<input type="hidden" name="agent_health" value="{{health_plan}}">{% endif %}
     {% if ticket %}<input type="hidden" name="k" value="{{ ticket }}">{% endif %}
     <div class="card-body p-4"><div class="row g-3">
       {% if kind == 'eau' %}
@@ -76,7 +79,11 @@
         <div class="form-text">Für diesen Arbeitgeber kann eine zusätzliche Bemerkung mitgesendet werden. Bitte keine Diagnosen angeben.</div></div>
     </div></div>
     <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
-      <button class="btn btn-primary" type="submit" {% if kind == 'simple' and not weekday_ok %}disabled{% endif %}><i class="fa-solid fa-paper-plane me-1"></i>Meldung absenden</button>
+      {% if health_plan %}
+      <button class="btn btn-outline-primary" type="button" data-health-preview>Vorschau prüfen</button>
+      <section class="w-100" data-health-review hidden aria-live="polite"><h2 class="h6">Vorschau deiner Meldung</h2>{% if kind == "simple" %}<p>Krank am {{today.strftime("%d.%m.%Y")}}</p>{% endif %}<dl data-health-values class="small"></dl><label class="form-check"><input type="checkbox" class="form-check-input" name="agent_confirm" value="1" required><span class="form-check-label">Ich habe die Angaben geprüft und bestätige die verbindliche Meldung an die Personalverwaltung.</span></label></section>
+      {% endif %}
+      <button class="btn btn-primary" type="submit" {% if health_plan %}data-health-send hidden{% endif %} {% if kind == 'simple' and not weekday_ok %}disabled{% endif %}><i class="fa-solid fa-paper-plane me-1"></i>Meldung absenden</button>
       <span class="small text-secondary"><i class="fa-solid fa-lock me-1"></i>verschlüsselt gespeichert</span>
     </div>
   </form>

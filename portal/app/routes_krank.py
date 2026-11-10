@@ -385,10 +385,19 @@ def _form(request: Request, embed: bool, kind: str, k: str, db: Session):
         prefill = {"first_name": " ".join(parts[:-1]) if len(parts) > 1 else user.name,
                    "last_name": parts[-1] if len(parts) > 1 else "", "email": user.email}
     stored = request.session.pop("krank_form", None) if not embed else None
+    health_nonce = request.query_params.get("agent_health", "") if not embed else ""
+    health = None
+    if health_nonce:
+        from .agent_krank import load_creation
+        health = load_creation(request, user, health_nonce, kind)
+        prefill.update(health["fields"])
+        krank.audit(db, user, None, "agent_draft", "Meldeweg: " + kind)
+        db.commit()
     emps = krank.employers(db)
     return render(request, "krank_form.html", user, kind=kind, ticket=ticket, employers=emps,
                   employer_groups=krank.employer_groups(emps),
-                  values=(stored or {}).get("values") or prefill, error=(stored or {}).get("error") or request.query_params.get("fehler", ""),
+                  values=prefill if health else (stored or {}).get("values") or prefill, error=(stored or {}).get("error") or request.query_params.get("fehler", ""),
+                  health_plan=health_nonce, health_error=health.get("error", "") if health else "",
                   today=krank.today(), weekday_ok=krank.today().weekday() <= 4, **ctx)
 
 
@@ -406,19 +415,49 @@ async def _submit(request: Request, embed: bool, kind: str, db: Session):
         return redirect(R)
     if user is not None and not csrf_valid(request.session, form.get("csrf")):
         raise HTTPException(400, "Sitzung abgelaufen. Bitte Seite neu laden und erneut versuchen.")
+    health_nonce = str(form.get("agent_health") or "")
+    health = None
+    if health_nonce:
+        from .agent_krank import load_creation
+        health = load_creation(request, user, health_nonce, kind)
+        if str(form.get("agent_confirm") or "") != "1":
+            raise HTTPException(422, "Bitte die Vorschau prüfen und das Absenden ausdrücklich bestätigen.")
     rate_limit(request, "krank-submit", limit=20, window=3600)
-    values = {k: str(v) for k, v in form.items() if isinstance(v, str) and k not in ("csrf", "k")}
+    values = {k: str(v) for k, v in form.items() if isinstance(v, str) and k not in ("csrf", "k", "agent_health", "agent_confirm")}
+    if health:
+        from .agent_krank import FIELDS
+        values = {k: v for k, v in values.items() if k in FIELDS}
+        if any(len(v) > 2000 for v in values.values()):
+            raise HTTPException(422, "Bitte die Feldlängen im Krankmeldeformular beachten.")
     emp_id = values.get("employer", "")
     employer = db.get(KrankEmployer, int(emp_id)) if emp_id.isdigit() else None
     try:
         upload = await _read_upload(form, "file")
+        if health:
+            # Consume before the domain mutation; an old tab cannot submit twice.
+            from .main import stash_get
+            consumed = stash_get(request, "takt-agent-krank", pop=True)
+            if not consumed or consumed["nonce"] != health_nonce:
+                raise HTTPException(409, "Dieser Vorschlag wurde bereits verwendet.")
         report, track, _warnings = krank.create(db, kind, values, employer, upload, user)
     except ValueError as exc:
         db.rollback()
         if embed:
             return redirect(_with_k(f"{R}/{kind}?fehler={quote(str(exc))}", ticket, True))
+        if health:
+            from .main import stash_put
+            import secrets
+            health["nonce"] = secrets.token_urlsafe(24)
+            health["fields"] = values
+            health["error"] = str(exc)
+            stash_put(request, "takt-agent-krank", health)
+            return redirect(f"{R}/{kind}?agent_health=" + health["nonce"])
         request.session["krank_form"] = {"values": values, "error": str(exc)}
         return redirect(f"{R}/{kind}")
+    if health:
+        from .ai_models import AgentAudit
+        krank.audit(db, user, report, "agent_create")
+        db.add(AgentAudit(actor_id=user.id, tool="create_krank", target_id=report.id, target_url="/krank/meine"))
     db.commit()
     from . import worker
     worker.wake()

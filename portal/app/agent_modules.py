@@ -23,6 +23,7 @@ READ = {
     "search_my_leave": "leave", "search_leave_requests": "leave",
 }
 WRITE = {
+    "set_krank_status": "krank", "add_krank_note": "krank", "send_krank_message": "krank",
     "create_leave": "leave", "edit_leave": "leave", "leave_command": "leave",
     "create_form": "forms",
     "configure_anliegen_category": "anliegen",
@@ -48,6 +49,8 @@ def enabled(user, module):
         return "forms" in mods and user.can("forms")
     if module == "calendars":
         return "calendars" in mods
+    if module == "krank":
+        return "krank" in mods and user.active
     if module == "leave":
         return "calendars" in mods and user.active
     if module == "dms":
@@ -152,6 +155,9 @@ def target(db, user, action):
 
 
 def normalize(db, user, raw, findings):
+    from . import agent_krank
+    if raw["tool"] in agent_krank.TOOLS:
+        return agent_krank.normalize(db, user, raw, findings)
     from . import agent_leave
     if raw["tool"] in agent_leave.TOOLS:
         return agent_leave.normalize(db, user, raw, findings)
@@ -202,6 +208,9 @@ def normalize(db, user, raw, findings):
 
 
 def preview(db, action):
+    from . import agent_krank
+    if action["tool"] in agent_krank.TOOLS:
+        return agent_krank.preview(db, action)
     from . import agent_leave
     if action["tool"] in agent_leave.TOOLS:
         return agent_leave.preview(db, action)
@@ -222,6 +231,9 @@ def preview(db, action):
 
 
 def execute(db, user, action):
+    from . import agent_krank
+    if action["tool"] in agent_krank.TOOLS:
+        return agent_krank.execute(db, user, action)
     from . import agent_leave
     if action["tool"] in agent_leave.TOOLS:
         return agent_leave.execute(db, user, action)

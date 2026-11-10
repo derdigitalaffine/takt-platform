@@ -3,6 +3,38 @@
   'use strict';
   var form = document.getElementById('krank-form');
   if (!form) { return; }
+  if (form.elements.agent_health) {
+    const review = form.querySelector('[data-health-review]');
+    const send = form.querySelector('[data-health-send]');
+    const confirm = form.elements.agent_confirm;
+    form.querySelector('[data-health-preview]').addEventListener('click', () => {
+      // Confirmation is deliberately required only after reviewing valid fields.
+      confirm.required = false;
+      const valid = form.reportValidity();
+      confirm.required = true;
+      if (!valid) return;
+      const list = form.querySelector('[data-health-values]'); list.replaceChildren();
+      for (const field of form.querySelectorAll('input, select, textarea')) {
+        if (field.disabled || ['hidden', 'checkbox', 'submit'].includes(field.type) || !field.name || (field.type === 'radio' && !field.checked)) continue;
+        const label = form.querySelector('label[for="' + field.id + '"]') || form.querySelector('label[for="' + field.id + '-display"]');
+        const term = document.createElement('dt'); term.textContent = field.type === 'radio' ? field.closest('fieldset')?.querySelector('legend')?.textContent || label?.textContent : label?.textContent || field.name;
+        const value = document.createElement('dd');
+        value.textContent = field.type === 'radio' ? label?.textContent || field.value : field.type === 'file' ? [...field.files].map(f => f.name).join(', ') || 'Kein Nachweis – gegebenenfalls nachreichen' :
+          field.tagName === 'SELECT' ? field.selectedOptions[0]?.textContent || '–' : field.value || '–';
+        list.append(term, value);
+      }
+      review.hidden = false; send.hidden = false; confirm.checked = false;
+      review.scrollIntoView({block: 'nearest'});
+    });
+    form.addEventListener('input', event => {
+      if (event.target === confirm) return;
+      review.hidden = true; send.hidden = true; confirm.checked = false;
+    });
+    form.addEventListener('change', event => {
+      if (event.target === confirm) return;
+      review.hidden = true; send.hidden = true; confirm.checked = false;
+    });
+  }
   var employer = document.getElementById('kf-employer');
   var remarks = document.getElementById('kf-remarks-box');
   var syncRemarks = function () {

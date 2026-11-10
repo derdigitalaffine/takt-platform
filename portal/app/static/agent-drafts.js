@@ -23,6 +23,8 @@
     const selectors = {
       configure_anliegen_category: `form[action="/anliegen/kategorien/${id}"]`,
       create_form: 'form[action="/forms"]',
+      set_krank_status: `form[action="/krankmelder/${id}/status"]`,
+      add_krank_note: `form[action="/krankmelder/${id}/notiz"]`, send_krank_message: `form[action="/krankmelder/${id}/nachricht"]`,
       create_leave: '#leave-form', edit_leave: '#leave-form', leave_command: `#leave-row-${id} form[data-leave-command]`,
       create_task: 'form[data-task-create]', create_anliegen: '#anliegen-create',
       assign_task: `form[action="/aufgaben/${id}/bearbeiten"]`,
@@ -46,6 +48,13 @@
     }
     if (!form) throw new Error('Die Fachmaske ist nicht verfügbar. Bitte den Vorschlag neu planen.');
     const fields = {...data.fields};
+    if (tool === 'set_krank_status') {
+      const chosen = form.querySelector(`button[name="status"][value="${data.fields.status}"]`);
+      if (!chosen || chosen.disabled) throw new Error('Dieser Statuswechsel ist nicht mehr verfügbar.');
+      for (const button of form.querySelectorAll('button')) {
+        if (button !== chosen) { button.disabled = true; button.hidden = true; }
+      }
+    }
     if (tool === 'leave_command') {
       const chosen = form.querySelector(`button[name="action"][value="${data.fields.command}"]`);
       if (!chosen) throw new Error('Diese Urlaubsaktion ist nicht mehr verfügbar. Bitte neu planen.');
@@ -58,6 +67,7 @@
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
       create_form: ['title'],
+      set_krank_status: ['note'], add_krank_note: ['text'], send_krank_message: ['text'],
       create_leave: ['starts_on', 'ends_on', 'start_half', 'end_half'],
       edit_leave: ['starts_on', 'ends_on', 'start_half', 'end_half'], leave_command: ['reason'],
       create_task: ['title', 'description', 'priority', 'assignee_id', 'due_date', 'due_time', 'starts_at', 'tags', 'checklist'],
@@ -87,7 +97,7 @@
     }
     for (const [name, value] of Object.entries(fields)) {
       const control = form.elements.namedItem(name);
-      if (!control || !('value' in control)) continue;
+      if (!control || !('value' in control) || typeof control.dispatchEvent !== 'function') continue;
       if (control.type === 'checkbox') control.checked = value === true;
       else if (control.tomselect) control.tomselect.setValue(value == null ? '' : String(value), true);
       else control.value = value == null ? '' : String(value);

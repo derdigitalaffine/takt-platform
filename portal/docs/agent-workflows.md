@@ -38,6 +38,7 @@ als LLM-Kontext** mit den aktuellen Rechten geprüft.
 | Anliegenverwaltung | Für Administratoren: nicht vertrauliche Kategorien, Aktivierung und Personen-/Leitungsrouting; bestehende aktive Zuständigkeiten nur bei ausdrücklichem Auftrag übernehmen |
 | Geschützte Anliegen | Sensible Eingaben werden vor jedem LLM-/Verlaufsaufruf abgefangen und ausschließlich lokal im sitzungsgebundenen Server-Stash an das manuelle geschützte Formular übergeben. Kein Inhalt wird an das LLM oder den KI-Chatverlauf gesendet. |
 | Urlaub | Eigene Anträge sowie explizit planbare/zu entscheidende Anträge suchen; eigenen Entwurf anlegen, berechtigt gefundenen Zeitraum ändern; Einreichung, Verbindlichmachen, Genehmigung/Ablehnung, Storno und Ausnahmen nach bestehenden Fachregeln |
+| Krankmelder | Lokale Erkennung ohne LLM/Chatverlauf; eindeutige Angaben für ohne AU, AU, eAU oder Kind krank vorausfüllen; explizite Formularvorschau und Bestätigung; berechtigte Einzelbearbeitung per exaktem Aktenzeichen (Status, interne Notiz, Nachricht) |
 | Kalender | Zugängliche Kalender und gespeicherte Terminmetadaten finden; Einzeltermin in beschreibbarem freien Kalender mit expliziter Zeitzone vorbereiten |
 | Formulare | Metadaten eigener/freigegebener Formulare finden; geschlossene Kopie ohne Antworten, Einladungen und öffentlichen Link; interne Grenze bleibt erhalten |
 | Prozesse | Prozessnamen und Veröffentlichungsstatus mit passender Rolle finden; Weiterarbeit im verlinkten Facheditor |
@@ -79,6 +80,42 @@ Es gibt keine Browser-Fernsteuerung, frei wählbaren Tool-URLs, Codeausführung,
 autonome Veröffentlichung, Löschung, Genehmigung, Ressourcenbuchung oder Änderung
 einer Terminserie. Eine administrative Kategorie-Routingänderung übernimmt dieselben
 Fachgrenzen wie die native Verwaltung (maximal 300 Vorgänge je Fachlauf).
+
+## Geschützter Krankmelder
+
+Krankmeldeanfragen werden vor Provider-, Wissens- und Gesprächsverarbeitung lokal
+abgefangen. Originaltexte und medizinische Daten werden nicht in den KI-Verlauf
+übernommen. Ältere Gesundheitsturns aus dem bisherigen Chat werden nicht erneut als
+Modellkontext verwendet. Ein reiner Text-/Bildanalysemodus bleibt eine gesonderte,
+bewusst gewählte Funktion; die automatische Bedienunterstützung nutzt diese
+lokale Krankmeldergrenze.
+
+Der Adapter übernimmt nur eindeutig benannte vollständige Datumsangaben bzw.
+explizite relative Tage und erfindet keine Feststellungsdaten, Versicherungsart,
+Bescheinigung oder Kinderdaten. Bei unklarem Meldeweg führt ein Link zur nativen
+Auswahl. Die einfache Meldung gilt weiterhin nur für heute an Werktagen. Persönliche
+Stammdaten kommen wie bisher aus dem angemeldeten Konto; Arbeitgeber wird nur bei
+eindeutiger Auswahl vorgeschlagen. Fehlendes ergänzt die Person in der Fachmaske.
+
+Die Fachmaske erstellt zunächst eine sichtbare Vorschau einschließlich ausgewählter
+Datei; jede Änderung verwirft die Bestätigung. Erst das ausdrückliche Bestätigungsfeld
+und Absenden erstellen die Meldung über den bestehenden Krankmelder samt Prüfung,
+verschlüsselter Ablage, Nachweisverarbeitung und Benachrichtigungen. Einmalige,
+sitzungsgebundene Vorschläge werden serverseitig aufbewahrt. Auch Fehlereingaben
+bleiben im Server-Stash statt im signierten Sitzungscookie. Alte Tabs, neue Pläne,
+Zurücksetzen oder neue Unterhaltungen entwerten offene Vorschläge. Die bestehende
+begrenzte prozesslokale Stash-Lebensdauer gilt auch hier.
+
+Zur Bearbeitung muss das genaue Aktenzeichen einer einzelnen Krankmeldung genannt
+werden. Aktuelle Arbeitgeberzuständigkeit wird vor Suche, Vorschau und Speicherung
+geprüft. Statusnamen müssen eindeutig sein; Notiz und Nachricht benötigen einen
+expliziten Doppelpunkt mit dem gewünschten Text. Nachrichten werden als öffentliche
+Statusseiten-Nachrichten mit möglichem E-Mail-Versand ausgewiesen; interne Notizen
+bleiben intern. Die Vorschläge nutzen dieselben nativen Formulare mit erneuter
+Bestätigung. Datensatzänderungen und Rechteentzug entwerten die Freigabe.
+Krankmelder-Zugriffsprotokoll und Agenten-Schreibaudit halten die Operationen fest,
+ohne Diagnosen, Dateien oder Statuslink-Geheimnisse ins Agenten-Audit zu schreiben.
+Export, Massenbearbeitung und Löschung bleiben native manuelle Funktionen.
 
 ## Urlaubsabläufe
 

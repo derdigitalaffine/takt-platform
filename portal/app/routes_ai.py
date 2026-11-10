@@ -917,7 +917,7 @@ def ai_new_chat(request: Request, provider_id: int = Form(0),
         flash(request, "Bitte zuerst einen KI-Provider in der Administration aktivieren.", "error")
         return redirect("/agent")
     from .main import stash_get
-    for key in ("takt-agent-plan", "takt-agent-context", "takt-agent-private-intake"):
+    for key in ("takt-agent-plan", "takt-agent-context", "takt-agent-private-intake", "takt-agent-krank"):
         stash_get(request, key, pop=True)
     convo = AIConversation(owner_id=user.id, title="Neue Unterhaltung", provider_id=provider.id)
     db.add(convo)
