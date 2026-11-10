@@ -3,11 +3,10 @@
 DMS deliberately uses the newer opt-in AI source policy, not general fulltext.
 Only metadata reaches the planner; form answers and process definitions do not.
 """
-from datetime import datetime
 from itertools import islice
 
 from fastapi import HTTPException
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_
 
 from . import ai_dms, calendars, dms, forms as fm, agent_anliegen
 from .ai_models import AIDmsSource
@@ -27,7 +26,7 @@ WRITE = {
     "create_leave": "leave", "edit_leave": "leave", "leave_command": "leave",
     "create_form": "forms",
     "configure_anliegen_category": "anliegen",
-    "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
+    "update_event": "calendars", "delete_event": "calendars", "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
 }
 LABELS = {
     "search_anliegen_categories": "Anliegen-Kategorien",
@@ -80,20 +79,8 @@ def search(db, user, spec):
         return list(islice((dict(type="calendar", id=r.id, title=r.title, writable=calendars.access(db, user, r, True),
                      url="/kalender?ansicht=termine") for r in rows if calendars.access(db, user, r)), 20))
     if tool == "search_events":
-        # Only stored, free-calendar events. Source calendars keep their own business ACLs.
-        rows = db.scalars(select(CalendarEvent).join(Calendar).where(
-            Calendar.source == "free", CalendarEvent.title.ilike(pattern, escape="\\")
-        ).order_by(CalendarEvent.starts_at, CalendarEvent.id))
-        out = []
-        for row in rows:
-            cal = db.get(Calendar, row.calendar_id)
-            if calendars.event_access(db, user, cal, row):
-                out.append(dict(type="event", id=row.id, title=row.title, calendar_id=cal.id,
-                                start=row.starts_at, end=row.ends_at,
-                                series=bool(calendars.event_data(row)["extendedProps"].get("series")), url="/kalender?ansicht=termine"))
-            if len(out) == 20:
-                break
-        return out
+        from .agent_events import search as search_events
+        return search_events(db, user, spec)
     if tool == "search_forms":
         rows = db.scalars(select(Form).where(Form.deleted_at.is_(None), Form.archived_at.is_(None),
                           Form.title.ilike(pattern, escape="\\")).order_by(Form.id))
@@ -139,10 +126,6 @@ def target(db, user, action):
     row = db.get(MODELS[tool], action["id"])
     if row is None:
         raise HTTPException(404, "Vorgang nicht gefunden.")
-    if tool == "create_event" and not calendars.access(db, user, row, True):
-        raise HTTPException(403)
-    if tool == "create_event" and db.scalar(select(func.count()).select_from(CalendarEvent).where(CalendarEvent.calendar_id == row.id)) >= 10000:
-        raise HTTPException(409, "Dieser Kalender enthält bereits 10000 Termine.")
     if tool == "copy_form" and (row.deleted_at or row.archived_at or fm.access_level(db, row, user) < fm.VIEW):
         raise HTTPException(403)
     if tool == "move_dms":
@@ -155,6 +138,9 @@ def target(db, user, action):
 
 
 def normalize(db, user, raw, findings):
+    from . import agent_events
+    if raw["tool"] in agent_events.TOOLS:
+        return agent_events.normalize(db, user, raw, findings)
     from . import agent_krank
     if raw["tool"] in agent_krank.TOOLS:
         return agent_krank.normalize(db, user, raw, findings)
@@ -177,27 +163,6 @@ def normalize(db, user, raw, findings):
     action = dict(tool=tool, id=found("id", KINDS[tool]))
     if tool == "move_dms":
         action["area_id"] = found("area_id", "dms_area")
-    if tool == "create_event":
-        for field, limit in (("title", 200), ("description", 10000), ("location", 500)):
-            value = raw.get(field, "")
-            if not isinstance(value, str) or len(value) > limit:
-                raise ValueError("Terminangaben prüfen.")
-            action[field] = value.strip()
-        if not action["title"]:
-            raise ValueError("Termintitel fehlt.")
-        for key in ("start", "end"):
-            try:
-                value = raw[key]
-                if not isinstance(value, str) or len(value) > 40:
-                    raise ValueError()
-                parsed = datetime.fromisoformat(value)
-                if parsed.tzinfo is None or not 1970 <= parsed.year <= 2200:
-                    raise ValueError()
-            except (KeyError, TypeError, ValueError):
-                raise ValueError("Beginn und Ende mit expliziter Zeitzone angeben.")
-            action[key] = value
-        if datetime.fromisoformat(action["end"]) <= datetime.fromisoformat(action["start"]):
-            raise ValueError("Das Terminende muss nach dem Beginn liegen.")
     row = target(db, user, action)
     action["version"] = version(row)
     if tool == "move_dms":
@@ -208,6 +173,9 @@ def normalize(db, user, raw, findings):
 
 
 def preview(db, action):
+    from . import agent_events
+    if action["tool"] in agent_events.TOOLS:
+        return agent_events.preview(db, action)
     from . import agent_krank
     if action["tool"] in agent_krank.TOOLS:
         return agent_krank.preview(db, action)
@@ -220,10 +188,6 @@ def preview(db, action):
     if action["tool"] == "configure_anliegen_category":
         return agent_anliegen.preview(db, action)
     row = db.get(MODELS[action["tool"]], action["id"])
-    if action["tool"] == "create_event":
-        return (f"Termin erstellen in Kalender „{row.title}“: {action['title']}\n"
-                f"{action['start']} bis {action['end']}\nOrt: {action['location'] or '–'}\n"
-                f"Beschreibung: {action['description'] or '–'}")
     if action["tool"] == "copy_form":
         return f"Formular „{row.title}“ als geschlossenen Entwurf kopieren. Keine Antworten, Einladungen oder öffentlichen Links."
     area = db.get(DmsArea, action["area_id"])
@@ -231,6 +195,9 @@ def preview(db, action):
 
 
 def execute(db, user, action):
+    from . import agent_events
+    if action["tool"] in agent_events.TOOLS:
+        return agent_events.execute(db, user, action)
     from . import agent_krank
     if action["tool"] in agent_krank.TOOLS:
         return agent_krank.execute(db, user, action)
@@ -248,11 +215,7 @@ def execute(db, user, action):
     if version(row) != action["version"]:
         raise HTTPException(409, "Der Vorgang hat sich geändert. Bitte neu planen.")
     label = preview(db, action)
-    if action["tool"] == "create_event":
-        event = calendars.save_event(db, user, row, action)
-        target_id = event.id
-        url = "/kalender?ansicht=termine"
-    elif action["tool"] == "copy_form":
+    if action["tool"] == "copy_form":
         clone = fm.copy_form(db, row, user)
         # Preserve the internal boundary even though the existing copy service defaults to public.
         clone.internal = row.internal

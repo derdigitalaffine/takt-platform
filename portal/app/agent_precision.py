@@ -37,7 +37,7 @@ def focus_modules(prompt):
     patterns = {
         'tasks': r'aufgabe|checkliste|fällig|priorit',
         'anliegen': r'anliegen|mangel|mängel|büromaterial|büromöbel|bürost[üu]hl|druckerpapier|kopierpapier|toner|störung|defekt',
-        'forms': r'formular', 'calendars': r'kalender|termin',
+        'forms': r'formular', 'calendars': r'kalender|termin|besprechung',
         'dms': r'\bdms\b|wissensakte', 'processes': r'prozess',
         'leave': r'urlaub|urlaubsantrag|urlaubsplanung',
     }

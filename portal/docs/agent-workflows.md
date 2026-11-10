@@ -39,7 +39,7 @@ als LLM-Kontext** mit den aktuellen Rechten geprüft.
 | Geschützte Anliegen | Sensible Eingaben werden vor jedem LLM-/Verlaufsaufruf abgefangen und ausschließlich lokal im sitzungsgebundenen Server-Stash an das manuelle geschützte Formular übergeben. Kein Inhalt wird an das LLM oder den KI-Chatverlauf gesendet. |
 | Urlaub | Eigene Anträge sowie explizit planbare/zu entscheidende Anträge suchen; eigenen Entwurf anlegen, berechtigt gefundenen Zeitraum ändern; Einreichung, Verbindlichmachen, Genehmigung/Ablehnung, Storno und Ausnahmen nach bestehenden Fachregeln |
 | Krankmelder | Lokale Erkennung ohne LLM/Chatverlauf; eindeutige Angaben für ohne AU, AU, eAU oder Kind krank vorausfüllen; explizite Formularvorschau und Bestätigung; berechtigte Einzelbearbeitung per exaktem Aktenzeichen (Status, interne Notiz, Nachricht) |
-| Kalender | Zugängliche Kalender und gespeicherte Terminmetadaten finden; Einzeltermin in beschreibbarem freien Kalender mit expliziter Zeitzone vorbereiten |
+| Kalender | Berechtigte Einzeltermine nach Titel, ID und Zeitraum suchen; zeitgebundene und ganztägige Einzeltermine erstellen, ändern oder ausdrücklich bestätigt löschen; Serien und Quellkalender bleiben im nativen Bereich |
 | Formulare | Metadaten eigener/freigegebener Formulare finden; geschlossene Kopie ohne Antworten, Einladungen und öffentlichen Link; interne Grenze bleibt erhalten |
 | Prozesse | Prozessnamen und Veröffentlichungsstatus mit passender Rolle finden; Weiterarbeit im verlinkten Facheditor |
 | DMS | Nur explizit für KI freigegebene geeignete manuelle Wissensakten finden; in Bereiche mit aktuellem Schreibrecht verschieben; Aufbewahrung über bestehenden Fachservice |
@@ -80,6 +80,25 @@ Es gibt keine Browser-Fernsteuerung, frei wählbaren Tool-URLs, Codeausführung,
 autonome Veröffentlichung, Löschung, Genehmigung, Ressourcenbuchung oder Änderung
 einer Terminserie. Eine administrative Kategorie-Routingänderung übernimmt dieselben
 Fachgrenzen wie die native Verwaltung (maximal 300 Vorgänge je Fachlauf).
+
+## Einzeltermine
+
+Zeitgebundene Termine benötigen ISO-Zeitpunkte mit explizitem Offset; ganztägige
+Termine verwenden im Vorschlag und Fachformular ein einschließliches Enddatum.
+Der vorhandene Kalenderdienst speichert das exklusive Kalender-Ende. Änderungen
+übernehmen nicht geänderte Titel, Beschreibungen, Orte und Zielgruppen exakt.
+Vorschau und Bestätigung benennen vorherigen und neuen Zeitraum; beim Löschen
+stehen der konkrete Termin und die endgültige Entfernung ausdrücklich im Vorschlag.
+Der native Kalender und der Agent verwenden denselben Löschdienst mit Kalender-Audit.
+
+Nur tatsächlich lesbare, beschreibbare Einzeltermine in freien Kalendern sind
+bearbeitbar. Datensatz-/Kalenderstand und aktuelle Rechte werden beim Speichern
+unter der Organisationssperre erneut geprüft. Serienänderungen und Serienlöschung
+werden im Agenten abgelehnt; Quellkalender behalten ihre eigenen Fachabläufe.
+Ein fehlender oder bei der Zeitumstellung mehrdeutiger Zeitpunkt wird nicht still
+umgerechnet. Ein bereits explizit geplanter Offset bleibt bei unveränderten
+Fachmaskenwerten erhalten. Einladungen, Besprechungsräume und Ressourcenbuchungen
+sind eigene Fachabläufe und werden nicht als freie Kalendertermine ausgegeben.
 
 ## Geschützter Krankmelder
 

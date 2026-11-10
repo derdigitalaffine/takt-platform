@@ -17,7 +17,7 @@ _QUESTION = re.compile(
 _DOMAIN = re.compile(
     r"\b(?:aufgab\w*|todo\w*|anliegen|mängel|mangel|beschaffung|"
     r"büromaterial|büromöbel|bestellung\w*|formular\w*|"
-    r"kalender\w*|termin\w*|urlaub\w*|besprechung\w*|akte\w*|"
+    r"kalender\w*|termin\w*|einzeltermin\w*|urlaub\w*|besprechung\w*|akte\w*|"
     r"dms|vorgang\w*|prozess\w*|status|priorität|"
     r"zuständigkeit\w*|kolleg\w*)\b",
     re.I,
@@ -26,7 +26,7 @@ _ACTION = re.compile(
     r"\b(?:erstell\w*|anleg\w*|lege\b|leg\b|"
     r"trag\w*\s+ein|eintragen|änder\w*|bearbeit\w*|"
     r"setz\w*|weise\w*|zuweis\w*|verschieb\w*|"
-    r"kopier\w*|lösch\w*|meld\w*|erfass\w*|"
+    r"kopier\w*|lösch\w*|entfern\w*|meld\w*|erfass\w*|"
     r"beantrag\w*|einreich\w*|genehmig\w*|ablehn\w*|stornier\w*|bestätig\w*|plan\w*|organisier\w*|aktualisier\w*|"
     r"priorisier\w*|vorbereit\w*|start\w*|markier\w*|abschließ\w*|"
     r"als\s+(?:erledigt|in\s+bearbeitung)\s+markieren)\b",

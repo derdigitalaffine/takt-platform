@@ -33,7 +33,7 @@ def destination(action):
         return f"/aufgaben/{action['id']}"
     if tool in ("assign_anliegen", "set_anliegen_status"):
         return f"/anliegen/{action['id']}"
-    if tool == "create_event":
+    if tool in ("create_event", "update_event", "delete_event"):
         return "/kalender?ansicht=termine"
     if tool == "copy_form":
         return f"/forms/{action['id']}"
@@ -58,6 +58,10 @@ def load(request, user, nonce, step):
 
 
 def validate(db, user, action):
+    from . import agent_events
+    if action["tool"] in agent_events.TOOLS:
+        agent_events.target(db, user, action)
+        return
     from . import agent_krank
     if action["tool"] in agent_krank.TOOLS:
         agent_krank.target(db, user, action)
@@ -94,23 +98,38 @@ def validate(db, user, action):
 def view(db, user, plan, step):
     action = plan["actions"][step]
     validate(db, user, action)
-    fields = {k: v for k, v in action.items() if k not in ("version", "routing_snapshot", "area_snapshot", "affected", "tool", "id", "policy_snapshot", "requester_id", "org_id", "display_unit")}
+    fields = {k: v for k, v in action.items() if k not in ("version", "routing_snapshot", "area_snapshot", "affected", "tool", "id", "policy_snapshot", "calendar_snapshot", "requester_id", "org_id", "display_unit")}
     tool = action["tool"]
     if tool == "create_anliegen":
         fields["description_final"] = fields["description"]
-    if tool == "create_event":
-        fields["calendar_id"] = action["id"]
-        for key in ("start", "end"):
-            local = datetime.fromisoformat(action[key]).astimezone(LOCAL_TZ)
-            fields[key] = local.date().isoformat()
-            fields[key + "_time"] = local.strftime("%H:%M")
+    event_times = {}
+    if tool in ("create_event", "update_event", "delete_event"):
+        source = action
+        if tool == "delete_event":
+            from .calendar_models import CalendarEvent
+            from datetime import date, timedelta
+            row = db.get(CalendarEvent, action["id"])
+            source = dict(title=row.title, description=row.description, location=row.location,
+                          start=row.starts_at, end=(date.fromisoformat(row.ends_at)-timedelta(days=1)).isoformat() if row.all_day else row.ends_at, all_day=row.all_day)
+        fields.update({key: source[key] for key in ("title", "description", "location", "all_day", "start", "end")})
+        fields["calendar_id"] = action["calendar_id"]
+        if not source["all_day"]:
+            event_times = {key: source[key] for key in ("start", "end")}
+            for key in ("start", "end"):
+                local = datetime.fromisoformat(source[key]).astimezone(LOCAL_TZ)
+                fields[key] = local.date().isoformat()
+                fields[key + "_time"] = local.strftime("%H:%M")
         fields["kind"] = "event"
         fields["repeat"] = "none"
-        fields["all_day"] = False
+        if tool != "create_event":
+            from .calendar_models import CalendarEvent
+            row = db.get(CalendarEvent, action["id"])
+            fields["org_id_event"] = row.org_id or ""
+            fields["include_children"] = row.include_children
     return dict(tool=tool, fields=fields, id=action.get("id"), step=step,
                 total=len(plan["actions"]), preview=agent.preview(db, [action])[0],
                 path=destination(action).split("?")[0],
-                event_times={k: action[k] for k in ("start", "end")} if tool == "create_event" else {})
+                event_times=event_times)
 
 
 def edited(db, user, original, data):
@@ -130,6 +149,7 @@ def edited(db, user, original, data):
         "set_task_status": (), "assign_anliegen": ("assignee_id",),
         "set_anliegen_status": ("status", "supplier", "order_reference", "expected_delivery"),
         "create_event": ("title", "description", "location", "calendar_id"),
+        "update_event": ("title", "description", "location"), "delete_event": (),
         "copy_form": (), "move_dms": ("area_id",),
         "configure_anliegen_category": ("title", "routing", "assignee_id"),
     }[tool]
@@ -147,20 +167,25 @@ def edited(db, user, original, data):
         raw["apply_open"] = data.get("apply_open") == "1"
     if tool == "create_anliegen":
         raw["description"] = str(data.get("description_final", data.get("description", raw["description"])))
-    if tool == "create_event":
-        raw["id"] = raw.pop("calendar_id", raw["id"])
+    if tool in ("create_event", "update_event"):
+        from .agent_events import local_timestamp
+        if tool == "create_event":
+            raw["id"] = raw.pop("calendar_id", raw["id"])
+        raw["all_day"] = str(data.get("all_day") or "") in ("1", "on", "true")
         for key in ("start", "end"):
-            try:
-                from zoneinfo import ZoneInfo
-                zone = ZoneInfo(str(data.get("agent_timezone") or "Europe/Berlin"))
-                raw[key] = datetime.fromisoformat(str(data[key]) + "T" + str(data[key + "_time"])).replace(tzinfo=zone).isoformat()
-            except (KeyError, TypeError, ValueError):
+            if key not in data:
                 raise HTTPException(422, "Beginn und Ende prüfen.")
+            if raw["all_day"]:
+                raw[key] = str(data[key])
+            else:
+                raw[key] = local_timestamp(str(data[key]), str(data.get(key + "_time") or ""),
+                    str(data.get("agent_timezone") or "Europe/Berlin"),
+                    original=original.get(key) if not original.get("all_day") else None)
     # These IDs come from a human form submission, not from the LLM. The exact
     # module ACL is still checked by normalize/validate, including the new target.
     findings = []
     if "id" in raw:
-        kind = "krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
+        kind = "krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else "event" if tool in ("update_event", "delete_event") else agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
         findings.append(dict(type=kind, id=raw["id"]))
     if "assignee_id" in raw:
         findings.append(dict(type="person", id=raw["assignee_id"]))
