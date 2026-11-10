@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from . import maps as mp
 from . import map_lifecycle
+from . import map_catalog as catalog_library
 from .db import MapLayer, TrashItem, SessionLocal, User, UserMap, Group, get_settings, set_setting
 from .main import (
     app, check_csrf, enabled_modules, flash, get_db, rate_limit, redirect, render, require,
@@ -561,6 +562,10 @@ def admin_maps(request: Request, user: User = Depends(maps_admin_user), db: Sess
     known = {(lyr.kind, lyr.url, lyr.layers) for lyr in layers}
     from . import parcels
     return render(request, "admin_maps.html", user, catalog=parcels.CATALOG, layers=layers, kinds=mp.KINDS, roles=mp.ROLES,
+                  library=catalog_library.search(request.query_params.get('q', '')[:200], request.query_params.get('region', ''), request.query_params.get('topic', '')),
+                  library_total=len(catalog_library.CATALOG),
+                  library_regions=sorted({s['region'] for s in catalog_library.CATALOG.values()}),
+                  library_topics=sorted({s['topic'] for s in catalog_library.CATALOG.values()}),
                   cfg=get_settings(db), cache_count=count, cache_size=size,
                   user_layers=[u for u in _user_layers(db) if (u["def"]["kind"], u["def"]["url"], u["def"]["layers"]) not in known],
                   saved_maps=db.scalar(select(func.count(UserMap.id))), maps_module="maps" in enabled_modules(),
@@ -912,3 +917,66 @@ def admin_map_catalog(request: Request, key: str, user: User = Depends(maps_admi
         attribution=spec.get('attribution',parcels.ATTRIBUTION),category='Amtliche Daten Rheinland-Pfalz',role='overlay',default_visible=False,
         position=(db.scalar(select(func.max(MapLayer.position))) or 0)+1,proxy=True,public=True)
     db.add(row);db.commit();flash(request,'Amtliche Ebene ergänzt. Vorhandene Layer und Startgrundkarte bleiben erhalten.');return redirect(f'/admin/maps/{row.id}')
+
+
+def _library_choices(key):
+    spec = catalog_library.CATALOG.get(key)
+    if not spec:
+        raise HTTPException(404)
+    result = mp.query_service(spec['url'], spec['kind'], True)
+    return spec, result, catalog_library.choices(spec, result)
+
+
+@app.post('/admin/maps/library/{key}', dependencies=[Depends(check_csrf)])
+def admin_map_library_preview(request: Request, key: str, user: User = Depends(maps_admin_user)):
+    try:
+        spec, result, choices = _library_choices(key)
+    except (ValueError, httpx.HTTPError, mp.ET.ParseError) as exc:
+        return render(request, 'admin_map_library.html', user, key=key,
+                      source=catalog_library.CATALOG[key], choices=[],
+                      error='Quelle derzeit nicht verfügbar: '+str(exc)[:300], selected_names=[])
+    return render(request, 'admin_map_library.html', user, key=key, source=spec,
+                  choices=choices, service=result, selected_names=[])
+
+
+@app.post('/admin/maps/library/{key}/import', dependencies=[Depends(check_csrf)])
+async def admin_map_library_import(request: Request, key: str, user: User = Depends(maps_admin_user), db: Session = Depends(get_db)):
+    data = await request.form()
+    names = list(dict.fromkeys(data.getlist('layers')))
+    if not names or len(names) > 100:
+        flash(request, 'Bitte zwischen einer und 100 Ebenen auswählen.', 'error')
+        return redirect('/admin/maps#library')
+    try:
+        spec, result, choices = await run_in_threadpool(_library_choices, key)
+    except (ValueError, httpx.HTTPError, mp.ET.ParseError) as exc:
+        return render(request, 'admin_map_library.html', user, key=key,
+                      source=catalog_library.CATALOG[key],
+                      choices=[{'name': name, 'title': name} for name in names], selected_names=names,
+                      error='Quelle derzeit nicht verfügbar. Ihre Auswahl bleibt erhalten. Bitte erneut versuchen: '+str(exc)[:300])
+    available = {layer['name']: layer for layer in choices}
+    if any(name not in available for name in names):
+        flash(request, 'Die Auswahl ist nicht mehr verfügbar. Bitte die Quelle erneut öffnen.', 'error')
+        return redirect('/admin/maps#library')
+    position = (db.scalar(select(func.max(MapLayer.position))) or 0) + 1
+    added = skipped = 0
+    for name in names:
+        chosen = available[name]
+        url = chosen.get('template') or result['url']
+        existing = db.scalar(select(MapLayer).where(MapLayer.kind == result['type'], MapLayer.url == url, MapLayer.layers == name))
+        if existing:
+            skipped += 1
+            continue
+        row = MapLayer(name=(spec['name']+' · '+chosen.get('title', name))[:200],
+            kind=result['type'], url=url, layers=name, version=result.get('version', ''),
+            styles=chosen.get('styles', ''), image_format=chosen.get('format', 'image/png'),
+            service_json=json.dumps(chosen.get('service', {})), feature_info=chosen.get('queryable', False),
+            legend_url=chosen.get('legend', ''), time_values=','.join(chosen.get('times', [])), time_default=chosen.get('time', ''),
+            attribution=spec['attribution'], category=(spec['region']+' · '+spec['topic'])[:100],
+            description='\n'.join(filter(None, [chosen.get('abstract', ''), spec['note'], 'Quelle: '+spec['source_url'], 'Nutzung: '+spec['license']+' – '+spec['license_url']])),
+            role=spec['role'], default_visible=False, enabled=False, public=False, in_forms=False,
+            position=position+added, proxy=True)
+        db.add(row)
+        added += 1
+    db.commit()
+    flash(request, f'{added} Ebenen ergänzt, {skipped} bereits vorhanden. Neue Ebenen sind deaktiviert. Bitte prüfen und gezielt aktivieren und freigeben.')
+    return redirect('/admin/maps#library')

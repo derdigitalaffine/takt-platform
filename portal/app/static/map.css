@@ -1,4 +1,10 @@
 /* Kartenbrowser */
+.map-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr));gap:1rem;max-height:42rem;overflow:auto;padding:.25rem}
+.map-library-source{display:flex;flex-direction:column;border:1px solid var(--bs-border-color);border-radius:.8rem;padding:1rem;background:var(--bs-body-bg);overflow-wrap:anywhere}
+.map-library-choices{max-height:60vh;overflow:auto;border:1px solid var(--bs-border-color);border-radius:.8rem}
+.map-library-choice{padding:1rem;border-bottom:1px solid var(--bs-border-color);overflow-wrap:anywhere}
+.map-library-choice:last-child{border-bottom:0}
+.map-library-choice .form-check-input{width:1.2rem;height:1.2rem}
 .map-shell { position: relative; display: flex; height: calc(100vh - 66px); min-height: 420px; }
 .map-shell.is-embed { height: calc(100vh - 38px); }
 .map-panel { width: 21rem; max-width: 88vw; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--bs-border-color); background: var(--bs-body-bg); z-index: 3; }
