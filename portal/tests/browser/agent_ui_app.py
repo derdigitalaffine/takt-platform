@@ -44,6 +44,8 @@ with SessionLocal() as db:
 
 async def complete(provider, messages, **kwargs):
     searching = '"searches"' in messages[0]['content']
+    if not searching and '"actions"' not in messages[0]['content']:
+        return 'Das ist eine Chat-Antwort. Für Portalaufträge verwende /takt.'
     content = messages[-1]['content']
     prompt = content if searching else json.loads(content)['auftrag']
     searches, actions = None, None

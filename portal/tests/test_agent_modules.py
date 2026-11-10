@@ -55,7 +55,7 @@ def fake(monkeypatch, searches, actions, captured=None):
 
 def plan(c, prompt="Bitte die Schritte vorbereiten"):
     csrf = csrf_of(c.get("/").text)
-    return c.post("/agent/plan", data={"csrf": csrf, "prompt": prompt}), csrf
+    return c.post("/agent/plan", data={"csrf": csrf, "prompt": "/takt " + prompt}), csrf
 
 
 def execute(c, response, csrf):
@@ -215,7 +215,8 @@ def test_calendar_only_account_context_reset_and_failed_replacement(monkeypatch)
     initial, csrf = plan(c)
     assert initial.status_code == 200
     rejected, _ = plan(c, " ")
-    assert rejected.status_code == 422
+    assert rejected.status_code == 200 and rejected.json()["plan_id"] == ""
+    assert "hinter /takt" in rejected.json()["message"]
     assert execute(c, initial, csrf).status_code == 409
 
 

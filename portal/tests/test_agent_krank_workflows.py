@@ -46,7 +46,7 @@ def health(monkeypatch, isolated):
 
 def prepare(c, prompt):
     csrf = csrf_of(c.get('/').text)
-    result = c.post('/agent/plan', data=dict(csrf=csrf, prompt=prompt))
+    result = c.post('/agent/plan', data=dict(csrf=csrf, prompt="/takt " + prompt))
     assert result.status_code == 200, result.text
     return result.json(), csrf
 
@@ -124,7 +124,7 @@ def test_exact_ref_staff_status_and_message_require_live_employer_rights(health)
         assert db.get(KrankReport,rid).status=='eau_open'
         db.execute(delete(KrankResponsible).where(KrankResponsible.user_id==uid)); db.commit()
     assert c.post('/agent/draft/save',data=dict(csrf=csrf,plan_id=nonce,review_id=token)).status_code==404
-    assert c.post('/agent/plan',data=dict(csrf=csrf,prompt=f'Setze Krankmeldung {otherref} auf Bearbeitet')).status_code==404
+    assert c.post('/agent/plan',data=dict(csrf=csrf,prompt=f'/takt Setze Krankmeldung {otherref} auf Bearbeitet')).status_code==404
     with SessionLocal() as db:
         db.add(KrankResponsible(user_id=uid,employer_id=eid));db.commit()
     data,csrf=prepare(c,f'Setze Krankmeldung {ref} auf In Bearbeitung')
@@ -158,7 +158,7 @@ def test_missing_or_ambiguous_kind_dates_and_cross_session_are_safe(health):
     assert agent_krank.creation_fields('seit 2026-11-09 und seit 2026-11-10')=={}
     settings(module_krank='0')
     csrf=csrf_of(c.get('/').text)
-    assert c.post('/agent/plan',data=dict(csrf=csrf,prompt='Melde eine eAU')).status_code==403
+    assert c.post('/agent/plan',data=dict(csrf=csrf,prompt='/takt Melde eine eAU')).status_code==403
 
 
 def test_legacy_health_history_is_not_replayed_to_models():

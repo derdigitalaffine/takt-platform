@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import agent, agent_intent, ai_provider
+from . import agent, agent_intent, ai_provider, agent_mode
 from .ai_models import AIProvider, AIConversation, AIMessage
 from .db import User
 from .main import app, check_csrf, current_user, get_db, rate_limit, stash_get, stash_put
@@ -54,7 +54,7 @@ async def _conversational_answer(
     messages = [{
         "role": "system",
         "content": (
-            "Du bist TAKT, ein freundlicher, kompetenter Assistent. "
+            agent_mode.CHAT_RULE + "Du bist TAKT, ein freundlicher, kompetenter Assistent. "
             "Sprich die Person konsequent mit Du an, antworte natürlich auf Deutsch "
             "und direkt auf die Frage. Antworte NICHT als JSON und erzeuge keinen "
             "Arbeitsplan, wenn nicht ausdrücklich eine TAKT-Aktion verlangt wurde. "
@@ -123,7 +123,7 @@ def _navigation_response(db, user, convo, provider, prompt, target):
     if convo:
         current = _conversation(db, convo.id, user)
         db.add_all([
-            AIMessage(conversation_id=current.id, role="user", content=prompt),
+            AIMessage(conversation_id=current.id, role="user", content="/takt " + prompt),
             AIMessage(conversation_id=current.id, role="assistant",
                       content=message, sources_json="[]", model_id=provider.model_id),
         ])
@@ -151,17 +151,26 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     prompt = prompt.strip()
     if not 1 <= len(prompt) <= 8000:
         raise HTTPException(422, "Bitte eine Anweisung mit 1 bis 8.000 Zeichen eingeben.")
-    if agent_krank.SIGNAL.search(prompt):
+    convo = None
+    if chat_id:
+        from .routes_ai import _conversation
+        convo = _conversation(db, chat_id, user)
+    portal_command, prompt = agent_mode.split(prompt)
+    if portal_command:
+        data = await request.form()
+        image = data.get("image")
+        if getattr(image, "filename", ""):
+            raise HTTPException(422, "Portalaufträge mit /takt bitte ohne Bild senden. Bilder kannst du im normalen Chat besprechen.")
+    if portal_command and not prompt:
+        return _response(dict(mode="operate", message="Schreibe deinen Portalauftrag hinter /takt, zum Beispiel: /takt Erstelle eine Aufgabe für die Inventur.", open_url="", proposals=[], results=[], steps=[], plan_id=""))
+    if portal_command and agent_krank.SIGNAL.search(prompt):
         stash_get(request, "takt-agent-context", pop=True)
         rate_limit(request, "takt-agent-health", limit=24, window=60, key=str(user.id))
         return _response(agent_krank.prepare(request, db, user, prompt))
-    previous_context = stash_get(request, "takt-agent-context") or {}
-    prior = (previous_context.get("prompts", [])
-             if previous_context.get("user_id") == user.id else [])
-    has_work_context = any(agent_intent.classify(text) == "operate"
-                           for text in prior[-2:])
-    intent = agent_intent.classify(prompt, has_work_context=has_work_context)
-    if agent.sensitive_request(prompt):
+    intent = "operate" if portal_command else "chat"
+    if portal_command and agent_intent.navigation(prompt, user) is not None:
+        intent = "navigate"
+    if portal_command and agent.sensitive_request(prompt):
         # Protected manual handoff: this branch precedes every provider/history call.
         agent.require(user, "anliegen")
         if not user.can("anliegen_submit"):
@@ -176,10 +185,6 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
                               open_url="/anliegen/neu?agent_private=" + private_nonce,
                               proposals=[], results=[], steps=[], plan_id=""))
     rate_limit(request, "takt-agent-plan", limit=24, window=60, key=str(user.id))
-    convo = None
-    if chat_id:
-        from .routes_ai import _conversation
-        convo = _conversation(db, chat_id, user)
     provider = db.get(AIProvider, convo.provider_id) if convo else db.scalar(select(AIProvider).where(AIProvider.active.is_(True)).order_by(AIProvider.id))
     if not provider or not provider.active:
         raise HTTPException(503, "Für TAKT Agent ist noch kein aktiver KI-Provider eingerichtet.")
@@ -190,6 +195,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
             return _response(_navigation_response(db, user, convo, provider, prompt, target))
         intent = "chat"
     if intent == "chat":
+        agent_mode.clear_pending(request)
         return _response(await _conversational_answer(
             request, db, user, provider, prompt, convo, use_knowledge, use_web,
         ))
@@ -279,7 +285,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     if convo:
         import json
         from .db import utcnow
-        db.add_all([AIMessage(conversation_id=convo.id, role="user", content=prompt),
+        db.add_all([AIMessage(conversation_id=convo.id, role="user", content="/takt " + prompt),
                     AIMessage(conversation_id=convo.id, role="assistant", content=plan["message"],
                               sources_json=json.dumps(metadata, ensure_ascii=False), model_id=provider.model_id)])
         if not rows:
