@@ -27,7 +27,7 @@ _ACTION = re.compile(
     r"trag\w*\s+ein|eintragen|änder\w*|bearbeit\w*|"
     r"setz\w*|weise\w*|zuweis\w*|verschieb\w*|"
     r"kopier\w*|lösch\w*|meld\w*|erfass\w*|"
-    r"plan\w*|organisier\w*|aktualisier\w*|"
+    r"beantrag\w*|einreich\w*|genehmig\w*|ablehn\w*|stornier\w*|bestätig\w*|plan\w*|organisier\w*|aktualisier\w*|"
     r"priorisier\w*|vorbereit\w*|start\w*|markier\w*|abschließ\w*|"
     r"als\s+(?:erledigt|in\s+bearbeitung)\s+markieren)\b",
     re.I,

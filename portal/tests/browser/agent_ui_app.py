@@ -9,7 +9,7 @@ from app.task_models import Task
 from app.security import hash_password
 from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, Organization, set_setting
 from app.org_models import OrgMembership
-from app.leave_models import LeavePolicy
+from app.leave_models import LeavePolicy, LeaveRequest
 from app import leave
 from sqlalchemy import select
 
@@ -51,7 +51,19 @@ async def complete(provider, messages, **kwargs):
         if 'Geburtstag' in prompt or prompt == 'ja':
             searches = []
             actions = [dict(tool='create_form', title='Geburtstage der Belegschaft', fields=[dict(type='short', title='Name', required=True), dict(type='date', title='Geburtstag', required=False)])]
+        elif prompt.startswith('Plane meinen Urlaub'):
+            searches = []
+            actions = [dict(tool='create_leave', starts_on='2030-12-09', ends_on='2030-12-11', start_half='pm', end_half='pm')]
+        elif prompt.startswith('Markiere meinen Urlaub'):
+            vacation = db.scalar(select(LeaveRequest).where(LeaveRequest.starts_on == '2030-12-09'))
+            searches = [dict(tool='search_my_leave', query='2030-12-09')]
+            actions = [dict(tool='leave_command', id=vacation.id, command='bind')]
+        elif prompt.startswith('Ändere meinen Urlaub'):
+            vacation = db.scalar(select(LeaveRequest).where(LeaveRequest.starts_on == '2030-12-09'))
+            searches = [dict(tool='search_my_leave', query='2030-12-09')]
+            actions = [dict(tool='edit_leave', id=vacation.id, starts_on='2030-12-16', ends_on='2030-12-18')]
         elif prompt.startswith('Internes Anliegen'):
+
             searches = []
             actions = [dict(tool='create_anliegen', category_id=cat_id, title='Browser Anliegen', description='Zwei Bürostühle für Raum 1 prüfen')]
         elif prompt.startswith('Anliegen bearbeiten'):

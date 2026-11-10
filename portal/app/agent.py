@@ -159,7 +159,7 @@ def search_instructions(user, focus=None):
         kinds.append("search_anliegen(query,scope=all|assigned|reported|orders|unassigned,status?,category_id?)")
         if user.can("anliegen_manage") and not allowed(user, "tasks"):
             kinds.append("search_people(query) für Zuständigkeitsänderungen")
-    kinds.extend(tool + "(query)" for tool, module in modules.READ.items() if allowed(user, module))
+    kinds.extend(tool + ("(query=Name|ID|Datum,scope=own|manageable|decisions,status?)" if tool == "search_leave_requests" else "(query)") for tool, module in modules.READ.items() if allowed(user, module))
     from .agent_precision import focused
     kinds = focused(kinds, focus)
     # The example must never name an unavailable/unfocused tool. This is
@@ -216,6 +216,9 @@ def plan_instructions(user, prompt, findings, categories, requester_id, focus=No
             capabilities.append("create_anliegen(title,description,category_id)")
         capabilities.extend(["set_anliegen_status(id,status,supplier?,order_reference?,expected_delivery=YYYY-MM-DD?): Bestell- und Lieferstatus nur gemäß next_states", "assign_anliegen(id,assignee_id)"])
     capabilities.extend(signature for tool, signature in {
+        "create_leave": "create_leave(starts_on=YYYY-MM-DD,ends_on=YYYY-MM-DD,start_half=am|pm,end_half=am|pm): eigener Urlaubsentwurf, keine automatische Genehmigung",
+        "edit_leave": "edit_leave(id,starts_on,ends_on,start_half,end_half): Zeitraum als neuen Entwurf ändern, alter verbindlicher Urlaub bleibt gültig",
+        "leave_command": "leave_command(id,command,reason?): nur exakte operations aus Suchergebnis; Genehmigung=approve, Einreichung=request, Selbstauskunft=attest nur auf ausdrücklichen Wunsch; Fachregeln können ablehnen",
         "create_event": "create_event(id=calendar_id,title,description,location,start,end): nur Einzeltermine mit ISO-Zeitzone, keine Einladungen oder Ressourcenbuchungen",
         "create_form": "create_form(title,fields=[{type:short|long|date|time|number|yesno,title,required:true|false}]): neuen internen geschlossenen Formularentwurf MIT konkreten Fragen anlegen, keine zusätzliche Vorab-Erlaubnis erfragen; Publikation bleibt manuell",
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
@@ -269,10 +272,10 @@ def normalize_plan(reply, user, findings, categories, db):
             raise ValueError("Nicht unterstützte KI-Aktion.")
         if tool in modules.WRITE:
             action = modules.normalize(db, user, raw, findings)
-            if tool == "create_form":
+            if tool in ("create_form", "create_leave"):
                 proposals.append(action)
                 continue
-            key = (modules.KINDS[tool], action["id"])
+            key = ("leave" if tool in ("edit_leave", "leave_command") else modules.KINDS[tool], action["id"])
             if key in seen:
                 raise ValueError("Mehrere Änderungen am selben Vorgang sind nicht zulässig.")
             seen.add(key)
@@ -577,17 +580,8 @@ def reference_accessible(db, user, source):
         if kind == "leave":
             require(user, "leave")
             from .leave_models import LeaveRequest
-            from .leave_admin import removed_ids
-            from . import leave
-            row = db.get(LeaveRequest, rid)
-            return bool(
-                row and row.person_id == user.id and
-                leave.can_plan(db, user, user.id) and
-                db.scalar(select(LeaveRequest.id).where(
-                    LeaveRequest.id == rid,
-                    LeaveRequest.id.not_in(removed_ids())
-                )) is not None
-            )
+            from .agent_leave import accessible
+            return accessible(db, user, db.get(LeaveRequest, rid))
         from . import calendars, forms, ai_dms, dms
         from .calendar_models import Calendar, CalendarEvent
         from .db import Form, Process

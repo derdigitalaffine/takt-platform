@@ -20,9 +20,10 @@ READ = {
     "search_calendars": "calendars", "search_events": "calendars",
     "search_forms": "forms", "search_processes": "processes",
     "search_dms": "dms", "search_dms_areas": "dms",
-    "search_my_leave": "leave",
+    "search_my_leave": "leave", "search_leave_requests": "leave",
 }
 WRITE = {
+    "create_leave": "leave", "edit_leave": "leave", "leave_command": "leave",
     "create_form": "forms",
     "configure_anliegen_category": "anliegen",
     "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
@@ -32,7 +33,7 @@ LABELS = {
     "search_calendars": "Kalendern", "search_events": "Terminen",
     "search_forms": "Formularen", "search_processes": "Prozessen",
     "search_dms": "freigegebenen DMS-Wissensakten", "search_dms_areas": "DMS-Zielbereichen",
-    "search_my_leave": "deinen eigenen Urlaubsanträgen",
+    "search_my_leave": "deinen eigenen Urlaubsanträgen", "search_leave_requests": "berechtigten Urlaubsanträgen",
 }
 KINDS = {"configure_anliegen_category": "anliegen_category", "create_event": "calendar", "copy_form": "form", "move_dms": "dms"}
 MODELS = {"configure_anliegen_category": AnliegenCategory, "create_event": Calendar, "copy_form": Form, "move_dms": DmsRecord}
@@ -100,31 +101,9 @@ def search(db, user, spec):
         rows = db.scalars(select(Process).where(Process.name.ilike(pattern, escape="\\")).order_by(Process.id).limit(20))
         return [dict(type="process", id=r.id, title=r.name, published=bool(r.current),
                      url=f"/processes/{r.id}") for r in rows]
-    if tool == "search_my_leave":
-        # Own leave requests only. Even administrators must explicitly use
-        # the native HR interface for other people's data; no bulk staff lookup.
-        from . import leave
-        from .leave_models import LeaveRequest
-        from .leave_admin import removed_ids
-        if not leave.can_plan(db, user, user.id):
-            return []
-        query = select(LeaveRequest).where(
-            LeaveRequest.person_id == user.id,
-            LeaveRequest.id.not_in(removed_ids()),
-        )
-        state = str(spec.get("status") or "")
-        if state in ("planned", "requested", "binding", "rejected", "cancelled"):
-            query = query.where(LeaveRequest.status == state)
-        rows = db.scalars(query.order_by(LeaveRequest.starts_on.desc(), LeaveRequest.id.desc()).limit(20))
-        return [
-            {"type": "leave", "id": row.id,
-             "title": f"Dein Urlaub: {row.starts_on} bis {row.ends_on}",
-             "starts_on": row.starts_on, "ends_on": row.ends_on,
-             "status": row.status,
-             "cancel_requested": bool(row.cancel_requested),
-             "url": f"/urlaub/vorgang/{row.id}"}
-            for row in rows
-        ]
+    if tool in ("search_my_leave", "search_leave_requests"):
+        from .agent_leave import search as leave_search
+        return leave_search(db, user, spec)
     if not ai_dms.available(db, user):
         return []
     if tool == "search_dms_areas":
@@ -173,6 +152,9 @@ def target(db, user, action):
 
 
 def normalize(db, user, raw, findings):
+    from . import agent_leave
+    if raw["tool"] in agent_leave.TOOLS:
+        return agent_leave.normalize(db, user, raw, findings)
     tool = raw["tool"]
     if tool == "create_form":
         from .agent_forms import normalize as normalize_form
@@ -220,6 +202,9 @@ def normalize(db, user, raw, findings):
 
 
 def preview(db, action):
+    from . import agent_leave
+    if action["tool"] in agent_leave.TOOLS:
+        return agent_leave.preview(db, action)
     if action["tool"] == "create_form":
         from .agent_forms import preview as preview_form
         return preview_form(action)
@@ -237,6 +222,9 @@ def preview(db, action):
 
 
 def execute(db, user, action):
+    from . import agent_leave
+    if action["tool"] in agent_leave.TOOLS:
+        return agent_leave.execute(db, user, action)
     if action["tool"] == "create_form":
         from .agent_forms import execute as create_form
         return create_form(db, user, action)
