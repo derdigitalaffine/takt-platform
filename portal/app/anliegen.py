@@ -410,6 +410,15 @@ def sync_from_native_task(db, task, actor, *, assignment=False, status=False):
         if case.status in ORDER_STATES and target in {"open", "in_progress"}:
             return  # Delivery state has more meaning than task activity.
         if case.status != target and target in next_states(case):
+            if target == "done":
+                from .anliegen_process_hub import active_runs
+                if any(run.state != "done" for run in active_runs(db, case)):
+                    # A linked native Task is not an authority to bypass the
+                    # audited manual override required for unfinished workflows.
+                    record(db, case, actor, "process_pending",
+                           "Die Aufgabe wurde beendet; verknüpfte Prozesse müssen noch "
+                           "abgeschlossen oder begründet über das Anliegen übersteuert werden.")
+                    return
             case.status = target
             record(db, case, actor, "status",
                    f"Aus verknüpfter Aufgabe übernommen: {STATUSES[target]}")
