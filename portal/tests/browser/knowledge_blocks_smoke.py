@@ -66,7 +66,7 @@ try:
         # Add a table and edit grid cells.
         page.locator('.knowledge-visual-add-kind').select_option('table')
         page.get_by_role('button', name='Block hinzufügen', exact=True).click()
-        tables = page.locator('.knowledge-visual-table')
+        tables = page.locator('table.knowledge-visual-table')
         expect(tables).to_have_count(2)
         tables.last.get_by_role('textbox', name='Zeile 2, Spalte 1').fill('Neuer Wert')
         assert 'Neuer Wert' in textarea.input_value()

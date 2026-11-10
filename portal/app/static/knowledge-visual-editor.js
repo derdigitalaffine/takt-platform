@@ -143,7 +143,7 @@
         textarea.value = text;
         invalid = false;
         status.classList.remove('knowledge-visual-error');
-        if (message) status.textContent = message;
+        status.textContent = message || '';
         return true;
       } catch (err) {
         invalid = true;
