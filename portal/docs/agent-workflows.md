@@ -37,6 +37,7 @@ als LLM-Kontext** mit den aktuellen Rechten geprüft.
 | Interne Anliegen | Eigene/zugewiesene/unzugewiesene Anliegen, Bestellungen, Kategorien und Folgestatus finden; Erfassung mit Routingvorschau; Zuweisung und Bearbeitung; Lieferant, Referenz und Lieferdatum |
 | Anliegenverwaltung | Für Administratoren: nicht vertrauliche Kategorien, Aktivierung und Personen-/Leitungsrouting; bestehende aktive Zuständigkeiten nur bei ausdrücklichem Auftrag übernehmen |
 | Geschützte Anliegen | Sensible Eingaben werden vor jedem LLM-/Verlaufsaufruf abgefangen und ausschließlich lokal im sitzungsgebundenen Server-Stash an das manuelle geschützte Formular übergeben. Kein Inhalt wird an das LLM oder den KI-Chatverlauf gesendet. |
+| Urlaub | Eigene Anträge sowie explizit planbare/zu entscheidende Anträge suchen; eigenen Entwurf anlegen, berechtigt gefundenen Zeitraum ändern; Einreichung, Verbindlichmachen, Genehmigung/Ablehnung, Storno und Ausnahmen nach bestehenden Fachregeln |
 | Kalender | Zugängliche Kalender und gespeicherte Terminmetadaten finden; Einzeltermin in beschreibbarem freien Kalender mit expliziter Zeitzone vorbereiten |
 | Formulare | Metadaten eigener/freigegebener Formulare finden; geschlossene Kopie ohne Antworten, Einladungen und öffentlichen Link; interne Grenze bleibt erhalten |
 | Prozesse | Prozessnamen und Veröffentlichungsstatus mit passender Rolle finden; Weiterarbeit im verlinkten Facheditor |
@@ -51,8 +52,8 @@ die Planung. Geschützte Kategorien werden nicht über das LLM administriert.
 
 1. Bis zu sechs erlaubte Suchen liefern belegte IDs. Fehlende Angaben werden im
    Chat geklärt; bis zu vier Schreibschritte werden sparsam vorgeschlagen.
-2. Der Agent öffnet unmittelbar den passenden Programmbereich mit vorausgefüllter
-   echter Fachmaske. Inhalte bleiben im Server-Stash; die URL enthält nur einen
+2. Der Agent bietet einen Link zum passenden Programmbereich mit vorausgefüllter
+   echter Fachmaske an. Der bewusste Klick öffnet sie im Hauptfenster. Inhalte bleiben im Server-Stash; die URL enthält nur einen
    zufälligen, sitzungs-/nutzergebundenen Planbezug. Öffnen speichert nichts.
 3. Die vom Werkzeug unterstützten Felder sind editierbar. Andere Felder sind für
    diesen Vorschlag gesperrt. Änderungen werden vor jeder Übernahme erneut anhand
@@ -78,6 +79,28 @@ Es gibt keine Browser-Fernsteuerung, frei wählbaren Tool-URLs, Codeausführung,
 autonome Veröffentlichung, Löschung, Genehmigung, Ressourcenbuchung oder Änderung
 einer Terminserie. Eine administrative Kategorie-Routingänderung übernimmt dieselben
 Fachgrenzen wie die native Verwaltung (maximal 300 Vorgänge je Fachlauf).
+
+## Urlaubsabläufe
+
+`create_leave` plant ausschließlich den eigenen Urlaub, `edit_leave` bindet einen
+zuvor berechtigt gefundenen Antrag. Bei einer Änderung bleibt der bisher wirksame
+Urlaub bis zur erneuten Entscheidung bestehen. `leave_command` akzeptiert nur die
+konkret angebotenen Operationen; im Fachformular ist dafür nur die Begründung
+änderbar. Die Person und die Operation sind durch den serverseitigen Plan gebunden.
+Die zusätzliche Suche `search_leave_requests` unterscheidet eigene Anträge,
+planbare Vorgänge und offene Entscheidungen. Ein gewöhnlicher Kollegenzugriff auf
+die Zeitachse berechtigt nicht zum Abruf von Urlaubsdetails im Agenten.
+
+Einreichung, Genehmigungsstufen, Vier-Augen-Prinzip, externe persönliche
+Selbstauskunft, Storno, Konten und Besetzung werden vom bestehenden Urlaubsservice
+geprüft. Vor der Vorschau wird ein Entscheidungsbefehl in einem zurückgerollten
+Savepoint validiert: keine dauerhaften Status-, Audit-, Postfach-, Outbox- oder
+Abwesenheitsänderungen. Beim Speichern prüft der Service alles erneut; eine
+geänderte Version, Hauptzuordnung oder Verfahrenskonfiguration entwertet den
+Vorschlag. Die endgültige Genehmigung erfordert stets die menschliche Bestätigung.
+Neue Entwürfe werden nicht stillschweigend eingereicht oder genehmigt; ein weiterer
+Schritt findet den gespeicherten Antrag erneut, statt eine noch nicht vorhandene
+ID zu erfinden. Administrative Löschung bleibt im gesonderten manuellen Ablauf.
 
 ## Administrative Korrektur von Urlaubsabwesenheiten
 

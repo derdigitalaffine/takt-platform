@@ -23,6 +23,7 @@
     const selectors = {
       configure_anliegen_category: `form[action="/anliegen/kategorien/${id}"]`,
       create_form: 'form[action="/forms"]',
+      create_leave: '#leave-form', edit_leave: '#leave-form', leave_command: `#leave-row-${id} form[data-leave-command]`,
       create_task: 'form[data-task-create]', create_anliegen: '#anliegen-create',
       assign_task: `form[action="/aufgaben/${id}/bearbeiten"]`,
       set_task_priority: `form[action="/aufgaben/${id}/bearbeiten"]`,
@@ -45,9 +46,20 @@
     }
     if (!form) throw new Error('Die Fachmaske ist nicht verfügbar. Bitte den Vorschlag neu planen.');
     const fields = {...data.fields};
+    if (tool === 'leave_command') {
+      const chosen = form.querySelector(`button[name="action"][value="${data.fields.command}"]`);
+      if (!chosen) throw new Error('Diese Urlaubsaktion ist nicht mehr verfügbar. Bitte neu planen.');
+      for (const button of form.querySelectorAll('button')) {
+        if (button !== chosen) { button.disabled = true; button.hidden = true; }
+      }
+      chosen.type = 'submit';
+    }
+
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
       create_form: ['title'],
+      create_leave: ['starts_on', 'ends_on', 'start_half', 'end_half'],
+      edit_leave: ['starts_on', 'ends_on', 'start_half', 'end_half'], leave_command: ['reason'],
       create_task: ['title', 'description', 'priority', 'assignee_id', 'due_date', 'due_time', 'starts_at', 'tags', 'checklist'],
       create_anliegen: ['title', 'description_final', 'category_id'],
       assign_task: ['assignee_id'], set_task_priority: ['priority'], set_task_status: [],
@@ -77,6 +89,7 @@
       const control = form.elements.namedItem(name);
       if (!control || !('value' in control)) continue;
       if (control.type === 'checkbox') control.checked = value === true;
+      else if (control.tomselect) control.tomselect.setValue(value == null ? '' : String(value), true);
       else control.value = value == null ? '' : String(value);
       if (tool !== 'create_event') control.dispatchEvent(new Event('change', {bubbles: true}));
     }
@@ -89,10 +102,15 @@
     if (hero) hero.hidden = true;
     const draftDetails = form.querySelector('#anliegen-review');
     if (draftDetails) draftDetails.open = true;
+    if (['create_leave', 'edit_leave'].includes(tool)) {
+      document.getElementById('leave-edit-note').hidden = tool !== 'edit_leave';
+    }
     // Only fields implemented by the tool can be changed in this proposal.
     for (const control of form.querySelectorAll('input, select, textarea, button')) {
       if (control.type === 'submit' || control.name === 'csrf' || control.name === 'agent_timezone') continue;
-      if (!allowed.includes(control.name)) control.disabled = true;
+      if (!allowed.includes(control.name)) {
+        control.disabled = true; control.tomselect?.disable();
+      }
     }
     for (const details of form.querySelectorAll('details')) {
       if (Array.from(details.querySelectorAll('input,select,textarea')).some(c => allowed.includes(c.name))) details.open = true;
@@ -101,9 +119,9 @@
       if (parent.tagName === 'DETAILS') parent.open = true;
     }
     // Copy/status actions otherwise live in menus; expose their native form here.
-    if (tool === 'copy_form' || tool === 'set_task_status') banner.after(form);
+    if (['copy_form', 'set_task_status', 'create_leave', 'edit_leave'].includes(tool)) banner.after(form);
     else form.before(banner);
-    const submit = form.querySelector('button[type="submit"], button:not([type])');
+    const submit = form.querySelector('button[type="submit"]:not(:disabled), button:not([type]):not(:disabled)');
     if (submit) { submit.className = 'btn btn-primary'; submit.textContent = 'Vorschlag prüfen'; }
     hidden('csrf', document.querySelector('meta[name="csrf"]')?.content || '');
     hidden('agent_plan', nonce); hidden('agent_step', String(data.step));

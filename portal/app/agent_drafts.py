@@ -15,6 +15,8 @@ from .db import DmsArea, LOCAL_TZ
 
 def destination(action):
     tool = action["tool"]
+    if tool in ("create_leave", "edit_leave", "leave_command"):
+        return "/urlaub/planer?unit=" + str(action["display_unit"])
     if tool == "configure_anliegen_category":
         return "/anliegen/kategorien"
     if tool == "create_form":
@@ -54,6 +56,10 @@ def load(request, user, nonce, step):
 
 
 def validate(db, user, action):
+    from . import agent_leave
+    if action["tool"] in agent_leave.TOOLS:
+        agent_leave.validate(db, user, action)
+        return
     if action["tool"] == "create_form":
         from .agent_forms import normalize
         normalize(user, action)
@@ -82,7 +88,7 @@ def validate(db, user, action):
 def view(db, user, plan, step):
     action = plan["actions"][step]
     validate(db, user, action)
-    fields = {k: v for k, v in action.items() if k not in ("version", "routing_snapshot", "area_snapshot", "affected", "tool", "id")}
+    fields = {k: v for k, v in action.items() if k not in ("version", "routing_snapshot", "area_snapshot", "affected", "tool", "id", "policy_snapshot", "requester_id", "org_id", "display_unit")}
     tool = action["tool"]
     if tool == "create_anliegen":
         fields["description_final"] = fields["description"]
@@ -108,6 +114,9 @@ def edited(db, user, original, data):
     tool = raw["tool"]
     allowed = {
         "create_form": ("title",),
+        "create_leave": ("starts_on", "ends_on", "start_half", "end_half"),
+        "edit_leave": ("starts_on", "ends_on", "start_half", "end_half"),
+        "leave_command": ("reason",),
         "create_task": ("title", "description", "priority", "assignee_id", "due_date", "due_time", "starts_at", "tags", "checklist"),
         "create_anliegen": ("title", "description", "category_id"),
         "assign_task": ("assignee_id",), "set_task_priority": ("priority",),
@@ -144,7 +153,7 @@ def edited(db, user, original, data):
     # module ACL is still checked by normalize/validate, including the new target.
     findings = []
     if "id" in raw:
-        kind = agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
+        kind = "leave" if tool in ("edit_leave", "leave_command") else agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
         findings.append(dict(type=kind, id=raw["id"]))
     if "assignee_id" in raw:
         findings.append(dict(type="person", id=raw["assignee_id"]))
