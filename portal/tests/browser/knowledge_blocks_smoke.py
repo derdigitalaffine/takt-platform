@@ -33,6 +33,8 @@ try:
         textarea = page.locator('[data-knowledge-markdown]')
         source = textarea.input_value()
         expect(page.locator('.knowledge-visual-shell')).to_be_visible()
+        expect(page.get_by_role('button', name='Visuelle Ansicht', exact=True)).to_contain_text('Visuell')
+        expect(page.get_by_role('button', name='Markdown-Quelltext', exact=True)).to_contain_text('Markdown')
         expect(page.locator('.knowledge-visual-card')).to_have_count(5)
         assert page.evaluate('window.TAKTKnowledgeBlocks.serialize(window.TAKTKnowledgeBlocks.parse(document.querySelector("[data-knowledge-markdown]").value)) === document.querySelector("[data-knowledge-markdown]").value')
 

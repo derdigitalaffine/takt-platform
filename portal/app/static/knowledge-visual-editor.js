@@ -90,6 +90,8 @@
     const markdownButton = button('Markdown-Quelltext', 'fa-code', function () { switchMode(false); });
     visualButton.classList.add('knowledge-mode-button');
     markdownButton.classList.add('knowledge-mode-button');
+    visualButton.appendChild(document.createTextNode(' Visuell'));
+    markdownButton.appendChild(document.createTextNode(' Markdown'));
     header.appendChild(heading);
     shell.appendChild(header);
 
