@@ -12,7 +12,7 @@ from app import anliegen_processes as policies
 from app.anliegen_models import Anliegen, AnliegenCategory, AnliegenEvent
 from app.anliegen_process_models import (
     AnliegenProcessRule, AnliegenProcessRun, AnliegenProcessTask, AnliegenProcessAudit,
-    AnliegenProcessRuleEvent,
+    AnliegenProcessRuleEvent, AnliegenProcessOverride,
 )
 from app.db import (Organization, Process, ProcessVersion, SessionLocal, Setting,
                     User, get_settings, set_setting)
@@ -117,6 +117,8 @@ def bundle():
             db.execute(delete(AnliegenProcessRule).where(
                 AnliegenProcessRule.id.in_(rule_ids)))
         if case_ids:
+            db.execute(delete(AnliegenProcessOverride).where(
+                AnliegenProcessOverride.anliegen_id.in_(case_ids)))
             db.execute(delete(AnliegenEvent).where(
                 AnliegenEvent.anliegen_id.in_(case_ids)))
             db.execute(delete(Anliegen).where(Anliegen.id.in_(case_ids)))
@@ -610,3 +612,31 @@ def test_org_manager_cannot_see_foreign_process_names_or_step_data(bundle):
               "outcome": "done", "field_cost": "10",
               "checks": ["Bedarf geprüft"]})
     assert forbidden.status_code == 403
+
+
+def test_native_task_completion_does_not_bypass_running_process(bundle):
+    from app import task_overview
+    with SessionLocal() as db:
+        rule = _rule(db, bundle, bundle["author_id"], approval=False)
+        db.commit()
+        rid = rule.id
+    _flag_enabled()
+    reporter = _client(bundle, "reporter")
+    response = _new_case(reporter, bundle, rule_id=rid)
+    cid = int(response.headers["location"].rsplit("/", 1)[-1])
+    with SessionLocal() as db:
+        case = db.get(Anliegen, cid)
+        actor = db.get(User, bundle["handler_id"])
+        parent = Task(title=case.title, description=case.description,
+                      creator_id=case.reporter_id, assignee_id=case.assignee_id,
+                      source_type="anliegen", source_id=str(case.id),
+                      source_key=f"anliegen:{case.id}", status="done")
+        db.add(parent)
+        db.flush()
+        case.task_id = parent.id
+        cases.sync_from_native_task(db, parent, actor, status=True)
+        assert case.status == "open"
+        assert db.scalar(select(AnliegenEvent.id).where(
+            AnliegenEvent.anliegen_id == cid,
+            AnliegenEvent.kind == "process_pending")) is not None
+        db.commit()
