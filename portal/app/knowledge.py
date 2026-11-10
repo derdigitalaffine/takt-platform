@@ -9,6 +9,7 @@ from markdown_it import MarkdownIt
 from markupsafe import Markup
 
 from .db import Group, GroupMember, Organization, User, get_settings, utcnow
+from .org_models import OrgMembership
 from .knowledge_models import (
     KnowledgeArticle, KnowledgeAudit, KnowledgeGrant, KnowledgeRevision,
     KnowledgeSpace, KnowledgeAmendmentRevision,
@@ -193,3 +194,73 @@ def change_status(db, item: KnowledgeArticle, actor, status: str) -> None:
 def principal_exists(db, kind: str, target_id: int) -> bool:
     model = {"user": User, "group": Group, "org": Organization}.get(kind)
     return bool(model and target_id > 0 and db.get(model, target_id) is not None)
+
+
+def can_manage_space(db, user, space: KnowledgeSpace | None) -> bool:
+    """Explicit, current, scoped management; portal-wide right alone is not enough."""
+    return bool(space is not None and allowed(db, user, space, "manage"))
+
+
+def eligible_subject(db, actor, space: KnowledgeSpace, target: User | None) -> bool:
+    """Delegated managers may grant within the room's EXACT organization only.
+
+    Explicitly do not infer other users' memberships from broad user-directory,
+    inherited leadership, or shared groups.
+    """
+    if not target or not target.active or not actor or not can_manage_space(db, actor, space):
+        return False
+    if actor.is_admin:
+        return True
+    if space.org_id is None:
+        return False
+    return db.scalar(select(OrgMembership.id).where(
+        OrgMembership.user_id == target.id,
+        OrgMembership.org_id == space.org_id,
+    ).limit(1)) is not None
+
+
+def explain_space_access(db, target: User, space: KnowledgeSpace) -> list[dict]:
+    """Trace rights for a manager's authorized subject; final verdict from allowed().
+
+    Explanations never override runtime authorization.
+    """
+    rules = [g for g in _grants(db, "space", space.id)
+             if _principal_matches(db, target, g)]
+    own = space.owner_id == target.id
+    org_member = bool(space.org_id and _org_scope(
+        db, target, space.org_id, include_children=False
+    ))
+    descriptions = {
+        "read": "Lesen", "edit": "Bearbeiten", "publish": "Freigeben",
+        "manage": "Verwalten", "ai": "KI-Verarbeitung",
+    }
+    outcomes = []
+    for capability, label in descriptions.items():
+        permit = allowed(db, target, space, capability)
+        matching_denies = [g for g in rules if g.effect == "deny"
+                           and g.capability in {"read", capability}]
+        matching_allows = [g for g in rules if g.effect == "allow"
+                           and g.capability == capability]
+        if not active(db):
+            reason = "Modul ist ausgeschaltet."
+        elif not target.active:
+            reason = "Benutzerkonto ist deaktiviert."
+        elif not target.can(CAP_PERMS[capability]):
+            reason = "Globale TAKT-Berechtigung fehlt."
+        elif target.is_admin:
+            reason = "TAKT-Administration (plattformweite Ausnahme)."
+        elif matching_denies:
+            reason = "Explizite Sperre hat Vorrang vor Vererbung und Freigabe."
+        elif capability != "read" and not _raw_allowed(db, target, space, "read"):
+            reason = "Das notwendige Leserecht fehlt."
+        elif matching_allows:
+            reason = "Ausdrückliche Freigabe im Wissensraum."
+        elif own:
+            reason = "Eigentümer des Wissensraums."
+        elif org_member and capability in {"read", "edit", "publish"}:
+            reason = "Aktive Organisationszuordnung bzw. vererbte Organisationsrolle."
+        else:
+            reason = "Keine passende Berechtigung im Wissensraum."
+        outcomes.append({"capability": capability, "label": label,
+                         "allowed": permit, "reason": reason})
+    return outcomes

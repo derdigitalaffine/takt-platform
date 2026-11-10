@@ -22,19 +22,11 @@
     </form>
   </details>{% endif %}
   {% if can_manage %}
-    <details class="knowledge-form-card mt-4"><summary>Berechtigungen des Wissensraums</summary>
-      <p class="text-secondary small mt-3">Erlauben oder verweigern – Verweigern hat Vorrang. Personen-, Gruppen- und Organisations-IDs stammen aus der bestehenden Verwaltung.</p>
-      {% for g in grants %}<div class="knowledge-grant">{{g.principal_kind}} #{{g.principal_id}} · {{g.capability}} · {{g.effect}}</div>{% endfor %}
-      <form class="row g-2 mt-2" action="/wissen/space/{{space.id}}/rechte" method="post">
-        <input type="hidden" name="csrf" value="{{csrf}}">
-        <div class="col-sm-3"><label class="form-label">Empfängertyp</label><select name="principal_kind" class="form-select"><option value="user">Person</option><option value="group">Gruppe</option><option value="org">Organisation</option></select></div>
-        <div class="col-sm-2"><label class="form-label">ID</label><input type="number" min="1" name="principal_id" required class="form-control"></div>
-        <div class="col-sm-3"><label class="form-label">Recht</label><select name="capability" class="form-select"><option value="read">Lesen</option><option value="edit">Bearbeiten</option><option value="publish">Veröffentlichen</option><option value="manage">Verwalten</option><option value="ai">KI-Freigabe</option></select></div>
-        <div class="col-sm-2"><label class="form-label">Regel</label><select name="effect" class="form-select"><option value="allow">Erlauben</option><option value="deny">Sperren</option><option value="remove">Entfernen</option></select></div>
-        <div class="col-sm-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Speichern</button></div>
-        <label class="col-12 small"><input type="checkbox" class="form-check-input" name="include_children" value="1"> Auch Untereinheiten (nur Organisation)</label>
-      </form>
-    </details>
+  <div class="knowledge-form-card mt-4 knowledge-manage-teaser">
+    <div><strong><i class="fa-solid fa-user-shield me-2" aria-hidden="true"></i>Zugriff und Fachredaktion</strong>
+    <p class="small text-secondary mb-0">Mitglieder berechtigen, direkte Sperren festlegen und effektive Rechte erklären.</p></div>
+    <a href="/wissen/raum/{{space.id}}/verwaltung" class="btn btn-outline-primary">Rechte verwalten</a>
+  </div>
   {% endif %}
 </div>
 {% endblock %}

@@ -111,9 +111,7 @@ def knowledge_space(request: Request, space_id: int,
     return render(request, "knowledge_space.html", user, space=space,
                   entries=entries, kinds=km.KINDS, statuses=km.STATUSES,
                   can_edit=km.allowed(db, user, space, "edit"),
-                  can_manage=user.is_admin, grants=list(db.scalars(select(KnowledgeGrant).where(
-                      KnowledgeGrant.resource_kind == "space", KnowledgeGrant.resource_id == space.id
-                  ))) if user.is_admin else [])
+                  can_manage=km.can_manage_space(db, user, space))
 
 
 @app.post("/wissen/raum/{space_id:int}/artikel", dependencies=[Depends(check_csrf)])
@@ -237,22 +235,31 @@ def knowledge_permissions(request: Request, resource_kind: str, resource_id: int
                           user: User = Depends(current_user),
                           db: Session = Depends(get_db)):
     _reader(user, db)
-    # First version deliberately confines ACL editing to global administrators.
-    # Broader delegated administration needs a separate authorization review.
-    if not user.is_admin:
-        raise HTTPException(403)
     if resource_kind == "space":
         space = db.get(KnowledgeSpace, resource_id)
         item = None
-        dest = f"/wissen/raum/{resource_id}"
+        dest = f"/wissen/raum/{resource_id}/verwaltung"
     elif resource_kind == "article":
         item = db.get(KnowledgeArticle, resource_id)
         space = db.get(KnowledgeSpace, item.space_id) if item else None
         dest = f"/wissen/artikel/{resource_id}"
     else:
         raise HTTPException(404)
-    if space is None or not km.principal_exists(db, principal_kind, principal_id):
-        raise HTTPException(422, "Bereich oder Empfänger nicht gefunden.")
+    if space is None:
+        raise HTTPException(404)
+    if not km.can_manage_space(db, user, space):
+        raise HTTPException(403, "Für diesen Wissensraum fehlt das Verwaltungsrecht.")
+    if not user.is_admin:
+        # Exact-unit, people-only delegation. Never assign roles, AI access,
+        # publication, other organizations or unrelated article ACLs here.
+        if (resource_kind != "space" or principal_kind != "user"
+                or capability not in {"read", "edit"} or include_children):
+            raise HTTPException(403, "Diese Rechte vergibt ausschließlich die zentrale Administration.")
+        recipient = db.get(User, principal_id)
+        if not km.eligible_subject(db, user, space, recipient):
+            raise HTTPException(403, "Person gehört nicht zum berechtigten Fachbereich.")
+    if not km.principal_exists(db, principal_kind, principal_id):
+        raise HTTPException(422, "Empfänger nicht gefunden.")
     if capability not in km.CAP_PERMS or effect not in {"allow", "deny", "remove"}:
         raise HTTPException(422, "Ungültige Berechtigungsregel.")
     existing = db.scalar(select(KnowledgeGrant).where(

@@ -3031,6 +3031,7 @@ from . import routes_laws  # noqa: E402,F401
 from . import routes_ai  # noqa: E402,F401
 from . import routes_knowledge  # noqa: E402,F401
 from . import routes_knowledge_review  # noqa: E402,F401
+from . import routes_knowledge_admin  # noqa: E402,F401
 from . import routes_anliegen  # noqa: E402,F401
 from . import routes_anliegen_processes  # noqa: E402,F401
 from . import routes_maps  # noqa: E402,F401

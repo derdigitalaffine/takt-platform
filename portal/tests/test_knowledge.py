@@ -312,3 +312,102 @@ def test_review_due_date_authority_and_version_conflict(sample):
         assert item.authority == "experience"
         assert item.review_due_on.isoformat() == "2030-10-01"
         assert item.version == 4
+
+
+
+def test_delegated_management_is_scoped_to_exact_org_and_read_edit_only(sample):
+    """A room-level manager cannot expand own scope into admin/AI or other units."""
+    org_id, space_id, article_id, author_id, outsider_id, reviewer_id = sample
+    reviewer = login("wissen-checker@example.org", "knowledge-test-123")
+    admin = login(*ADMIN)
+    path = f"/wissen/raum/{space_id}/verwaltung"
+    assert reviewer.get(path).status_code == 403
+    with SessionLocal() as db:
+        delegate = db.get(User, reviewer_id)
+        delegate.permissions += ",knowledge_manage"
+        db.add(KnowledgeGrant(resource_kind="space", resource_id=space_id,
+                              principal_kind="user", principal_id=reviewer_id,
+                              capability="manage", effect="allow"))
+        db.commit()
+
+    page = reviewer.get(path)
+    assert page.status_code == 200
+    assert "Wissensredaktion" in page.text
+    assert "Fremder Bereich" not in page.text
+    assert "Wissensraum Sachgebiet" in page.text
+    assert reviewer.get(path + f"?person={outsider_id}").status_code == 403
+    # A manager with global right and a live grant may explain exact-unit rights.
+    preview = reviewer.get(path + f"?person={author_id}")
+    assert preview.status_code == 200
+    assert "Eigentümer des Wissensraums" in preview.text
+    assert "Globale TAKT-Berechtigung fehlt" in preview.text
+
+    csrf = csrf_of(page.text)
+    url = f"/wissen/space/{space_id}/rechte"
+    payload = dict(csrf=csrf, principal_kind="user",
+                   principal_id=author_id, capability="edit", effect="deny")
+    assert reviewer.post(url, data=payload).status_code == 303
+    author = login("wissen-reader@example.org", "knowledge-test-123")
+    assert author.get(f"/wissen/artikel/{article_id}").status_code == 200
+    assert author.post(f"/wissen/artikel/{article_id}/save", data={
+        "csrf": csrf_of(author.get(f"/wissen/artikel/{article_id}").text),
+        "version": 1, "title": "Unzulässig", "body_md": "Sperre", "kind": "article"
+    }).status_code == 403
+    restricted = reviewer.get(path + f"?person={author_id}")
+    assert "Explizite Sperre hat Vorrang" in restricted.text
+    for forbidden in (
+        {"capability": "publish"},
+        {"capability": "manage"},
+        {"capability": "ai"},
+        {"principal_kind": "org", "principal_id": org_id},
+        {"principal_id": outsider_id},
+        {"include_children": "1"},
+    ):
+        assert reviewer.post(url, data={**payload, **forbidden}).status_code == 403
+
+    # Even a valid delegate cannot use an article-specific ACL endpoint.
+    assert reviewer.post(f"/wissen/article/{article_id}/rechte", data=payload).status_code == 403
+
+    # Existing administrator capability and deny override remain in force.
+    admin_token = csrf_of(admin.get(path).text)
+    assert admin.post(url, data={**payload, "csrf": admin_token, "effect": "remove"}).status_code == 303
+    assert author.get(f"/wissen/artikel/{article_id}").status_code == 200
+    assert reviewer.get(path).status_code == 200
+    with SessionLocal() as db:
+        db.get(User, reviewer_id).permissions = "knowledge_read,knowledge_publish"
+        db.commit()
+    assert reviewer.get(path).status_code == 403
+
+
+def test_review_inbox_filters_unrelated_users_and_honors_module_gate(sample):
+    """Review dates and pending approvals never enumerate other organizations."""
+    _, _, article_id, _, outsider_id, _ = sample
+    author, reviewer = _publish_sample(sample)
+    outsider = login("wissen-outsider@example.org", "knowledge-test-123")
+    from datetime import date, timedelta
+    with SessionLocal() as db:
+        doc = db.get(KnowledgeArticle, article_id)
+        doc.review_due_on = date.today() - timedelta(days=3)
+        db.get(User, outsider_id).permissions = "knowledge_read,knowledge_publish"
+        db.commit()
+    url = "/wissen/pruefungen"
+    result = reviewer.get(url)
+    assert result.status_code == 200
+    assert "Beschaffung Dienstmaterial" in result.text
+    assert "Überfällig" in result.text
+    assert "Beschaffung Dienstmaterial" not in outsider.get(url).text
+    assert author.get(url).status_code == 200
+    # An author cannot review their own document even with publish permissions.
+    assert "Beschaffung Dienstmaterial" not in author.get(url).text
+    settings(module_knowledge="0")
+    assert reviewer.get(url).status_code == 404
+    assert outsider.get(url).status_code == 404
+
+
+def test_management_endpoints_do_not_accept_missing_csrf(sample):
+    _, space_id, *_ = sample
+    admin = login(*ADMIN)
+    assert admin.post(f"/wissen/space/{space_id}/rechte", data={
+        "principal_kind": "user", "principal_id": 1,
+        "capability": "read", "effect": "allow",
+    }).status_code == 400

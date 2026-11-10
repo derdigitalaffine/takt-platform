@@ -5,7 +5,10 @@
 <div class="knowledge-ui">
   <header class="knowledge-head">
     <div><span class="knowledge-eyebrow"><i class="fa-solid fa-layer-group me-1"></i> ORGANISATIONSWISSEN</span><h1>Wissen</h1><p>Prozesse, Erfahrungen und Arbeitswissen sicher finden und gemeinsam dokumentieren.</p></div>
-    {% if can_create %}<a class="btn btn-primary" href="#space-new"><i class="fa-solid fa-plus me-2"></i>Wissensraum anlegen</a>{% endif %}
+    <div class="knowledge-head-actions">
+      {% if user.can('knowledge_publish') %}<a class="btn btn-outline-primary" href="/wissen/pruefungen"><i class="fa-solid fa-clipboard-check me-2" aria-hidden="true"></i>Wissensprüfungen</a>{% endif %}
+      {% if can_create %}<a class="btn btn-primary" href="#space-new"><i class="fa-solid fa-plus me-2"></i>Wissensraum anlegen</a>{% endif %}
+    </div>
   </header>
   <form role="search" action="/wissen" method="get" class="knowledge-search">
     <label for="wissen-search" class="visually-hidden">Wissensartikel durchsuchen</label>
