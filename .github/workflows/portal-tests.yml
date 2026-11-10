@@ -99,6 +99,10 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Check file-picker feedback
         run: node tests/test_task_create_client.js
+      - name: Verify visual knowledge-block Markdown round trips
+        run: node tests/test_knowledge_blocks_client.js
+      - name: Exercise knowledge block editor in Chromium
+        run: python tests/browser/knowledge_blocks_smoke.py
       - name: Exercise task UI in Chromium
         run: python tests/browser/task_ui_smoke.py
       - name: Exercise agent confirmation across modules
@@ -192,6 +196,17 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Set up board UI build
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: portal/ui/package-lock.json
+      - name: Verify bundled Mantine board UI
+        run: |
+          npm ci --prefix ui
+          npm run build --prefix ui
+          git diff --exit-code -- app/static/board-ui.js app/static/board-ui.css app/static/board-ui.js.LEGAL.txt app/static/vendor/mantine
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

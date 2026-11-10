@@ -411,3 +411,13 @@ def test_management_endpoints_do_not_accept_missing_csrf(sample):
         "principal_kind": "user", "principal_id": 1,
         "capability": "read", "effect": "allow",
     }).status_code == 400
+
+
+def test_knowledge_markdown_tables_and_untrusted_html_are_safe():
+    from app.knowledge import render_markdown
+    rendered = str(render_markdown("| Feld | Wert |\n| --- | --- |\n| A | 42 |"))
+    assert "<table>" in rendered and "<td>42</td>" in rendered
+    malicious = str(render_markdown("<img src=x onerror=alert(1)>\n\n[unsafe](javascript:alert(1))"))
+    assert "<img " not in malicious
+    assert "<script>" not in malicious
+    assert 'href="javascript:' not in malicious

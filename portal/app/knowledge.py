@@ -42,7 +42,7 @@ AUTHORITIES = {
 # separate legal-text and circulation workflows; ordinary knowledge cannot
 # proclaim itself a binding administrative rule.
 EDITOR_AUTHORITIES = {"unconfirmed", "experience", "verified"}
-_MD = MarkdownIt("commonmark", {"html": False, "linkify": False})
+_MD = MarkdownIt("commonmark", {"html": False, "linkify": False}).enable("table")
 
 
 def render_markdown(raw: str | None) -> Markup:

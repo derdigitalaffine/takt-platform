@@ -104,11 +104,29 @@ sein, bevor ein PR gemergt wird.
 
 ## P2 – sichere Redaktionsfortsetzung, Vorlagen und Wiedervorlagen
 
-- **Dokumenteditor:** Markdown-Formatierungsleiste und typbezogene Vorlagen
-  (Artikel, Prozess, FAQ, Checkliste, Erfahrungswissen) als optionale
-  JavaScript-Verbesserung; das Formular bleibt ohne JavaScript verwendbar.
-  Der vorhandene Markdown-Renderer wird serverseitig mit deaktiviertem rohem
-  HTML ausgeführt; auch die Vorschau prüft CSRF, Fachrechte und den Modulschalter.
+- **Dokumenteditor:** Der modulare, visuelle Blockeditor wird auf den
+  vorhandenen Markdown-Feldern aufgebaut (Artikel, Prozessbeschreibungen und
+  getrennte Änderungsentwürfe). Absätze, Überschriften, Aufzählungen,
+  nummerierte Listen, Checklisten, Zitate, Hinweise, Links, Code und Tabellen
+  werden als individuell bearbeitbare Blöcke dargestellt. Blöcke lassen
+  sich anlegen, duplizieren, entfernen und per Pfeiltasten, Alt+Pfeil oder
+  Drag-and-drop verschieben. Die zugängliche Markdown-Ansicht ist jederzeit
+  verfügbar und bleibt ohne JavaScript vollständig bedienbar.
+- **Datenhaltung und Sicherheit:** Der Blockeditor speichert weiterhin
+  ausschließlich das vorhandene Feld `body_md` und benötigt keine
+  Datenbankmigration, keinen KI-Provider und kein neues API.
+  Bei jedem Wechsel in die visuelle Ansicht bleiben unveränderte Teile
+  des Markdown-Quelltexts **bytegenau** erhalten, einschließlich fremder
+  Erweiterungen, Codeblöcken und Leerzeilen. Komplexe Strukturen lassen sich
+  als `Markdown-Original` editieren, nicht stillschweigend löschen. Eine
+  bewusste Neuanordnung normalisiert lediglich die Leerzeilen zwischen
+  den verschobenen Blöcken. Aufwändigere Rich-Text-Inlines bearbeitet man
+  weiterhin in Markdown innerhalb des jeweiligen Inhaltsblocks.
+- **Ausgabe:** Der serverseitige Markdown-Renderer lässt rohes HTML
+  deaktiviert, rendert jetzt zusätzlich einfache Markdown-Tabellen.
+  Der Client erzeugt keine ausführbaren HTML-Abschnitte und gestattet bei
+  neuen Links nur HTTPS, HTTP, Mailto oder lokale Pfade. Die vorhandene
+  Vorschau prüft CSRF, Rechte und Modulschalter weiterhin serverseitig.
 - **Veröffentlichte Fassungen:** Die Tabelle `knowledge_amendments` hält
   pro Artikel den aktuellen Änderungsentwurf. `knowledge_amendment_revisions`
   enthält jede Entwurfs-/Statusänderung. Leser sehen weiterhin ausschließlich
@@ -127,11 +145,11 @@ sein, bevor ein PR gemergt wird.
   Verbindliche Dienstanweisungen werden dadurch nicht eigenmächtig erlassen.
 - **Datenfluss:** Aus Wissensartikeln erfolgt weiterhin **keine** automatische
   Übernahme in KI-/RAG-Indizes, kein externer API-Aufruf, keine Mitarbeiteransprache.
-- **Abgrenzung:** Visueller Blockeditor mit frei sortierbaren Elementen,
-  automatisierte Erinnerungen, rollenbasierte ACL-Delegation und
-  Quellverknüpfungen sind weiterhin offene Teile des P2-Issues. Die hier
-  enthaltene Formatierungsleiste ist ausdrücklich ein Markdown-Editor,
-  kein vollwertiger WYSIWYG-Blockeditor.
+- **Abgrenzung:** Der visuelle Blockeditor ist ein blockbasierter,
+  Markdown-kompatibler Editor, aber kein freies HTML-/Layout-Canvas und
+  keine Rich-Text-WYSIWYG-Oberfläche für alle möglichen Plugins.
+  Automatisierte Erinnerungen, mehrstufige fachliche Freigaben und
+  Quellverknüpfungen bleiben spätere Aufgaben von #298.
 
 
 ## P2 – delegierte Fachredaktion und Prüfungsübersicht
@@ -154,3 +172,19 @@ sein, bevor ein PR gemergt wird.
   personenbezogenen Leistungskennzahlen.
 - **Tests:** Organisationsisolierung, Rechteentzugswirkung, verbotene
   delegierte Rechteausweitung, CSRF, Review-Filter und Modulabschaltung.
+
+
+## Browser- und JavaScript-Prüfungen des Blockeditors
+
+- `portal/tests/test_knowledge_blocks_client.js`: verlustfreie
+  Roundtrips inklusive CRLF, Codefences, Spezialsyntax, Roh-HTML,
+  sichere Linkziele, Checklisten, Tabellenänderungen und Neuordnung.
+- `portal/tests/browser/knowledge_blocks_smoke.py`: echte Bedienung
+  im Chromium (Moduswechsel, editierbare Blöcke, Tabelle, Checkliste,
+  Tastaturverschiebung, sichere Formularübertragung, Verweigerung
+  gefährlicher Links und mobile Bildschirmbreite).
+- `portal/tests/test_knowledge.py`: Markdown-Tabellenausgabe und
+  Schutz vor untrusted HTML, zusätzlich alle bisherigen serverseitigen
+  Autorisierungs-, CSRF-, Versions- und Vier-Augen-Tests.
+- Auslösung im CI-Job `tasks-browser` zusätzlich zu allen bisherigen
+  Tests. Ein PR darf bei Fehlern nicht gemergt werden.
