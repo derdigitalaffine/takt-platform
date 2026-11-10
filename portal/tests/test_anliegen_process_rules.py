@@ -438,3 +438,175 @@ def test_csrf_and_switch_admin_only(bundle):
         "csrf": _csrf(admin, "/anliegen/prozesse"), "enabled": "1"}).status_code == 303
     with SessionLocal() as db:
         assert policies.integration_enabled(db) is True
+
+
+def test_hub_work_feed_is_single_source_and_reporter_sees_no_internal_details(bundle):
+    """A native parent task is shadowed only while actionable process work exists."""
+    from app import task_overview
+    from app.anliegen_process_hub import summary, work_items
+    with SessionLocal() as db:
+        rule = _rule(db, bundle, bundle["author_id"], approval=False)
+        db.commit()
+        rid = rule.id
+    _flag_enabled()
+    reporter = _client(bundle, "reporter")
+    result = _new_case(reporter, bundle, rule_id=rid)
+    assert result.status_code == 303
+    case_id = int(result.headers["location"].rsplit("/", 1)[-1])
+    public_page = reporter.get(f"/anliegen/{case_id}")
+    assert public_page.status_code == 200
+    assert "Interner Bearbeitungsprozess" in public_page.text
+    assert "Beschaffung prüfen" not in public_page.text
+    assert "Monitorfreigabe Test" not in public_page.text
+    handler = _client(bundle, "handler")
+    page = handler.get(f"/anliegen/{case_id}")
+    assert page.status_code == 200
+    assert "Beschaffung prüfen" in page.text
+    assert "0 %" in page.text
+    with SessionLocal() as db:
+        case = db.get(Anliegen, case_id)
+        process_step = db.scalar(select(AnliegenProcessTask)
+                                 .join(AnliegenProcessRun,
+                                       AnliegenProcessRun.id == AnliegenProcessTask.run_id)
+                                 .where(AnliegenProcessRun.anliegen_id == case_id))
+        parent = Task(title=case.title, description=case.description,
+                      creator_id=case.reporter_id, assignee_id=case.assignee_id,
+                      source_type="anliegen", source_id=str(case.id),
+                      source_key=f"anliegen:{case.id}", status="open")
+        db.add(parent)
+        db.flush()
+        case.task_id = parent.id
+        db.commit()
+        user = db.get(User, bundle["handler_id"])
+        work = work_items(db, user)
+        assert len([row for row in work if row["case"].id == case_id]) == 1
+        dashboard = task_overview.collect(db, user, {"anliegen", "tasks"})
+        rows = dashboard["ready"] + dashboard["pool"] + dashboard["waiting"]
+        process_rows = [row for row in rows
+                        if row["source"] == "anliegen_process"
+                        and row.get("anliegen_process_task_id") == process_step.id]
+        assert len(process_rows) == 1
+        assert process_rows[0]["href"].endswith(f"#prozess-schritt-{process_step.id}")
+        assert not any(row.get("native_id") == parent.id for row in rows)
+        assert summary(db, case, user)["aggregate"]["running"] == 1
+
+
+def test_manual_early_closure_needs_encrypted_reason_and_private_audit(bundle):
+    from app.anliegen_process_models import AnliegenProcessOverride
+    from app.security import decrypt
+    with SessionLocal() as db:
+        rule = _rule(db, bundle, bundle["author_id"], approval=False)
+        db.commit()
+        rid = rule.id
+    _flag_enabled()
+    reporter = _client(bundle, "reporter")
+    response = _new_case(reporter, bundle, rule_id=rid)
+    cid = int(response.headers["location"].rsplit("/", 1)[-1])
+    handler = _client(bundle, "handler")
+    csrf = _csrf(handler, f"/anliegen/{cid}")
+    without_reason = handler.post(f"/anliegen/{cid}/status",
+                                  data={"csrf": csrf, "status": "done"})
+    assert without_reason.status_code == 409
+    explanation = "Vorzeitige manuelle Erledigung nach fachlicher Rücksprache."
+    completed = handler.post(f"/anliegen/{cid}/status",
+                             data={"csrf": csrf, "status": "done",
+                                   "override_reason": explanation})
+    assert completed.status_code == 303
+    with SessionLocal() as db:
+        assert db.get(Anliegen, cid).status == "done"
+        reason = db.scalar(select(AnliegenProcessOverride).where(
+            AnliegenProcessOverride.anliegen_id == cid))
+        assert reason is not None
+        assert explanation not in reason.reason_enc
+        assert decrypt(reason.reason_enc) == explanation
+        assert db.scalar(select(AnliegenProcessRun).where(
+            AnliegenProcessRun.anliegen_id == cid)).state == "running"
+    assert explanation in handler.get(f"/anliegen/{cid}").text
+    assert explanation not in reporter.get(f"/anliegen/{cid}").text
+
+
+def test_all_success_closes_anliegen_only_when_every_step_done(bundle):
+    from app.anliegen_process_hub import completion_state
+    with SessionLocal() as db:
+        author = db.get(User, bundle["author_id"])
+        approver = db.get(User, bundle["approver_id"])
+        policy = _policy("submit", approval=False)
+        policy["completion"] = "all_success"
+        rule = config.create_draft(db, author, bundle["cat_id"],
+                                   bundle["process_id"], bundle["org_id"], policy)
+        config.submit_review(db, rule, author, expected=0)
+        config.approve(db, rule, approver, expected=1)
+        db.commit()
+        rid = rule.id
+    _flag_enabled()
+    reporter = _client(bundle, "reporter")
+    posted = _new_case(reporter, bundle, rule_id=rid)
+    assert posted.status_code == 303
+    cid = int(posted.headers["location"].rsplit("/", 1)[-1])
+    handler = _client(bundle, "handler")
+    with SessionLocal() as db:
+        run = db.scalar(select(AnliegenProcessRun).where(
+            AnliegenProcessRun.anliegen_id == cid))
+        first = db.scalar(select(AnliegenProcessTask).where(
+            AnliegenProcessTask.run_id == run.id))
+        assert completion_state(db, db.get(Anliegen, cid))["ready"] is False
+        tid = first.id
+        run_id = run.id
+    one = handler.post(f"/anliegen/{cid}/prozesse/{run_id}/aufgabe/{tid}",
+                       data={"csrf": _csrf(handler, f"/anliegen/{cid}"),
+                             "outcome": "done", "field_cost": "70",
+                             "checks": ["Bedarf geprüft"]})
+    assert one.status_code == 303
+    with SessionLocal() as db:
+        assert db.get(Anliegen, cid).status == "open"
+        second = db.scalar(select(AnliegenProcessTask).where(
+            AnliegenProcessTask.run_id == run_id,
+            AnliegenProcessTask.kind == "approval"))
+        second_id = second.id
+    two = handler.post(f"/anliegen/{cid}/prozesse/{run_id}/aufgabe/{second_id}",
+                       data={"csrf": _csrf(handler, f"/anliegen/{cid}"),
+                             "outcome": "approved"})
+    assert two.status_code == 303
+    with SessionLocal() as db:
+        case = db.get(Anliegen, cid)
+        assert case.status == "done"
+        assert completion_state(db, case)["ready"] is True
+        assert db.get(AnliegenProcessRun, run_id).state == "done"
+        events = list(db.scalars(select(AnliegenEvent).where(
+            AnliegenEvent.anliegen_id == cid,
+            AnliegenEvent.kind == "process_completion")))
+        assert len(events) == 1
+
+
+def test_org_manager_cannot_see_foreign_process_names_or_step_data(bundle):
+    from app.anliegen_process_hub import private_access, work_items
+    with SessionLocal() as db:
+        rule = _rule(db, bundle, bundle["author_id"], approval=False)
+        other = db.get(User, bundle["stranger_id"])
+        other.permissions = "anliegen_manage,anliegen_process_work,anliegen_process_start"
+        db.commit()
+        rid = rule.id
+    _flag_enabled()
+    reporter = _client(bundle, "reporter")
+    posted = _new_case(reporter, bundle, rule_id=rid)
+    cid = int(posted.headers["location"].rsplit("/", 1)[-1])
+    unrelated = _client(bundle, "stranger")
+    page = unrelated.get(f"/anliegen/{cid}")
+    assert page.status_code == 200  # General case-management role only.
+    assert "Monitorfreigabe Test" not in page.text
+    assert "Beschaffung prüfen" not in page.text
+    with SessionLocal() as db:
+        case = db.get(Anliegen, cid)
+        other = db.get(User, bundle["stranger_id"])
+        assert not private_access(db, other, case)
+        assert not work_items(db, other)
+        run = db.scalar(select(AnliegenProcessRun).where(
+            AnliegenProcessRun.anliegen_id == cid))
+        step = db.scalar(select(AnliegenProcessTask).where(
+            AnliegenProcessTask.run_id == run.id))
+    forbidden = unrelated.post(
+        f"/anliegen/{cid}/prozesse/{run.id}/aufgabe/{step.id}",
+        data={"csrf": _csrf(unrelated, f"/anliegen/{cid}"),
+              "outcome": "done", "field_cost": "10",
+              "checks": ["Bedarf geprüft"]})
+    assert forbidden.status_code == 403
