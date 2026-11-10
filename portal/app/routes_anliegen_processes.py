@@ -10,6 +10,7 @@ from . import anliegen as cases
 from . import anliegen_process_config as config
 from . import anliegen_processes as policies
 from . import anliegen_process_engine as engine
+from . import anliegen_process_hub as hub
 from .anliegen_models import Anliegen, AnliegenCategory
 from .anliegen_process_models import (
     AnliegenProcessRule, AnliegenProcessRun, AnliegenProcessTask,
@@ -235,6 +236,7 @@ def approve_case_run(request: Request, run_id: int,
         engine.approve_run(db, run, user)
     except engine.ProcessEngineError as exc:
         _process_error(exc)
+    hub.sync_completion(db, case, user)
     db.commit()
     flash(request, "Prozessfreigabe erteilt.")
     return redirect("/anliegen/prozessfreigaben")
@@ -247,7 +249,7 @@ async def case_process_task(request: Request, case_id: int, run_id: int,
                             db: Session = Depends(get_db)):
     _module()
     case = cases.get(db, user, case_id)
-    if not user.can("anliegen_process_work") or not cases.can_handle(user, case):
+    if not hub.private_access(db, user, case):
         raise HTTPException(403)
     run = _get_run(db, run_id)
     task = db.get(AnliegenProcessTask, task_id)
@@ -270,6 +272,7 @@ async def case_process_task(request: Request, case_id: int, run_id: int,
                              comment=str(form.get("comment", "")))
     except engine.ProcessEngineError as exc:
         _process_error(exc)
+    hub.sync_completion(db, case, user)
     db.commit()
     flash(request, "Prozessschritt abgeschlossen.")
     return redirect(f"/anliegen/{case.id}#anliegen-processes")
@@ -282,7 +285,7 @@ def case_process_control(request: Request, case_id: int, run_id: int,
                          user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     case = cases.get(db, user, case_id)
-    if not user.can("anliegen_process_start") or not cases.can_handle(user, case):
+    if not user.can("anliegen_process_start") or not hub.private_access(db, user, case):
         raise HTTPException(403)
     run = _get_run(db, run_id)
     if run.anliegen_id != case.id:
@@ -300,6 +303,29 @@ def case_process_control(request: Request, case_id: int, run_id: int,
             raise HTTPException(422, "Unbekannte Prozessaktion.")
     except engine.ProcessEngineError as exc:
         _process_error(exc)
+    hub.sync_completion(db, case, user)
     db.commit()
     flash(request, "Prozesssteuerung aktualisiert.")
+    return redirect(f"/anliegen/{case.id}#anliegen-processes")
+
+
+@app.post("/anliegen/{case_id:int}/prozesse/abschluss", dependencies=[Depends(check_csrf)])
+def accept_case_process_completion(request: Request, case_id: int,
+                                   user: User = Depends(current_user),
+                                   db: Session = Depends(get_db)):
+    """Apply an already satisfied rule through the ordinary Anliegen state machine.
+
+    This explicit command is needed when a person without case-handler status
+    approved the final step. It never overrides failures or open work.
+    """
+    _module()
+    case = cases.get(db, user, case_id)
+    if not hub.private_access(db, user, case):
+        raise HTTPException(403)
+    rate_limit(request, "anliegen-process-finish", limit=20, window=3600,
+               key=str(user.id))
+    if not hub.sync_completion(db, case, user):
+        raise HTTPException(409, "Die freigegebene Abschlussregel ist noch nicht erfüllt.")
+    db.commit()
+    flash(request, "Anliegen nach abgeschlossenen Prozessen erledigt.")
     return redirect(f"/anliegen/{case.id}#anliegen-processes")

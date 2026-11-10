@@ -28,9 +28,28 @@
   <section class="card mt-3 anliegen-process-overview" id="anliegen-processes">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
       <span><i class="fa-solid fa-diagram-project me-2 text-primary" aria-hidden="true"></i>Verknüpfte Prozesse</span>
-      <span class="badge text-bg-light border text-body">{{process_cards|length}} Läufe</span>
+      <span class="badge text-bg-light border text-body">{{process_aggregate.total}} Läufe</span>
     </div>
     <div class="card-body">
+      {% if process_aggregate.total %}
+      <div class="ap-overview-metrics mb-3" role="group" aria-label="Prozessübersicht">
+        {% for value,label in [(process_aggregate.running,'Laufend'),(process_aggregate.waiting,'Freigabe offen'),(process_aggregate.blocked,'Pausiert / blockiert'),(process_aggregate.done,'Abgeschlossen')] %}
+        <div class="ap-metric"><strong class="ap-metric-number">{{value}}</strong><span class="ap-metric-label">{{label}}</span></div>
+        {% endfor %}
+      </div>
+      <div class="ap-completion d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <div class="small">
+          <strong>Abschlussregel:</strong> {{ {'manual':'Manuell','all_success':'Alle Prozesse erfolgreich','any_success':'Mindestens ein Prozess erfolgreich'}.get(process_aggregate.completion.mode,'Manuell') }}
+          <span class="text-secondary d-block">{{process_aggregate.completion.reason}}</span>
+        </div>
+        {% if process_aggregate.can_accept_completion %}
+        <form method="post" action="/anliegen/{{case.id}}/prozesse/abschluss">
+          <input type="hidden" name="csrf" value="{{csrf}}">
+          <button class="btn btn-success btn-sm" type="submit">Abschluss übernehmen</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
       {% if not process_enabled %}
       <p class="alert alert-light border small">Die Prozessanbindung ist derzeit abgeschaltet. Bereits gespeicherte Prozessläufe bleiben weiterhin nachvollziehbar.</p>
       {% endif %}
@@ -62,8 +81,27 @@
             {{ {'requested':'Startfreigabe ausstehend', 'running':'In Bearbeitung', 'done':'Abgeschlossen', 'rejected':'Abgelehnt', 'paused':'Pausiert', 'cancelled':'Abgebrochen', 'blocked':'Blockiert'}.get(run.state,run.state) }}
           </span>
         </div>
+        {% if card.can_view_details %}
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <div class="progress flex-grow-1" role="progressbar" aria-label="Prozessfortschritt"
+               aria-valuenow="{{card.progress}}" aria-valuemin="0" aria-valuemax="100"
+               style="height:.45rem">
+            <div class="progress-bar" style="width:{{card.progress}}%"></div>
+          </div>
+          <span class="small text-secondary text-nowrap">{{card.progress}} %</span>
+        </div>
+        <div class="d-flex flex-wrap gap-3 small text-secondary mb-2">
+          <span>{{card.completed}} von {{card.total}} Schritten erledigt / übersprungen</span>
+          {% if card.open_count %}<span>{{card.open_count}} offen</span>{% endif %}
+          {% if card.due %}<span>Frist {{card.due|local('%d.%m.%Y')}}</span>{% endif %}
+        </div>
+        {% if card.next_task %}<p class="small mb-2"><strong>Nächster Schritt:</strong> {{card.next_task.name}}</p>{% endif %}
+        {% if card.process and user.can('processes') %}
+        <a class="small d-inline-block mb-2" href="/processes/{{card.process.id}}">Prozessdefinition öffnen</a>
+        {% endif %}
+        {% endif %}
         <div class="small text-secondary mb-2">Veröffentlichte Version #{{run.process_version_id}} · Startart {{ {'submit':'Einreichen','handler':'Bearbeitung','auto':'Kategorieautomatik'}.get(run.origin,run.origin) }}</div>
-        {% if run.error_code %}<p class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Prozess wartet auf Klärung: {{run.error_code}}</p>{% endif %}
+        {% if run.error_code and card.can_view_details %}<p class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Prozess wartet auf Klärung: {{run.error_code}}</p>{% endif %}
         {% if card.can_approve and run.state == 'requested' %}
         <form method="post" action="/anliegen/prozessfreigaben/{{run.id}}" class="mb-3">
           <input type="hidden" name="csrf" value="{{csrf}}">
@@ -75,7 +113,7 @@
         {% for item in card.tasks %}
           {% set task = item.task %}
           {% set step = item.step %}
-          <li class="ap-task">
+          <li class="ap-task" id="prozess-schritt-{{task.id}}">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <strong class="small">{{task.name}}</strong>
               <span class="badge {{'text-bg-success' if task.state == 'done' else 'text-bg-secondary' if task.state == 'skipped' else 'text-bg-warning'}}">{{{'done':'Erledigt','open':'Offen','skipped':'Übersprungen','cancelled':'Abgebrochen'}.get(task.state, task.state)}}</span>
@@ -145,9 +183,44 @@
     </div>
   </section>
   {% endif %}
-  <section class="card mt-3"><div class="card-header">Bearbeitungsverlauf</div><div class="card-body">
-    <ol class="list-unstyled mb-0">{% for event in events %}<li class="border-bottom pb-2 mb-2 small"><strong>{{event.kind}}</strong> – {{event.note}}<div class="text-secondary">{{event.created_at|local('%d.%m.%Y %H:%M')}}</div></li>{% else %}<li>Keine Einträge.</li>{% endfor %}</ol>
-  </div></section>
+  <section class="card mt-3 ap-activity" id="anliegen-chronik">
+    <div class="card-header d-flex justify-content-between flex-wrap gap-2 align-items-center">
+      <span><i class="fa-solid fa-clock-rotate-left text-primary me-2" aria-hidden="true"></i>Bearbeitungsverlauf & Prozesschronik</span>
+      <span class="small text-secondary">Berechtigungsgefiltert</span>
+    </div>
+    <div class="card-body">
+      <ol class="list-unstyled mb-0 ap-timeline">
+        {% for item in process_timeline %}
+        <li class="ap-timeline-item">
+          <div class="d-flex gap-2 justify-content-between flex-wrap mb-1">
+            <strong class="small">{{item.title}}</strong>
+            <span class="small text-secondary">{{item.when|local('%d.%m.%Y %H:%M')}}</span>
+          </div>
+          <div class="small text-secondary text-break" style="white-space:pre-wrap">{{item.detail}}</div>
+          {% if item.href %}<a class="small" href="{{item.href}}">Zum Ursprung</a>{% endif %}
+        </li>
+        {% else %}
+        <li class="small text-secondary">Noch keine Einträge vorhanden.</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </section>
+  {% if process_documents and process_private %}
+  <section class="card mt-3 ap-documents">
+    <div class="card-header"><i class="fa-regular fa-file-lines text-primary me-2" aria-hidden="true"></i>Verknüpfte Dokumente</div>
+    <div class="card-body">
+      <p class="small text-secondary">Anhänge bleiben beim Original. Die Berechtigung wird beim Öffnen erneut geprüft.</p>
+      <ul class="list-unstyled mb-0">
+      {% for document in process_documents %}
+        <li class="d-flex align-items-center justify-content-between gap-2 border-bottom py-2">
+          <a class="text-break" href="{{document.href}}"><i class="fa-solid fa-paperclip me-1" aria-hidden="true"></i>{{document.name}}</a>
+          <span class="small text-secondary">{{document.when|local('%d.%m.%Y')}}</span>
+        </li>
+      {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
 </div><div class="col-12 col-xl-4">
   {% if can_handle %}
   <div class="card mb-3"><div class="card-header">Bearbeitung</div><div class="card-body">
@@ -155,7 +228,7 @@
     <p class="small text-secondary">Häufige Schritte direkt bestätigen:</p>
     <div class="d-flex flex-wrap gap-2 mb-3">
       {% for code,label in [('in_progress','Bearbeitung starten'),('ordered','Bei Lieferant bestellt'),('partially_delivered','Teilweise geliefert'),('delivered','Geliefert'),('done','Erledigen')] %}
-      {% if code in choices %}
+      {% if code in choices and not (code == 'done' and process_aggregate.needs_override) %}
       <form method="post" action="/anliegen/{{case.id}}/status">
         <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="status" value="{{code}}">
         <button class="btn btn-sm {{'btn-primary' if code=='ordered' else 'btn-outline-primary'}}" type="submit">{{label}}</button>
@@ -187,6 +260,17 @@
       <select class="form-select mb-2" id="anliegen-next" name="status">
         {% for code in choices|sort %}<option value="{{code}}">{{statuses[code]}}</option>{% endfor %}
       </select>
+      {% if process_aggregate.needs_override %}
+      <div class="alert alert-warning small mt-3 mb-2">
+        <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>
+        Mindestens ein verknüpfter Prozess ist nicht erfolgreich abgeschlossen.
+        Erledigen oder Schließen erfordert eine dokumentierte Begründung.
+      </div>
+      <label class="form-label small" for="anliegen-override-reason">Begründung für einen vorzeitigen Abschluss (nur intern sichtbar)</label>
+      <textarea class="form-control mb-2" id="anliegen-override-reason"
+                name="override_reason" rows="2" maxlength="1000"
+                placeholder="Nur für vorzeitiges Erledigen oder Schließen erforderlich"></textarea>
+      {% endif %}
       <button class="btn btn-outline-primary" type="submit">Status übernehmen</button>
     </form>
     {% else %}<p class="text-secondary small">Keine weiteren Statuswechsel.</p>{% endif %}

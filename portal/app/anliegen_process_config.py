@@ -278,6 +278,10 @@ def allowed_for_handler(db: Session, case: Anliegen, actor: User):
         return []
     if case.confidential or not cases.can_handle(actor, case):
         return []
+    if (case.org_id is not None and case.assignee_id != actor.id
+            and not actor.is_admin
+            and not organization.allows(db, actor, case.org_id, "view")):
+        return []
     return applicable(db, case.category_id, case.org_id, origin="handler")
 
 

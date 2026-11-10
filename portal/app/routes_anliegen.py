@@ -14,6 +14,7 @@ from . import anliegen as service
 from . import anliegen_process_config as process_config
 from . import anliegen_processes as process_policies
 from . import anliegen_process_engine as process_engine
+from . import anliegen_process_hub as process_hub
 from .anliegen_process_models import AnliegenProcessRule, AnliegenProcessRun, AnliegenProcessTask
 from .db import Process
 
@@ -184,43 +185,12 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
         not case.confidential and user.can("anliegen_manage")) else []
     process_enabled = process_policies.integration_enabled(db)
     process_rules = process_config.allowed_for_handler(db, case, user)
-    case_runs = list(db.scalars(select(AnliegenProcessRun).where(
-        AnliegenProcessRun.anliegen_id == case.id).order_by(
-        AnliegenProcessRun.id.desc()).limit(100)))
-    from . import absence
-    acting_users = set(absence.acting_ids(db, user)) if process_enabled else set()
-    acting_groups = set(absence.acting_group_ids(db, user)) if process_enabled else set()
-    cards = []
-    for run in case_runs:
-        rule = db.get(AnliegenProcessRule, run.rule_id)
-        proc = db.get(Process, rule.process_id) if rule else None
-        tasks = list(db.scalars(select(AnliegenProcessTask).where(
-            AnliegenProcessTask.run_id == run.id).order_by(
-            AnliegenProcessTask.ordinal)))
-        try:
-            steps = process_engine._definition(db, run)
-        except process_engine.ProcessEngineError:
-            steps = []
-        cards.append(dict(run=run, process=proc, rule=rule,
-                          can_view_details=(service.can_handle(user, case)
-                                            and user.can("anliegen_process_work")),
-                          can_approve=(process_enabled
-                            and process_config.can_approve_run(db, user, case)
-                            and run.requested_by_id != user.id),
-                          can_control=(process_enabled and service.can_handle(user, case)
-                                       and user.can("anliegen_process_start")),
-                          tasks=[dict(task=task, step=steps[task.step_index]
-                                       if 0 <= task.step_index < len(steps) else {},
-                                      can_act=(process_enabled and user.can("anliegen_process_work")
-                                               and service.can_handle(user, case)
-                                               and run.state == "running" and task.state == "open"
-                                               and (task.assignee_id in acting_users
-                                                    or (task.group_id is not None
-                                                        and task.group_id in acting_groups))))
-                                 for task in tasks]))
-    process_names = {rule.id: (db.get(Process, rule.process_id).name
-                               if db.get(Process, rule.process_id) else "Unbekannter Prozess")
-                     for rule in process_rules}
+    hub = process_hub.summary(
+        db, case, user, tasks_enabled=("tasks" in enabled_modules()))
+    process_names = {
+        rule.id: (proc.name if (proc := db.get(Process, rule.process_id)) else "Prozess")
+        for rule in process_rules
+    }
     return render(request, "anliegen_detail.html", user, case=case, events=events,
                   statuses=service.STATUSES,
                   choices=service.next_states(case),
@@ -228,14 +198,19 @@ def detail_anliegen(request: Request, case_id: int, user: User = Depends(current
                   tasks_enabled=("tasks" in enabled_modules()),
                   is_order=case.category.key in service.ORDER_KEYS,
                   process_enabled=process_enabled, process_rules=process_rules,
-                  process_cards=cards, process_token=uuid4().hex,
-                  process_names=process_names)
+                  process_cards=hub["cards"], process_token=uuid4().hex,
+                  process_names=process_names,
+                  process_aggregate=hub["aggregate"],
+                  process_timeline=hub["timeline"],
+                  process_documents=hub["documents"],
+                  process_private=hub["private"])
 
 
 @app.post("/anliegen/{case_id:int}/status", dependencies=[Depends(check_csrf)])
 def update_anliegen(request: Request, case_id: int, status: str = Form(...),
                    supplier: str = Form(""), order_reference: str = Form(""),
                    expected_delivery: str = Form(""), back: str = Form(""),
+                   override_reason: str = Form(""),
                    user: User = Depends(current_user), db: Session = Depends(get_db)):
     _module()
     _read(user, db)
@@ -248,6 +223,7 @@ def update_anliegen(request: Request, case_id: int, status: str = Form(...),
             delivery_at = datetime.fromisoformat(expected_delivery.strip())
         except ValueError as exc:
             raise HTTPException(422, "Ungültiger Liefertermin.") from exc
+    process_hub.require_end_reason(db, case, user, status, override_reason)
     service.update_status(db, case, user, status, supplier=supplier,
                           order_reference=order_reference,
                           expected_delivery_at=delivery_at)

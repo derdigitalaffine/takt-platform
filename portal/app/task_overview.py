@@ -3,14 +3,14 @@ from datetime import datetime
 from .db import utcnow, to_local
 
 SCOPES = {'all': 'Alle', 'personal': 'Persönlich', 'proxy': 'Vertretung', 'group': 'Gruppenaufgaben'}
-SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben', 'leave': 'Urlaubsplanung', 'anliegen': 'Interne Anliegen'}
+SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben', 'leave': 'Urlaubsplanung', 'anliegen': 'Interne Anliegen', 'anliegen_process': 'Anliegenprozesse'}
 
 
 def collect(db, user, modules, *, now=None):
     from . import workflow, circulations, resources
     now = now or utcnow()
     ready, pool, waiting, delegated, history, managed, archive = [], [], [], [], [], [], []
-    source_modules = {'application': 'applications', 'circulation': 'circulations', 'resource': 'resources', 'native': 'tasks', 'leave': 'calendars', 'anliegen': 'anliegen'}
+    source_modules = {'application': 'applications', 'circulation': 'circulations', 'resource': 'resources', 'native': 'tasks', 'leave': 'calendars', 'anliegen': 'anliegen', 'anliegen_process': 'anliegen'}
     sources = {key: label for key, label in SOURCES.items() if key == 'all' or source_modules.get(key) in modules}
 
     resource_scopes = {}
@@ -39,6 +39,12 @@ def collect(db, user, modules, *, now=None):
         return dict(source=source, source_label=SOURCES[source], title=title, href=href, action=action,
                     due=due, scope=scope, detail=detail, icon=icon, late=bool(due and due < now), **extra)
 
+    process_work = []
+    shadow_case_ids = set()
+    if 'anliegen' in modules:
+        from . import anliegen_process_hub as process_hub
+        process_work = process_hub.work_items(db, user)
+        shadow_case_ids = {row["case"].id for row in process_work}
     if 'calendars' in modules:
         from sqlalchemy import select, or_
         from .leave_extensions import LeaveInbox
@@ -63,6 +69,13 @@ def collect(db, user, modules, *, now=None):
         visible_ids = {task.id for task in rows}
         unfinished = set(db.scalars(select(TaskCheck.task_id).where(TaskCheck.task_id.in_(visible_ids), TaskCheck.done.is_(False))))
         for task in rows:
+            # A parent Anliegen task remains stored and retains its history,
+            # but the actual open process step is the single actionable item
+            # for this user in the combined view.
+            if (task.source_type == 'anliegen'
+                    and task.source_id.isdigit()
+                    and int(task.source_id) in shadow_case_ids):
+                continue
             predecessors = native.blockers(db, task)
             blocked = bool(predecessors)
             own = task.assignee_id == user.id
@@ -111,7 +124,7 @@ def collect(db, user, modules, *, now=None):
             Anliegen.assignee_id == user.id,
             Anliegen.status.not_in(('done', 'closed')),
         ).order_by(Anliegen.updated_at.desc()).limit(250)):
-            if case.task_id and 'tasks' in modules:
+            if (case.task_id and 'tasks' in modules) or case.id in shadow_case_ids:
                 continue
             info = intake.STATUSES.get(case.status, 'Offen') + ' · ' + case.category.title
             item = entry('anliegen', case.display_title, f'/anliegen/{case.id}',
@@ -119,6 +132,20 @@ def collect(db, user, modules, *, now=None):
                          icon='fa-lock' if case.confidential else 'fa-inbox',
                          status=case.status, priority='normal')
             (waiting if case.status == 'unassigned' else ready).append(item)
+        for item in process_work:
+            case, run, task = item["case"], item["run"], item["task"]
+            # Only already authorized worker-visible steps are materialized;
+            # the entry links to the real source, never a mirrored Task.
+            detail = f'ANL-{case.id:06d} · {case.category.title} · Prozesslauf #{run.id}'
+            scope = item["scope"]
+            work = entry(
+                'anliegen_process', task.name,
+                f'/anliegen/{case.id}#prozess-schritt-{task.id}',
+                'Bearbeiten', task.due_at, scope,
+                detail=detail,
+                icon='fa-stamp' if task.kind == 'approval' else 'fa-list-check',
+                status='open', priority='normal', anliegen_process_task_id=task.id)
+            (pool if scope == 'group' else ready).append(work)
     if 'applications' in modules:
         for task in workflow.my_tasks(db, user):
             response = task.response
