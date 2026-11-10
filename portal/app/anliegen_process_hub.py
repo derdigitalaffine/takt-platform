@@ -97,7 +97,7 @@ def completion_state(db: Session, case: Anliegen,
 def sync_completion(db: Session, case: Anliegen, actor: User) -> bool:
     """Close only through the existing case state machine, when its rules allow."""
     if (not rules.integration_enabled(db) or case.confidential
-            or not cases.can_handle(actor, case)):
+            or not private_access(db, actor, case)):
         return False
     decision = completion_state(db, case)
     if (not decision["ready"] or "done" not in cases.next_states(case)
@@ -162,6 +162,18 @@ def _timeline(db: Session, case: Anliegen, runs, *, private: bool,
                         kind="prozess", title=title,
                         detail=f"Prozesslauf #{audit.run_id}",
                         href=f"#process-run-{audit.run_id}"))
+            for task in db.scalars(select(AnliegenProcessTask).where(
+                    AnliegenProcessTask.run_id.in_(run_ids),
+                    AnliegenProcessTask.state == "done").order_by(
+                    AnliegenProcessTask.id.desc()).limit(180)):
+                if task.comment_enc:
+                    note = decrypt(task.comment_enc)
+                    if note:
+                        result.append(dict(
+                            id=f"process_comment:{task.id}", when=task.completed_at,
+                            kind="notiz", title=f"Kommentar: {task.name}",
+                            detail=note,
+                            href=f"#prozess-schritt-{task.id}"))
             for override in db.scalars(select(AnliegenProcessOverride).where(
                     AnliegenProcessOverride.anliegen_id == case.id).order_by(
                     AnliegenProcessOverride.id.desc()).limit(80)):
@@ -182,8 +194,18 @@ def _timeline(db: Session, case: Anliegen, runs, *, private: bool,
                         TaskAttachment.task_id == case.task_id,
                         TaskAttachment.removed_at.is_(None)).order_by(
                         TaskAttachment.id.desc()).limit(80)):
-                    # Original download endpoint applies native task ACL
-                    # and, for DMS references, validates source ACL again.
+                    # Reference only accessible files; downloads always recheck
+                    # the original endpoint's authorization and DMS source ACL.
+                    if doc.is_reference:
+                        from .db import DmsFile, DmsRecord
+                        from . import dms
+                        file = db.get(DmsFile, doc.dms_file_id) if doc.dms_file_id else None
+                        record = db.get(DmsRecord, file.record_id) if file else None
+                        if not (record and not record.archived_at
+                                and dms.record_level(db, user, record)):
+                            continue
+                    elif not native.attachment_path(doc).is_file():
+                        continue
                     docs.append(dict(id=doc.id, name=doc.name,
                                      href=f"/aufgaben/{case.task_id}/dateien/{doc.id}",
                                      when=doc.created_at))
