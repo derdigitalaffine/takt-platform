@@ -199,13 +199,20 @@ def _timeline(db: Session, case: Anliegen, runs, *, private: bool,
                     if doc.is_reference:
                         from .db import DmsFile, DmsRecord
                         from . import dms
+                        from .main import enabled_modules
+                        if "dms" not in enabled_modules():
+                            continue
                         file = db.get(DmsFile, doc.dms_file_id) if doc.dms_file_id else None
                         record = db.get(DmsRecord, file.record_id) if file else None
                         if not (record and not record.archived_at
                                 and dms.record_level(db, user, record)):
                             continue
-                    elif not native.attachment_path(doc).is_file():
-                        continue
+                    else:
+                        try:
+                            if not native.attachment_path(doc).is_file():
+                                continue
+                        except HTTPException:
+                            continue
                     docs.append(dict(id=doc.id, name=doc.name,
                                      href=f"/aufgaben/{case.task_id}/dateien/{doc.id}",
                                      when=doc.created_at))
