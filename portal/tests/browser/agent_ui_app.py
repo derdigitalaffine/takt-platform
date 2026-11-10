@@ -3,7 +3,7 @@ import json
 from task_ui_app import app
 from app import ai_provider
 from app.ai_models import AIProvider, AIDmsSource
-from app.calendar_models import Calendar
+from app.calendar_models import Calendar, CalendarEvent
 from app.anliegen_models import AnliegenCategory, Anliegen
 from app.task_models import Task
 from app.security import hash_password
@@ -53,7 +53,19 @@ async def complete(provider, messages, **kwargs):
         if 'Geburtstag' in prompt or prompt == 'ja':
             searches = []
             actions = [dict(tool='create_form', title='Geburtstage der Belegschaft', fields=[dict(type='short', title='Name', required=True), dict(type='date', title='Geburtstag', required=False)])]
+        elif prompt.startswith('Verschiebe den Kalendertermin'):
+            event = db.scalar(select(CalendarEvent).where(CalendarEvent.title == 'Von mir geprüfte Projektbesprechung'))
+            searches = [dict(tool='search_events', query='Von mir geprüfte Projektbesprechung')]
+            actions = [dict(tool='update_event', id=event.id, start='2026-11-14T14:00:00+01:00', end='2026-11-14T15:00:00+01:00')]
+        elif prompt.startswith('Erstelle einen ganztägigen Kalendertermin'):
+            searches = [dict(tool='search_calendars', query='Projektkalender')]
+            actions = [dict(tool='create_event', id=ids[0], title='Agent Ganztägig', start='2026-12-04', end='2026-12-04', all_day=True)]
+        elif prompt.startswith('Lösche den Kalendertermin Agent Ganztägig'):
+            event = db.scalar(select(CalendarEvent).where(CalendarEvent.title == 'Agent Ganztägig'))
+            searches = [dict(tool='search_events', query='Agent Ganztägig')]
+            actions = [dict(tool='delete_event', id=event.id)]
         elif prompt.startswith('Plane meinen Urlaub'):
+
             searches = []
             actions = [dict(tool='create_leave', starts_on='2030-12-09', ends_on='2030-12-11', start_half='pm', end_half='pm')]
         elif prompt.startswith('Markiere meinen Urlaub'):

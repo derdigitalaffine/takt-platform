@@ -20,6 +20,7 @@
     if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Vorschlag nicht mehr verfügbar.');
     if (data.path !== location.pathname) throw new Error('Dieser Vorschlag gehört in einen anderen Programmbereich.');
     const tool = data.tool, id = data.id;
+    const calendarTool = ['create_event', 'update_event', 'delete_event'].includes(tool);
     const selectors = {
       configure_anliegen_category: `form[action="/anliegen/kategorien/${id}"]`,
       create_form: 'form[action="/forms"]',
@@ -31,7 +32,7 @@
       set_task_priority: `form[action="/aufgaben/${id}/bearbeiten"]`,
       assign_anliegen: `form[action="/anliegen/${id}/assign"]`,
       set_anliegen_status: `form[action="/anliegen/${id}/status"]`,
-      create_event: '#calendar-event-form', copy_form: `form[action="/forms/${id}/copy"]`,
+      update_event: '#calendar-event-form', delete_event: '#calendar-event-form', create_event: '#calendar-event-form', copy_form: `form[action="/forms/${id}/copy"]`,
       move_dms: `form[action="/dms/move"]`
     };
     let form;
@@ -75,7 +76,8 @@
       assign_task: ['assignee_id'], set_task_priority: ['priority'], set_task_status: [],
       assign_anliegen: ['assignee_id'],
       set_anliegen_status: ['status', 'supplier', 'order_reference', 'expected_delivery'],
-      create_event: ['title', 'description', 'location', 'calendar_id', 'start', 'end', 'start_time', 'end_time'],
+      create_event: ['title', 'description', 'location', 'calendar_id', 'start', 'end', 'start_time', 'end_time', 'all_day'],
+      update_event: ['title', 'description', 'location', 'start', 'end', 'start_time', 'end_time', 'all_day'], delete_event: [],
       copy_form: [], move_dms: ['area_id']
     }[tool];
     function hidden(name, value) {
@@ -84,8 +86,8 @@
       input.disabled = false;
       input.value = value;
     }
-    if (tool === 'create_event') {
-      for (const key of ['start', 'end']) {
+    if (calendarTool) {
+      if (!fields.all_day) for (const key of ['start', 'end']) {
         const date = new Date(data.event_times[key]);
         const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString();
         fields[key] = local.slice(0, 10); fields[key + '_time'] = local.slice(11, 16);
@@ -101,12 +103,12 @@
       if (control.type === 'checkbox') control.checked = value === true;
       else if (control.tomselect) control.tomselect.setValue(value == null ? '' : String(value), true);
       else control.value = value == null ? '' : String(value);
-      if (tool !== 'create_event') control.dispatchEvent(new Event('change', {bubbles: true}));
+      if (!calendarTool) control.dispatchEvent(new Event('change', {bubbles: true}));
     }
-    if (tool === 'create_event') {
+    if (calendarTool) {
       form.elements.kind.dispatchEvent(new Event('change', {bubbles: true}));
       form.elements.all_day.dispatchEvent(new Event('change', {bubbles: true}));
-      form.elements.duration.value = String((new Date(data.event_times.end) - new Date(data.event_times.start)) / 60000);
+      if (!fields.all_day) form.elements.duration.value = String((new Date(data.event_times.end) - new Date(data.event_times.start)) / 60000);
     }
     const hero = form.querySelector('.anliegen-hero');
     if (hero) hero.hidden = true;

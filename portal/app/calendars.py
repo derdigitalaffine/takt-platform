@@ -248,6 +248,18 @@ def save_event(db, actor, calendar, data, row=None, *, raw_ical=None, device_id=
     return row
 
 
+
+def delete_event(db, actor, calendar, row, version, *, single_only=False):
+    if row.calendar_id != calendar.id or not access(db, actor, calendar, True) or not event_access(db, actor, calendar, row):
+        raise HTTPException(403)
+    if str(row.version) != str(version):
+        raise HTTPException(409, "Der Termin wurde inzwischen geändert.")
+    if single_only and event_data(row)["extendedProps"].get("series"):
+        raise HTTPException(422, "Serientermine bitte im Kalenderclient bearbeiten.")
+    audit(db, actor, calendar, "delete", row)
+    db.delete(row)
+    calendar.version += 1
+
 def export(db, actor, calendar, events=None, channel="ics"):
     if not access(db, actor, calendar):
         raise HTTPException(403)

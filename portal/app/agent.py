@@ -159,7 +159,7 @@ def search_instructions(user, focus=None):
         kinds.append("search_anliegen(query,scope=all|assigned|reported|orders|unassigned,status?,category_id?)")
         if user.can("anliegen_manage") and not allowed(user, "tasks"):
             kinds.append("search_people(query) für Zuständigkeitsänderungen")
-    kinds.extend(tool + ("(query=Name|ID|Datum,scope=own|manageable|decisions,status?)" if tool == "search_leave_requests" else "(query)") for tool, module in modules.READ.items() if allowed(user, module))
+    kinds.extend(tool + ("(query=Name|ID|Datum,scope=own|manageable|decisions,status?)" if tool == "search_leave_requests" else "(query=Name|ID,start=YYYY-MM-DD?,end=YYYY-MM-DD?)" if tool == "search_events" else "(query)") for tool, module in modules.READ.items() if allowed(user, module))
     from .agent_precision import focused
     kinds = focused(kinds, focus)
     # The example must never name an unavailable/unfocused tool. This is
@@ -172,7 +172,7 @@ def search_instructions(user, focus=None):
             + json.dumps(example, ensure_ascii=False) + ". "
             "Für allgemeine Fragen, Texte und Wissensfragen plane KEINE Fachsuche; antworte später im message-Feld. Sonst plane 0 bis 6 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
             "bei Aufgaben und Anliegen sind 0 Suchen erlaubt. Für Termine zuerst Kalender suchen; für Kopien Formulare, für DMS-Verschiebungen Akten UND Zielbereiche suchen. "
-            "Filter nach Status und Fälligkeit zielgerichtet, aber erfinde keine IDs. "
+            "Filter nach Status und Fälligkeit zielgerichtet, aber erfinde keine IDs. Bei Terminen Datumswünsche über start/end filtern, query ist nur Titel oder Datensatz-ID; ohne Titel query leer lassen. "
             "Erlaubte Werkzeuge: " + "; ".join(kinds) + ". "
             "Keine externen URLs, keine Schreibaufrufe in dieser Stufe. "
             "Vertrauliche Beschwerden dürfen nicht gelesen oder bearbeitet werden."
@@ -199,6 +199,7 @@ def parse_searches(reply, user):
                       "scope": str(s.get("scope") or "all")[:20],
                       "status": str(s.get("status") or "")[:30],
                       "overdue": s.get("overdue") is True,
+                      **({k: s[k] for k in ("start", "end") if k in s} if s["tool"] == "search_events" else {}),
                       **({"category_id": s["category_id"]} if type(s.get("category_id")) is int else {})})
     return valid
 
@@ -219,7 +220,9 @@ def plan_instructions(user, prompt, findings, categories, requester_id, focus=No
         "create_leave": "create_leave(starts_on=YYYY-MM-DD,ends_on=YYYY-MM-DD,start_half=am|pm,end_half=am|pm): eigener Urlaubsentwurf, keine automatische Genehmigung",
         "edit_leave": "edit_leave(id,starts_on,ends_on,start_half,end_half): Zeitraum als neuen Entwurf ändern, alter verbindlicher Urlaub bleibt gültig",
         "leave_command": "leave_command(id,command,reason?): nur exakte operations aus Suchergebnis; Genehmigung=approve, Einreichung=request, Selbstauskunft=attest nur auf ausdrücklichen Wunsch; Fachregeln können ablehnen",
-        "create_event": "create_event(id=calendar_id,title,description,location,start,end): nur Einzeltermine mit ISO-Zeitzone, keine Einladungen oder Ressourcenbuchungen",
+        "create_event": "create_event(id=calendar_id,title,description,location,start,end,all_day=false): Einzeltermin; Uhrzeiten mit expliziter ISO-Zeitzone, ganztägig YYYY-MM-DD mit Enddatum einschließlich; keine Einladungen/Ressourcenbuchungen",
+        "update_event": "update_event(id=event_id,title?,description?,location?,start?,end?,all_day?): nur editable=true, bestehende nicht geänderte Angaben beibehalten; keine Serie",
+        "delete_event": "delete_event(id=event_id): nur bei ausdrücklichem Löschauftrag, einzelner editierbarer freier Kalendertermin; keine Serie",
         "create_form": "create_form(title,fields=[{type:short|long|date|time|number|yesno,title,required:true|false}]): neuen internen geschlossenen Formularentwurf MIT konkreten Fragen anlegen, keine zusätzliche Vorab-Erlaubnis erfragen; Publikation bleibt manuell",
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
         "move_dms": "move_dms(id,area_id): freigegebene manuelle Wissensakte in berechtigten Zielbereich verschieben",
@@ -275,7 +278,7 @@ def normalize_plan(reply, user, findings, categories, db):
             if tool in ("create_form", "create_leave"):
                 proposals.append(action)
                 continue
-            key = ("krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else modules.KINDS[tool], action["id"])
+            key = ("krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else "event" if tool in ("update_event", "delete_event") else modules.KINDS[tool], action["id"])
             if key in seen:
                 raise ValueError("Mehrere Änderungen am selben Vorgang sind nicht zulässig.")
             seen.add(key)
