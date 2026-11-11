@@ -113,3 +113,9 @@
 .sg-route-chip {border:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);border-radius:100px;padding:7px 11px;font-size:.77rem;max-width:100%}
 .sg-route-chip i {margin-right:6px;color:var(--bs-primary)}
 .sg-anchor-form {padding:0}
+
+.sg-route-chip {display:inline-flex;align-items:center;gap:5px}
+.sg-remove-route {border:0;border-radius:50%;font-size:1.1rem;line-height:1.2;background:transparent;color:var(--bs-danger);cursor:pointer;padding:0 5px}
+.sg-remove-route:hover,.sg-remove-route:focus-visible {background:var(--bs-danger-bg-subtle)}
+.sg-route-links {max-height:300px;overflow:auto;border-top:1px solid var(--bs-border-color);margin-top:10px}
+.sg-route-links .sg-link-row {font-size:.8rem}
