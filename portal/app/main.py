@@ -144,7 +144,7 @@ templates.env.globals["geo_position"] = lambda v, raw="": _forms_mod().geo_posit
 templates.env.globals["form_constraints"] = lambda item: _forms_mod().validation_constraints(item)
 templates.env.globals["form_rule_hint"] = lambda item: _forms_mod().validation_hint(item)
 templates.env.globals["perm_modules"] = {"processes": "applications", "app_create": "applications", "formblocks": "forms",
-                                         "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources",
+                                         "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources", "signage_manage": "signage",
                                          "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai", "ai_web": "ai", "anliegen_submit": "anliegen", "anliegen_manage": "anliegen",
                                          "knowledge_read": "knowledge", "knowledge_edit": "knowledge",
                                          "knowledge_publish": "knowledge", "knowledge_manage": "knowledge",
@@ -204,6 +204,7 @@ MODULES = {
     "circulations": ("Umläufe & Aushänge", "module_circulations", ("/umlaeufe",)),
     "dms": ("Ablage (DMS)", "module_dms", ("/dms",)),
     "resources": ("Ressourcenbuchung", "module_resources", ("/resources", "/r/", "/r", "/r-embed")),
+    "signage": ("Digital Signage", "module_signage", ("/signage",)),
     "krank": ("BlueOtter Krankmelder", "module_krank", ("/krank", "/krankmelder")),
 }
 _module_cache: dict = {"at": 0.0, "enabled": set(MODULES)}
@@ -3041,6 +3042,7 @@ from . import routes_payments  # noqa: E402,F401
 from . import routes_votes  # noqa: E402,F401
 from . import routes_resources  # noqa: E402,F401
 from . import routes_resources_public  # noqa: E402,F401
+from . import routes_signage  # noqa: E402,F401
 from . import routes_caretakers  # noqa: E402,F401
 from . import routes_qr  # noqa: E402,F401
 from . import routes_trash  # noqa: E402,F401
