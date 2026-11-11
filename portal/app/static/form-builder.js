@@ -529,7 +529,7 @@
     });
   }
 
-  form.addEventListener('submit', function (event) {
+  function serialize() {
     var pairs = [['min','max','Unter- und Obergrenze'], ['relative_min','relative_max','Zeitraum ab heute'], ['min_age','max_age','Altersgrenzen'], ['date_gap_min','date_gap_max','Abstand zum Bezugsdatum'], ['min_length','max_length','Textlänge']];
     var conflict;
     items.some(function(item) {
@@ -545,14 +545,13 @@
       });
     });
     if (conflict) {
-      event.preventDefault();
       selected = conflict.id; render();
       var state = document.getElementById('builder-state');
       state.textContent = conflict.text; state.setAttribute('role','alert');
       var card = list.querySelector('[data-id="'+conflict.id+'"]');
       var input = card && card.querySelector('[data-key="'+conflict.key+'"]');
       if (input) {input.focus();}
-      return;
+      return false;
     }
     // Offene Eingaben in „Neue Option“ nicht verlieren
     list.querySelectorAll('[data-new-option]').forEach(function (el) {
@@ -560,7 +559,18 @@
     });
     document.getElementById('schema-json').value = JSON.stringify(items);
     dirty = false;
+    return true;
+  }
+  form.addEventListener('submit', function (event) {
+    if (!serialize()) event.preventDefault();
   });
+  form.taktAgentPopulate = function (fields) {
+    items = fields.fields;
+    selected = null;
+    render();
+    markDirty();
+  };
+  form.taktAgentSerialize = serialize;
   window.addEventListener('beforeunload', function (ev) { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
 
   // Schmale, kontrollierte Anbindung für den KI-Assistenten; alle normalen Baukastenwege bleiben erhalten.

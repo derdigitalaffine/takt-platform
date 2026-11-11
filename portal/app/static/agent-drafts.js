@@ -20,10 +20,11 @@
     if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Vorschlag nicht mehr verfügbar.');
     if (data.path !== location.pathname) throw new Error('Dieser Vorschlag gehört in einen anderen Programmbereich.');
     const tool = data.tool, id = data.id;
+    const formBuilder = ['create_form', 'edit_form'].includes(tool);
     const calendarTool = ['create_event', 'update_event', 'delete_event'].includes(tool);
     const selectors = {
       configure_anliegen_category: `form[action="/anliegen/kategorien/${id}"]`,
-      create_form: 'form[action="/forms"]',
+      create_form: '#builder-form', edit_form: '#builder-form',
       set_krank_status: `form[action="/krankmelder/${id}/status"]`,
       add_krank_note: `form[action="/krankmelder/${id}/notiz"]`, send_krank_message: `form[action="/krankmelder/${id}/nachricht"]`,
       create_leave: '#leave-form', edit_leave: '#leave-form', leave_command: `#leave-row-${id} form[data-leave-command]`,
@@ -80,7 +81,8 @@
 
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
-      create_form: ['title'],
+      create_form: ['title', 'description', 'items_json'],
+      edit_form: ['title', 'description', 'items_json'],
       create_survey: ['title','description','location','duration','options_json','questions_json','secrecy','access','results','allow_change','pacing'], survey_state: [], finalize_poll: [],
       set_krank_status: ['note'], add_krank_note: ['text'], send_krank_message: ['text'],
       create_leave: ['starts_on', 'ends_on', 'start_half', 'end_half'],
@@ -94,7 +96,8 @@
       update_event: ['title', 'description', 'location', 'start', 'end', 'start_time', 'end_time', 'all_day'], delete_event: [],
       copy_form: [], move_dms: ['area_id']
     }[tool];
-    if (tool === "create_survey") form.taktAgentPopulate?.(fields);
+    if (formBuilder && !form.taktAgentPopulate) throw new Error('Der Formularbaukasten konnte nicht geladen werden.');
+    if (formBuilder || tool === 'create_survey') form.taktAgentPopulate?.(fields);
     function hidden(name, value) {
       let input = form.querySelector(`input[type="hidden"][name="${name}"]`);
       if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = name; form.appendChild(input); }
@@ -141,7 +144,7 @@
     }
     // Only fields implemented by the tool can be changed in this proposal.
     for (const control of form.querySelectorAll('input, select, textarea, button')) {
-      if (tool === 'create_survey' && control.closest('[data-agent-editor]')) continue;
+      if ((formBuilder || tool === 'create_survey') && control.closest('[data-agent-editor]')) continue;
       if (control.type === 'submit' || control.name === 'csrf' || control.name === 'agent_timezone') continue;
       if (!allowed.includes(control.name)) {
         control.disabled = true; control.tomselect?.disable();
@@ -160,7 +163,8 @@
     for (const element of [form, ...form.querySelectorAll('[data-confirm]')]) {
       for (const attribute of [...element.attributes]) if (attribute.name.startsWith('data-confirm')) element.removeAttribute(attribute.name);
     }
-    const submit = form.querySelector('button[type="submit"]:not(:disabled), button:not([type]):not(:disabled)');
+    const submit = form.querySelector(formBuilder ? '.builder-savebar button[type="submit"]' :
+      'button[type="submit"]:not(:disabled), button:not([type]):not(:disabled)');
     if (submit) { submit.className = 'btn btn-primary'; submit.textContent = 'Vorschlag prüfen'; }
     hidden('csrf', document.querySelector('meta[name="csrf"]')?.content || '');
     hidden('agent_plan', nonce); hidden('agent_step', String(data.step));
@@ -168,9 +172,11 @@
     // Capture before calendar/task progressive-enhancement handlers.
     form.addEventListener('submit', event => {
       event.preventDefault(); event.stopImmediatePropagation();
-      form.taktAgentSerialize?.();
-      if (form.reportValidity()) HTMLFormElement.prototype.submit.call(form);
+      if (form.taktAgentSerialize?.() !== false && form.reportValidity()) {
+        HTMLFormElement.prototype.submit.call(form);
+      }
     }, true);
+    if (formBuilder && submit) submit.disabled = false;
     banner.replaceChildren();
     const heading = document.createElement('h2'); heading.className = 'h5';
     heading.textContent = `TAKT-Agent-Vorschlag · ${data.total} Schritt${data.total === 1 ? '' : 'e'} offen`;

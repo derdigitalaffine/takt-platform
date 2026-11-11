@@ -3,13 +3,17 @@
 {% block title %}{{ form.title }} · Formulare{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/form-ai-assistant.css">{% endblock %}
 {% block content %}
+{% if agent_new %}
+<div class="mb-3"><a href="/forms" class="small">Formulare</a><h1 class="h3 mt-2">Neuer Formularentwurf</h1></div>
+{% else %}
 {% include "_form_head.html" %}
+{% endif %}
 
 {% if response_count %}
 <div class="alert alert-info small"><i class="fa-solid fa-circle-info me-1"></i>Es gibt schon {{ response_count }} Antwort(en). Änderungen gelten für neue Antworten; bestehende bleiben erhalten. Gelöschte Fragen fehlen danach in Auswertung und Export.</div>
 {% endif %}
 
-<form method="post" action="/forms/{{ form.id }}/schema" id="builder-form">
+<form method="post" action="{% if agent_new %}/agent/draft/review{% else %}/forms/{{ form.id }}/schema{% endif %}" id="builder-form" data-agent-editor>
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="items_json" id="schema-json">
   <div class="row g-4">
@@ -113,8 +117,8 @@
     </div>
   </div>
   <div class="builder-savebar d-flex align-items-center gap-3">
-    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
-    <span class="small text-secondary" id="builder-state">Alle Änderungen gespeichert</span>
+    <button class="btn btn-primary" type="submit"{% if agent_new %} disabled{% endif %}><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+    <span class="small text-secondary" id="builder-state">{% if not agent_new %}Alle Änderungen gespeichert{% endif %}</span>
     <span class="small text-secondary ms-auto d-none d-md-inline" id="builder-count"></span>
   </div>
 </form>

@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 
 from fastapi import HTTPException
 
-from . import agent, tasks, anliegen
+from . import agent, agent_forms, tasks, anliegen
 from .db import DmsArea, LOCAL_TZ
 
 
@@ -27,7 +27,9 @@ def destination(action):
     if tool == "configure_anliegen_category":
         return "/anliegen/kategorien"
     if tool == "create_form":
-        return "/forms"
+        return "/forms/new"
+    if tool == "edit_form":
+        return f"/forms/{action['id']}"
     if tool == "create_task":
         return "/aufgaben/neu"
     if tool == "create_anliegen":
@@ -80,9 +82,8 @@ def validate(db, user, action):
     if action["tool"] in agent_leave.TOOLS:
         agent_leave.validate(db, user, action)
         return
-    if action["tool"] == "create_form":
-        from .agent_forms import normalize
-        normalize(user, action)
+    if action["tool"] in agent_forms.TOOLS:
+        agent_forms.validate(db, user, action)
         return
     if action["tool"] in agent.modules.WRITE:
         row = agent.modules.target(db, user, action)
@@ -144,11 +145,15 @@ def view(db, user, plan, step):
 
 def edited(db, user, original, data):
     """The human edits a native form; normalization still checks the real services."""
+    if original["tool"] in agent_forms.TOOLS:
+        try:
+            return agent_forms.edited(db, user, original, data)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(422, str(exc)) from exc
     validate(db, user, original)
     raw = dict(original)
     tool = raw["tool"]
     allowed = {
-        "create_form": ("title",),
         "create_survey": ("title","description","location","duration","secrecy","results","pacing"), "survey_state": (), "finalize_poll": (),
         "set_krank_status": ("note",), "add_krank_note": ("text",), "send_krank_message": ("text",),
         "create_leave": ("starts_on", "ends_on", "start_half", "end_half"),

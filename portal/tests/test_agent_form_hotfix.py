@@ -36,7 +36,7 @@ def test_birthday_form_and_short_confirmation_open_real_closed_draft(monkeypatch
     fake(monkeypatch, [], [proposal])
     response = c.post('/agent/plan', data=dict(csrf=csrf, prompt='/takt ja'))
     assert response.status_code == 200, response.text
-    assert response.json()['open_url'].startswith('/forms?agent_plan=')
+    assert response.json()['open_url'].startswith('/forms/new?agent_plan=')
     assert 'Geburtstag' in response.json()['proposals'][0]
     pid = response.json()['plan_id']
     assert c.get(response.json()['open_url']).status_code == 200
