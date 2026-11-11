@@ -273,7 +273,7 @@ def test_public_wizard_shows_one_day_and_paginates_available_days():
     times = c.get(f"{base}?art={a_id}").text
     assert "Wann passt es Ihnen?" in times
     assert 'name="name"' not in times
-    assert len(re.findall(r'class="bk-day-option(?:\\s|")', times)) == 7
+    assert len(re.findall(r'class="bk-day-option[ "]', times)) == 7
     assert "Weitere Tage" in times
     assert times.count('name="slot"') == 7
     value = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', times).group(1)
@@ -283,7 +283,7 @@ def test_public_wizard_shows_one_day_and_paginates_available_days():
     assert 'name="email"' in details and "Zurück zum Termin" in details
 
     later = c.get(f"{base}?art={a_id}&step=times&offset=7").text
-    assert len(re.findall(r'class="bk-day-option(?:\\s|")', later)) <= 7
+    assert len(re.findall(r'class="bk-day-option[ "]', later)) <= 7
     assert "Vorherige Tage" in later
     assert 'name="slot"' in later
     bad = c.get(f"{base}?art={a_id}&step=details&slot=invalid").text
