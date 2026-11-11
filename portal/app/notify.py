@@ -224,14 +224,14 @@ def text_to_html(text: str, frame: dict | None = None, *, kind: str = "") -> str
                 '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
                 + ''.join(rows) + '</table></td></tr></table>'
             )
-        elif booking and len(lines) >= 2 and lines[0].strip().endswith(":") and re.fullmatch(r'https?://[^\\s<>"\\']+', lines[1].strip()):
+        elif booking and len(lines) >= 2 and lines[0].strip().endswith(":") and lines[1].strip().startswith("https://") and not any(ch.isspace() for ch in lines[1].strip()):
             href = html.escape(lines[1].strip(), quote=True)
             caption = html.escape(lines[0].strip().rstrip(":"))
             content = (
                 f'<a href="{href}" style="display:inline-block;background:{color};color:white;'
                 f'font-weight:700;padding:13px 19px;border-radius:7px;text-decoration:none">'
                 f'{caption}</a>'
-            ) + ('<br>' + links('\\n'.join(lines[2:])) if len(lines) > 2 else '')
+            ) + ('<br>' + links('\n'.join(lines[2:])) if len(lines) > 2 else '')
         elif len(lines) >= 2 and label in labels and re.fullmatch(r'https?://[^\s<>"\']+/umlaeufe/[^\s<>"\']+', lines[1]):
             button = f'<a href="{html.escape(lines[1], quote=True)}" style="display:inline-block;padding:12px 18px;border-radius:6px;background:{color};color:#ffffff;font-weight:600;text-decoration:none">{html.escape(label)}</a>'
             content = button + ('<br>' + links('\n'.join(lines[2:])) if len(lines)>2 else '')
