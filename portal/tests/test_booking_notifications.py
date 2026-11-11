@@ -5,8 +5,8 @@ from datetime import datetime, timedelta
 
 from starlette.datastructures import FormData
 
-from app import booking_integration, bookings
-from app.db import Booking, BookingPage
+from app import booking_integration, bookings, notify
+from app.db import Booking, BookingPage, Notification
 from app.routes_bookings import _apply
 from test_native_tasks import task_people
 
@@ -141,3 +141,38 @@ def test_notification_settings_validate_and_keep_page_defaults(db, task_people):
     assert booking_integration.escalation_hours(
         BookingPage(integration_json='{"request_escalation_hours":99999}')
     ) == 0
+
+
+def test_esc_is_blocked_at_delivery_if_request_or_owner_changed(db, task_people):
+    owner = task_people[0]
+    page, booking, _ = _fixture_booking(db, owner, settings={
+        "request_escalation_hours": 24,
+    })
+    guard = json.dumps({
+        "type": "booking_escalation",
+        "booking_id": booking.id,
+        "owner_id": owner.id,
+    })
+    notice = Notification(
+        kind="booking_escalation", to_addr=owner.email,
+        subject="Offene Anfrage", body="Nur interner Link", guard_json=guard,
+    )
+    try:
+        assert notify._booking_delivery_allowed(db, notice)
+        booking.status = "booked"
+        assert not notify._booking_delivery_allowed(db, notice)
+        booking.status = "requested"
+        owner.active = False
+        assert not notify._booking_delivery_allowed(db, notice)
+        owner.active = True
+        notice.to_addr = "unberechtigt@example.org"
+        assert not notify._booking_delivery_allowed(db, notice)
+        notice.to_addr = owner.email
+        notice.guard_json = '{"booking_id": "irrelevant"}'
+        assert not notify._booking_delivery_allowed(db, notice)
+    finally:
+        booking.status = "requested"
+        owner.active = True
+        db.delete(booking)
+        db.delete(page)
+        db.commit()
