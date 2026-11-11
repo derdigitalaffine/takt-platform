@@ -102,7 +102,17 @@ def slots(db, page: BookingPage, bt: BookingType, provider_id: int | None = None
         if not hours:
             continue
         blocked = _blocked_days(db, page, p.id, first, last)
-        busy = _busy(db, p.id, _to_utc(datetime.combine(first, time())), _to_utc(datetime.combine(last + timedelta(days=1), time())), keep)
+        range_start = _to_utc(datetime.combine(first, time()))
+        range_end = _to_utc(datetime.combine(last + timedelta(days=1), time()))
+        busy = _busy(db, p.id, range_start, range_end, keep)
+        from . import booking_integration as integration
+        if integration.configured(page, "calendar_conflicts"):
+            sources = integration.options(page).get("conflict_sources", ["personal", "meetings"])
+            if not isinstance(sources, list):
+                sources = ["personal", "meetings"]
+            busy += integration.internal_busy(
+                db, p.id, range_start, range_end, scopes=sources,
+                exclude_meeting_id=keep.meeting_id if keep else None)
         d = first
         while d <= last:
             if d not in blocked and d not in specials:
