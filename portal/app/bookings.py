@@ -547,6 +547,59 @@ def parse_guests(text: str) -> tuple[list[tuple[str, str]], list[str]]:
 
 # --- Erinnerungen (Worker) und Export ------------------------------------------------------
 
+def escalate_pending_requests(db, *, now: datetime | None = None) -> int:
+    """Raise one action reminder to the active page owner for overdue requests.
+
+    The notification intentionally contains no guest name, email, notes or
+    access token. A recipient must authenticate to view booking details.
+    The existing worker runs this under a shared organizational write lock.
+    """
+    from . import booking_integration
+    now = now or utcnow()
+    requested = db.scalars(select(Booking).where(
+        Booking.status == "requested",
+        Booking.escalated_at.is_(None),
+        Booking.created_at < now,
+        Booking.starts_at > now,
+    )).all()
+    cfg = get_settings(db)
+    count = 0
+    for item in requested:
+        hours = booking_integration.escalation_hours(item.page)
+        if not hours or item.created_at > now - timedelta(hours=hours):
+            continue
+        owner = item.page.owner
+        if owner is None or not owner.active or not owner.email:
+            continue
+        link = f"{settings.portal_base_url}/bookings/{item.page.id}?status=requested"
+        subject = f"Offene Terminanfrage prüfen – {item.page.title}"[:255]
+        body = (
+            f"Guten Tag {owner.name},\n\n"
+            "eine Terminanfrage wartet seit mehr als "
+            f"{hours} Stunden auf eine Entscheidung.\n\n"
+            f"Buchungsseite: {item.page.title}\n"
+            "Bitte prüfen Sie die Anfrage zeitnah oder weisen Sie die Bearbeitung "
+            "einer zuständigen Person zu.\n\n"
+            f"Anfragen in TAKT öffnen: {link}\n\n"
+            "Aus Datenschutzgründen enthält diese Erinnerung keine Bürgerdaten.\n\n"
+            + mailtpl.common_vars()["fusszeile"]
+        )
+        if notify.enqueue(db, owner.email, subject, body, "booking_escalation", cfg):
+            item.escalated_at = now
+            count += 1
+    return count
+
+
+def send_escalations() -> int:
+    """Worker entry point: serialize idempotent escalation and commit queue items."""
+    from .leave import lock
+    with SessionLocal() as db:
+        lock(db)
+        count = escalate_pending_requests(db)
+        db.commit()
+    return count
+
+
 def send_reminders() -> int:
     now = utcnow()
     count = 0
