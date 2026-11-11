@@ -77,7 +77,12 @@
       calendar.unselect();
       if (info.view.type === 'dayGridMonth') { calendar.changeView('timeGridDay', info.start); return; }
       post('/bookings/' + pageId + '/windows', { start: info.startStr, end: info.endStr }).then(function (d) {
-        if (d.ok) { reload(d.events); toast('Zeitbereich freigegeben'); } else { toast(d.error || 'Nicht gespeichert', true); }
+        if (d.ok) {
+          /* Slots sind aus Zeitbereichen berechnet. Nach einer Änderung müssen
+             Vorschau und Kennzahlen ebenfalls neu geladen werden. */
+          window.location.hash = 'freie-zeiten';
+          window.location.reload();
+        } else { toast(d.error || 'Nicht gespeichert', true); }
       }).catch(function () { toast('Verbindung fehlgeschlagen', true); });
     },
     dateClick: function (info) {
@@ -93,7 +98,8 @@
       }).then(function (res) {
         if (!res.isConfirmed) { return; }
         post('/bookings/' + pageId + '/windows/' + w.extendedProps.wid + '/delete').then(function (d) {
-          reload(d.events); toast(d.message || 'Entfernt');
+          if (d.ok) { window.location.hash = 'kalender'; window.location.reload(); }
+          else { toast(d.error || 'Nicht entfernt', true); }
         });
       });
     },
