@@ -2,12 +2,13 @@
 
 import re
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 import pytest
 from sqlalchemy import delete, select
 
 from app import bookings as bk
-from app.db import Booking, BookingPage, SessionLocal, User, to_local, utcnow
+from app.db import Booking, BookingInvite, BookingPage, SessionLocal, User, to_local, utcnow
 from conftest import client, csrf_of, login, settings
 
 
@@ -202,3 +203,34 @@ def test_booking_calendar_has_no_automatic_hash_jump_or_reload():
     assert 'id="bk-availability-content"' in template
     assert "data-bk-window-form" in template
     assert "</div>\n{% endblock %}\n{% block scripts %}" in template
+
+
+def test_simple_public_wizard_and_invitation_are_both_navigable():
+    page_id, token = make_page(slot_minutes=30)
+    with SessionLocal() as db:
+        page = db.get(BookingPage, page_id)
+        day = future_day()
+        start = bk.to_utc(datetime.combine(day, datetime.min.time()).replace(hour=9))
+        assert bk.add_window(db, page, start, start + timedelta(hours=1)) == ""
+        page.invite_only = True
+        db.add(BookingInvite(page_id=page_id, email="eingeladen@example.org", name="Eingeladener Gast",
+                             token="simple-invite-multistep-123"))
+        db.commit()
+    c = client()
+    base = f"/b/{token}"
+    blocked = c.get(base).text
+    assert "nur mit persönlicher Einladung" in blocked
+    times = c.get(base + "?i=simple-invite-multistep-123").text
+    assert "Wann passt es Ihnen?" in times and 'name="name"' not in times
+    assert 'name="i" value="simple-invite-multistep-123"' in times
+    value = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', times).group(1)
+    details = c.get(base + "?i=simple-invite-multistep-123&step=details&slot=" + quote(value, safe="")).text
+    assert "Ihre Angaben" in details and 'value="eingeladen@example.org"' in details
+    assert 'value="Eingeladener Gast"' in details
+    assert 'name="email"' in details and "readonly" in details
+    assert 'name="i" value="simple-invite-multistep-123"' in details
+    assert 'name="slot" value="' + value + '"' in details
+    response = c.post(base, data={"csrf": csrf_of(details), "i": "simple-invite-multistep-123",
+                                  "slot": value, "name": "Eingeladener Gast",
+                                  "email": "eingeladen@example.org"}, follow_redirects=False)
+    assert response.status_code == 303 and "/b/m/" in response.headers["location"]
