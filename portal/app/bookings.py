@@ -584,7 +584,8 @@ def escalate_pending_requests(db, *, now: datetime | None = None) -> int:
             "Aus Datenschutzgründen enthält diese Erinnerung keine Bürgerdaten.\n\n"
             + mailtpl.common_vars()["fusszeile"]
         )
-        if notify.enqueue(db, owner.email, subject, body, "booking_escalation", cfg):
+        guard = {"type": "booking_escalation", "booking_id": item.id, "owner_id": owner.id}
+        if notify.enqueue(db, owner.email, subject, body, "booking_escalation", cfg, guard=guard):
             item.escalated_at = now
             count += 1
     return count
