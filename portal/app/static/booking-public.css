@@ -107,13 +107,15 @@
  .bk-public-hero{padding:1.1rem 1.15rem}
  .bk-type-grid{grid-template-columns:1fr}
  .bk-fields-grid{grid-template-columns:1fr}
- .bk-day-options{grid-template-columns:repeat(4,minmax(0,1fr))}
- .bk-day-options .bk-day-option:nth-child(n+5){display:none}
- .bk-day-option{min-height:4.45rem}
+ .bk-day-options{display:flex;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:.35rem}
+ .bk-day-option{flex:0 0 4.8rem;min-height:4.45rem}
  .bk-progress{padding-inline:0}
  .bk-public-actions .bk-primary-action{width:100%;margin:0;order:-1}
  .bk-public-actions{align-items:stretch}
  .bk-person-filter>div{flex-direction:column}
 }
-@media(max-width:400px){.bk-day-options{grid-template-columns:repeat(3,minmax(0,1fr))}.bk-day-options .bk-day-option:nth-child(n+4){display:none}}
+@media(max-width:400px){.bk-day-option{flex-basis:4.5rem}}
 @media(prefers-reduced-motion:reduce){.bk-type-choice,.bk-slot-option,.bk-day-option{transition:none}.bk-type-choice:hover{transform:none}}
+
+.bk-type-choice[hidden]{display:none!important}
+.bk-day-options{scrollbar-width:thin}
