@@ -222,15 +222,18 @@ def exercise(page):
     expect(chat.locator('.ai-agent-destination a')).to_be_visible()
     chat.locator('.ai-agent-destination a').click()
     try:
-        expect(page).to_have_url(re.compile(r'/forms\?agent_plan='))
+        expect(page).to_have_url(re.compile(r'/forms/new\?agent_plan='))
     except Exception:
         print('Dock errors:', errors, flush=True)
         print('Dock chat:', chat.locator('body').inner_text(), flush=True)
         raise
     expect(page.locator('[data-agent-draft]')).to_contain_text('Geburtstag')
     expect(page.locator('form[action="/agent/draft/review"] [name="title"]')).to_have_value('Geburtstage der Belegschaft')
+    field = page.locator('#builder-items .builder-item').filter(has_text='Geburtstag')
+    field.locator('.builder-compact').click()
+    page.locator('#builder-items [data-key="title"]').fill('Geburtstag im Kalender')
     page.get_by_role('button', name='Vorschlag prüfen', exact=True).click()
-    expect(page.locator('[data-agent-final-preview]')).to_contain_text('Geburtstag')
+    expect(page.locator('[data-agent-final-preview]')).to_contain_text('Geburtstag im Kalender')
     page.get_by_role('button', name='Diesen Schritt verbindlich speichern', exact=True).click()
     expect(page).to_have_url(re.compile(r'/forms/[0-9]+$'))
     assert not errors, errors

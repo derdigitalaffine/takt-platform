@@ -270,6 +270,13 @@ def visibility(items: list[dict], answers: dict) -> dict[str, bool]:
     return out
 
 
+def schema_values(title: str, description: str, items: list[dict]) -> dict:
+    """Fields written by the builder after validation."""
+    return dict(title=" ".join(title.split())[:255],
+                description=description.replace("\r\n", "\n").strip()[:5000],
+                schema_json=json.dumps(items, ensure_ascii=False), updated_at=utcnow())
+
+
 def raw_schema(form: Form) -> list[dict]:
     """Aufbau wie gespeichert (Datenblöcke als Verweis) – für den Baukasten."""
     try:

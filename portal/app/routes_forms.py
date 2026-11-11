@@ -108,6 +108,26 @@ def forms_inbox(request: Request, user: User = Depends(current_user), db: Sessio
 
 # --- Baukasten -------------------------------------------------------------------
 
+@app.get("/forms/new")
+def form_new_proposal(request: Request, agent_plan: str, agent_step: int = 0,
+                      user: User = Depends(forms_user), db: Session = Depends(get_db)):
+    from . import agent_drafts, agent_forms
+    from .routes_agent import _access
+
+    _access(user)
+    _, action = agent_drafts.load(request, user, agent_plan, agent_step)
+    if action["tool"] != "create_form":
+        raise HTTPException(409, "Dieser Vorschlag gehört in einen anderen Programmbereich.")
+    agent_forms.validate(db, user, action)
+    response = render(
+        request, "form_builder.html", user, form=Form(title="Neuer Formularentwurf", description=""),
+        types=fm.TYPES, schema=[], subtypes=fm.SUBTYPES, max_file_mb=fm.MAX_FILE_MB,
+        agent_new=True, **builder_extras(db, user),
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/forms/{form_id}")
 def form_builder(request: Request, form_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     form, level = _form(db, form_id, user, fm.EDIT)
@@ -211,10 +231,10 @@ def form_save_schema(request: Request, form_id: int, title: str = FormField(""),
     if rule_errors:
         labels = {i['id']: i.get('title') or fm.TYPES[i['type']][0] for i in items}
         raise HTTPException(400, ' · '.join(f"{labels[qid]}: {message}" for qid, message in rule_errors.items()))
-    form.title = " ".join(title.split())[:255] or form.title
-    form.description = description.replace("\r\n", "\n").strip()[:5000]
-    form.schema_json = json.dumps(items, ensure_ascii=False)
-    form.updated_at = utcnow()
+    values = fm.schema_values(title, description, items)
+    values["title"] = values["title"] or form.title
+    for key, value in values.items():
+        setattr(form, key, value)
     db.commit()
     flash(request, f"Formular gespeichert ({len(fm.questions(items))} Fragen, {len(fm.pages(items))} Seite(n)).")
     return redirect(f"/forms/{form.id}")

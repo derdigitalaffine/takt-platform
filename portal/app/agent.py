@@ -171,7 +171,7 @@ def search_instructions(user, focus=None):
             "Du bist TAKT Agent. Antworte nur als JSON-Objekt: "
             + json.dumps(example, ensure_ascii=False) + ". "
             "Für allgemeine Fragen, Texte und Wissensfragen plane KEINE Fachsuche; antworte später im message-Feld. Sonst plane 0 bis 6 nötige lesende Suchaufrufe, um die Anfrage zu erfüllen; "
-            "bei Aufgaben und Anliegen sind 0 Suchen erlaubt. Für Termine zuerst Kalender suchen; für Kopien Formulare, für DMS-Verschiebungen Akten UND Zielbereiche suchen. "
+            "bei Aufgaben und Anliegen sind 0 Suchen erlaubt. Für Termine zuerst Kalender suchen; für Änderungen und Kopien Formulare, für DMS-Verschiebungen Akten UND Zielbereiche suchen. "
             "Filter nach Status und Fälligkeit zielgerichtet, aber erfinde keine IDs. Bei Terminen Datumswünsche über start/end filtern, query ist nur Titel oder Datensatz-ID; ohne Titel query leer lassen. "
             "Erlaubte Werkzeuge: " + "; ".join(kinds) + ". "
             "Keine externen URLs, keine Schreibaufrufe in dieser Stufe. "
@@ -223,7 +223,8 @@ def plan_instructions(user, prompt, findings, categories, requester_id, focus=No
         "create_event": "create_event(id=calendar_id,title,description,location,start,end,all_day=false): Einzeltermin; Uhrzeiten mit expliziter ISO-Zeitzone, ganztägig YYYY-MM-DD mit Enddatum einschließlich; keine Einladungen/Ressourcenbuchungen",
         "update_event": "update_event(id=event_id,title?,description?,location?,start?,end?,all_day?): nur editable=true, bestehende nicht geänderte Angaben beibehalten; keine Serie",
         "delete_event": "delete_event(id=event_id): nur bei ausdrücklichem Löschauftrag, einzelner editierbarer freier Kalendertermin; keine Serie",
-        "create_form": "create_form(title,fields=[{type:short|long|date|time|number|yesno,title,required:true|false}]): neuen internen geschlossenen Formularentwurf MIT konkreten Fragen anlegen, keine zusätzliche Vorab-Erlaubnis erfragen; Publikation bleibt manuell",
+        "create_form": "create_form(title,description?,fields=[{type,title,description?,required?,options?,subtype?,min?,max?}]): geschlossenen internen Formularentwurf mit konkreten Fragen öffnen. Typen short|long|radio|checkbox|dropdown|date|time|scale|heading|text|pagebreak|file|address|geo; options=[Antworttexte] bei Auswahl, short subtype=number|email|phone|text. Keine Vorab-Erlaubnis erfragen.",
+        "edit_form": "edit_form(id,title?,description?,fields?): nur gefundenen Formularentwurf mit editable=true bearbeiten. fields ergänzt ausschließlich neue Bausteine mit der gleichen Struktur wie create_form. Keine Antragstypen oder Veröffentlichungen.",
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
         "move_dms": "move_dms(id,area_id): freigegebene manuelle Wissensakte in berechtigten Zielbereich verschieben",
     }.items() if allowed(user, modules.WRITE[tool]))

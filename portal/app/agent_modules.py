@@ -8,7 +8,7 @@ from itertools import islice
 from fastapi import HTTPException
 from sqlalchemy import select, or_
 
-from . import ai_dms, calendars, dms, forms as fm, agent_anliegen
+from . import ai_dms, calendars, dms, forms as fm, agent_anliegen, agent_forms
 from .ai_models import AIDmsSource
 from .calendar_models import Calendar, CalendarEvent
 from .anliegen_models import AnliegenCategory
@@ -26,7 +26,7 @@ WRITE = {
     "create_survey": "surveys", "survey_state": "surveys", "finalize_poll": "surveys",
     "set_krank_status": "krank", "add_krank_note": "krank", "send_krank_message": "krank",
     "create_leave": "leave", "edit_leave": "leave", "leave_command": "leave",
-    "create_form": "forms",
+    "create_form": "forms", "edit_form": "forms",
     "configure_anliegen_category": "anliegen",
     "update_event": "calendars", "delete_event": "calendars", "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
 }
@@ -38,7 +38,7 @@ LABELS = {
     "search_dms": "freigegebenen DMS-Wissensakten", "search_dms_areas": "DMS-Zielbereichen",
     "search_my_leave": "deinen eigenen Urlaubsanträgen", "search_leave_requests": "berechtigten Urlaubsanträgen",
 }
-KINDS = {"configure_anliegen_category": "anliegen_category", "create_event": "calendar", "copy_form": "form", "move_dms": "dms"}
+KINDS = {"configure_anliegen_category": "anliegen_category", "create_event": "calendar", "copy_form": "form", "edit_form": "form", "move_dms": "dms"}
 MODELS = {"configure_anliegen_category": AnliegenCategory, "create_event": Calendar, "copy_form": Form, "move_dms": DmsRecord}
 
 
@@ -90,10 +90,7 @@ def search(db, user, spec):
         from .agent_events import search as search_events
         return search_events(db, user, spec)
     if tool == "search_forms":
-        rows = db.scalars(select(Form).where(Form.deleted_at.is_(None), Form.archived_at.is_(None),
-                          Form.title.ilike(pattern, escape="\\")).order_by(Form.id))
-        return list(islice((dict(type="form", id=r.id, title=r.title, active=r.active, kind=r.kind,
-                     url=f"/forms/{r.id}") for r in rows if fm.access_level(db, r, user) >= fm.VIEW), 20))
+        return agent_forms.search(db, user, phrase, pattern)
     if tool == "search_processes":
         # Process editor uses the global processes role; there is no owner-only ACL.
         rows = db.scalars(select(Process).where(Process.name.ilike(pattern, escape="\\")).order_by(Process.id).limit(20))
@@ -159,9 +156,8 @@ def normalize(db, user, raw, findings):
     if raw["tool"] in agent_leave.TOOLS:
         return agent_leave.normalize(db, user, raw, findings)
     tool = raw["tool"]
-    if tool == "create_form":
-        from .agent_forms import normalize as normalize_form
-        return normalize_form(user, raw)
+    if tool in agent_forms.TOOLS:
+        return agent_forms.normalize(user, raw, db, findings)
     if tool == "configure_anliegen_category":
         from .agent import require
         require(user, "anliegen")
@@ -196,9 +192,8 @@ def preview(db, action):
     from . import agent_leave
     if action["tool"] in agent_leave.TOOLS:
         return agent_leave.preview(db, action)
-    if action["tool"] == "create_form":
-        from .agent_forms import preview as preview_form
-        return preview_form(action)
+    if action["tool"] in agent_forms.TOOLS:
+        return agent_forms.preview(db, action)
     if action["tool"] == "configure_anliegen_category":
         return agent_anliegen.preview(db, action)
     row = db.get(MODELS[action["tool"]], action["id"])
@@ -221,9 +216,8 @@ def execute(db, user, action):
     from . import agent_leave
     if action["tool"] in agent_leave.TOOLS:
         return agent_leave.execute(db, user, action)
-    if action["tool"] == "create_form":
-        from .agent_forms import execute as create_form
-        return create_form(db, user, action)
+    if action["tool"] in agent_forms.TOOLS:
+        return agent_forms.execute(db, user, action)
     if action["tool"] == "configure_anliegen_category":
         from .agent import require
         require(user, "anliegen")

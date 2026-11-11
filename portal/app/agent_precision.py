@@ -33,6 +33,10 @@ def context(prompt, categories):
         text += 'Terminumfragen sind create_survey mit record_kind=poll und konkreten Alternativterminen, keine freien Kalendertermine. '
     if re.search(r'wortwolke|quiz|live.umfrage',prompt,re.I):
         text += 'Wortwolke und Quiz gehören zu create_survey mit record_kind=live_poll. Quizlösungen müssen ausdrücklich mit Antwortnummern ab 1 angegeben werden. '
+    if re.search(r'formular', prompt, re.I) and re.search(r'geburtstag', prompt, re.I):
+        text += ('Bei einer Geburtstagsliste für die Belegschaft nur Namen, Tag und Monat abfragen, '
+                 'wenn kein Geburtsjahr verlangt ist. Tag als Zahl 1–31, Monat als Auswahlliste. '
+                 'Nur ausdrücklich gewünschte weitere personenbezogene Felder aufnehmen. ')
     return text
 
 
