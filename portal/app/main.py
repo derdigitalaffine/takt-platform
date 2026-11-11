@@ -1567,6 +1567,29 @@ def admin_templates(request: Request, user: User = Depends(admin_user), db: Sess
                   sample=sample, open_key=request.query_params.get("t", ""))
 
 
+@app.get("/admin/templates/{key}/vorschau")
+def admin_template_html_preview(
+    key: str, user: User = Depends(admin_user), db: Session = Depends(get_db)
+):
+    """Branded, server-rendered sample with no third-party resources or scripts."""
+    if key not in mailtpl.TEMPLATES:
+        raise HTTPException(404)
+    cfg = get_settings(db)
+    _, body = mailtpl.render(db, key, mailtpl.SAMPLE, cfg)
+    frame = notify.mail_frame(cfg)
+    document = notify.text_to_html(body, frame, kind=key)
+    if frame and frame.get("logo"):
+        binary, subtype = frame["logo"]
+        data = "data:image/" + subtype + ";base64," + base64.b64encode(binary).decode("ascii")
+        document = document.replace("cid:" + frame["cid"], data)
+    return HTMLResponse(document, headers={
+        "Cache-Control": "private, no-store",
+        "Content-Security-Policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+    })
+
+
 @app.post("/admin/templates/{key}", dependencies=[Depends(check_csrf)])
 async def admin_templates_save(request: Request, key: str, subject: str = Form(""), body: str = Form(""),
                                action: str = Form("save"), user: User = Depends(admin_user),
@@ -1592,7 +1615,7 @@ async def admin_templates_save(request: Request, key: str, subject: str = Form("
         cfg = get_settings(db)
         s, b = mailtpl.render(db, key, mailtpl.SAMPLE, cfg)
         try:
-            await asyncio.to_thread(notify.deliver, cfg, user.email, "[Test] " + s, b)
+            await asyncio.to_thread(notify.deliver, cfg, user.email, "[Test] " + s, b, kind=key)
         except notify.MailError as exc:
             flash(request, f"Gespeichert, aber die Testmail ging nicht raus: {exc}", "error")
         else:
