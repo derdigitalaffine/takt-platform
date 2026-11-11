@@ -11,7 +11,7 @@ from app import signage
 from app.db import LOCAL_TZ, Resource, ResourceBooking, SessionLocal, User, utcnow
 from app.calendar_models import Calendar, CalendarEvent
 from app.signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
-                                SignageOffice, SignageRoom, SignageScreen)
+                                SignageOffice, SignageRoom, SignageScreen, SignageRevision)
 
 
 ADMIN = ("admin@example.org", "admin-passwort-123")
@@ -214,3 +214,64 @@ def test_calendar_date_conversion_uses_local_timezone_for_day_and_aware_iso():
     assert day.hour == 0 and day.tzinfo == LOCAL_TZ
     dt = signage._calendar_date("2026-11-11T13:00:00+00:00")
     assert dt.hour == 14
+
+def test_studio_revision_restore_leaves_publication_and_links_unchanged():
+    c = _admin()
+    sid = _screen(c, name="Original", kind="room", visibility="link")
+    with SessionLocal() as db:
+        created = db.scalar(select(SignageRevision).where(
+            SignageRevision.screen_id == sid, SignageRevision.version == 1))
+        assert created
+        revision_id = created.id
+    editor = c.get(f"/signage/{sid}/edit")
+    assert "Designverlauf" in editor.text
+    csrf = csrf_of(editor.text)
+    changed = c.post(f"/signage/{sid}/save", data={
+        "csrf": csrf, "version": "1", "name": "Neues Design",
+        "kind": "info", "visibility": "public", "enabled": "1",
+        "background": "#000000", "foreground": "#ffffff", "accent": "#42d4ad",
+        "layout_json": '["clock","message"]',
+    })
+    assert changed.status_code == 303
+    with SessionLocal() as db:
+        row = db.get(SignageScreen, sid)
+        assert row.version == 2 and row.visibility == "public"
+        assert db.scalar(select(SignageRevision).where(SignageRevision.screen_id == sid,
+                                                       SignageRevision.version == 2))
+    stale = c.post(f"/signage/{sid}/save", data={"csrf": csrf, "version": "1",
+             "name": "Old tab", "kind": "agenda", "visibility": "link"})
+    assert stale.status_code == 409
+    restored = c.post(f"/signage/{sid}/revision/{revision_id}/restore",
+                      data={"csrf": csrf, "version": "2"})
+    assert restored.status_code == 303
+    with SessionLocal() as db:
+        row = db.get(SignageScreen, sid)
+        assert row.name == "Original" and row.kind == "room"
+        assert row.version == 3
+        assert row.visibility == "public"  # Never restore publication state.
+        assert db.scalar(select(SignageRevision).where(SignageRevision.screen_id == sid,
+                                                       SignageRevision.version == 3))
+
+
+def test_live_preview_changes_are_not_persisted():
+    c = _admin()
+    sid = _screen(c, name="Original Preview", kind="agenda")
+    editor = c.get(f"/signage/{sid}/edit")
+    assert "sg-live-status" in editor.text
+    csrf = csrf_of(editor.text)
+    preview = c.post(f"/signage/{sid}/preview-live", data={
+        "csrf": csrf, "name": "Entwurf nur in Vorschau",
+        "kind": "info", "subtitle": "Nicht gespeichert",
+        "visibility": "public", "resource_id": "", "room_id": "", "org_id": "",
+        "background": "#162b3e", "foreground": "#f8fafc", "accent": "#42d4ad",
+        "layout_json": '["clock","message"]'
+    })
+    assert preview.status_code == 200, preview.text[:400]
+    assert "Entwurf nur in Vorschau" in preview.text
+    assert "Nicht gespeichert" in preview.text
+    assert preview.headers["cache-control"].startswith("no-store")
+    with SessionLocal() as db:
+        row = db.get(SignageScreen, sid)
+        assert row.name == "Original Preview" and row.kind == "agenda"
+        assert row.visibility == "private"
+        assert row.version == 1
