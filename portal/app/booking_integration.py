@@ -55,7 +55,7 @@ def _utc(value):
     raise ValueError("Ungültige Kalenderzeit")
 
 
-def internal_busy(db, user_id: int, start: datetime, end: datetime, *, scopes=None):
+def internal_busy(db, user_id: int, start: datetime, end: datetime, *, scopes=None, exclude_meeting_id=None):
     """Relevant occupied intervals (UTC, naive), without copying personal event data.
 
     Only free calendars *owned by this user* count, never arbitrary organization
@@ -79,6 +79,8 @@ def internal_busy(db, user_id: int, start: datetime, end: datetime, *, scopes=No
                                   Meeting.cancelled_at.is_(None))
         ).all()
         for row in meetings:
+            if row.id == exclude_meeting_id:
+                continue
             finish = row.starts_at + timedelta(minutes=row.duration_minutes or 0)
             if finish > start:
                 busy.append((row.starts_at, finish))
@@ -128,15 +130,8 @@ def conflicts(db, page, user_id: int | None, start: datetime, end: datetime, *, 
     sources = options(page).get("conflict_sources", list(SCOPES))
     if not isinstance(sources, list):
         sources = list(SCOPES)
-    # Own booking-generated meetings are already accounted for by booking
-    # overlap checks. When rescheduling, suppress its old meeting's busy slot.
-    meeting_id = keep.meeting_id if keep else None
-    for a, b in internal_busy(db, user_id, start, end, scopes=sources):
-        if a < end and start < b:
-            if meeting_id:
-                from .db import Meeting
-                row = db.get(Meeting, meeting_id)
-                if row and row.starts_at == a and row.starts_at + timedelta(minutes=row.duration_minutes or 0) == b:
-                    continue
-            return True
-    return False
+    # Bookings are canonical, so the meeting created for the booking being
+    # rescheduled must not conflict with its own new interval.
+    return any(a < end and start < b for a, b in internal_busy(
+        db, user_id, start, end, scopes=sources,
+        exclude_meeting_id=keep.meeting_id if keep else None))
