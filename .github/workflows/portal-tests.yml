@@ -96,7 +96,7 @@ jobs:
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        run: bash tests/browser/install_chromium.sh
       - name: Check file-picker feedback
         run: node tests/test_task_create_client.js
       - name: Verify visual knowledge-block Markdown round trips
@@ -133,7 +133,7 @@ jobs:
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        run: bash tests/browser/install_chromium.sh
       - name: Check responsive cloud rendering
         run: node tests/test_live_chart_client.js
       - name: Exercise survey UI in Chromium
@@ -166,7 +166,7 @@ jobs:
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        run: bash tests/browser/install_chromium.sh
       - name: Check seminar planner client contracts
         run: node tests/test_seminar_planner_client.js
       - name: Check module discovery and responsive navigation
@@ -217,7 +217,7 @@ jobs:
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        run: bash tests/browser/install_chromium.sh
       - name: Exercise shared Kanban boards on desktop and touch mobile
         run: python tests/browser/board_ui_smoke.py
       - name: Save Kanban screenshots and server log
@@ -244,7 +244,7 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        run: bash tests/browser/install_chromium.sh
       - name: Check person timeline, keyboard, mobile and 150-person annual view
         run: python tests/browser/person_timeline_smoke.py
       - name: Check integrated leave and calendar forms
