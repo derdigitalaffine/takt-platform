@@ -26,11 +26,16 @@
   var events = JSON.parse(document.getElementById('bk-events').textContent || '[]');
 
   function post(url, fields) {
-    var body = new FormData();
-    body.append('csrf', csrf);
-    Object.keys(fields || {}).forEach(function (k) { body.append(k, fields[k]); });
+    var body = fields instanceof FormData ? fields : new FormData();
+    if (!(fields instanceof FormData)) {
+      Object.keys(fields || {}).forEach(function (k) { body.append(k, fields[k]); });
+    }
+    if (!body.has('csrf')) { body.append('csrf', csrf); }
     return fetch(url, { method: 'POST', body: body, headers: { 'X-Requested-With': 'fetch' }, credentials: 'same-origin' })
-      .then(function (r) { return r.json().then(function (d) { d.status = r.status; return d; }); });
+      .then(function (r) {
+        if (!r.ok && r.status !== 422) { throw new Error('HTTP ' + r.status); }
+        return r.json();
+      });
   }
   function toast(text, error) {
     if (window.Swal) {
@@ -39,8 +44,107 @@
     }
   }
   function reload(list) {
-    calendar.removeAllEvents();
-    list.forEach(function (e) { calendar.addEvent(e); });
+    // Der angezeigte Tag / die Woche und die Scrollposition bleiben unverändert.
+    calendar.batchRendering(function () {
+      calendar.removeAllEvents();
+      list.forEach(function (e) { calendar.addEvent(e); });
+    });
+  }
+  function node(tag, className, content) {
+    var el = document.createElement(tag);
+    if (className) { el.className = className; }
+    if (content !== undefined) { el.textContent = content; }
+    return el;
+  }
+  function updateAvailability(info) {
+    if (!info) { return; }
+    [['free', 'free_count'], ['slots', 'slot_count']].forEach(function (entry) {
+      var value = document.querySelector('[data-bk-stat="' + entry[0] + '"] .stat-value');
+      if (value) { value.textContent = String(info[entry[1]]); }
+    });
+    var count = document.querySelector('[data-bk-window-count]');
+    if (count) { count.textContent = String(info.window_count); }
+
+    var root = document.getElementById('bk-availability-content');
+    if (!root) { return; }
+    var days = info.days || [];
+    var children = [];
+    if (days.length) {
+      var grid = node('div', 'bk-availability-grid');
+      days.forEach(function (day) {
+        var card = node('div', 'bk-day-preview');
+        var heading = node('div', 'd-flex justify-content-between flex-wrap gap-1 mb-2');
+        heading.appendChild(node('strong', '', day.label));
+        heading.appendChild(node('span', 'small text-secondary', day.count + ' Zeiten'));
+        card.appendChild(heading);
+        var times = node('div', 'd-flex flex-wrap gap-2');
+        (day.slots || []).forEach(function (slot) {
+          var chip = node('span', 'bk-time-chip', slot.time);
+          if (slot.free > 1) { chip.appendChild(node('small', '', '· ' + slot.free + ' frei')); }
+          times.appendChild(chip);
+        });
+        if (day.count > day.slots.length) {
+          times.appendChild(node('span', 'small text-secondary align-self-center', '+ ' + (day.count - day.slots.length) + ' weitere'));
+        }
+        card.appendChild(times);
+        grid.appendChild(card);
+      });
+      children.push(grid);
+      children.push(node('p', 'small text-secondary mb-0 mt-3',
+        'Vorschau der nächsten sieben verfügbaren Tage. Alle buchbaren Zeiten stehen auf der öffentlichen Buchungsseite.'));
+    } else {
+      var empty = node('div', 'bk-empty');
+      empty.appendChild(node('i', 'fa-regular fa-calendar-xmark'));
+      var description = node('div');
+      description.appendChild(node('strong', 'd-block text-body', 'Zurzeit keine buchbaren Termine'));
+      description.appendChild(document.createTextNode(info.window_count
+        ? 'Zeitbereiche sind vorhanden. Prüfe, ob sie in der Zukunft liegen, lang genug für einen Termin sind und der eingestellte Vorlauf bereits erfüllt ist.'
+        : 'Lege zuerst einen Zeitbereich im Kalender an. Daraus entstehen die freien Buchungsslots automatisch.'));
+      empty.appendChild(description);
+      children.push(empty);
+    }
+    root.replaceChildren.apply(root, children);
+  }
+  function applyChange(data) {
+    if (!data || !data.ok || !Array.isArray(data.events)) { return false; }
+    reload(data.events);
+    updateAvailability(data.availability);
+    var status = document.getElementById('bk-window-status');
+    if (status) { status.textContent = data.message || 'Zeitbereiche aktualisiert.'; }
+    toast(data.message || 'Zeitbereiche aktualisiert.', false);
+    return true;
+  }
+  var busy = false;
+  function saveWindow(url, fields, form) {
+    if (busy) { return Promise.resolve(); }
+    busy = true;
+    el.classList.add('bk-updating');
+    var submit = form && form.querySelector('[type="submit"]');
+    if (submit) { submit.disabled = true; }
+    var formStatus = form && form.querySelector('[data-bk-form-status]');
+    if (formStatus) { formStatus.textContent = 'Wird gespeichert …'; }
+    return post(url, fields).then(function (data) {
+      if (!applyChange(data)) {
+        var msg = (data && data.error) || 'Der Zeitbereich konnte nicht gespeichert werden.';
+        if (formStatus) { formStatus.textContent = msg; }
+        toast(msg, true);
+      } else if (formStatus) { formStatus.textContent = data.message; }
+    }).catch(function () {
+      var msg = 'Verbindung fehlgeschlagen. Bitte erneut versuchen.';
+      if (formStatus) { formStatus.textContent = msg; }
+      toast(msg, true);
+    }).finally(function () {
+      busy = false;
+      el.classList.remove('bk-updating');
+      if (submit) { submit.disabled = false; }
+    });
+  }
+  var windowForm = document.querySelector('[data-bk-window-form]');
+  if (windowForm && !readonly) {
+    windowForm.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      saveWindow(windowForm.action, new FormData(windowForm), windowForm);
+    });
   }
   function windowAt(date) {
     var t = date.getTime();
@@ -76,14 +180,7 @@
     select: function (info) {
       calendar.unselect();
       if (info.view.type === 'dayGridMonth') { calendar.changeView('timeGridDay', info.start); return; }
-      post('/bookings/' + pageId + '/windows', { start: info.startStr, end: info.endStr }).then(function (d) {
-        if (d.ok) {
-          /* Slots sind aus Zeitbereichen berechnet. Nach einer Änderung müssen
-             Vorschau und Kennzahlen ebenfalls neu geladen werden. */
-          window.location.hash = 'freie-zeiten';
-          window.location.reload();
-        } else { toast(d.error || 'Nicht gespeichert', true); }
-      }).catch(function () { toast('Verbindung fehlgeschlagen', true); });
+      saveWindow('/bookings/' + pageId + '/windows', { start: info.startStr, end: info.endStr });
     },
     dateClick: function (info) {
       if (readonly) { return; }
@@ -97,10 +194,7 @@
         buttonsStyling: false, customClass: { confirmButton: 'btn btn-danger ms-2', cancelButton: 'btn btn-outline-secondary' }
       }).then(function (res) {
         if (!res.isConfirmed) { return; }
-        post('/bookings/' + pageId + '/windows/' + w.extendedProps.wid + '/delete').then(function (d) {
-          if (d.ok) { window.location.hash = 'kalender'; window.location.reload(); }
-          else { toast(d.error || 'Nicht entfernt', true); }
-        });
+        saveWindow('/bookings/' + pageId + '/windows/' + w.extendedProps.wid + '/delete', {});
       });
     },
     eventClick: function (info) {
