@@ -122,16 +122,20 @@ def _build(cfg: dict[str, str], to_addr: str, subject: str, body: str,
     for att in attachments or []:
         method = att.get("calendar_method")
         if method:
-            # Kalenderteil als dritte Alternative: daraus macht Outlook die Besprechungsanfrage
-            # (Annehmen/Ablehnen). Wichtig: byte-genau mit CRLF-Zeilenenden (RFC 5545); als Text
-            # übergeben würde die Mail-Bibliothek sie in LF umwandeln, und Outlook verwirft die Einladung.
-            # Kopfzeilen wörtlich wie bei Outlook/Google (method=REQUEST ohne Anführungszeichen):
-            # dafür ein einfaches Message-Objekt, dessen Kopfzeilen nicht neu formatiert werden.
+            # RFC 5545 iTIP calendar alternative for Outlook/Google/Apple.
+            # The HTML part must remain the LAST supported alternative so that
+            # receiving mail clients display the branded booking message instead
+            # of a plain generic calendar preview. Keep the iTIP bytes base64-
+            # encoded to preserve CRLF and the original METHOD header.
             part = Message()
             part["Content-Type"] = f'text/calendar; charset="UTF-8"; method={method}'
             part["Content-Transfer-Encoding"] = "base64"
             part.set_payload(base64.encodebytes(att["content"].encode("utf-8")).decode("ascii"))
-            msg.attach(part)
+            # Current multipart/alternative is [plain, HTML (or HTML+CID logo)].
+            # Insert before HTML; append() would put the calendar last and some
+            # mail clients then hide the beautifully formatted HTML altogether.
+            alternatives = msg.get_payload()
+            alternatives.insert(len(alternatives) - 1, part)
     for att in attachments or []:
         if att.get("calendar_method"):
             msg.add_attachment(att["content"].encode("utf-8"), maintype="application", subtype="ics",
