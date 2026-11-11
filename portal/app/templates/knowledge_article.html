@@ -24,16 +24,16 @@
   <div class="knowledge-status-actions">
     {% if item.status=='draft' and can_edit %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="review"><button class="btn btn-outline-primary">Zur Prüfung einreichen</button></form>{% endif %}
     {% if item.status=='review' and can_edit %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="draft"><button class="btn btn-outline-secondary">Zur Überarbeitung zurückgeben</button></form>{% endif %}
-    {% if item.status=='review' and can_publish and item.owner_id != user.id %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="published"><button class="btn btn-primary">Fachlich freigeben</button></form>{% endif %}
+    {% if can_approve %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="published"><button class="btn btn-primary">Fachlich freigeben</button></form>{% endif %}
   </div>
-  {% if item.status=='published' and can_publish and item.owner_id != user.id %}
+  {% if can_confirm %}
   <details class="knowledge-form-card mt-4">
     <summary><i class="fa-solid fa-clipboard-check me-2"></i>Wissensqualität und Wiedervorlage</summary>
     <p class="text-secondary small mt-3">Die nächste regelmäßige Prüfung veranlassen. Verbindliche Regelungen dürfen nicht durch eine einfache Wissensbestätigung entstehen.</p>
     <form action="/wissen/artikel/{{item.id}}/pruefung" method="post" class="row g-3">
       <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}">
       <div class="col-md-6"><label for="wissen-authority" class="form-label">Verbindlichkeitsstufe</label><select id="wissen-authority" name="authority" class="form-select"><option value="unconfirmed" {{'selected' if item.authority=='unconfirmed'}}>Unbestätigte Information</option><option value="experience" {{'selected' if item.authority=='experience'}}>Erfahrungswissen</option><option value="verified" {{'selected' if item.authority=='verified'}}>Fachlich geprüft</option><option value="official" disabled>Offiziell freigegeben – Regelwerksverfahren</option><option value="binding" disabled>Verbindliche Regelung – Regelwerksverfahren</option></select></div>
-      <div class="col-md-6"><label for="wissen-next-review" class="form-label">Nächster Prüftermin</label><input class="form-control" id="wissen-next-review" name="review_due_on" type="date" value="{{item.review_due_on.isoformat() if item.review_due_on else ''}}"></div>
+      <div class="col-md-6"><label for="wissen-next-review" class="form-label">Nächster Prüftermin</label><input class="form-control" id="wissen-next-review" name="review_due_on" type="date" min="{{today.isoformat()}}" value="{{item.review_due_on.isoformat() if item.review_due_on else ''}}" aria-describedby="wissen-review-help"><div id="wissen-review-help" class="form-text">Leer lassen, um ohne neuen Prüftermin abzuschließen.</div></div>
       <div><button class="btn btn-outline-primary" type="submit">Prüfung bestätigen und Termin speichern</button></div>
     </form>
   </details>{% endif %}
