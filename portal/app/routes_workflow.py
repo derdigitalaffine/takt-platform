@@ -49,7 +49,7 @@ def tasks_page(request: Request, user: User = Depends(current_user), db: Session
     mods = enabled_modules()
     if not mods & {"applications", "resources", "circulations", "tasks", "anliegen"}:
         raise HTTPException(404, "Kein Aufgabenmodul ist eingeschaltet.")
-    from . import task_overview, tasks as native
+    from . import knowledge, task_overview, tasks as native
     from urllib.parse import urlencode
     keys = ('scope', 'source', 'perspective', 'priority', 'status', 'tag', 'q', 'view', 'sort', 'since', 'until', 'period', 'date')
     if request.query_params:
@@ -117,6 +117,7 @@ def tasks_page(request: Request, user: User = Depends(current_user), db: Session
     capture = getattr(request.state, 'task_capture', {})
     response = render(request, "tasks.html", user, work=view, apps_on="applications" in mods,
                   circulations_on="circulations" in mods, resources_on="resources" in mods,
+                  knowledge_due_notice=knowledge.has_due_review_reminder(db, user),
                   native_on='tasks' in mods, may_create=native.may_create(user),
                   anliegen_on=('anliegen' in mods),
                   priorities=native.PRIORITIES,

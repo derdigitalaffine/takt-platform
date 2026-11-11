@@ -252,3 +252,12 @@ interne Benutzerzuordnung. Beim Löschen eines Benutzerkontos wird diese
 Zuordnung entfernt. Die fachlichen Entscheidungen enthalten keinen
 Artikeltext. Die bestehende Aufbewahrung von Wissensfassungen und der
 gesonderte Freigabeprozess für verbindliche Regelungen gelten weiterhin.
+
+## Persönliche Hinweise auf fällige Wissensprüfungen
+
+Prüfberechtigte können in der Prüfungsübersicht einen persönlichen
+Portalhinweis einschalten. Er erscheint in **Wissen** und **Meine Aufgaben**,
+wenn mindestens eine für die Person prüfbare Wiedervorlage heute fällig
+oder überfällig ist. Beim Seitenaufruf prüft TAKT die aktuellen Rechte.
+Der Hinweis enthält keine Artikeldaten und legt keine Aufgabe an.
+Die Voreinstellung ist aus. Es werden keine Nachrichten versandt.

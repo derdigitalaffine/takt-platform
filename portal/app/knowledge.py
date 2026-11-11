@@ -254,6 +254,25 @@ def can_confirm_review(db, user, space, item):
             and allowed(db, user, space, "publish", item))
 
 
+def due_reviews(db, user, through):
+    """Yield eligible published reviews in deadline order, including overdue items."""
+    stmt = (select(KnowledgeArticle, KnowledgeSpace).join(KnowledgeSpace)
+            .where(KnowledgeArticle.status == "published",
+                   KnowledgeArticle.review_due_on <= through,
+                   KnowledgeArticle.owner_id.is_distinct_from(user.id))
+            .order_by(KnowledgeArticle.review_due_on, KnowledgeArticle.id))
+    for item, space in db.execute(stmt.execution_options(yield_per=100)):
+        if can_confirm_review(db, user, space, item):
+            yield item, space
+
+
+def has_due_review_reminder(db, user) -> bool:
+    if (not user.knowledge_review_reminders or not user.can("knowledge_read")
+            or not user.can("knowledge_publish") or not active(db)):
+        return False
+    return next(due_reviews(db, user, review_today()), None) is not None
+
+
 def update_article(db, item, version, **fields):
     result = db.execute(update(KnowledgeArticle).where(
         KnowledgeArticle.id == item.id,

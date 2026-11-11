@@ -628,3 +628,36 @@ def test_two_reviewers_publish_amendment_only_after_both_approve(sample):
     assert "Überarbeitete Wissensfassung" not in reviewer.get(article).text
     assert admin.post(proposal + "/status", data={**vote, "csrf": admin_csrf}).status_code == 303
     assert "Überarbeitete Wissensfassung" in reviewer.get(article).text
+
+
+def test_in_app_review_reminders_are_opt_in_and_follow_current_rights(sample):
+    from app.knowledge import review_today
+
+    _, space_id, article_id, _, _, reviewer_id = sample
+    _, reviewer = _publish_sample(sample)
+    settings(module_tasks="1")
+    with SessionLocal() as db:
+        db.get(KnowledgeArticle, article_id).review_due_on = review_today()
+        db.commit()
+
+    notice = "Wissensprüfungen sind fällig."
+    preference = "/wissen/pruefungen/hinweise"
+    assert notice not in reviewer.get("/tasks").text
+    assert reviewer.post(preference, data={"enabled": "true"}).status_code == 400
+    csrf = csrf_of(reviewer.get("/wissen/pruefungen").text)
+    assert reviewer.post(preference, data={"csrf": csrf, "enabled": "true"}).status_code == 303
+    assert notice in reviewer.get("/wissen").text
+    task_view = reviewer.get("/tasks").text
+    assert notice in task_view
+    assert "Beschaffung Dienstmaterial" not in task_view
+
+    with SessionLocal() as db:
+        db.add(KnowledgeGrant(resource_kind="space", resource_id=space_id,
+                              principal_kind="user", principal_id=reviewer_id,
+                              capability="publish", effect="deny"))
+        db.commit()
+    assert notice not in reviewer.get("/tasks").text
+
+    settings(module_knowledge="0")
+    assert reviewer.post(preference, data={"csrf": csrf, "enabled": "false"}).status_code == 404
+    assert notice not in reviewer.get("/tasks").text

@@ -10,6 +10,7 @@
       {% if can_create %}<a class="btn btn-primary" href="#space-new"><i class="fa-solid fa-plus me-2"></i>Wissensraum anlegen</a>{% endif %}
     </div>
   </header>
+  {% include "_knowledge_due_notice.html" %}
   <form role="search" action="/wissen" method="get" class="knowledge-search">
     <label for="wissen-search" class="visually-hidden">Wissensartikel durchsuchen</label>
     <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>

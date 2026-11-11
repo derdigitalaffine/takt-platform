@@ -5,6 +5,14 @@
 <div class="knowledge-ui">
   <nav class="knowledge-breadcrumb" aria-label="Pfad"><a href="/wissen">Wissen</a><i class="fa-solid fa-chevron-right"></i><span>Wissensprüfungen</span></nav>
   <header class="knowledge-head"><div><span class="knowledge-eyebrow">REDAKTION · QUALITÄT</span><h1>Meine Wissensprüfungen</h1><p>Fachliche Freigaben und Wiedervorlagen aus deinen Wissensräumen.</p></div></header>
+  <form action="/wissen/pruefungen/hinweise" method="post" class="mb-4">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="enabled" value="{{ 'false' if user.knowledge_review_reminders else 'true' }}">
+    <button type="submit" class="btn btn-outline-secondary">
+      {{ 'Prüfhinweise ausschalten' if user.knowledge_review_reminders else 'Prüfhinweise einschalten' }}
+    </button>
+    <p class="form-text mb-0">Fällige Wissensprüfungen auf „Wissen“ und „Meine Aufgaben“ anzeigen.</p>
+  </form>
   <div class="knowledge-review-summary">
     <div><span>Fachliche Freigaben</span><strong>{{articles|length}}</strong></div>
     <div><span>Änderungsvorschläge</span><strong>{{amendments|length}}</strong></div>
