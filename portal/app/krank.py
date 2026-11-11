@@ -610,7 +610,8 @@ def create(db, kind: str, form: dict, employer: KrankEmployer | None, upload: tu
     if user is not None:
         values["by_user"] = user.email
     report = KrankReport(ref_no=next_ref(db), kind=kind, status=initial_status(kind, bool(upload)),
-                         employer_id=employer.id, employer_name=employer.name, has_email=bool(values.get("email")),
+                         employer_id=employer.id, employer_name=(employer.org.name if employer.org else employer.name),
+                         has_email=bool(values.get("email")),
                          track_hash=hash_token(token))
     if user is not None and user.krank_history:
         report.user_id = user.id
