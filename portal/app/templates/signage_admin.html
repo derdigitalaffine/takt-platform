@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css">{% endblock %}
+{% block content %}
+<div class="sg-workspace">
+  <div class="sg-page-intro">
+    <div><span class="sg-eyebrow">TAKT · WORKSPACE</span><h1>Digital Signage</h1>
+      <p>Räume, Wegweiser und Besucherinformationen – alles aus einem Gestaltungsstudio.</p></div>
+    <div class="sg-intro-icon" aria-hidden="true"><i class="fa-solid fa-display"></i></div>
+  </div>
+  <div class="sg-metrics" aria-label="Überblick">
+    <div class="sg-metric"><span>Displays</span><strong>{{ screens|length }}</strong></div>
+    <div class="sg-metric"><span>Gebäude</span><strong>{{ buildings|length }}</strong></div>
+    <div class="sg-metric"><span>Räume</span><strong>{{ rooms|length }}</strong></div>
+    <div class="sg-metric"><span>Öffentlich</span><strong>{{ screens|selectattr('visibility','equalto','public')|list|length }}</strong></div>
+  </div>
+  <div class="sg-heading-row"><div><h2>Deine Anzeigen</h2><p>Wähle einen Bildschirm, um sein Design und seine Inhalte zu bearbeiten.</p></div></div>
+  {% if screens %}
+  <div class="sg-screen-grid">
+  {% for screen in screens %}
+    <a class="sg-screen-card" href="/signage/{{ screen.id }}/edit">
+      <div class="sg-screen-preview" style="--sg-bg:{{ (screen.theme_json|default('')) and '#17283d' or '#17283d' }}">
+        <div class="sg-screen-preview-top"><i class="fa-solid {{ {'agenda':'fa-calendar-days','room':'fa-door-open','directory':'fa-address-book','wayfinder':'fa-signs-post','info':'fa-bullhorn'}[screen.kind] }}"></i><span>TAKT Signage</span></div>
+        <strong>{{ screen.name }}</strong><small>{{ kinds[screen.kind] }}</small>
+      </div>
+      <div class="sg-screen-card-foot"><div><strong>{{ screen.name }}</strong><span>{{ kinds[screen.kind] }}</span></div>
+        <span class="sg-pill {{ 'sg-pill-success' if screen.visibility == 'public' else 'sg-pill-neutral' }}">{{ {'private':'Intern','public':'Öffentlich','link':'Sicherer Link'}[screen.visibility] }}</span></div>
+    </a>
+  {% endfor %}
+  </div>
+  {% else %}
+  <div class="sg-empty"><i class="fa-solid fa-display"></i><h3>Noch keine Anzeigen</h3><p>Erstelle die erste Anzeige. Design und Sichtbarkeit kannst du anschließend festlegen.</p></div>
+  {% endif %}
+  <section class="sg-panel" aria-labelledby="sg-new">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">SCHNELLSTART</span><h2 id="sg-new">Neue Anzeige erstellen</h2></div></div>
+    <form class="sg-create-form" action="/signage/new" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Name <input class="form-control" name="name" maxlength="180" required placeholder="z. B. Eingang Rathaus oder Raum 1.14"></label>
+      <label>Vorlage <select class="form-select" name="kind">{% for key,label in kinds.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+      <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus me-1"></i>Anzeige gestalten</button>
+    </form>
+  </section>
+  <section id="buildings" class="sg-panel" aria-labelledby="sg-buildings-title">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">ZENTRALE STAMMDATEN</span><h2 id="sg-buildings-title">Standorte, Gebäude und Räume</h2><p>Nutze bereits vorhandene zentrale Orte, Organisationen und Ressourcen.</p></div></div>
+    <div class="sg-structure-grid">
+      <form action="/signage/structure" method="post" class="sg-mini-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="building">
+        <h3><i class="fa-solid fa-building me-1"></i> Gebäude anlegen</h3>
+        <label>Gebäudename<input class="form-control" name="name" maxlength="180" required placeholder="Hauptgebäude"></label>
+        <label>Standort<select class="form-select" name="location_id"><option value="">Kein Standort gewählt</option>{% for loc in locations %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}</select></label>
+        <label>Organisation<select class="form-select" name="org_id"><option value="">Organisationsübergreifend</option>{% for org in organizations %}<option value="{{ org.id }}">{{ org.name }}</option>{% endfor %}</select></label>
+        <button class="btn btn-outline-primary" type="submit">Gebäude hinzufügen</button>
+      </form>
+      <form action="/signage/structure" method="post" class="sg-mini-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="floor">
+        <h3><i class="fa-solid fa-layer-group me-1"></i> Geschoss anlegen</h3>
+        <label>Gebäude<select class="form-select" name="building_id" required>{% for building in buildings %}<option value="{{ building.id }}">{{ building.name }}</option>{% endfor %}</select></label>
+        <label>Geschossname<input class="form-control" name="name" maxlength="100" required placeholder="1. Obergeschoss"></label>
+        <label>Etagennummer<input class="form-control" name="level" type="number" min="-20" max="200" value="1"></label>
+        <button class="btn btn-outline-primary" type="submit" {% if not buildings %}disabled{% endif %}>Geschoss hinzufügen</button>
+      </form>
+      <form action="/signage/structure" method="post" class="sg-mini-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="room">
+        <h3><i class="fa-solid fa-door-open me-1"></i> Raum anlegen</h3>
+        <label>Geschoss<select class="form-select" name="floor_id" required>{% for floor in floors %}<option value="{{ floor.id }}">{{ floor.name }} · {{ (buildings|selectattr('id','equalto',floor.building_id)|first).name }}</option>{% endfor %}</select></label>
+        <label>Zimmernummer<input class="form-control" name="name" maxlength="40" required placeholder="1.14"></label>
+        <label>Raumbezeichnung<input class="form-control" name="label" maxlength="180" placeholder="Personalbüro"></label>
+        <label>Verknüpfte Ressource<select class="form-select" name="resource_id"><option value="">Keine</option>{% for r in resources %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></label>
+        <label class="sg-check"><input type="checkbox" name="accessible" value="1"> Barrierefrei erreichbar</label>
+        <button class="btn btn-outline-primary" type="submit" {% if not floors %}disabled{% endif %}>Raum hinzufügen</button>
+      </form>
+    </div>
+    {% if rooms %}<div class="sg-table-wrap"><table class="table table-hover align-middle mb-0"><thead><tr><th>Raum</th><th>Bezeichnung</th><th>Geschoss</th><th>Ressource</th></tr></thead><tbody>
+      {% for room in rooms %}<tr><td><strong>{{ room.number }}</strong></td><td>{{ room.name or '—' }}</td><td>{{ (floors|selectattr('id','equalto',room.floor_id)|first).name }}</td><td>{{ (resources|selectattr('id','equalto',room.resource_id)|first).name if room.resource_id else '—' }}</td></tr>{% endfor %}
+    </tbody></table></div>{% endif %}
+  </section>
+  <section id="offices" class="sg-panel" aria-labelledby="sg-office-title">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">PERSONEN & BESUCHER</span><h2 id="sg-office-title">Büros zuordnen</h2><p>Nur ausdrücklich freigegebene Personen erscheinen in öffentlichen Besucheranzeigen. Private Profile bleiben privat.</p></div></div>
+    <form method="post" action="/signage/office" class="sg-create-form"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Person<select class="form-select" name="user_id">{% for member in staff %}<option value="{{ member.id }}">{{ member.name }}</option>{% endfor %}</select></label>
+      <label>Büro<select class="form-select" name="room_id">{% for room in rooms %}<option value="{{ room.id }}">{{ room.number }} · {{ room.name }}</option>{% endfor %}</select></label>
+      <label class="sg-check"><input type="checkbox" name="primary" value="1" checked> Hauptbüro</label>
+      <label class="sg-check"><input type="checkbox" name="public" value="1"> Im öffentlichen Wegweiser anzeigen</label>
+      <button class="btn btn-primary" type="submit" {% if not staff or not rooms %}disabled{% endif %}>Zuordnung speichern</button>
+    </form>
+    {% if offices %}<p class="sg-muted">Bestehende Zuordnungen: {{ offices|length }}. Die öffentliche Sichtbarkeit kann durch erneutes Speichern der Zuordnung geändert werden.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}
