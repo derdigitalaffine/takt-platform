@@ -102,3 +102,14 @@
 .sg-inline-calendar select {max-width:205px;min-width:135px}
 .sg-inline-calendar button {white-space:nowrap}
 @media(max-width:650px) {.sg-inline-calendar{min-width:190px;flex-wrap:wrap}}
+
+/* Central wayfinding topology editor */
+.sg-coordinate-row {display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.sg-coordinate-row label {min-width:0}
+.sg-route-help p {font-size:.82rem;line-height:1.5}
+.sg-route-collection {margin-top:20px}
+.sg-route-collection h3 {margin:0 0 12px}
+.sg-route-chips {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.sg-route-chip {border:1px solid var(--bs-border-color);background:var(--bs-tertiary-bg);border-radius:100px;padding:7px 11px;font-size:.77rem;max-width:100%}
+.sg-route-chip i {margin-right:6px;color:var(--bs-primary)}
+.sg-anchor-form {padding:0}
