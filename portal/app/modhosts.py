@@ -24,6 +24,37 @@ MODULE_PUBLIC = {
     "maps": ("Kartenbrowser", "/karte", ("/karte", "/karte-embed")),
     "krank": ("BlueOtter Krankmelder", "/krank", ("/krank", "/krank-embed")),
 }
+# Explizite Entscheidung für Module ohne eigene öffentliche Domain.
+# Jedes neue Modul MUSS entweder in MODULE_PUBLIC oder hier eingetragen
+# werden. test_domains.py prüft die Abdeckung gegen main.MODULES im CI.
+# Niemals interne Verwaltungsseiten pauschal auf Modul-Domains freigeben.
+PORTAL_ONLY = {
+    "ai": "Agent und Chat benötigen eine Anmeldung.",
+    "knowledge": "Internes Wissensmanagement mit Berechtigungsprüfung.",
+    "anliegen": "Interne Anliegen und ihre Bearbeitung.",
+    "calendars": "Kalender, Urlaub und CalDAV laufen über die Portal-Anmeldung.",
+    "tasks": "Interne Aufgaben und Zusammenarbeit.",
+    "seminars": "Seminar- und Lehrgangsverwaltung.",
+    "shortlinks": "Kurzlinks verwalten ihre eigene Domain separat.",
+    "circulations": "Umläufe und Aushänge werden im Portal verwaltet.",
+    "dms": "Die Ablage enthält geschützte Dokumente.",
+}
+
+
+def assert_module_coverage(modules: dict) -> None:
+    """Fail closed if a module has no explicit domain policy (CI contract)."""
+    public = set(MODULE_PUBLIC)
+    portal_only = set(PORTAL_ONLY)
+    missing = set(modules) - public - portal_only
+    unknown = (public | portal_only) - set(modules)
+    overlap = public & portal_only
+    if missing or unknown or overlap:
+        raise ValueError(
+            f"Modul-Domain-Zuordnung unvollständig: fehlend={sorted(missing)}, "
+            f"unbekannt={sorted(unknown)}, doppelt={sorted(overlap)}"
+        )
+
+
 # Hilfspfade, die öffentliche Seiten aller Module nachladen
 SHARED = ("/static", "/healthz", "/branding", "/org", "/geo", "/map", "/pay", "/paypal/return", "/favicon.ico", "/robots.txt")
 # Pfade, die in fremden Seiten (iframe) erscheinen dürfen – für den Proxy
