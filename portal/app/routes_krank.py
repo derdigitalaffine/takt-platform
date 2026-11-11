@@ -821,16 +821,34 @@ async def krank_employer_new(request: Request, user: User = Depends(current_user
     _manager(user)
     form = await request.form()
     oid = str(form.get("org_id") or "")
-    org = db.get(Organization, int(oid)) if oid.isdigit() else None
-    name = " ".join(str(form.get("name") or "").split())[:200] or (org.name if org else "")
-    if not name:
-        flash(request, "Bitte einen Namen angeben.", "error")
+    parent = db.get(Organization, int(oid)) if oid.isdigit() else None
+    if oid and (parent is None or not parent.active):
+        flash(request, "Die gewählte Organisationseinheit existiert nicht oder ist inaktiv.", "error")
         return redirect("/krankmelder/verwaltung#arbeitgeber")
+    requested_name = " ".join(str(form.get("name") or "").split())[:200]
+    if parent is None and not requested_name:
+        flash(request, "Bitte eine Organisationseinheit auswählen oder einen Arbeitgebernamen eingeben.", "error")
+        return redirect("/krankmelder/verwaltung#arbeitgeber")
+    # Ein vorhandener Knoten kann selbst Arbeitgeber sein; ein neuer Name
+    # unter einem gewählten Knoten legt einen echten Kindknoten an.
+    use_existing = parent is not None and (not requested_name or requested_name == parent.name)
+    name = parent.name if use_existing else requested_name
     if db.scalar(select(KrankEmployer.id).where(KrankEmployer.name == name)) is not None:
         flash(request, f"„{name}“ gibt es schon.", "error")
         return redirect("/krankmelder/verwaltung#arbeitgeber")
+    if use_existing:
+        org = parent
+    else:
+        org = Organization(name=name, kind="arbeitgeber", parent=parent,
+                           color=parent.color if parent and parent.color else "", active=True)
+        db.add(org)
+        db.flush()
+    if db.scalar(select(KrankEmployer.id).where(KrankEmployer.org_id == org.id)) is not None:
+        flash(request, "Diese Organisationseinheit ist bereits als Arbeitgeber hinterlegt.", "error")
+        return redirect("/krankmelder/verwaltung#arbeitgeber")
     pos = (db.scalar(select(func.max(KrankEmployer.position))) or 0) + 1
-    emp = KrankEmployer(name=name, position=pos, org=org, color=(org.color if org and org.color else "#3B82F6"))
+    emp = KrankEmployer(name=org.name, position=pos, org=org,
+                        color=(org.color or "#3B82F6"))
     db.add(emp)
     db.commit()
     flash(request, f"Arbeitgeber „{name}“ angelegt. Bitte Empfänger und Zuständige festlegen.")
@@ -862,12 +880,24 @@ async def krank_employer_save(request: Request, emp_id: int, user: User = Depend
     if emp is None:
         raise HTTPException(404, "Arbeitgeber nicht gefunden.")
     form = await request.form()
-    name = " ".join(str(form.get("name") or "").split())[:200]
-    if name and name != emp.name:
-        if db.scalar(select(KrankEmployer.id).where(KrankEmployer.name == name)) is not None:
-            flash(request, f"„{name}“ gibt es schon.", "error")
-            return redirect(f"/krankmelder/arbeitgeber/{emp.id}")
-        emp.name = name
+    oid = str(form.get("org_id") or "")
+    requested_org = db.get(Organization, int(oid)) if oid.isdigit() else None
+    if not requested_org or not requested_org.active:
+        flash(request, "Bitte eine aktive Organisationseinheit als Arbeitgeber wählen.", "error")
+        return redirect(f"/krankmelder/arbeitgeber/{emp.id}")
+    duplicate = db.scalar(select(KrankEmployer.id).where(
+        KrankEmployer.org_id == requested_org.id, KrankEmployer.id != emp.id))
+    if duplicate:
+        flash(request, "Diese Organisationseinheit ist bereits als Arbeitgeber hinterlegt.", "error")
+        return redirect(f"/krankmelder/arbeitgeber/{emp.id}")
+    emp.org = requested_org
+    name = requested_org.name
+    duplicate_name = db.scalar(select(KrankEmployer.id).where(
+        KrankEmployer.name == name, KrankEmployer.id != emp.id))
+    if duplicate_name:
+        flash(request, "Ein Arbeitgeber mit diesem Namen existiert bereits.", "error")
+        return redirect(f"/krankmelder/arbeitgeber/{emp.id}")
+    emp.name = name
     addrs = [a.strip().lower() for a in str(form.get("emails") or "").replace(",", "\n").replace(";", "\n").split("\n") if a.strip()]
     bad = [a for a in addrs if not krank.EMAIL_RE.match(a)]
     if bad:
@@ -880,9 +910,9 @@ async def krank_employer_save(request: Request, emp_id: int, user: User = Depend
     emp.send_global_copy = form.get("send_global_copy") == "1"
     emp.allow_remarks = form.get("allow_remarks") == "1"
     emp.attach_files = form.get("attach_files") == "1"
+    emp.attach_original_au = emp.attach_files and form.get("attach_original_au") == "1"
+    emp.notify_supervisors = form.get("notify_supervisors") == "1"
     emp.subject_prefix = str(form.get("subject_prefix") or "").strip()[:100]
-    oid = str(form.get("org_id") or "")
-    emp.org_id = int(oid) if oid.isdigit() and db.get(Organization, int(oid)) else None
     emp.dms_enabled = form.get("dms_enabled") == "1"
     area = str(form.get("dms_area_id") or "")
     emp.dms_area_id = int(area) if area.isdigit() and db.get(DmsArea, int(area)) else None
