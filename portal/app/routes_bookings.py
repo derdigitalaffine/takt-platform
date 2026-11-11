@@ -69,6 +69,7 @@ def _apply(page: BookingPage, data) -> None:
             "conflict_sources": [key for key in ("personal", "meetings")
                                  if flag("conflict_" + key)],
             "staff_calendar_attachment": flag("staff_calendar_attachment"),
+            "approval_escalation_hours": _int(data.get("approval_escalation_hours"), 0, 168, 0),
             "mail_digest": flag("mail_digest"),
             "calendar_privacy": data.get("calendar_privacy") if data.get("calendar_privacy")
                                 in ("staff", "assigned", "busy") else "staff",
