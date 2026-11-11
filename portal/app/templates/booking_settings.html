@@ -19,6 +19,7 @@
   <a href="#buchungs-grunddaten"><i class="fa-solid fa-circle-info" aria-hidden="true"></i>Grunddaten</a>
   <a href="#buchungs-zeiten"><i class="fa-regular fa-clock" aria-hidden="true"></i>Zeiten und Regeln</a>
   <a href="#buchungs-terminarten"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Erweiterter Modus</a>
+  <a href="#buchungs-integration"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i>Kalender &amp; E-Mail</a>
 </nav>
 <form method="post" class="row g-4">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -57,6 +58,20 @@
       <select class="form-select" id="n-step" name="step_minutes">{% for st in [5, 10, 15, 20, 30, 60] %}<option value="{{ st }}" {% if (page.step_minutes if page else 15) == st %}selected{% endif %}>alle {{ st }} Minuten</option>{% endfor %}</select></div>
     <div class="col-sm-4 d-flex align-items-end">{{ sw('holidays_closed', 'An Feiertagen keine Termine', page.holidays_closed if page else True) }}</div>
   </div></div></div>
+  <div class="col-12" id="buchungs-integration"><div class="card"><div class="card-header"><i class="fa-solid fa-calendar-check me-2"></i>Kalenderintegration und E-Mail</div>
+    <div class="card-body">
+      <input type="hidden" name="integration_form" value="1">
+      <p class="text-secondary small">Bürgertermine erscheinen bereits als Fachkalender in TAKT. Die Buchungsseite bleibt dabei die führende Datenquelle; andere Kalender werden nicht beschrieben. Externe CalDAV-/ICS-Ansichten zeigen aus Datenschutzgründen nur Belegungen.</p>
+      {{ sw('calendar_conflicts', 'Termine aus persönlichen TAKT-Kalendern bei der Buchbarkeit berücksichtigen', integration.get('calendar_conflicts', False), 'Nur die für die zuständige Person ausgewählten Kalenderquellen zählen als belegte Zeiten. Bestehende Buchungen werden nicht verändert.') }}
+      <div class="ps-3 mb-3">
+        {{ sw('conflict_personal', 'Eigene private Kalendertermine berücksichtigen', 'personal' in integration.get('conflict_sources', ['personal', 'meetings']), 'Freie oder abgesagte Termine blockieren nicht.') }}
+        {{ sw('conflict_meetings', 'Eigene Besprechungen berücksichtigen', 'meetings' in integration.get('conflict_sources', ['personal', 'meetings']), 'Auch Videokonferenzen und Besprechungen aus TAKT werden als Belegtzeiten geprüft.') }}
+      </div>
+      {{ sw('staff_calendar_attachment', 'Kalenderdatei zusätzlich in interne Benachrichtigungen aufnehmen', integration.get('staff_calendar_attachment', False), 'Optional: Mitarbeitende können Termin-ICS-Dateien importieren. Wer den TAKT-Kalender bereits abonniert hat, braucht diese Option nicht.') }}
+      <p class="form-text">Kalenderdateien für Bürger werden weiterhin automatisch mit verbindlichen Bestätigungen, Änderungen und Absagen verschickt. Erinnerungen, Vorlagen und Branding bleiben über die zentrale E-Mail-Konfiguration verwaltbar.</p>
+      <a href="/kalender?ansicht=termine" class="btn btn-sm btn-outline-secondary"><i class="fa-regular fa-calendar me-1"></i>Kalendermodul öffnen</a>
+      <a href="/admin/templates" class="btn btn-sm btn-outline-secondary"><i class="fa-regular fa-envelope me-1"></i>E-Mail-Vorlagen</a>
+    </div></div></div>
   <div class="col-12"><div class="bk-save-row"><div><strong>{{ 'Änderungen übernehmen' if page else 'Buchungsseite einrichten' }}</strong><p class="small text-secondary mb-0">Danach {{ 'werden Verfügbarkeiten automatisch neu berechnet.' if page else 'kannst du die buchbaren Zeitbereiche festlegen.' }}</p></div>
     <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>{{ 'Speichern' if page else 'Anlegen und Zeiten festlegen' }}</button></div></div>
 </form>
