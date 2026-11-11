@@ -141,10 +141,31 @@
       {% for node in route_nodes %}
         <span class="sg-route-chip"><i class="fa-solid {{ {'entrance':'fa-door-open','corridor':'fa-location-dot','elevator':'fa-elevator','stairs':'fa-stairs','room':'fa-location-crosshairs','exit':'fa-person-walking-arrow-right'}[node.kind] }}"></i>
           #{{ node.id }} · {{ node.label }}{% if not node.accessible %} · nicht barrierefrei{% endif %}
+          <form method="post" action="/signage/route/node/{{ node.id }}/delete">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="sg-remove-route" aria-label="Wegepunkt {{ node.label }} entfernen" title="Entfernen">×</button>
+          </form>
         </span>
       {% endfor %}
       </div>
       <p class="sg-muted">{{ route_edges|length }} Verbindungen im Wegenetz</p>
+      {% if route_edges %}
+      <div class="sg-route-links">
+        {% for edge in route_edges %}
+        <div class="sg-link-row">
+          <span><i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
+            {{ (route_nodes|selectattr('id','equalto',edge.from_node_id)|first).label }}
+            {{ '↔' if edge.bidirectional else '→' }}
+            {{ (route_nodes|selectattr('id','equalto',edge.to_node_id)|first).label }}
+            · {{ edge.distance_m }} m {% if edge.accessible %}· barrierefrei{% endif %}
+          </span>
+          <form method="post" action="/signage/route/edge/{{ edge.id }}/delete">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Verbindung {{ edge.id }} entfernen">Entfernen</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>{% endif %}
     </div>
     {% endif %}
   </section>
