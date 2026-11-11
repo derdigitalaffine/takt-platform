@@ -104,7 +104,7 @@ def slots(page: BookingPage, include_past: bool = False, exclude: Booking | None
     return result
 
 
-def bookable(page: BookingPage, keep: Booking | None = None) -> list[dict]:
+def bookable(page: BookingPage, keep: Booking | None = None, *, db=None) -> list[dict]:
     """Jetzt buchbare Slots. Beim Umbuchen blockiert die eigene Buchung den neuen Slot nicht."""
     earliest = utcnow() + timedelta(hours=page.min_notice_hours)
     result = []
@@ -112,6 +112,18 @@ def bookable(page: BookingPage, keep: Booking | None = None) -> list[dict]:
         own = keep is not None and keep.status in ("booked", "requested") and keep.starts_at == s["start"]
         if s["start"] >= earliest and (s["free"] > 0 or own):
             result.append({**s, "own": own})
+    if db is not None and page.owner_id and result:
+        from . import booking_integration as integration
+        if integration.configured(page, "calendar_conflicts"):
+            sources = integration.options(page).get("conflict_sources", ["personal", "meetings"])
+            if not isinstance(sources, list):
+                sources = ["personal", "meetings"]
+            busy = integration.internal_busy(
+                db, page.owner_id, result[0]["start"],
+                result[-1]["end"] + timedelta(days=1), scopes=sources,
+                exclude_meeting_id=keep.meeting_id if keep else None)
+            result = [slot for slot in result if not any(
+                slot["start"] < end and slot["end"] > start for start, end in busy)]
     return result
 
 
@@ -145,7 +157,7 @@ def responsible(b: Booking) -> User | None:
 def free_slots(db, page: BookingPage, keep: Booking | None = None) -> list[dict]:
     """Freie Zeitfenster der Seite – im erweiterten Umfang über alle Terminarten (z. B. für Zähler)."""
     if not page.extended:
-        return bookable(page, keep)
+        return bookable(page, keep, db=db)
     from . import btypes
     merged: dict = {}
     for bt in btypes.active_types(page):
@@ -159,7 +171,7 @@ def slots_for(db, b: Booking) -> list[dict]:
     if b.type is not None:
         from . import btypes
         return [{**s, "own": False} for s in btypes.slots(db, b.page, b.type, keep=b)]
-    return bookable(b.page, keep=b)
+    return bookable(b.page, keep=b, db=db)
 
 
 # --- Links, Kalender, Mails ---------------------------------------------------------------
@@ -242,7 +254,7 @@ def _notify_owner(db, b: Booking, event: str) -> None:
     if not targets:
         return
     cfg = get_settings(db)
-    free = "" if page.extended else str(sum(s["free"] for s in bookable(page)))
+    free = "" if page.extended else str(sum(s["free"] for s in bookable(page, db=db)))
     for who in targets:
         subject, body = mailtpl.render(db, "booking_owner", _values(db, b, {
             "ereignis": event, "name": who.name, "gast": f"{b.name} <{b.email}>" + (f", Tel. {b.phone}" if b.phone else ""),
@@ -274,8 +286,8 @@ def _meeting_for(db, b: Booking) -> None:
     b.meeting_id = meeting.id
 
 
-def check(page: BookingPage, start: datetime, email: str, keep: Booking | None = None) -> tuple[dict | None, str]:
-    slot = next((s for s in bookable(page, keep) if s["start"] == start), None)
+def check(page: BookingPage, start: datetime, email: str, keep: Booking | None = None, *, db=None) -> tuple[dict | None, str]:
+    slot = next((s for s in bookable(page, keep, db=db) if s["start"] == start), None)
     if slot is None:
         return None, "Dieser Termin ist leider nicht mehr frei. Bitte wählen Sie einen anderen."
     if keep is None:
@@ -300,7 +312,7 @@ def book(db, page: BookingPage, start: datetime, name: str, email: str, phone: s
                 error = ("Sie haben bereits einen Termin gebucht. Über den Link in Ihrer Bestätigung können Sie "
                          "ihn verschieben oder absagen.")
     else:
-        slot, error = check(page, start, email)
+        slot, error = check(page, start, email, db=db)
     if error:
         return None, error
     b = Booking(page_id=page.id, starts_at=slot["start"], ends_at=slot["end"], name=name, email=email, phone=phone,
@@ -338,7 +350,7 @@ def move(db, b: Booking, start: datetime) -> str:
         from . import btypes
         slot, error = btypes.check(db, b.page, b.type, start, keep=b)
     else:
-        slot, error = check(b.page, start, b.email, keep=b)
+        slot, error = check(b.page, start, b.email, keep=b, db=db)
     if error:
         return error
     b.starts_at, b.ends_at, b.sequence, b.reminded_at = slot["start"], slot["end"], b.sequence + 1, None
@@ -406,7 +418,7 @@ def invite(db, page: BookingPage, actor: User, user_ids: list[int], group_ids: l
 
 def _send_invite(db, inv: BookingInvite, actor: User, key: str, cfg) -> bool:
     page = inv.page
-    days = group_by_day(bookable(page))
+    days = group_by_day(free_slots(db, page))
     span = f"{days[0]['full']} bis {days[-1]['full']}" if days else ""
     subject, body = mailtpl.render(db, key, {
         "name": inv.name, "titel": page.title, "beschreibung": page.description, "link": invite_link(inv),
