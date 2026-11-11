@@ -40,7 +40,7 @@ from . import csvsafe, links, mailtpl, notify
 from .config import settings
 from .db import (
     DmsArea, DmsRecord, GroupMember, KrankAccess, KrankEmployer, KrankEvent, KrankFeedback, KrankFile, KrankReport,
-    KrankResponsible, SessionLocal, User, get_settings, set_setting, to_local, utcnow,
+    KrankResponsible, Organization, SessionLocal, User, get_settings, set_setting, to_local, utcnow,
 )
 from .security import hash_password, hash_token, verify_password
 
@@ -1199,6 +1199,14 @@ def _import_rows(db, con, zf, uploads, counts, user) -> None:
     tables = _tables(con)
     cfg = get_settings(db)
     by_name = {e.name: e for e in employers(db)}
+
+    def employer_node(name: str, color: str = "", active: bool = True) -> Organization:
+        node = db.scalar(select(Organization).where(Organization.name == name).order_by(Organization.id))
+        if node is None:
+            node = Organization(name=name, kind="arbeitgeber", color=color or "", active=active)
+            db.add(node)
+        return node
+
     if "employers" in tables:
         cols = {r[1] for r in con.execute("PRAGMA table_info('employers')")}
         for row in con.execute("SELECT * FROM employers"):
@@ -1208,6 +1216,7 @@ def _import_rows(db, con, zf, uploads, counts, user) -> None:
             emp = KrankEmployer(name=name, active=bool(row["active"]) if "active" in cols else True,
                                 color=(row["color"] if "color" in cols and re.fullmatch(r"#[0-9A-Fa-f]{6}", str(row["color"] or "")) else "#3B82F6"),
                                 position=int(row["sort_order"] or 0) if "sort_order" in cols else len(by_name))
+            emp.org = employer_node(name, emp.color, emp.active)
             db.add(emp)
             by_name[name] = emp
             counts["employers"] += 1
@@ -1217,6 +1226,7 @@ def _import_rows(db, con, zf, uploads, counts, user) -> None:
             emp = by_name.get(str(row["employer"] or "").strip())
             if emp is None:
                 emp = KrankEmployer(name=str(row["employer"]).strip()[:200], position=len(by_name))
+                emp.org = employer_node(emp.name)
                 db.add(emp)
                 by_name[emp.name] = emp
                 counts["employers"] += 1
