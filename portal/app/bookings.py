@@ -332,6 +332,10 @@ def book(db, page: BookingPage, start: datetime, name: str, email: str, phone: s
          answers: str = "") -> tuple[Booking | None, str]:
     """Termin buchen. Im erweiterten Umfang mit Terminart bt (und optional gewünschter Person); braucht die Art
     eine Bestätigung, ist der Termin zunächst „angefragt“ (Platz bleibt reserviert)."""
+    # Serialize availability checks with calendar and organization mutations.
+    # Without the lock two parallel requests could both reserve the final slot.
+    from .leave import lock
+    lock(db)
     if bt is not None:
         from . import btypes
         slot, error = btypes.check(db, page, bt, start, provider_id)
@@ -374,6 +378,8 @@ def confirm(db, b: Booking) -> None:
 
 def move(db, b: Booking, start: datetime) -> str:
     """Termin verschieben (Gast oder anbietende Person). Gibt eine Fehlermeldung oder ''."""
+    from .leave import lock
+    lock(db)
     if start == b.starts_at:
         return ""
     if b.type is not None:
