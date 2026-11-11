@@ -38,10 +38,15 @@ def calendar_visibility(booking, *, channel="web", can_edit=False, responsible=F
     An event may be visible as occupied without granting booking-record access.
     External feeds are always busy-only, even for the owning employee, by default.
     """
+    opts = options(booking.page)
+    level = booking.type.privacy_mode if booking.type else "inherit"
     if channel in ("ics", "caldav"):
+        return ("type" if opts.get("external_calendar") == "type"
+                and level not in ("busy", "restricted") else "busy")
+    if level == "busy" or opts.get("calendar_privacy") == "busy":
         return "busy"
-    if booking.type and booking.type.privacy_mode in ("restricted", "busy"):
-        return "busy" if booking.type.privacy_mode == "busy" or not responsible else "detail"
+    if level == "restricted" or opts.get("calendar_privacy") == "assigned":
+        return "detail" if responsible else "busy"
     return "detail" if can_edit or responsible else "busy"
 
 
