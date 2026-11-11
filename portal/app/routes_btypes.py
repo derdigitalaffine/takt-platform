@@ -1,14 +1,14 @@
 """Terminbuchung im erweiterten Umfang: Terminarten, zuständige Mitarbeitende, Sprechzeiten und Ausnahmen
 verwalten (Stufe „Bearbeiten“ der Buchungsseite). Logik in btypes.py."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import bookings as bk, btypes, shares as sh
-from .db import BookingClosure, BookingHours, BookingType, Organization, User
+from .db import BookingClosure, BookingHours, BookingType, Organization, User, to_local, utcnow
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
 from .routes_bookings import _bpage, _int
 
@@ -26,11 +26,25 @@ def btypes_page(request: Request, page_id: int, user: User = Depends(current_use
     from . import booking_integration
     oid = booking_integration.creator_org_id(db, page)
     unit = db.get(Organization, oid) if oid else None
+    calendar_module_enabled = booking_integration.calendars_enabled(db)
+    org_closing_entries = []
+    if oid and calendar_module_enabled:
+        from . import organization as org
+        from .leave_extensions import Closure
+        path = org.active_path(db, oid)
+        if path:
+            now = to_local(utcnow()).date()
+            org_closing_entries = list(db.scalars(select(Closure).where(
+                Closure.org_id.in_(path),
+                Closure.starts_on <= (now + timedelta(days=366)).isoformat(),
+                Closure.ends_on >= now.isoformat(),
+            ).order_by(Closure.starts_on).limit(20)))
     return render(request, "booking_types.html", user, page=page, users=_users(db),
                   providers=providers, organizations=organizations, routing=btypes.routing,
                   org_closures=booking_integration.options(page).get("org_closures", True) is not False,
                   creator_org_name=unit.name if unit else "",
-                  calendar_module_enabled=booking_integration.calendars_enabled(db),
+                  calendar_module_enabled=calendar_module_enabled,
+                  org_closing_entries=org_closing_entries,
                   plan=btypes.weekly_plan(page), weekdays=btypes.WEEKDAYS, durations=btypes.DURATIONS,
                   phone_modes=btypes.PHONE_MODES, summary=btypes.summary, field_kinds=btypes.FIELD_KINDS,
                   fields=btypes.fields, max_fields=btypes.MAX_FIELDS, can_video=user.can("video"),
