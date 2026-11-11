@@ -51,13 +51,15 @@
         </section>
         {% elif widget == 'directory' %}
         <section class="sd-tile sd-directory" aria-label="Öffentlich freigegebene Mitarbeiter"><h2><i class="fa-solid fa-users" aria-hidden="true"></i> Personen und Büros</h2>
-          {% if staff %}<div class="sd-directory-grid">{% for person in staff %}<article class="sd-person"><strong>{{ person.name }}</strong><span>{{ person.building }} · {{ person.floor }} · Raum {{ person.room }}</span></article>{% endfor %}</div>
+          <label class="sd-search-label">Person oder Raum suchen<input type="search" class="sd-search" data-sg-search="staff" placeholder="Namen, Gebäude oder Zimmer eingeben" autocomplete="off" aria-label="Person oder Raum suchen"></label>
+          {% if staff %}<div class="sd-directory-grid">{% for person in staff %}<article class="sd-person" data-sg-entry><strong>{{ person.name }}</strong><span>{{ person.building }} · {{ person.floor }} · Raum {{ person.room }}</span></article>{% endfor %}</div>
           {% else %}<div class="sd-empty">Es sind keine Personen für dieses Verzeichnis freigegeben.</div>{% endif %}
         </section>
         {% elif widget == 'wayfinder' %}
         <section class="sd-tile sd-wayfinder" aria-label="Raumwegweiser"><h2><i class="fa-solid fa-signs-post" aria-hidden="true"></i> Wegweiser</h2>
+          <label class="sd-search-label">Raum oder Ziel suchen<input type="search" class="sd-search" data-sg-search="rooms" placeholder="Raum, Gebäude oder Geschoss eingeben" autocomplete="off" aria-label="Raum oder Ziel suchen"></label>
           {% if screen.direction %}<div class="sd-direction"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><strong>{{ screen.direction }}</strong></div>{% endif %}
-          {% if waypoints %}<div class="sd-directory-grid">{% for point in waypoints[:24] %}<article class="sd-person"><strong>{{ point.label }} · {{ point.number }}</strong><span>{{ point.building }} · {{ point.floor }}{% if point.accessible %} · barrierefrei{% endif %}</span></article>{% endfor %}</div>
+          {% if waypoints %}<div class="sd-directory-grid">{% for point in waypoints[:24] %}<article class="sd-person" data-sg-entry><strong>{{ point.label }} · {{ point.number }}</strong><span>{{ point.building }} · {{ point.floor }}{% if point.accessible %} · barrierefrei{% endif %}</span></article>{% endfor %}</div>
           {% else %}<div class="sd-empty">Noch keine Räume hinterlegt.</div>{% endif %}
         </section>
         {% elif widget == 'message' %}
