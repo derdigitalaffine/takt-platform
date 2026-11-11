@@ -64,13 +64,32 @@
         <label>Zimmernummer<input class="form-control" name="name" maxlength="40" required placeholder="1.14"></label>
         <label>Raumbezeichnung<input class="form-control" name="label" maxlength="180" placeholder="Personalbüro"></label>
         <label>Verknüpfte Ressource<select class="form-select" name="resource_id"><option value="">Keine</option>{% for r in resources %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></label>
+        <label>Raumkalender aus TAKT (optional)
+          <select class="form-select" name="calendar_id"><option value="">Nicht verknüpft</option>
+            {% for cal in calendars %}<option value="{{ cal.id }}">{{ cal.title }}</option>{% endfor %}
+          </select>
+        </label>
         <label class="sg-check"><input type="checkbox" name="accessible" value="1"> Barrierefrei erreichbar</label>
         <button class="btn btn-outline-primary" type="submit" {% if not floors %}disabled{% endif %}>Raum hinzufügen</button>
       </form>
     </div>
-    {% if rooms %}<div class="sg-table-wrap"><table class="table table-hover align-middle mb-0"><thead><tr><th>Raum</th><th>Bezeichnung</th><th>Geschoss</th><th>Ressource</th></tr></thead><tbody>
-      {% for room in rooms %}<tr><td><strong>{{ room.number }}</strong></td><td>{{ room.name or '—' }}</td><td>{{ (floors|selectattr('id','equalto',room.floor_id)|first).name }}</td><td>{{ (resources|selectattr('id','equalto',room.resource_id)|first).name if room.resource_id else '—' }}</td></tr>{% endfor %}
-    </tbody></table></div>{% endif %}
+    {% if rooms %}
+    <div class="sg-table-wrap"><table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Raum</th><th>Bezeichnung</th><th>Geschoss</th><th>Ressource</th><th>TAKT-Kalender</th></tr></thead><tbody>
+      {% for room in rooms %}
+      <tr><td><strong>{{ room.number }}</strong></td><td>{{ room.name or '—' }}</td>
+      <td>{{ (floors|selectattr('id','equalto',room.floor_id)|first).name }}</td>
+      <td>{{ (resources|selectattr('id','equalto',room.resource_id)|first).name if room.resource_id else '—' }}</td>
+      <td><form class="sg-inline-calendar" action="/signage/room/{{ room.id }}/calendar" method="post">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <select class="form-select form-select-sm" name="calendar_id" aria-label="TAKT-Kalender für Raum {{ room.number }}">
+          <option value="">Kein Kalender</option>
+          {% for cal in calendars %}<option value="{{ cal.id }}" {% if cal.id == room.calendar_id %}selected{% endif %}>{{ cal.title }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-sm btn-outline-primary" type="submit">Übernehmen</button>
+      </form></td></tr>
+      {% endfor %}</tbody></table></div>
+    {% endif %}
   </section>
   <section id="offices" class="sg-panel" aria-labelledby="sg-office-title">
     <div class="sg-panel-head"><div><span class="sg-eyebrow">PERSONEN & BESUCHER</span><h2 id="sg-office-title">Büros zuordnen</h2><p>Nur ausdrücklich freigegebene Personen erscheinen in öffentlichen Besucheranzeigen. Private Profile bleiben privat.</p></div></div>
