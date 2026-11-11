@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ screen.name }} · Signage Studio{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css">{% endblock %}
+{% block content %}
+<div class="sg-workspace sg-editor">
+  <div class="sg-editor-toolbar">
+    <div><a class="sg-back" href="/signage"><i class="fa-solid fa-arrow-left"></i> Alle Displays</a>
+      <span class="sg-eyebrow d-block mt-2">TAKT SIGNAGE STUDIO</span>
+      <h1>{{ screen.name }}</h1>
+      <p>Bildschirm gestalten, Inhalte verknüpfen und sicher veröffentlichen.</p></div>
+    <div class="sg-toolbar-actions">
+      <a class="btn btn-outline-secondary" href="/signage/{{ screen.id }}/preview" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square me-1"></i>Vollbild-Vorschau</a>
+      <button class="btn btn-primary" type="submit" form="sg-design-form"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
+    </div>
+  </div>
+  <div class="sg-editor-grid">
+    <div class="sg-editor-properties">
+      <form action="/signage/{{ screen.id }}/save" method="post" id="sg-design-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" id="sg-layout-json" name="layout_json" value="{{ selected_widgets|tojson|forceescape }}">
+        <details class="sg-panel" open><summary><i class="fa-solid fa-sliders me-2"></i>Anzeige & Inhalt</summary>
+          <div class="sg-form-stack">
+            <label>Name<input class="form-control" name="name" value="{{ screen.name }}" maxlength="180" required></label>
+            <label>Anzeigetyp<select class="form-select" name="kind">{% for key,label in kinds.items() %}<option value="{{ key }}" {% if screen.kind == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <label>Untertitel oder Hinweismeldung<textarea class="form-control" rows="2" name="subtitle" maxlength="250">{{ screen.subtitle }}</textarea></label>
+            <label>Richtungsinformation (Wegweiser)<input class="form-control" name="direction" value="{{ screen.direction }}" maxlength="100" placeholder="z. B. links zum Bürgerbüro"></label>
+            <label>Verknüpfte Ressource<select class="form-select" name="resource_id"><option value="">Keine Ressource</option>{% for item in resources %}<option value="{{ item.id }}" {% if screen.resource_id == item.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
+            <label>Raum<select class="form-select" name="room_id"><option value="">Kein Raum</option>{% for room in rooms %}<option value="{{ room.id }}" {% if screen.room_id == room.id %}selected{% endif %}>{{ room.number }} · {{ room.name }}</option>{% endfor %}</select></label>
+            <label>Organisation<select class="form-select" name="org_id"><option value="">Globales TAKT-Design</option>{% for org in organizations %}<option value="{{ org.id }}" {% if screen.org_id == org.id %}selected{% endif %}>{{ org.name }}</option>{% endfor %}</select></label>
+          </div>
+        </details>
+        <details class="sg-panel" open><summary><i class="fa-solid fa-palette me-2"></i>Designsystem</summary>
+          <div class="sg-form-stack">
+            <p class="sg-muted">Du kannst ein eigenes Erscheinungsbild wählen. Logo und Wappen werden aus TAKT übernommen.</p>
+            <div class="sg-colors">
+              <label>Hintergrund<input type="color" name="background" value="{{ theme.background }}" aria-label="Hintergrundfarbe"></label>
+              <label>Schrift<input type="color" name="foreground" value="{{ theme.foreground }}" aria-label="Schriftfarbe"></label>
+              <label>Akzent<input type="color" name="accent" value="{{ theme.accent }}" aria-label="Akzentfarbe"></label>
+            </div>
+            <p class="sg-muted" id="sg-contrast-alert" role="status"></p>
+          </div>
+        </details>
+        <details class="sg-panel" open><summary><i class="fa-solid fa-grip me-2"></i>Widgets & Reihenfolge</summary>
+          <div class="sg-form-stack">
+            <p class="sg-muted">Widgets aktivieren und anschließend mit der Maus oder den Pfeiltasten verschieben.</p>
+            <div id="sg-widget-list" class="sg-widget-list">
+            {% for key,label in widgets.items() %}
+              <div class="sg-widget-choice" data-widget="{{ key }}" draggable="true">
+                <span class="sg-drag" aria-hidden="true"><i class="fa-solid fa-grip-vertical"></i></span>
+                <label><input type="checkbox" value="{{ key }}" class="sg-widget-check" {% if key in selected_widgets %}checked{% endif %}> {{ label }}</label>
+                <div class="sg-widget-buttons"><button type="button" class="sg-widget-up" aria-label="{{ label }} nach oben"><i class="fa-solid fa-chevron-up"></i></button><button type="button" class="sg-widget-down" aria-label="{{ label }} nach unten"><i class="fa-solid fa-chevron-down"></i></button></div>
+              </div>
+            {% endfor %}
+            </div>
+          </div>
+        </details>
+        <details class="sg-panel" open><summary><i class="fa-solid fa-shield-halved me-2"></i>Veröffentlichung & Datenschutz</summary>
+          <div class="sg-form-stack">
+            <label>Zugriffsart<select class="form-select" name="visibility">
+                <option value="private" {% if screen.visibility == 'private' %}selected{% endif %}>Nur intern (Verwaltung)</option>
+                <option value="public" {% if screen.visibility == 'public' %}selected{% endif %}>Öffentlich, ohne Anmeldung</option>
+                <option value="link" {% if screen.visibility == 'link' %}selected{% endif %}>Nur mit sicherem Freigabelink</option>
+              </select></label>
+            <label>Termindetails<select class="form-select" name="data_level">
+              <option value="busy" {% if screen.data_level == 'busy' %}selected{% endif %}>Nur Frei / Belegt (empfohlen)</option>
+              <option value="title" {% if screen.data_level == 'title' %}selected{% endif %}>Termintitel bei internem/geschütztem Zugriff</option>
+            </select></label>
+            <div class="sg-info-box"><i class="fa-solid fa-lock"></i> Öffentliche Anzeigen zeigen aus Buchungen grundsätzlich nur die Belegung. Kontaktdaten werden nie ausgespielt.</div>
+            <label class="sg-check"><input type="checkbox" name="enabled" value="1" {% if screen.enabled %}checked{% endif %}> Anzeige eingeschaltet</label>
+          </div>
+        </details>
+      </form>
+    </div>
+    <div class="sg-preview-column">
+      <div class="sg-preview-heading"><div><span class="sg-eyebrow">LIVE-VORSCHAU</span><h2>Dein Bildschirm</h2></div>
+        <div class="sg-preview-size"><button class="sg-size-btn is-active" type="button" data-aspect="landscape" aria-pressed="true"><i class="fa-solid fa-display"></i> 16:9</button><button class="sg-size-btn" type="button" data-aspect="portrait" aria-pressed="false"><i class="fa-solid fa-mobile-screen"></i> 9:16</button></div></div>
+      <div class="sg-preview-shell" id="sg-preview-shell">
+        <iframe title="Vorschau der Anzeige" loading="lazy" src="/signage/{{ screen.id }}/preview" id="sg-live-frame"></iframe>
+      </div>
+      <p class="sg-muted mt-2">Die Anzeige aktualisiert sich selbst. Widgetauswahl und Datenverknüpfungen werden nach dem Speichern übernommen.</p>
+      <div class="sg-panel">
+        <h2>Freigabelinks</h2>
+        {% if screen.visibility == 'public' %}<p>Diese Anzeige ist öffentlich erreichbar.</p><a target="_blank" rel="noopener" href="/signage/view/{{ screen.id }}" class="btn btn-outline-primary">Öffentliche Anzeige öffnen</a>{% elif screen.visibility == 'link' %}
+        <p>Jeder neu erzeugte Link ist zeitlich begrenzt und jederzeit einzeln widerrufbar.</p>
+        <div class="sg-share-actions">
+          <form method="post" action="/signage/{{ screen.id }}/share"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mail" value="1"><input type="hidden" name="days" value="7"><button class="btn btn-primary"><i class="fa-solid fa-envelope me-1"></i>Link an mich mailen</button></form>
+          <form method="post" action="/signage/{{ screen.id }}/share"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="days" value="7"><button class="btn btn-outline-secondary">Neuen Link erzeugen</button></form>
+        </div>
+        {% else %}<p class="sg-muted">Die Anzeige ist aktuell intern. Wähle „Öffentlich“ oder „Sicherer Link“ und speichere, um sie freizugeben.</p>{% endif %}
+        {% if keys %}<div class="sg-links">{% for key in keys %}<div class="sg-link-row"><span>Link #{{ key.id }} · bis {{ key.expires_at.strftime('%d.%m.%Y') }} {% if key.revoked %}<em>(widerrufen)</em>{% endif %}</span>{% if not key.revoked %}<form method="post" action="/signage/{{ screen.id }}/link/{{ key.id }}/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger">Widerrufen</button></form>{% endif %}</div>{% endfor %}</div>{% endif %}
+      </div>
+      <div class="sg-panel">
+        <h2>Geräte & Monitoring</h2>
+        <p class="sg-muted">Player nutzen separate Zugangsdaten und melden ihren Zustand über die Heartbeat-API.</p>
+        <form method="post" action="/signage/{{ screen.id }}/device" class="sg-create-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Gerätename<input class="form-control" name="name" placeholder="z. B. Empfang EG" maxlength="180" required></label><button class="btn btn-outline-primary" type="submit">Geräteschlüssel erstellen</button></form>
+        <div class="sg-links">{% for device in devices %}<div class="sg-link-row"><div><strong>{{ device.name }}</strong><small class="d-block sg-muted">#{{ device.id }} · {% if device.revoked %}gesperrt{% elif device.last_seen_at %}zuletzt {{ device.last_seen_at.strftime('%d.%m.%Y %H:%M') }} UTC{% else %}noch kein Heartbeat{% endif %}</small></div>{% if not device.revoked %}<form method="post" action="/signage/{{ screen.id }}/device/{{ device.id }}/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger">Sperren</button></form>{% endif %}</div>{% endfor %}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/signage-studio.js" defer></script>{% endblock %}
