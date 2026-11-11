@@ -13,7 +13,8 @@ from .db import Organization, PortalLocation, Resource, User, get_settings, utcn
 from .main import app, check_csrf, current_user, enabled_modules, flash, get_db, rate_limit, redirect, render, require, templates
 from .calendar_models import Calendar
 from .signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
-                             SignageOffice, SignageRoom, SignageScreen, SignageRevision)
+                             SignageOffice, SignageRoom, SignageScreen, SignageRevision,
+                             SignageWayNode, SignageWayEdge, SignageDisplayAnchor)
 
 manage_user = require("signage_manage")
 VISIBLE = {"private", "public", "link"}
@@ -60,6 +61,8 @@ def signage_home(request: Request, user: User = Depends(manage_user), db: Sessio
         floors=list(db.scalars(select(SignageFloor).order_by(SignageFloor.level))),
         rooms=list(db.scalars(select(SignageRoom).order_by(SignageRoom.number))),
         offices=list(db.scalars(select(SignageOffice))),
+        route_nodes=list(db.scalars(select(SignageWayNode).order_by(SignageWayNode.id))),
+        route_edges=list(db.scalars(select(SignageWayEdge).order_by(SignageWayEdge.id))),
         staff=list(db.scalars(select(User).where(User.active.is_(True)).order_by(User.name))),
         locations=list(db.scalars(select(PortalLocation).where(PortalLocation.active.is_(True), PortalLocation.owner_id.is_(None)).order_by(PortalLocation.name))),
         organizations=list(db.scalars(select(Organization).order_by(Organization.name))),
@@ -101,6 +104,8 @@ def signage_edit(sid: int, request: Request, user: User = Depends(manage_user), 
         organizations=list(db.scalars(select(Organization).order_by(Organization.name))),
         revisions=list(db.scalars(select(SignageRevision).where(SignageRevision.screen_id == sid)
                                   .order_by(SignageRevision.version.desc()).limit(30))),
+        route_nodes=list(db.scalars(select(SignageWayNode).order_by(SignageWayNode.label))),
+        anchor=db.get(SignageDisplayAnchor, sid),
         devices=devices, keys=keys, now=utcnow())
 
 
@@ -451,6 +456,92 @@ async def signage_update_room_calendar(room_id: int, request: Request,
     db.commit()
     flash(request, "Raumkalender aktualisiert.")
     return redirect("/signage#buildings")
+
+
+NODE_KINDS = {"entrance", "corridor", "stairs", "elevator", "room", "exit"}
+
+
+@app.post("/signage/route/node", dependencies=[Depends(check_csrf)])
+async def signage_route_node(request: Request, user: User = Depends(manage_user),
+                            db: Session = Depends(get_db)):
+    _enabled()
+    form = await request.form()
+    label = str(form.get("label") or "").strip()[:120]
+    floor_id, room_id = _int(form.get("floor_id")), _int(form.get("room_id"))
+    kind = str(form.get("kind") or "corridor")
+    if not label or kind not in NODE_KINDS or not floor_id or not db.get(SignageFloor, floor_id):
+        raise HTTPException(422)
+    room = db.get(SignageRoom, room_id) if room_id else None
+    if room_id and (not room or room.floor_id != floor_id):
+        raise HTTPException(422, "Das Zielzimmer liegt nicht auf diesem Geschoss.")
+    try:
+        x, y = float(form.get("x_pct") or 50), float(form.get("y_pct") or 50)
+    except (TypeError, ValueError):
+        raise HTTPException(422)
+    if not 0 <= x <= 100 or not 0 <= y <= 100:
+        raise HTTPException(422, "Die Plan-Koordinaten müssen zwischen 0 und 100 liegen.")
+    db.add(SignageWayNode(floor_id=floor_id, room_id=room_id, label=label,
+                          kind=kind, x_pct=x, y_pct=y,
+                          accessible=kind != "stairs" and form.get("accessible") == "1"))
+    db.commit()
+    flash(request, "Wegepunkt gespeichert.")
+    return redirect("/signage#routing")
+
+
+@app.post("/signage/route/edge", dependencies=[Depends(check_csrf)])
+async def signage_route_edge(request: Request, user: User = Depends(manage_user),
+                            db: Session = Depends(get_db)):
+    _enabled()
+    form = await request.form()
+    a, b = _int(form.get("from_node_id")), _int(form.get("to_node_id"))
+    if not a or not b or a == b or not db.get(SignageWayNode, a) or not db.get(SignageWayNode, b):
+        raise HTTPException(422, "Bitte zwei verschiedene gültige Wegepunkte auswählen.")
+    try:
+        distance = int(form.get("distance_m") or 5)
+    except (ValueError, TypeError):
+        raise HTTPException(422)
+    if not 1 <= distance <= 5000:
+        raise HTTPException(422, "Entfernung zwischen 1 und 5000 Metern.")
+    existing = db.scalar(select(SignageWayEdge).where(
+        SignageWayEdge.from_node_id == a, SignageWayEdge.to_node_id == b))
+    if existing:
+        existing.distance_m = distance
+        existing.accessible = form.get("accessible") == "1"
+        existing.bidirectional = form.get("bidirectional") == "1"
+    else:
+        db.add(SignageWayEdge(from_node_id=a, to_node_id=b, distance_m=distance,
+                               accessible=form.get("accessible") == "1",
+                               bidirectional=form.get("bidirectional") == "1"))
+    db.commit()
+    flash(request, "Wegeverbindung gespeichert.")
+    return redirect("/signage#routing")
+
+
+@app.post("/signage/{sid:int}/anchor", dependencies=[Depends(check_csrf)])
+async def signage_route_anchor(sid: int, request: Request,
+                               user: User = Depends(manage_user), db: Session = Depends(get_db)):
+    screen = _screen(db, sid)
+    form = await request.form()
+    node_id = _int(form.get("node_id"))
+    node = db.get(SignageWayNode, node_id) if node_id else None
+    if node_id and not node:
+        raise HTTPException(422)
+    if node and screen.org_id:
+        floor = db.get(SignageFloor, node.floor_id)
+        building = db.get(SignageBuilding, floor.building_id) if floor else None
+        if not building or building.org_id != screen.org_id:
+            raise HTTPException(403, "Der Display-Standort gehört nicht zur gewählten Organisation.")
+    anchor = db.get(SignageDisplayAnchor, sid)
+    if node:
+        if not anchor:
+            db.add(SignageDisplayAnchor(screen_id=sid, node_id=node_id))
+        else:
+            anchor.node_id = node_id
+    elif anchor:
+        db.delete(anchor)
+    db.commit()
+    flash(request, "Position des Wegweisers gespeichert.")
+    return redirect(f"/signage/{sid}/edit")
 
 
 @app.post("/signage/office", dependencies=[Depends(check_csrf)])
