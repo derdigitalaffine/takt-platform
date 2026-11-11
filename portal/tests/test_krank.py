@@ -818,3 +818,43 @@ def test_supervisor_au_queue_revalidates_access_at_delivery(monkeypatch, revocat
             assert "AU-Zugriff" in note.error
         assert note.attachments_json is None
         assert "Weitergeben" not in note.body
+
+
+def test_late_au_proof_obeys_supervisor_original_delivery_policy():
+    from app.db import Organization
+    from app.org_models import OrgRoleGrant
+    import base64
+
+    email = "late-proof-supervisor@example.org"
+    _staff_user(email, "krank_admin")
+    with SessionLocal() as db:
+        node = Organization(name="Employer for Late AU Proof", kind="arbeitgeber")
+        db.add(node)
+        db.flush()
+        user = db.scalar(select(User).where(User.email == email))
+        db.add(OrgRoleGrant(org_id=node.id, user_id=user.id,
+                            role="lead", include_children=True))
+        emp = KrankEmployer(name="Late AU Proof", org_id=node.id,
+                            notify_supervisors=True, supervisor_attachment_mode="original")
+        db.add(emp)
+        db.commit()
+        emp_id = emp.id
+
+    c = public_client()
+    result = submit(c, "au", first_name="Später", last_name="Nachweis",
+                    employer=str(emp_id),
+                    **{"from": "2026-10-05", "to": "2026-10-06", "first": "1"})
+    assert result.status_code == 303
+    with SessionLocal() as db:
+        report = db.scalar(select(KrankReport).order_by(KrankReport.id.desc()))
+        assert report.status == "proof_missing"
+        krank.employee_reply(db, report, "", ("später-original.pdf", PDF))
+        db.commit()
+        notices = db.scalars(select(Notification).where(
+            Notification.to_addr == email).order_by(Notification.id)).all()
+        assert len(notices) == 2
+        assert notices[0].attachments_json is None
+        files = json.loads(notices[1].attachments_json)
+        assert len(files) == 1
+        assert files[0]["filename"] == "später-original.pdf"
+        assert base64.b64decode(files[0]["content_b64"]) == PDF
