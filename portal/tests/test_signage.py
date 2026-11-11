@@ -11,7 +11,8 @@ from app import signage
 from app.db import LOCAL_TZ, Resource, ResourceBooking, SessionLocal, User, utcnow
 from app.calendar_models import Calendar, CalendarEvent
 from app.signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
-                                SignageOffice, SignageRoom, SignageScreen, SignageRevision)
+                                SignageOffice, SignageRoom, SignageScreen, SignageRevision,
+                                SignageWayNode, SignageWayEdge, SignageDisplayAnchor)
 
 
 ADMIN = ("admin@example.org", "admin-passwort-123")
@@ -275,3 +276,99 @@ def test_live_preview_changes_are_not_persisted():
         assert row.name == "Original Preview" and row.kind == "agenda"
         assert row.visibility == "private"
         assert row.version == 1
+
+def test_indoor_shortest_path_can_detour_around_stairs_and_obey_one_way_edges():
+    from types import SimpleNamespace as Row
+    nodes = [Row(id=1, kind="entrance", accessible=True),
+             Row(id=2, kind="stairs", accessible=False),
+             Row(id=3, kind="elevator", accessible=True),
+             Row(id=4, kind="room", accessible=True)]
+    edges = [Row(from_node_id=1, to_node_id=2, distance_m=2, accessible=False, bidirectional=True),
+             Row(from_node_id=2, to_node_id=4, distance_m=3, accessible=False, bidirectional=True),
+             Row(from_node_id=1, to_node_id=3, distance_m=6, accessible=True, bidirectional=True),
+             Row(from_node_id=3, to_node_id=4, distance_m=5, accessible=True, bidirectional=False)]
+    shortest = signage.shortest_paths(nodes, edges, 1)
+    assert shortest[4]["distance_m"] == 5
+    assert shortest[4]["nodes"] == [1, 2, 4]
+    accessible = signage.shortest_paths(nodes, edges, 1, barrier_free=True)
+    assert accessible[4]["distance_m"] == 11
+    assert accessible[4]["nodes"] == [1, 3, 4]
+    reverse = signage.shortest_paths(nodes, edges, 4, barrier_free=True)
+    assert 1 not in reverse  # One-way elevator corridor cannot be traversed backward.
+
+
+def test_kiosk_wayfinder_shows_real_route_and_accessible_alternative():
+    c = _admin()
+    with SessionLocal() as db:
+        building = SignageBuilding(name="Rathaus Navigation")
+        db.add(building); db.flush()
+        floor = SignageFloor(building_id=building.id, name="Erdgeschoss", level=0)
+        db.add(floor); db.flush()
+        room = SignageRoom(floor_id=floor.id, name="Bürgerbüro", number="0.19", accessible=True)
+        db.add(room); db.flush()
+        start = SignageWayNode(floor_id=floor.id, label="Haupteingang", kind="entrance", accessible=True)
+        stairs = SignageWayNode(floor_id=floor.id, label="Treppe", kind="stairs", accessible=False)
+        lift = SignageWayNode(floor_id=floor.id, label="Aufzug", kind="elevator", accessible=True)
+        target = SignageWayNode(floor_id=floor.id, room_id=room.id,
+                                label="Zimmer 0.19", kind="room", accessible=True)
+        db.add_all([start, stairs, lift, target]); db.flush()
+        db.add_all([
+            SignageWayEdge(from_node_id=start.id, to_node_id=stairs.id,
+                           distance_m=2, accessible=False),
+            SignageWayEdge(from_node_id=stairs.id, to_node_id=target.id,
+                           distance_m=3, accessible=False),
+            SignageWayEdge(from_node_id=start.id, to_node_id=lift.id,
+                           distance_m=6, accessible=True),
+            SignageWayEdge(from_node_id=lift.id, to_node_id=target.id,
+                           distance_m=5, accessible=True),
+        ])
+        db.commit()
+        start_id = start.id
+    sid = _screen(c, name="Wegweiser Rathaus", kind="wayfinder", visibility="public")
+    csrf = csrf_of(c.get(f"/signage/{sid}/edit").text)
+    assert c.post(f"/signage/{sid}/save", data={
+        "csrf": csrf, "kind": "wayfinder", "name": "Wegweiser Rathaus",
+        "visibility": "public", "enabled": "1",
+        "background": "#111e30", "foreground": "#f8fafc", "accent": "#42d4ad",
+        "layout_json": '["clock","wayfinder"]'
+    }).status_code == 303
+    assert c.post(f"/signage/{sid}/anchor", data={
+        "csrf": csrf, "node_id": str(start_id)
+    }).status_code == 303
+    display = client().get(f"/signage/view/{sid}")
+    assert display.status_code == 200
+    assert "Bürgerbüro" in display.text
+    assert "Weg anzeigen" in display.text
+    assert "Barrierefreier Weg" in display.text
+    assert "Aufzug" in display.text
+
+
+def test_navigation_graph_respects_organizational_boundaries():
+    from app.db import Organization
+    with SessionLocal() as db:
+        org_a = Organization(name="Signage Organisation A")
+        org_b = Organization(name="Signage Organisation B")
+        db.add_all([org_a, org_b]); db.flush()
+        building_a = SignageBuilding(name="Gebäude A", org_id=org_a.id)
+        building_b = SignageBuilding(name="Gebäude B – NICHT ÖFFENTLICH", org_id=org_b.id)
+        db.add_all([building_a, building_b]); db.flush()
+        floor_a = SignageFloor(building_id=building_a.id, name="EG", level=0)
+        floor_b = SignageFloor(building_id=building_b.id, name="EG", level=0)
+        db.add_all([floor_a, floor_b]); db.flush()
+        room_a = SignageRoom(floor_id=floor_a.id, name="A Raum", number="A1")
+        room_b = SignageRoom(floor_id=floor_b.id, name="B Raum", number="B1")
+        db.add_all([room_a, room_b]); db.flush()
+        node_a = SignageWayNode(floor_id=floor_a.id, room_id=room_a.id,
+                                label="A Start", kind="room", accessible=True)
+        node_b = SignageWayNode(floor_id=floor_b.id, room_id=room_b.id,
+                                label="VERTRAULICH B", kind="room", accessible=True)
+        db.add_all([node_a, node_b]); db.flush()
+        db.add(SignageWayEdge(from_node_id=node_a.id, to_node_id=node_b.id,
+                              distance_m=2, accessible=True))
+        screen = SignageScreen(name="Nur A", kind="wayfinder", org_id=org_a.id)
+        db.add(screen); db.flush()
+        db.add(SignageDisplayAnchor(screen_id=screen.id, node_id=node_a.id))
+        db.commit()
+        points = signage.waypoints(db, screen)
+        assert [point["number"] for point in points] == ["A1"]
+        assert "VERTRAULICH B" not in str(points)
