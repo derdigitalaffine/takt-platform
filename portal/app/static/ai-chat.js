@@ -292,7 +292,7 @@
       // A suggested destination is informational only. Navigating the
       // application requires the user's explicit click, never a model output.
       if (typeof data.open_url === 'string' &&
-          /^\/(?:aufgaben|anliegen|forms|dms|kalender|processes|urlaub|krank|krankmelder)(?:[/?#]|$)/.test(data.open_url) &&
+          /^\/(?:aufgaben|anliegen|forms|dms|kalender|processes|urlaub|krank|krankmelder|polls|votes|umfragen)(?:[/?#]|$)/.test(data.open_url) &&
           !data.open_url.startsWith('//') && !data.open_url.includes('\\')) {
         var actionBox = document.createElement('div');
         actionBox.className = 'ai-agent-destination';

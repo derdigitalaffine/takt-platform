@@ -15,12 +15,15 @@ function App(){
   const [api,setApi]=useState(window.MapWorkspace),[state,setState]=useState(null);
   const [view,setView]=useState(JSON.parse(document.getElementById('map-bundle').textContent).plan?'plan':'layers'),[scheme,setScheme]=useState(document.documentElement.dataset.bsTheme||'light');
   const [snap,setSnap]=useState(false),[scale,setScale]=useState('auto'),[radius,setRadius]=useState(100),[error,setError]=useState('');
+  const [confirmClear,setConfirmClear]=useState(false);
   useEffect(()=>{
     const update=()=>{if(window.MapWorkspace){setApi(window.MapWorkspace);setState(window.MapWorkspace.snapshot());}};
+    const showDrawing = () => setView('tools');
+    window.addEventListener('map-workbench-selection', showDrawing);
     update();window.addEventListener('map-workbench-ready',update);window.addEventListener('map-workbench-change',update);
     const observer=new MutationObserver(()=>setScheme(document.documentElement.dataset.bsTheme||'light'));
     observer.observe(document.documentElement,{attributes:true,attributeFilter:['data-bs-theme']});
-    return()=>{observer.disconnect();window.removeEventListener('map-workbench-ready',update);window.removeEventListener('map-workbench-change',update);};
+    return()=>{observer.disconnect();window.removeEventListener('map-workbench-selection', showDrawing);window.removeEventListener('map-workbench-ready',update);window.removeEventListener('map-workbench-change',update);};
   },[]);
   useEffect(()=>{
     document.getElementById('map-shell').classList.toggle('plan-open',view==='plan');
@@ -29,6 +32,7 @@ function App(){
     api?.map.resize();
     const detail=document.querySelector('#parcel-browser .parcel-search');if(detail)detail.open=view==='parcels';
     if(view!=='tools'&&api?.draw.mode())api.draw.cancel();
+    setConfirmClear(false);
   },[view,api]);
   const act=fn=>{setError('');try{Promise.resolve(fn()).catch(e=>setError(e.message));setState(api.snapshot());}catch(e){setError(e.message||'Die Aktion ist gerade nicht möglich.');}};
   if(!state)return <p className="small text-secondary" role="status">Kartenwerkzeuge werden geladen …</p>;
@@ -44,11 +48,18 @@ function App(){
       {plan&&view!=='plan'&&<Paper withBorder p="xs"><Text size="xs" c="dimmed">Planbezug</Text><Button variant="subtle" className="map-plan-shortcut" onClick={()=>setView('plan')}>{plan.title}</Button></Paper>}
       {view==='tools'&&<>
         <Text size="sm" c="dimmed">Werkzeug wählen und Punkte in der Karte setzen. Die Messwerte erscheinen direkt beim Zeichnen.</Text>
-        <SimpleGrid cols={2} spacing="xs">{tools.map(([key,label,i])=><Button key={key} variant={state.sketch?.mode===key?'filled':'light'} leftSection={icon(i)} disabled={state.features.length>=500} onClick={()=>act(()=>api.start(key))}>{label}</Button>)}</SimpleGrid>
+        <SimpleGrid cols={2} spacing="xs">{tools.map(([key,label,i])=><Button key={key} variant={state.sketch?.mode===key?'filled':'light'} leftSection={icon(i)} disabled={state.features.length>=500} aria-pressed={state.sketch?.mode===key} onClick={()=>act(()=>state.sketch?.mode===key?api.draw.cancel():api.start(key))}>{label}</Button>)}</SimpleGrid>
         {state.sketch&&<Paper withBorder p="sm"><Text size="sm" role="status">{state.sketch.text||'Punkt in der Karte setzen'}</Text><Group gap="xs" mt="xs"><Button disabled={state.sketch.count<state.sketch.min} onClick={()=>act(()=>api.draw.finish())}>Fertig</Button><Button variant="subtle" onClick={()=>act(()=>api.draw.cancel())}>Abbrechen</Button></Group></Paper>}
         <Switch label="An Punkten und Grenzen einrasten" description="Zeichnungen, gesammelte Flurstücke und Geltungsbereich" checked={snap} onChange={e=>{setSnap(e.currentTarget.checked);api.draw.setSnapping(e.currentTarget.checked);}}/>
         <Group gap="xs"><Button variant="default" leftSection={icon('rotate-left')} disabled={!state.canUndo} onClick={()=>act(()=>api.draw.undo())}>Rückgängig</Button><Button variant="default" disabled={!state.canRedo} onClick={()=>act(()=>api.draw.redo())}>Wiederholen</Button></Group>
         <Divider label={`${state.features.length} Zeichnungen`}/>
+        {state.features.length>0&&<Group justify="flex-end">
+          <Button color="red" variant="subtle" size="xs" aria-expanded={confirmClear} onClick={()=>setConfirmClear(!confirmClear)}>Alle Zeichnungen entfernen</Button>
+        </Group>}
+        {confirmClear&&<Alert color="red" title="Alle Zeichnungen entfernen?">
+          <Text size="sm">Sie können den Schritt rückgängig machen.</Text>
+          <Group gap="xs" mt="xs"><Button color="red" onClick={()=>act(()=>{api.draw.cancel();api.draw.clear();setConfirmClear(false);})}>Alle entfernen</Button><Button variant="default" onClick={()=>setConfirmClear(false)}>Abbrechen</Button></Group>
+        </Alert>}
         {state.features.length===0&&<Text size="sm" c="dimmed">Noch keine Zeichnungen. Ein Klick auf eine fertige Zeichnung wählt sie aus. Bei Flächen und Linien können Sie anschließend die Stützpunkte verschieben.</Text>}
         <div className="map-object-list">{state.features.map((f,index)=><Paper key={f.id} withBorder p="sm" className={selected?.id===f.id?'map-object-selected':''}>
           <Group justify="space-between" wrap="nowrap"><Button variant="subtle" className="map-object-name" onClick={()=>act(()=>{api.draw.select(f.id);api.draw.zoomTo(f.id);})}>{f.properties.name||`${tools.find(t=>t[0]===(f.properties.shape||f.properties.kind))?.[1]||'Zeichnung'} ${index+1}`}</Button><ActionIcon variant="subtle" aria-label={`Zeichnung ${index+1} löschen`} color="red" onClick={()=>act(()=>api.draw.remove(f.id))}>{icon('trash-can')}</ActionIcon></Group>
@@ -71,10 +82,11 @@ function App(){
     </Stack>
     {createPortal(<Stack gap="xs" className="map-workspace map-output-actions">
       <Divider/>
-      <Group grow>{state.canSave&&<Button leftSection={icon('floppy-disk')} onClick={()=>api.click('open-save-map')}>Karte speichern</Button>}<Button variant="default" onClick={()=>api.click('btn-link')}>Ausschnitt teilen</Button></Group>
-      {state.canSave&&<Button component="a" href="/maps" variant="subtle" size="xs">Meine Karten</Button>}
+      <Text fw={700} size="sm">Kartenblatt und Bild</Text>
+
       <NativeSelect label="Druckmaßstab" value={scale} onChange={e=>setScale(e.currentTarget.value)} data={[{value:'auto',label:'Aktueller Ausschnitt'},...['500','1000','2500','5000','10000','25000'].map(v=>({value:v,label:`1 : ${Number(v).toLocaleString('de-DE')}`}))]}/>
       <Group grow><Button variant="light" leftSection={icon('print')} onClick={()=>act(()=>window.MapPrint.open(api,scale))}>Drucken / PDF</Button><Button variant="subtle" onClick={()=>api.click('btn-export')}>PNG</Button></Group>
+      {state.canSave&&<Button component="a" href="/maps" variant="subtle" size="xs">Meine Karten</Button>}
     </Stack>,actions)}
   </MantineProvider>;
 }

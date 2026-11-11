@@ -15,6 +15,11 @@ from .db import DmsArea, LOCAL_TZ
 
 def destination(action):
     tool = action["tool"]
+    if tool=="create_survey":
+        return {"poll":"/polls/new","vote":"/votes/new","live_poll":"/umfragen/neu"}[action["record_kind"]]
+    if tool in ("survey_state","finalize_poll"):
+        base={"poll":"/polls/","vote":"/votes/","live_poll":"/votes/live/"}[action["record_kind"]]+str(action["id"])
+        return base+"?tab="+("results" if tool=="finalize_poll" else "moderate" if action["record_kind"]=="live_poll" else "conduct")
     if tool in ("set_krank_status", "add_krank_note", "send_krank_message"):
         return f"/krankmelder/{action['id']}"
     if tool in ("create_leave", "edit_leave", "leave_command"):
@@ -58,6 +63,11 @@ def load(request, user, nonce, step):
 
 
 def validate(db, user, action):
+    from . import agent_surveys
+    if action["tool"] in agent_surveys.TOOLS:
+        if action["tool"]=="create_survey":agent_surveys.draft(user,action)
+        else:agent_surveys.target(db,user,action)
+        return
     from . import agent_events
     if action["tool"] in agent_events.TOOLS:
         agent_events.target(db, user, action)
@@ -139,6 +149,7 @@ def edited(db, user, original, data):
     tool = raw["tool"]
     allowed = {
         "create_form": ("title",),
+        "create_survey": ("title","description","location","duration","secrecy","results","pacing"), "survey_state": (), "finalize_poll": (),
         "set_krank_status": ("note",), "add_krank_note": ("text",), "send_krank_message": ("text",),
         "create_leave": ("starts_on", "ends_on", "start_half", "end_half"),
         "edit_leave": ("starts_on", "ends_on", "start_half", "end_half"),
@@ -162,6 +173,19 @@ def edited(db, user, original, data):
                 except ValueError:
                     raise HTTPException(422, "Bitte ein gültiges Ziel auswählen.")
             raw[key] = value
+    if tool=="create_survey":
+        import json
+        for key in ("options","questions"):
+            field=key+"_json"
+            if field in data:
+                try:raw[key]=json.loads(str(data[field]))
+                except (ValueError,TypeError):raise HTTPException(422,"Bitte die Fragen bzw. Terminvorschläge prüfen.")
+        if raw["record_kind"]=="vote":
+            raw["access"]=list(data.getlist("access")) if hasattr(data,"getlist") else data.get("access",raw.get("access",["invite"]))
+            raw["allow_change"]=str(data.get("allow_change") or "") in ("1","on","true")
+        if "duration" in data:
+            try:raw["duration"]=int(str(data["duration"]))
+            except ValueError:raise HTTPException(422,"Gültige Dauer wählen.")
     if tool == "configure_anliegen_category":
         raw["enabled"] = data.get("enabled") == "1"
         raw["apply_open"] = data.get("apply_open") == "1"
@@ -185,8 +209,10 @@ def edited(db, user, original, data):
     # module ACL is still checked by normalize/validate, including the new target.
     findings = []
     if "id" in raw:
-        kind = "krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else "event" if tool in ("update_event", "delete_event") else agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
+        kind = raw["record_kind"] if tool in ("survey_state","finalize_poll") else "krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else "event" if tool in ("update_event", "delete_event") else agent.modules.KINDS.get(tool, "anliegen" if "anliegen" in tool else "task")
         findings.append(dict(type=kind, id=raw["id"]))
+    if tool=="finalize_poll":
+        findings.append(dict(type="poll_option",id=raw["option_id"],poll_id=raw["id"]))
     if "assignee_id" in raw:
         findings.append(dict(type="person", id=raw["assignee_id"]))
     if "area_id" in raw:

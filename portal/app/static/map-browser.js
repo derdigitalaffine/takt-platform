@@ -11,8 +11,11 @@
   var params = new URLSearchParams(location.search);
 
   // Ebenen und Grundkarte aus dem Link (?base=s1&layers=s3,s4)
-  if (params.get('base')) { bundle.state.base = params.get('base'); }
-  if (params.get('layers')) {
+  if (params.has('base')) {
+    bundle.state.base = params.get('base');
+    bundle.state.noBase = bundle.state.base === '';
+  }
+  if (params.has('layers')) {
     var wanted = params.get('layers').split(',');
     bundle.state.layers = bundle.layers.filter(function (l) { return l.role !== 'base'; }).map(function (l) {
       return { id: l.id, visible: wanted.indexOf(l.id) >= 0, opacity: l.opacity };
@@ -54,7 +57,9 @@
       if (!byCat[c]) { byCat[c] = []; cats.push(c); }
       byCat[c].push(l);
     });
-    document.getElementById('overlay-empty').hidden = kit.overlays.length > 0;
+    var empty = document.getElementById('overlay-empty');
+    empty.hidden = cats.length > 0;
+    empty.textContent = filterText ? 'Keine passenden Ebenen. Ändern Sie den Suchbegriff.' : 'Keine Ebenen verfügbar.';
     box.innerHTML = cats.map(function (c) {
       return '<div class="layer-cat">' + esc(c) + '</div><div class="layer-group" data-cat="' + esc(c) + '">' + byCat[c].map(rowHtml).join('') + '</div>';
     }).join('');
@@ -179,6 +184,14 @@
     if(!meta.canEdit){toast('Eigene Ebenen können angemeldete Portalnutzer ergänzen.',true);return;}
     document.getElementById('map-catalog').value='parcels';bootstrap.Modal.getOrCreateInstance(document.getElementById('add-layer')).show();document.getElementById('map-catalog-load').click();
   }});
+  var advanced = document.getElementById('map-advanced');
+  try { advanced.checked = localStorage.getItem('map-advanced') === '1'; } catch (_) {}
+  function updateLayerOptions() {
+    shell.classList.toggle('is-advanced', advanced.checked);
+    try { localStorage.setItem('map-advanced', advanced.checked ? '1' : '0'); } catch (_) {}
+  }
+  advanced.addEventListener('change', updateLayerOptions);
+  updateLayerOptions();
   map.on('map-service-error',function(e){document.getElementById('map-service-status').textContent=e.message;});
   map.on('error',function(e){if(e.sourceId)document.getElementById('map-service-status').textContent='Ein Kartendienst konnte nicht geladen werden. Quelle und Layerauswahl prüfen.';});
   /* --- Klick: Sachinformation (WMS) und Objekte (WFS/GeoJSON) ----------------------- */
@@ -211,7 +224,13 @@
     labels:true,
     snapFeatures:function(){return parcelKit.features().concat(bundle.plan?.geometry?[{geometry:bundle.plan.geometry}]:[]);},
     onChange: publishWorkspace,
-    onSelect: publishWorkspace,
+    onSelect: function (id) {
+      publishWorkspace();
+      if (!id) return;
+      shell.classList.remove('panel-hidden');
+      map.resize();
+      window.dispatchEvent(new CustomEvent('map-workbench-selection'));
+    },
     onSketch: function (info) {
       sketchInfo=info;publishWorkspace();
       if (!info) { measureBox.hidden = true; return; }
@@ -278,7 +297,10 @@
   });
   document.getElementById('btn-link').addEventListener('click', function () {
     var on = kit.overlays.filter(function (l) { return l.visible && !l.custom; }).map(function (l) { return l.id; });
-    var url = location.origin + location.pathname + '?base=' + encodeURIComponent(kit.baseId || '') + '&layers=' + on.join(',') + location.hash;
+    var link = new URL(location.href);
+    link.searchParams.set('base', kit.baseId || '');
+    link.searchParams.set('layers', on.join(','));
+    var url = link.href;
     (navigator.clipboard && window.isSecureContext ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link kopiert'); })
       .catch(function () { window.prompt('Link zu diesem Ausschnitt:', url); });
   });
@@ -300,7 +322,7 @@
       if(!plan.geometry)return;
       if(!map.getSource('law-boundary')){map.addSource('law-boundary',{type:'geojson',data:{type:'Feature',geometry:plan.geometry,properties:{}}});map.addLayer({id:'law-boundary-fill',type:'fill',source:'law-boundary',paint:{'fill-color':'#7950f2','fill-opacity':0.13}});map.addLayer({id:'law-boundary-line',type:'line',source:'law-boundary',paint:{'line-color':'#7950f2','line-width':3,'line-dasharray':[3,2]}});}
     }
-    map.on('load',function(){showPlan();if(plan.geometry){var bounds=new maplibregl.LngLatBounds();plan.geometry.coordinates[0].forEach(function(p){bounds.extend(p);});map.fitBounds(bounds,{padding:50,maxZoom:17});}});
+    map.on('load',function(){showPlan();if(plan.geometry&&!/^#\d+(?:\.\d+)?\/-?\d+(?:\.\d+)?\/-?\d/.test(location.hash)){var bounds=new maplibregl.LngLatBounds();plan.geometry.coordinates[0].forEach(function(p){bounds.extend(p);});map.fitBounds(bounds,{padding:50,maxZoom:17});}});
     map.on('style.load',showPlan);
   }
   if (!meta.canEdit) { return; }

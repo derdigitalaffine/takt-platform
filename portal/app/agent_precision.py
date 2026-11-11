@@ -29,6 +29,10 @@ def context(prompt, categories):
     if cat:
         text += ('Für die eindeutige Anliegenart passt die tatsächlich freigegebene Kategorie '
                  + str(cat['id']) + ' (' + cat['key'] + '). Eine Beschaffungsanfrage ist keine bereits ausgelöste Lieferantenbestellung. ')
+    if re.search(r'terminumfrage',prompt,re.I):
+        text += 'Terminumfragen sind create_survey mit record_kind=poll und konkreten Alternativterminen, keine freien Kalendertermine. '
+    if re.search(r'wortwolke|quiz|live.umfrage',prompt,re.I):
+        text += 'Wortwolke und Quiz gehören zu create_survey mit record_kind=live_poll. Quizlösungen müssen ausdrücklich mit Antwortnummern ab 1 angegeben werden. '
     return text
 
 
@@ -37,11 +41,15 @@ def focus_modules(prompt):
     patterns = {
         'tasks': r'aufgabe|checkliste|fällig|priorit',
         'anliegen': r'anliegen|mangel|mängel|büromaterial|büromöbel|bürost[üu]hl|druckerpapier|kopierpapier|toner|störung|defekt',
+        'surveys': r'umfrage|abstimmung|wortwolke|doodle|quiz',
         'forms': r'formular', 'calendars': r'kalender|termin|besprechung',
         'dms': r'\bdms\b|wissensakte', 'processes': r'prozess',
         'leave': r'urlaub|urlaubsantrag|urlaubsplanung',
     }
-    return {key for key, pattern in patterns.items() if re.search(pattern, prompt, re.I)} or None
+    selected = {key for key, pattern in patterns.items() if re.search(pattern, prompt, re.I)}
+    if re.search(r'terminumfrage',prompt,re.I) and not re.search(r'kalender|einzeltermin',prompt,re.I):
+        selected.discard('calendars')
+    return selected or None
 
 
 def tool_module(tool):

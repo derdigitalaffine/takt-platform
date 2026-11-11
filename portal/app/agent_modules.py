@@ -15,6 +15,7 @@ from .anliegen_models import AnliegenCategory
 from .db import DmsArea, DmsRecord, Form, Process, get_settings
 
 READ = {
+    "search_surveys": "surveys",
     "search_anliegen_categories": "anliegen",
     "search_calendars": "calendars", "search_events": "calendars",
     "search_forms": "forms", "search_processes": "processes",
@@ -22,6 +23,7 @@ READ = {
     "search_my_leave": "leave", "search_leave_requests": "leave",
 }
 WRITE = {
+    "create_survey": "surveys", "survey_state": "surveys", "finalize_poll": "surveys",
     "set_krank_status": "krank", "add_krank_note": "krank", "send_krank_message": "krank",
     "create_leave": "leave", "edit_leave": "leave", "leave_command": "leave",
     "create_form": "forms",
@@ -29,6 +31,7 @@ WRITE = {
     "update_event": "calendars", "delete_event": "calendars", "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
 }
 LABELS = {
+    "search_surveys": "Umfragen und Abstimmungen",
     "search_anliegen_categories": "Anliegen-Kategorien",
     "search_calendars": "Kalendern", "search_events": "Terminen",
     "search_forms": "Formularen", "search_processes": "Prozessen",
@@ -48,6 +51,8 @@ def enabled(user, module):
         return "forms" in mods and user.can("forms")
     if module == "calendars":
         return "calendars" in mods
+    if module == "surveys":
+        return "polls" in mods and user.active
     if module == "krank":
         return "krank" in mods and user.active
     if module == "leave":
@@ -64,6 +69,9 @@ def search(db, user, spec):
     require(user, READ[tool])
     phrase = _term(spec.get("query"))
     pattern = _like(phrase)
+    if tool == "search_surveys":
+        from .agent_surveys import search as search_surveys
+        return search_surveys(db,user,spec)
     if tool == "search_anliegen_categories":
         query = select(AnliegenCategory).where(AnliegenCategory.confidential.is_(False), or_(AnliegenCategory.title.ilike(pattern, escape="\\"), AnliegenCategory.key.ilike(pattern, escape="\\"),
                          AnliegenCategory.description.ilike(pattern, escape="\\"),
@@ -138,6 +146,9 @@ def target(db, user, action):
 
 
 def normalize(db, user, raw, findings):
+    from . import agent_surveys
+    if raw["tool"] in agent_surveys.TOOLS:
+        return agent_surveys.normalize(db, user, raw, findings)
     from . import agent_events
     if raw["tool"] in agent_events.TOOLS:
         return agent_events.normalize(db, user, raw, findings)
@@ -173,6 +184,9 @@ def normalize(db, user, raw, findings):
 
 
 def preview(db, action):
+    from . import agent_surveys
+    if action["tool"] in agent_surveys.TOOLS:
+        return agent_surveys.preview(db, action)
     from . import agent_events
     if action["tool"] in agent_events.TOOLS:
         return agent_events.preview(db, action)
@@ -195,6 +209,9 @@ def preview(db, action):
 
 
 def execute(db, user, action):
+    from . import agent_surveys
+    if action["tool"] in agent_surveys.TOOLS:
+        return agent_surveys.execute(db, user, action)
     from . import agent_events
     if action["tool"] in agent_events.TOOLS:
         return agent_events.execute(db, user, action)

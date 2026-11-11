@@ -36,6 +36,7 @@ async def live_create(request: Request, user: User = Depends(vote_user), db: Ses
     _module_on()
     data = await request.form()
     poll = LivePoll(owner_id=user.id, title=" ".join(str(data.get("title", "")).split())[:255] or "Live-Umfrage",
+                    description=str(data.get("description", "")).strip()[:2000],
                     public_token=new_link_token(),
                     pacing=data.get("pacing") if data.get("pacing") in lv.PACING else "moderated")
     db.add(poll)
@@ -244,15 +245,11 @@ async def live_status(request: Request, poll_id: int, user: User = Depends(vote_
         if not poll.questions:
             flash(request, "Bitte zuerst mindestens eine Frage anlegen.", "error")
             return _return(poll, {}, "build", "neu")
-        poll.status = "open"
-        poll.opened_at = poll.opened_at or utcnow()
-        if poll.current_id is None:
-            poll.current_id = poll.questions[0].id
-        for question in poll.questions:
-            if poll.pacing == "free" or question.id == poll.current_id:
-                lv.start_timer(question)
+        from .survey_commands import state
+        state(db,user,"live_poll",poll,action)
     elif action == "close":
-        poll.status = "closed"
+        from .survey_commands import state
+        state(db,user,"live_poll",poll,action)
     db.commit()
     flash(request, {"open": "Die Umfrage läuft – Teilnehmende können jetzt per QR-Code antworten.",
                     "close": "Die Umfrage ist beendet."}.get(action, "Gespeichert."))

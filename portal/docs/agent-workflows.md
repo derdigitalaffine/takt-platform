@@ -91,6 +91,21 @@ autonome Veröffentlichung, Löschung, Genehmigung, Ressourcenbuchung oder Ände
 einer Terminserie. Eine administrative Kategorie-Routingänderung übernimmt dieselben
 Fachgrenzen wie die native Verwaltung (maximal 300 Vorgänge je Fachlauf).
 
+## Umfragen und Abstimmungen
+
+`/takt` kann Terminumfragen, Abstimmungen und Live-Umfragen als geschlossene
+Entwürfe vorbereiten. Terminvorschläge und Abstimmungsfragen lassen sich vor der
+Bestätigung im vorhandenen Editor bearbeiten. Bei Live-Umfragen sind Titel,
+Beschreibung und Ablauf direkt editierbar. Die Vorschau zeigt die vorbereiteten
+Fragen einschließlich Quizlösungen und Zeitlimit. Der gespeicherte Entwurf
+öffnet den Live-Editor zur weiteren Bearbeitung.
+
+Veröffentlichen, starten, anhalten, beenden und einen gemeinsamen Termin
+festlegen verwenden die bestehenden Freigaben und Statusregeln. Die Vorschau
+nennt Auswirkungen auf Teilnahme, Einladungen und Ergebnisfestschreibung.
+Die Umfragensuche liefert Metadaten, Beteiligungszahlen und konkrete
+Terminvorschläge. Einzelantworten und Stimmzettel bleiben im Fachbereich.
+
 ## Einzeltermine
 
 Zeitgebundene Termine benötigen ISO-Zeitpunkte mit explizitem Offset; ganztägige

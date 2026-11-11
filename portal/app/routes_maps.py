@@ -378,6 +378,8 @@ def _clean_state(raw) -> dict:
         pass
     if isinstance(raw.get("base"), str):
         out["base"] = raw["base"][:20]
+    if raw.get("noBase") is True:
+        out["noBase"] = True
     layers = []
     for item in raw.get("layers", [])[:200] if isinstance(raw.get("layers"), list) else []:
         if isinstance(item, dict) and re.fullmatch(r"[sc][0-9a-f]{1,12}", str(item.get("id", ""))):
