@@ -557,6 +557,66 @@ def booking_manage_action(request: Request, token: str, action: str = Form(...),
     return redirect(f"/b/m/{token}")
 
 
+def _booking_public_steps(request: Request, db: Session, page: BookingPage, invite: BookingInvite | None,
+                          member: User | None, types: list, bt=None, person: int | None = None):
+    """Serverseitige, direkt verlinkbare Schritte: Terminart, Tag/Uhrzeit, Kontaktdaten.
+
+    Es werden nur öffentliche Auswahlwerte über GET transportiert. Kontaktdaten werden
+    erst mit dem abschließenden POST übermittelt und niemals in der URL gespeichert.
+    """
+    q = request.query_params
+    base = f"/b/{page.public_token}"
+    params = {}
+    if invite is not None:
+        params["i"] = invite.token
+    if bt is not None:
+        params["art"] = str(bt.id)
+    if person is not None:
+        params["person"] = str(person)
+
+    def link(**changes):
+        args = {**params, **changes}
+        args = {k: v for k, v in args.items() if v is not None and v != ""}
+        return base + ("?" + urlencode(args) if args else "")
+
+    if bt is None and page.extended:
+        from . import btypes
+        return _public(request, db, page, mode="types", types=types,
+                       summary=btypes.summary, invite=invite, start_url=link())
+
+    from . import btypes
+    available = (btypes.slots(db, page, bt, person) if bt is not None else bk.bookable(page))
+    days = bk.group_by_day(available)
+    slot_value = q.get("slot", "")[:100]
+    chosen = next(((day, slot) for day in days for slot in day["slots"]
+                   if slot["iso"] + "+00:00" == slot_value), None)
+    is_details = q.get("step") == "details" and chosen is not None
+    show_invalid = q.get("step") == "details" and chosen is None
+
+    # Pro Seite höchstens sieben Tage anzeigen, aber nur einen Tag mit Uhrzeiten.
+    requested_day = q.get("day", "")[:10]
+    if chosen:
+        requested_day = chosen[0]["key"]
+    index = next((n for n, day in enumerate(days) if day["key"] == requested_day), None)
+    offset = (index // 7) * 7 if index is not None else (_int(q.get("offset"), 0, max(0, len(days) - 1), 0) // 7) * 7
+    chunk = days[offset:offset + 7]
+    day = (days[index] if index is not None else chunk[0] if chunk else None)
+    back_day = day["key"] if day else ""
+    return _public(
+        request, db, page, mode="book", step="details" if is_details else "times",
+        invite=invite, member=member, bt=bt, person=person, types=types,
+        fields=btypes.fields(bt) if bt is not None else [],
+        days=days, day_nav=chunk, active_day=day, day_offset=offset,
+        prev_days=link(step="times", offset=max(0, offset - 7)) if offset > 0 else "",
+        next_days=link(step="times", offset=offset + 7) if offset + 7 < len(days) else "",
+        times_url=link(step="times", day=back_day), types_url=link() if page.extended else "",
+        chosen_day=chosen[0] if chosen else None, chosen_slot=chosen[1] if chosen else None,
+        selected=slot_value, invalid_slot=show_invalid,
+        summary=btypes.summary if bt is not None else None,
+        public_link=link,
+    )
+
+
 @app.get("/b/{token}")
 def booking_public(request: Request, token: str, i: str = "", db: Session = Depends(get_db)):
     page = _page(db, token)
@@ -577,16 +637,11 @@ def booking_public(request: Request, token: str, i: str = "", db: Session = Depe
         types = btypes.active_types(page)
         art = request.query_params.get("art", "")
         bt = next((t for t in types if str(t.id) == art), None) if art else (types[0] if len(types) == 1 else None)
-        if bt is None:
-            return _public(request, db, page, mode="types", types=types, summary=btypes.summary, invite=inv)
         person = request.query_params.get("person", "")
-        pid = int(person) if person.isdigit() and bt.choose_provider and any(p.id == int(person) for p in bt.providers) else None
-        return _public(request, db, page, mode="book", invite=inv, member=member, bt=bt, person=pid, types=types,
-                       fields=btypes.fields(bt),
-                       days=bk.group_by_day(btypes.slots(db, page, bt, pid)), selected=request.query_params.get("slot", ""),
-                       summary=btypes.summary)
-    return _public(request, db, page, mode="book", invite=inv, member=member,
-                   days=bk.group_by_day(bk.bookable(page)), selected=request.query_params.get("slot", ""))
+        pid = int(person) if person.isdigit() and bt and bt.choose_provider and any(
+            p.id == int(person) and p.active for p in bt.providers) else None
+        return _booking_public_steps(request, db, page, inv, member, types, bt, pid)
+    return _booking_public_steps(request, db, page, inv, member, [], None)
 
 
 @app.post("/b/{token}", dependencies=[Depends(check_csrf)])
@@ -637,7 +692,11 @@ async def booking_public_book(request: Request, token: str, db: Session = Depend
     if error:
         db.rollback()
         flash(request, error, "error")
-        return redirect(back + ("&" if "?" in back else "?") + "slot=" + quote(str(data.get("slot", ""))))
+        # Bei Eingabefehlern zurück zu den Kontaktdaten, bei nicht mehr freien
+        # Slots zur Tagesauswahl. Die Buchungsdaten selbst landen nie im URL.
+        recover_step = "times" if not start or "nicht mehr frei" in error or "Termin" in error and "frei" in error else "details"
+        return redirect(back + ("&" if "?" in back else "?") + "step=" + recover_step
+                        + "&slot=" + quote(str(data.get("slot", ""))))
     db.commit()
     access.sync(db)
     worker.wake()
