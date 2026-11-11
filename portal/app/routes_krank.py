@@ -394,6 +394,23 @@ def _form(request: Request, embed: bool, kind: str, k: str, db: Session):
         krank.audit(db, user, None, "agent_draft", "Meldeweg: " + kind)
         db.commit()
     emps = krank.employers(db)
+    # The signed-in person's primary organizational assignment is the
+    # authoritative source for an unambiguous employer suggestion.
+    if user is not None and not prefill.get("employer"):
+        from .org_models import OrgMembership
+        from .orgs import path as org_path
+        memberships = db.scalars(select(OrgMembership).where(
+            OrgMembership.user_id == user.id).order_by(OrgMembership.is_primary.desc())).all()
+        candidates = []
+        for membership in memberships:
+            unit = db.get(Organization, membership.org_id)
+            if unit is None or not unit.active:
+                continue
+            ancestor_ids = {node.id for node in org_path(unit) if node.active}
+            candidates += [emp.id for emp in emps if emp.active and emp.org_id in ancestor_ids]
+        choices = set(candidates)
+        if len(choices) == 1:
+            prefill["employer"] = str(next(iter(choices)))
     return render(request, "krank_form.html", user, kind=kind, ticket=ticket, employers=emps,
                   employer_groups=krank.employer_groups(emps),
                   values=prefill if health else (stored or {}).get("values") or prefill, error=(stored or {}).get("error") or request.query_params.get("fehler", ""),
