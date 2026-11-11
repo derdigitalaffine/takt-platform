@@ -160,7 +160,7 @@ def free_slots(db, page: BookingPage, keep: Booking | None = None) -> list[dict]
         return bookable(page, keep, db=db)
     from . import btypes
     merged: dict = {}
-    for bt in btypes.active_types(page):
+    for bt in btypes.active_types(page, db):
         for slot in btypes.slots(db, page, bt, keep=keep):
             merged.setdefault(slot["start"], {**slot, "free": 0})["free"] += slot["free"]
     return sorted(merged.values(), key=lambda x: x["start"])
