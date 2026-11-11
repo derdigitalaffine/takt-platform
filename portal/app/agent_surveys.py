@@ -574,8 +574,7 @@ def preview(db, action):
                     + " ("
                     + (votes.KINDS if kind == "vote" else live.KINDS)[q["kind"]][0]
                     + "): "
-                    + text
-                    + rules
+                    + details
                 )
         if kind == "vote":
             lines.append(
