@@ -83,6 +83,12 @@ _BOOKING_VARS = {
     "absagefrist": "Bis wann vorher abgesagt werden kann",
     "hinweis": "Zusatztext der Buchungsseite",
     "anbieter": "Name der anbietenden Person",
+    "terminart": "Art des Termins oder Anliegen",
+    "datum": "Datum des Termins",
+    "uhrzeit": "Beginn und Ende des Termins",
+    "status": "Status der Buchung (bestätigt, angefragt, abgesagt)",
+    "vorher": "Alter Termin bei einer Verschiebung",
+    "unterlagen": "Für den Termin mitzubringende Unterlagen",
 }
 
 _BOOKING_INVITE_VARS = {
@@ -308,74 +314,103 @@ TEMPLATES: dict[str, dict] = {
                  "{fusszeile}"),
     },
     "booking_confirm": {
-        "group": "Terminbuchung", "label": "Buchungsbestätigung (an den Gast)",
+        "group": "Terminbuchung", "label": "Termin bestätigt – Bürger",
         "vars": _BOOKING_VARS,
-        "subject": "Terminbestätigung: {titel} – {termin}",
-        "body": ("Guten Tag {name},\n\nvielen Dank für Ihre Buchung. Ihr Termin:\n\n    {termin}\n\n"
-                 "{ort}\n\n{videolink}\n\n{hinweis}\n\n"
-                 "Mit der angehängten Datei übernehmen Sie den Termin in Ihren Kalender.\n"
-                 "Termin verschieben oder absagen (bis {absagefrist} vorher):\n{verwalten}\n\n{fusszeile}"),
+        "subject": "Ihr Termin ist bestätigt: {terminart} am {datum}",
+        "body": ("Guten Tag {name},\n\n"
+                 "Ihr Termin ist verbindlich bestätigt. Wir freuen uns auf Ihren Besuch.\n\n"
+                 "TERMINÜBERSICHT\n"
+                 "Anliegen: {terminart}\nDatum: {datum}\nUhrzeit: {uhrzeit}\n{ort}\n{videolink}\n\n"
+                 "{hinweis}\n\n"
+                 "Termin ansehen, verschieben oder absagen:\n{verwalten}\n\n"
+                 "Die Kalenderdatei im Anhang lässt sich in Outlook, Apple Kalender, Thunderbird oder andere Kalender übernehmen. "
+                 "Bitte beachten Sie die Absagefrist von {absagefrist}.\n\n{fusszeile}"),
     },
     "booking_update": {
-        "group": "Terminbuchung", "label": "Termin verschoben (an den Gast)",
+        "group": "Terminbuchung", "label": "Termin verschoben – Bürger",
         "vars": _BOOKING_VARS,
-        "subject": "Termin verschoben: {titel} – {termin}",
-        "body": ("Guten Tag {name},\n\nIhr Termin wurde verschoben. Neuer Termin:\n\n    {termin}\n\n"
-                 "{ort}\n\n{videolink}\n\nDer Kalendereintrag im Anhang ersetzt den bisherigen.\n"
-                 "Verschieben oder absagen: {verwalten}\n\n{fusszeile}"),
+        "subject": "Ihr Termin wurde verschoben: {terminart} am {datum}",
+        "body": ("Guten Tag {name},\n\n"
+                 "Ihr Termin wurde verschoben. Maßgeblich ist ab sofort die neue Uhrzeit.\n\n"
+                 "Bisheriger Termin: {vorher}\n\n"
+                 "TERMINÜBERSICHT\n"
+                 "Anliegen: {terminart}\nDatum: {datum}\nUhrzeit: {uhrzeit}\n{ort}\n{videolink}\n\n"
+                 "{hinweis}\n\n"
+                 "Termin ansehen oder erneut ändern:\n{verwalten}\n\n"
+                 "Die aktualisierte Kalenderdatei im Anhang hat dieselbe Termin-ID und ersetzt bei unterstützten Kalenderprogrammen die bisherige Einladung.\n\n{fusszeile}"),
     },
     "booking_cancelled": {
-        "group": "Terminbuchung", "label": "Termin abgesagt (an den Gast)",
+        "group": "Terminbuchung", "label": "Termin abgesagt – Bürger",
         "vars": {**_BOOKING_VARS, "wer": "„Sie haben“ oder „<Anbieter> hat“", "grund": "Begründung (falls angegeben)"},
-        "subject": "Abgesagt: {titel} – {termin}",
-        "body": ("Guten Tag {name},\n\n{wer} den Termin am {termin} abgesagt.\n\n{grund}\n\n"
-                 "Mit der angehängten Datei wird der Termin aus Ihrem Kalender entfernt.\n\n{fusszeile}"),
+        "subject": "Termin abgesagt: {terminart} am {datum}",
+        "body": ("Guten Tag {name},\n\n{wer} den folgenden Termin abgesagt. Er findet nicht mehr statt.\n\n"
+                 "Anliegen: {terminart}\nTermin: {termin}\n{grund}\n\n"
+                 "Für einen neuen Termin nutzen Sie bitte die Terminbuchung der anbietenden Stelle. "
+                 "Eine Kalender-Absage liegt im Anhang, sofern der Termin zuvor bestätigt war.\n\n{fusszeile}"),
     },
     "booking_requested": {
-        "group": "Terminbuchung", "label": "Anfrage eingegangen – Bestätigung folgt (an den Gast, Terminarten)",
+        "group": "Terminbuchung", "label": "Terminanfrage eingegangen – Bürger",
         "vars": _BOOKING_VARS,
-        "subject": "Ihre Terminanfrage: {titel} – {termin}",
-        "body": ("Guten Tag {name},\n\nvielen Dank für Ihre Anfrage. Wir haben folgenden Termin für Sie vorgemerkt:\n\n"
-                 "    {termin}\n\nSobald {anbieter} den Termin bestätigt, erhalten Sie eine weitere Mail mit "
-                 "Kalendereintrag.\n\n{hinweis}\n\nAnfrage ansehen oder zurückziehen: {verwalten}\n\n{fusszeile}"),
+        "subject": "Ihre Terminanfrage ist eingegangen: {terminart} am {datum}",
+        "body": ("Guten Tag {name},\n\n"
+                 "Ihre Terminanfrage ist eingegangen. Wichtig: Der Termin ist noch nicht bestätigt.\n\n"
+                 "Anliegen: {terminart}\nDatum: {datum}\nUhrzeit: {uhrzeit}\n\n"
+                 "Sobald die zuständige Stelle die Anfrage geprüft hat, informieren wir Sie per E-Mail.\n\n"
+                 "{hinweis}\n\nAnfrage ansehen oder zurückziehen:\n{verwalten}\n\n{fusszeile}"),
     },
     "booking_declined": {
-        "group": "Terminbuchung", "label": "Anfrage abgelehnt (an den Gast, Terminarten)",
+        "group": "Terminbuchung", "label": "Terminanfrage abgelehnt – Bürger",
         "vars": {**_BOOKING_VARS, "grund": "Begründung (falls angegeben)"},
-        "subject": "Terminanfrage nicht möglich: {titel} – {termin}",
-        "body": ("Guten Tag {name},\n\nleider können wir Ihre Terminanfrage für {termin} nicht bestätigen.\n\n{grund}\n\n"
-                 "Gern können Sie einen anderen Termin anfragen.\n\n{fusszeile}"),
+        "subject": "Terminanfrage nicht bestätigt: {terminart} am {datum}",
+        "body": ("Guten Tag {name},\n\n"
+                 "Ihre Terminanfrage konnte leider nicht bestätigt werden.\n\n"
+                 "Anliegen: {terminart}\nAngefragter Termin: {termin}\n{grund}\n\n"
+                 "Sie können bei der anbietenden Stelle einen neuen Termin anfragen.\n\n{fusszeile}"),
     },
     "booking_reminder": {
-        "group": "Terminbuchung", "label": "Erinnerung an den Termin (an den Gast)",
+        "group": "Terminbuchung", "label": "Terminerinnerung – Bürger",
         "vars": _BOOKING_VARS,
-        "subject": "Erinnerung: {titel} – {termin}",
-        "body": ("Guten Tag {name},\n\nwir erinnern an Ihren Termin:\n\n    {termin}\n\n{ort}\n\n{videolink}\n\n"
-                 "Falls Sie nicht kommen können: {verwalten}\n\n{fusszeile}"),
+        "subject": "Erinnerung an Ihren Termin: {terminart} am {datum}",
+        "body": ("Guten Tag {name},\n\n"
+                 "wir erinnern Sie an Ihren bevorstehenden Termin.\n\n"
+                 "TERMINÜBERSICHT\n"
+                 "Anliegen: {terminart}\nDatum: {datum}\nUhrzeit: {uhrzeit}\n{ort}\n{videolink}\n\n"
+                 "{unterlagen}\n\nFalls Sie verhindert sind, können Sie Ihren Termin hier verwalten:\n"
+                 "{verwalten}\n\n{fusszeile}"),
     },
     "booking_owner": {
-        "group": "Terminbuchung", "label": "Neue Buchung, Verschiebung, Absage (an die anbietende Person)",
-        "vars": {"name": "Name der anbietenden Person", "ereignis": "Neue Buchung, Termin verschoben oder Absage",
-                 "titel": "Titel der Buchungsseite", "termin": "Termin", "gast": "Name, E-Mail und Telefon des Gastes",
-                 "nachricht": "Nachricht des Gastes", "frei": "Noch freie Plätze", "link": "Link zur Buchungsseite im Portal"},
-        "subject": "{ereignis}: {gast} – {termin}",
-        "body": ("Guten Tag {name},\n\n{ereignis} für „{titel}“:\n\n    {termin}\n    {gast}\n\n{nachricht}\n\n"
-                 "Noch {frei} freie Plätze. Übersicht: {link}\n\n{fusszeile}"),
+        "group": "Terminbuchung", "label": "Neue Buchung, Anfrage, Verschiebung, Absage – Mitarbeitende",
+        "vars": {**_BOOKING_VARS, "ereignis": "Neue Buchung, Anfrage, Verschiebung, Bestätigung oder Absage",
+                 "gast": "Kontaktangaben des Gastes", "nachricht": "Nachricht und Zusatzfelder des Gastes",
+                 "frei": "Noch freie Plätze", "link": "Link zum Buchungsvorgang in TAKT"},
+        "subject": "{ereignis}: {titel} – {datum}",
+        "body": ("Guten Tag {name},\n\n{ereignis} auf der Buchungsseite „{titel}“.\n\n"
+                 "TERMINÜBERSICHT\n"
+                 "Anliegen: {terminart}\nDatum: {datum}\nUhrzeit: {uhrzeit}\nStatus: {status}\n"
+                 "Bisheriger Termin (nur bei Verschiebung): {vorher}\n\n"
+                 "Kontaktdaten (nur für die Terminbearbeitung):\n{gast}\n\n"
+                 "{nachricht}\n\n"
+                 "In TAKT ansehen und ggf. bestätigen oder bearbeiten:\n{link}\n\n"
+                 "{fusszeile}"),
     },
     "booking_invite": {
         "group": "Terminbuchung", "label": "Einladung zur Terminbuchung",
         "vars": _BOOKING_INVITE_VARS,
         "subject": "Bitte wählen Sie Ihren Termin: {titel}",
-        "body": ("Guten Tag {name},\n\n{absender} lädt Sie ein, einen Termin für „{titel}“ zu wählen "
-                 "(Dauer {dauer}, {zeitraum}).\n\n{beschreibung}\n\n{ort}\n\n"
-                 "Zur Terminauswahl (persönlicher Link):\n{link}\n\n{fusszeile}"),
+        "body": ("Guten Tag {name},\n\n"
+                 "{absender} lädt Sie ein, einen Termin für „{titel}“ zu buchen.\n\n"
+                 "{beschreibung}\n\n{ort}\n"
+                 "Dauer: {dauer}\nBuchungszeitraum: {zeitraum}\n\n"
+                 "Jetzt einen passenden Termin auswählen:\n{link}\n\n"
+                 "Dieser Link ist persönlich und sollte nicht weitergegeben werden.\n\n{fusszeile}"),
     },
     "booking_invite_reminder": {
-        "group": "Terminbuchung", "label": "Erinnerung an die Terminbuchung",
+        "group": "Terminbuchung", "label": "Erinnerung an die Terminwahl",
         "vars": _BOOKING_INVITE_VARS,
         "subject": "Erinnerung: Bitte wählen Sie Ihren Termin – {titel}",
-        "body": ("Guten Tag {name},\n\nfür „{titel}“ haben Sie noch keinen Termin gewählt. Hier geht es direkt "
-                 "zur Auswahl:\n{link}\n\n{fusszeile}"),
+        "body": ("Guten Tag {name},\n\n"
+                 "für „{titel}“ wurde noch kein Termin ausgewählt. Nutzen Sie Ihren persönlichen Link:\n"
+                 "{link}\n\n{fusszeile}"),
     },
     "app_received": {
         "group": "Online-Anträge", "label": "Eingangsbestätigung mit Aktenzeichen (an die antragstellende Person)",
