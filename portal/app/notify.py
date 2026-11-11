@@ -411,8 +411,14 @@ def process_queue() -> int:
                                                        attachments, cfg, applicant=attachments[0].get("applicant", False),
                                                        reply_to=n.reply_to)
                     n.attachments_json = json.dumps(attachments, ensure_ascii=False) if attachments else None
-                deliver(cfg, n.to_addr, n.subject, n.body, attachments=attachments, reply_to=n.reply_to,
-                        kind=n.kind)
+                if n.kind.startswith("booking_"):
+                    deliver(cfg, n.to_addr, n.subject, n.body, attachments=attachments,
+                            reply_to=n.reply_to, kind=n.kind)
+                else:
+                    # Preserve the established delivery contract for all other
+                    # modules and their explicit message-size/privacy guards.
+                    deliver(cfg, n.to_addr, n.subject, n.body, attachments=attachments,
+                            reply_to=n.reply_to)
             except MailError as exc:
                 n.error = str(exc)[:1000]
                 if n.attempts >= MAX_ATTEMPTS or not mail_configured(cfg):
