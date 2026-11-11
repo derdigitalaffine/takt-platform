@@ -59,3 +59,11 @@ body {overflow-x:hidden}
 @media(max-width:850px) {.sd-stage{gap:30px}.sd-widgets{grid-template-columns:1fr}.sd-agenda,.sd-directory,.sd-wayfinder,.sd-message{grid-column:span 1}.sd-availability{flex-wrap:wrap}.sd-title-row{align-items:start;flex-direction:column}.sd-time-wrap{display:none}}
 @media(orientation:portrait) {.sd-widgets{grid-template-columns:1fr}.sd-agenda,.sd-directory,.sd-wayfinder,.sd-message{grid-column:span 1}.sd-title-row{align-items:start;flex-direction:column}.sd-time-wrap{display:none}.sd-event{grid-template-columns:1fr}.sd-header-meta{display:none}}
 @media(prefers-reduced-motion:reduce) {*{animation:none!important;transition:none!important}}
+
+/* Touch/keyboard kiosk search: read-only filtering of the already public directory. */
+.sd-search-label {display:flex;flex-direction:column;gap:10px;font-size:clamp(.85rem,1.1vw,1.1rem);font-weight:650;margin:0 0 22px}
+.sd-search {font:inherit;font-size:clamp(1rem,1.7vw,1.65rem);color:var(--sg-fg);background:color-mix(in srgb,var(--sg-bg) 54%,transparent);border:2px solid color-mix(in srgb,var(--sg-fg) 35%,transparent);border-radius:15px;padding:clamp(15px,1.5vw,24px);width:100%;min-height:56px}
+.sd-search::placeholder {color:color-mix(in srgb,var(--sg-fg) 50%,transparent)}
+.sd-search:focus-visible {outline:4px solid var(--sg-accent);outline-offset:3px}
+.sd-person[hidden] {display:none}
+.sd-search-status {min-height:1.2em;font-size:clamp(.8rem,1.1vw,1.1rem);opacity:.72;margin:0 0 16px}
