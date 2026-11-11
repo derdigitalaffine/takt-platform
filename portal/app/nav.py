@@ -112,6 +112,8 @@ ITEMS: list[Item] = [
          lambda p: p == "/resources" or (p.startswith("/resources/") and not p.startswith(("/resources/bookings", "/resources/planner")))),
     Item("res_planner", "schedule", "/resources/planner", "fa-table-cells", "Belegungsplaner", lambda c: c.res_nav,
          _pre("/resources/planner")),
+    Item("signage", "schedule", "/signage", "fa-display", "Digital Signage",
+         lambda c: "signage" in c.modules and c.can("signage_manage"), _pre("/signage")),
     Item("res_bookings", "schedule", "/resources/bookings", "fa-calendar-check", "Raumbuchungen", lambda c: c.res_nav,
          _pre("/resources/bookings")),
     Item("bookings", "schedule", "/bookings", "fa-calendar-plus", "Terminbuchung",
