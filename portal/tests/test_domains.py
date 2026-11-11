@@ -96,7 +96,9 @@ def test_admin_domains_shows_portal_only_module_policy():
     admin = login("admin@example.org", "admin-passwort-123")
     page = admin.get("/admin/domains")
     assert page.status_code == 200
+    from html import unescape
+    readable_html = unescape(page.text)
     for key in modhosts.PORTAL_ONLY:
-        assert main.MODULES[key][0] in page.text
+        assert main.MODULES[key][0] in readable_html
     assert "Module ohne eigene öffentliche Domain" in page.text
     assert "Interne Verwaltungsseiten" in page.text
