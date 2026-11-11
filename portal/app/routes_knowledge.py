@@ -76,6 +76,7 @@ def knowledge_home(request: Request, q: str = "",
         if km.can_create_space(db, user, o.id)]
     return render(request, "knowledge_home.html", user,
                   spaces=spaces, articles=articles, q=q, orgs=orgs,
+                  knowledge_due_notice=km.has_due_review_reminder(db, user),
                   can_create=bool(orgs or user.is_admin),
                   kinds=km.KINDS, statuses=km.STATUSES)
 

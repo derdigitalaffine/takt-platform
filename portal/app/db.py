@@ -85,6 +85,7 @@ class User(Base):
     email_code_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Krankmelder: eigene Meldungen unter „Meine Krankmeldungen“ führen (freiwillig, siehe krank.py)
     krank_history: Mapped[bool] = mapped_column(Boolean, default=False)
+    knowledge_review_reminders: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     sub_confirm: Mapped[bool] = mapped_column(Boolean, default=False)   # Vertretungen für mich erst nach Zustimmung
 
     meetings: Mapped[list["Meeting"]] = relationship(back_populates="owner")
@@ -3038,6 +3039,7 @@ _NEW_COLUMNS = {
                         "cancel_rule": "VARCHAR(8) NOT NULL DEFAULT ''", "cancel_days": "INTEGER NOT NULL DEFAULT 0"},
     "resource_photos": {"thumb": "VARCHAR(80) NOT NULL DEFAULT ''", "caption": "VARCHAR(300) NOT NULL DEFAULT ''"},
     "users": {
+        "knowledge_review_reminders": "BOOLEAN NOT NULL DEFAULT 0",
         "profile_data_enc": "TEXT",
         "password_set": "BOOLEAN NOT NULL DEFAULT 1",
         "must_change_password": "BOOLEAN NOT NULL DEFAULT 0",

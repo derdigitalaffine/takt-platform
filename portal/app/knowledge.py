@@ -224,34 +224,71 @@ def publication_fields():
                 review_due_on=review_today() + timedelta(days=365))
 
 
-def can_approve_article(db, user, space, item):
-    if (item.status != "review" or item.owner_id == user.id
-            or not allowed(db, user, space, "publish", item)):
-        return False
+def _draft_contributor(db, user, item):
     return db.scalar(select(KnowledgeRevision.id).where(
         KnowledgeRevision.article_id == item.id,
         KnowledgeRevision.status == "draft",
         KnowledgeRevision.editor_id == user.id,
-    ).limit(1)) is None
+    ).limit(1)) is not None
+
+
+def _amendment_contributor(db, user, item, start_version, end_version):
+    return db.scalar(select(KnowledgeAmendmentRevision.id).where(
+        KnowledgeAmendmentRevision.article_id == item.id,
+        KnowledgeAmendmentRevision.version.between(start_version, end_version),
+        KnowledgeAmendmentRevision.action.in_(("start", "edit")),
+        KnowledgeAmendmentRevision.actor_id == user.id,
+    ).limit(1)) is not None
+
+
+def can_approve_article(db, user, space, item):
+    return (item.status == "review" and item.owner_id != user.id
+            and allowed(db, user, space, "publish", item)
+            and not _draft_contributor(db, user, item))
 
 
 def can_approve_amendment(db, user, space, item, proposal):
-    if (item.status != "published" or proposal.status != "review"
-            or proposal.base_version != item.version
-            or user.id in {proposal.creator_id, proposal.last_editor_id}
-            or not allowed(db, user, space, "publish", item)):
-        return False
-    return db.scalar(select(KnowledgeAmendmentRevision.id).where(
-        KnowledgeAmendmentRevision.article_id == item.id,
-        KnowledgeAmendmentRevision.version >= proposal.cycle_start_version,
-        KnowledgeAmendmentRevision.action.in_(("start", "edit")),
-        KnowledgeAmendmentRevision.actor_id == user.id,
-    ).limit(1)) is None
+    return (item.status == "published" and proposal.status == "review"
+            and proposal.base_version == item.version
+            and user.id not in {proposal.creator_id, proposal.last_editor_id}
+            and allowed(db, user, space, "publish", item)
+            and not _amendment_contributor(db, user, item, proposal.cycle_start_version, proposal.version))
 
 
 def can_confirm_review(db, user, space, item):
-    return (item.status == "published" and item.owner_id != user.id
-            and allowed(db, user, space, "publish", item))
+    if (item.status != "published" or item.owner_id == user.id
+            or not allowed(db, user, space, "publish", item)):
+        return False
+    revisions = select(KnowledgeAmendmentRevision.version).where(
+        KnowledgeAmendmentRevision.article_id == item.id,
+    ).order_by(KnowledgeAmendmentRevision.version.desc()).limit(1)
+    published_version = db.scalar(revisions.where(KnowledgeAmendmentRevision.action == "publish"))
+    if published_version is None:
+        return not _draft_contributor(db, user, item)
+    cycle_start = db.scalar(revisions.where(
+        KnowledgeAmendmentRevision.version < published_version,
+        KnowledgeAmendmentRevision.action == "start",
+    ))
+    return cycle_start is not None and not _amendment_contributor(db, user, item, cycle_start, published_version)
+
+
+def due_reviews(db, user, through):
+    """Yield eligible published reviews in deadline order, including overdue items."""
+    stmt = (select(KnowledgeArticle, KnowledgeSpace).join(KnowledgeSpace)
+            .where(KnowledgeArticle.status == "published",
+                   KnowledgeArticle.review_due_on <= through,
+                   KnowledgeArticle.owner_id.is_distinct_from(user.id))
+            .order_by(KnowledgeArticle.review_due_on, KnowledgeArticle.id))
+    for item, space in db.execute(stmt.execution_options(yield_per=100)):
+        if can_confirm_review(db, user, space, item):
+            yield item, space
+
+
+def has_due_review_reminder(db, user) -> bool:
+    if (not user.knowledge_review_reminders or not user.can("knowledge_read")
+            or not user.can("knowledge_publish") or not active(db)):
+        return False
+    return next(due_reviews(db, user, review_today()), None) is not None
 
 
 def update_article(db, item, version, **fields):

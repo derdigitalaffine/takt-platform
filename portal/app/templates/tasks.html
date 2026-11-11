@@ -19,6 +19,7 @@
 {% endcall %}
   </div>
 </div>
+{% include "_knowledge_due_notice.html" %}
 <section class="task-summary" aria-label="Aufgabenstatus">
   <div class="task-stat task-stat-primary"><span class="task-stat-icon"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.count}}</strong><span>Jetzt bearbeitbar</span></span></div>
   <a class="task-stat {{'task-stat-alert' if work.overdue else ''}}" href="{{task_url(perspective='overdue')}}"><span class="task-stat-icon"><i class="fa-solid fa-clock" aria-hidden="true"></i></span><span class="task-stat-copy"><strong>{{work.overdue}}</strong><span>Überfällig</span></span><i class="fa-solid fa-arrow-up-right-from-square task-stat-arrow" aria-hidden="true"></i></a>

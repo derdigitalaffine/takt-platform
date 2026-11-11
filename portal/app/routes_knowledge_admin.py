@@ -147,18 +147,23 @@ def knowledge_review_queue(request: Request,
         100,
     ))
 
-    due_query = with_space.where(
-        KnowledgeArticle.status == "published",
-        KnowledgeArticle.review_due_on <= deadline,
-        KnowledgeArticle.owner_id.is_distinct_from(user.id),
-    ).order_by(KnowledgeArticle.review_due_on, KnowledgeArticle.id)
     page_size = 150
-    due = list(islice(
-        ((item, space) for item, space in db.execute(due_query.execution_options(yield_per=100))
-         if km.can_confirm_review(db, user, space, item)),
-        (due_page - 1) * page_size, due_page * page_size + 1,
-    ))
+    due = list(islice(km.due_reviews(db, user, deadline),
+                      (due_page - 1) * page_size, due_page * page_size + 1))
     return render(request, "knowledge_reviews.html", user,
                   articles=articles, amendments=amendments, due=due[:page_size],
                   due_page=due_page, more_due=len(due) > page_size,
                   today=today, deadline=deadline)
+
+
+@app.post("/wissen/pruefungen/hinweise", dependencies=[Depends(check_csrf)])
+def knowledge_review_reminders(request: Request, enabled: bool = Form(...),
+                               user: User = Depends(current_user),
+                               db: Session = Depends(get_db)):
+    _reader(user, db)
+    if not user.can("knowledge_publish"):
+        raise HTTPException(403)
+    user.knowledge_review_reminders = enabled
+    db.commit()
+    flash(request, "Einstellung für Prüfhinweise gespeichert.")
+    return redirect("/wissen/pruefungen")
