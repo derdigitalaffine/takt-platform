@@ -215,15 +215,15 @@ def calendar(db, b: Booking, method: str = "REQUEST") -> str:
                      attendees=[(b.name, b.email)], cancelled=method == "CANCEL", rsvp=False)
 
 
-def calendar_staff(db, b: Booking, method: str = "PUBLISH") -> str:
+def calendar_staff(db, b: Booking, method: str = "PUBLISH", *, prior_start=None, prior_end=None) -> str:
     """Internal appointment ICS, deliberately without guest booking tokens."""
     cfg = get_settings(db)
     page = b.page
     url = f"{settings.portal_base_url}/kalender/buchungen/{b.id}"
     return ics.build(
         method=method, uid=_uid(b).replace("booking-", "booking-staff-", 1),
-        sequence=b.sequence, start=b.starts_at,
-        minutes=int((b.ends_at - b.starts_at).total_seconds() // 60),
+        sequence=b.sequence, start=prior_start or b.starts_at,
+        minutes=int(((prior_end or b.ends_at) - (prior_start or b.starts_at)).total_seconds() // 60),
         title="Bürgertermin – " + page.title,
         description="Termindetails im berechtigten TAKT-Kalender: " + url,
         location=(b.type.location if b.type else page.location) or "",
@@ -290,6 +290,32 @@ def _notify_owner(db, b: Booking, event: str, *, previous: str = "") -> None:
         att = ([{"filename": "buergertermin.ics", "content": calendar_staff(db, b, method),
                  "calendar_method": method}] if opts.get("staff_calendar_attachment") is True and method else None)
         notify.enqueue(db, who.email, subject, body, "booking_owner", cfg, attachments=att)
+
+
+def _notify_reassigned(db, booking: Booking, previous_provider: User,
+                       prior_start: datetime, prior_end: datetime) -> None:
+    """Notify the old assignee without disclosing the new assignee or guest access token."""
+    if not previous_provider.active:
+        return
+    cfg = get_settings(db)
+    message = (
+        "Guten Tag " + previous_provider.name + ",\n\n"
+        "ein bislang Ihnen zugewiesener Bürgertermin wurde auf eine andere Person umverteilt. "
+        "Sie sind für diesen Termin nicht mehr zuständig.\n\n"
+        "Bisheriger Termin: " + label(prior_start, prior_end) +
+        "\n\nDer bisherige Kalendereintrag ist zu entfernen.\n\n"
+        + mailtpl.common_vars().get("fusszeile", "")
+    )
+    from . import booking_integration
+    att = None
+    if booking_integration.options(booking.page).get("staff_calendar_attachment") is True:
+        att = [{"filename": "buergertermin-absage.ics",
+                "content": calendar_staff(db, booking, "CANCEL",
+                                          prior_start=prior_start, prior_end=prior_end),
+                "calendar_method": "CANCEL"}]
+    notify.enqueue(db, previous_provider.email,
+                   "Termin nicht mehr zugewiesen – " + booking.page.title,
+                   message, "booking_owner", cfg, attachments=att)
 
 
 # --- Buchen, Umbuchen, Absagen -----------------------------------------------------------
@@ -390,6 +416,7 @@ def move(db, b: Booking, start: datetime) -> str:
     if error:
         return error
     old_label = label(b.starts_at, b.ends_at)
+    old_start, old_end, old_responsible = b.starts_at, b.ends_at, responsible(b)
     b.starts_at, b.ends_at, b.sequence, b.reminded_at = slot["start"], slot["end"], b.sequence + 1, None
     if slot.get("provider_id"):
         b.provider_id = slot["provider_id"]
@@ -401,6 +428,8 @@ def move(db, b: Booking, start: datetime) -> str:
     _send_guest(db, b, "booking_update", "REQUEST" if b.status == "booked" else "",
                 {"vorher": old_label})
     _notify_owner(db, b, "Termin verschoben", previous=old_label)
+    if old_responsible is not None and old_responsible != responsible(b):
+        _notify_reassigned(db, b, old_responsible, old_start, old_end)
     return ""
 
 
@@ -412,12 +441,12 @@ def cancel(db, b: Booking, by: str, reason: str = "") -> None:
     b.cancel_reason, b.sequence = reason[:1000], b.sequence + 1
     if was_requested and by != "guest":
         _send_guest(db, b, "booking_declined", "", {"grund": f"Begründung: {reason}" if reason else ""})
+        _notify_owner(db, b, "Anfrage abgelehnt")
         return
     _send_guest(db, b, "booking_cancelled", "" if was_requested else "CANCEL", {
         "grund": f"Begründung: {reason}" if reason else "",
         "wer": "Sie haben" if by == "guest" else (f"{b.page.owner.name} hat" if b.page.owner else "Der Anbieter hat")})
-    if by == "guest":
-        _notify_owner(db, b, "Absage")
+    _notify_owner(db, b, "Absage")
     if b.meeting_id:
         meeting = db.get(Meeting, b.meeting_id)
         if meeting:
