@@ -34,10 +34,10 @@ def _int(value):
     return int(value) if str(value or "").isdigit() and int(value) > 0 else None
 
 
-def _render_display(request, db, screen, *, public):
+def _render_display(request, db, screen, *, public, viewer=None):
     if not screen.enabled:
         raise HTTPException(404)
-    data = signage.context(db, screen, public=public)
+    data = signage.context(db, screen, public=public, viewer=viewer)
     org = db.get(Organization, screen.org_id) if screen.org_id else None
     response = templates.TemplateResponse(request, "signage_display.html", {
         **data, "ui": branding.load(), "org_logo": f"/org/{org.id}/logo" if org and org.logo else None,
@@ -136,7 +136,7 @@ def signage_preview(sid: int, request: Request, user: User = Depends(manage_user
     active = screen.enabled
     screen.enabled = True
     try:
-        return _render_display(request, db, screen, public=False)
+        return _render_display(request, db, screen, public=False, viewer=user)
     finally:
         screen.enabled = active
 
