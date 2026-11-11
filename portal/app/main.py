@@ -1813,7 +1813,22 @@ def recording_fetch(request: Request, rec_id: int, user: User = Depends(video_us
 def _profile_page(request, user, db, details=None, profile_error=""):
     from . import profiles
     cfg = get_settings(db)
+    signage_offices = []
+    if "signage" in enabled_modules():
+        from .signage_models import SignageOffice, SignageRoom, SignageFloor, SignageBuilding
+        rows = db.execute(select(SignageOffice, SignageRoom, SignageFloor, SignageBuilding)
+            .join(SignageRoom, SignageOffice.room_id == SignageRoom.id)
+            .join(SignageFloor, SignageRoom.floor_id == SignageFloor.id)
+            .join(SignageBuilding, SignageFloor.building_id == SignageBuilding.id)
+            .where(SignageOffice.user_id == user.id, SignageBuilding.active.is_(True))
+            .order_by(SignageOffice.is_primary.desc(), SignageRoom.number)).all()
+        signage_offices = [dict(id=office.id, room=room.number, room_name=room.name,
+                                 floor=floor.name, building=building.name, public=office.public,
+                                 is_primary=office.is_primary)
+                           for office, room, floor, building in rows]
     return render(request, "profile.html", user,
+                  signage_enabled="signage" in enabled_modules(),
+                  signage_offices=signage_offices,
                   allow_user_keys=cfg.get("allow_user_keys") == "1",
                   own_key_mask=mask_secret(decrypt(user.sm_api_key_enc)),
                   profile_groups=profiles.GROUPS,
