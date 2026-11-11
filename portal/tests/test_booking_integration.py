@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app import booking_integration, bookings, calendar_sources, notify
 from app.calendar_models import Calendar, CalendarEvent
-from app.db import Booking, BookingPage, BookingType, BookingWindow, to_local, utcnow
+from app.db import Booking, BookingPage, BookingType, BookingWindow, get_settings, to_local, utcnow
 from conftest import login, settings
 from test_native_tasks import task_people
 
@@ -20,6 +20,7 @@ def _range():
 
 def test_assigned_booking_visible_only_to_staff_and_external_feeds_anonymous(db, task_people):
     owner, provider, stranger = task_people[:3]
+    previous = get_settings(db)
     settings(module_bookings="1", module_calendars="1")
     token = secrets.token_hex(12)
     page = BookingPage(owner_id=owner.id, title="Bürgerbüro", public_token=token)
@@ -71,6 +72,8 @@ def test_assigned_booking_visible_only_to_staff_and_external_feeds_anonymous(db,
         db.delete(bt)
         db.delete(page)
         db.commit()
+        settings(module_bookings=previous.get("module_bookings", "1"),
+                 module_calendars=previous.get("module_calendars", "0"))
 
 
 def test_opt_in_private_calendar_prevents_simple_double_booking(db, task_people):
