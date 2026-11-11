@@ -717,6 +717,34 @@ def _notify_task(db, resp, task, step, key: str, extra: dict | None = None, targ
     return count
 
 
+def completion_fields(step: dict, checks: list[str], values: dict) -> tuple[dict, str]:
+    """Validate the checklist and inputs without changing an application."""
+    missing = [c for c in step.get("checklist", []) if c not in checks]
+    if missing:
+        return {}, "Bitte zuerst alle Prüfpunkte abhaken: " + "; ".join(missing)
+    fields, errors = {}, []
+    for f in step.get("fields", []):
+        raw = _s(values.get(f["key"]), 5000)
+        if f["required"] and not raw:
+            errors.append(f"„{f['label']}“ fehlt")
+            continue
+        if raw and f["type"] in ("number", "money"):
+            num = _num(raw)
+            if num is None or not math.isfinite(num) or abs(num)>100000000:
+                errors.append(f"„{f['label']}“ ist keine Zahl")
+                continue
+            fields[f["key"]] = round(num, 2) if f["type"] == "money" else (int(num) if num.is_integer() else num)
+        elif raw and f["type"] == "select" and raw not in f["options"]:
+            errors.append(f"„{f['label']}“: ungültige Auswahl")
+        elif raw and f["type"] == "yesno" and raw not in ("Ja", "Nein"):
+            errors.append(f"„{f['label']}“: bitte Ja oder Nein")
+        else:
+            fields[f["key"]] = raw
+    if errors:
+        return {}, "Bitte prüfen: " + ", ".join(errors) + "."
+    return fields, ""
+
+
 def complete(db, task: ApplicationTask, user: User, outcome: str, comment: str, checks: list[str],
              values: dict) -> str:
     """Erledigt eine Aufgabe oder Freigabe. Gibt eine Fehlermeldung zurück oder "" bei Erfolg."""
@@ -725,29 +753,9 @@ def complete(db, task: ApplicationTask, user: User, outcome: str, comment: str, 
     if task.state != "open":
         return "Dieser Schritt ist nicht mehr offen."
     if task.kind == "task":
-        missing = [c for c in step.get("checklist", []) if c not in checks]
-        if missing:
-            return "Bitte zuerst alle Prüfpunkte abhaken: " + "; ".join(missing)
-        fields, errors = {}, []
-        for f in step.get("fields", []):
-            raw = _s(values.get(f["key"]), 5000)
-            if f["required"] and not raw:
-                errors.append(f"„{f['label']}“ fehlt")
-                continue
-            if raw and f["type"] in ("number", "money"):
-                num = _num(raw)
-                if num is None or not math.isfinite(num) or abs(num)>100000000:
-                    errors.append(f"„{f['label']}“ ist keine Zahl")
-                    continue
-                fields[f["key"]] = round(num, 2) if f["type"] == "money" else (int(num) if num.is_integer() else num)
-            elif raw and f["type"] == "select" and raw not in f["options"]:
-                errors.append(f"„{f['label']}“: ungültige Auswahl")
-            elif raw and f["type"] == "yesno" and raw not in ("Ja", "Nein"):
-                errors.append(f"„{f['label']}“: bitte Ja oder Nein")
-            else:
-                fields[f["key"]] = raw
-        if errors:
-            return "Bitte prüfen: " + ", ".join(errors) + "."
+        fields, error = completion_fields(step, checks, values)
+        if error:
+            return error
         data = resp.fields
         data.update(fields)
         resp.fields_json = json.dumps(data, ensure_ascii=False)

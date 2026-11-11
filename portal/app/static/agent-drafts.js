@@ -37,7 +37,20 @@
       move_dms: `form[action="/dms/move"]`
     };
     let form;
-    if (tool === 'create_survey') {
+    const applicationTool = ['application_command', 'application_step'].includes(tool);
+    if (applicationTool) {
+      const fields = data.fields;
+      const operation = fields.operation;
+      const base = `/forms/${fields.form_id}/applications/${id}`;
+      const target = tool === 'application_step' ? base + '/task/' + fields.task_id : base + '/action';
+      form = Array.from(document.querySelectorAll(`form[action="${target}"]`)).find(candidate =>
+        candidate.querySelector(`[name="action"][value="${operation}"]`));
+      if (form) {
+        for (const button of form.querySelectorAll('button[name="action"]')) {
+          if (button.value !== operation) { button.disabled = true; button.hidden = true; }
+        }
+      }
+    } else if (tool === 'create_survey') {
       form = document.querySelector({poll:'#poll-form',vote:'#vote-form',live_poll:'form[action="/votes/live/new"]'}[data.fields.record_kind]);
     } else if (tool === 'survey_state') {
       const base = {poll:'/polls/',vote:'/votes/',live_poll:'/votes/live/'}[data.fields.record_kind] + id;
@@ -50,7 +63,7 @@
     } else if (tool === 'finalize_poll') {
       form = [...document.querySelectorAll(`form[action="/polls/${id}/final"]`)].find(f => f.querySelector(`input[name="option_id"][value="${data.fields.option_id}"]`));
     }
-    if (['create_survey','survey_state','finalize_poll'].includes(tool)) { /* Selected using the exact native record and operation above. */ } else if (tool === 'set_task_status') {
+    if (applicationTool || ['create_survey','survey_state','finalize_poll'].includes(tool)) { /* Selected using the exact native record and operation above. */ } else if (tool === 'set_task_status') {
       form = Array.from(document.querySelectorAll(`form[action="/aufgaben/${id}/aktion"]`))
         .find(f => f.elements.action?.value === 'status' && f.elements.status?.value === data.fields.status);
     } else if (tool === 'set_anliegen_status') {
@@ -81,6 +94,9 @@
 
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
+      application_command: {status: ['status', 'text', 'inform'], note: ['text'], message: ['text'],
+        assign: ['user_id', 'group_id'], due: ['due'], take: []}[fields.operation],
+      application_step: ['comment', ...(fields.input_names || [])],
       create_form: ['title', 'description', 'items_json'],
       edit_form: ['title', 'description', 'items_json'],
       create_survey: ['title','description','location','duration','options_json','questions_json','secrecy','access','results','allow_change','pacing'], survey_state: [], finalize_poll: [],
@@ -163,8 +179,10 @@
     for (const element of [form, ...form.querySelectorAll('[data-confirm]')]) {
       for (const attribute of [...element.attributes]) if (attribute.name.startsWith('data-confirm')) element.removeAttribute(attribute.name);
     }
-    const submit = form.querySelector(formBuilder ? '.builder-savebar button[type="submit"]' :
-      'button[type="submit"]:not(:disabled), button:not([type]):not(:disabled)');
+    const submitSelector = formBuilder ? '.builder-savebar button[type="submit"]' :
+      applicationTool ? 'button[type="submit"]:not([hidden])' :
+      'button[type="submit"]:not(:disabled), button:not([type]):not(:disabled)';
+    const submit = form.querySelector(submitSelector);
     if (submit) { submit.className = 'btn btn-primary'; submit.textContent = 'Vorschlag prüfen'; }
     hidden('csrf', document.querySelector('meta[name="csrf"]')?.content || '');
     hidden('agent_plan', nonce); hidden('agent_step', String(data.step));

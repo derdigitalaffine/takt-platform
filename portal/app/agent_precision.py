@@ -37,6 +37,10 @@ def context(prompt, categories):
         text += ('Bei einer Geburtstagsliste für die Belegschaft nur Namen, Tag und Monat abfragen, '
                  'wenn kein Geburtsjahr verlangt ist. Tag als Zahl 1–31, Monat als Auswahlliste. '
                  'Nur ausdrücklich gewünschte weitere personenbezogene Felder aufnehmen. ')
+    if re.search(r'aktenzeichen|antrag|anträge', prompt, re.I):
+        text += ('Eingegangene Anträge sind Vorgänge, keine Prozessvorlagen. Zuerst nach exaktem '
+                 'Aktenzeichen suchen. Für Genehmigung, Ablehnung und Erledigung eines aktiven '
+                 'Arbeitsschritts application_step mit step.id und den angebotenen operation-Werten wählen. ')
     return text
 
 
@@ -46,6 +50,7 @@ def focus_modules(prompt):
         'tasks': r'aufgabe|checkliste|fällig|priorit',
         'anliegen': r'anliegen|mangel|mängel|büromaterial|büromöbel|bürost[üu]hl|druckerpapier|kopierpapier|toner|störung|defekt',
         'surveys': r'umfrage|abstimmung|wortwolke|doodle|quiz',
+        'applications': r'\bantr(?:ag|äge|ägen|ags\w*)\b|aktenzeichen|sachbearbeitung|nachforderung',
         'forms': r'formular', 'calendars': r'kalender|termin|besprechung',
         'dms': r'\bdms\b|wissensakte', 'processes': r'prozess',
         'leave': r'urlaub|urlaubsantrag|urlaubsplanung',

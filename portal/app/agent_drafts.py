@@ -9,12 +9,14 @@ from urllib.parse import urlencode
 
 from fastapi import HTTPException
 
-from . import agent, agent_forms, tasks, anliegen
+from . import agent, agent_applications, agent_forms, tasks, anliegen
 from .db import DmsArea, LOCAL_TZ
 
 
 def destination(action):
     tool = action["tool"]
+    if tool in agent_applications.TOOLS:
+        return f"/forms/{action['form_id']}/applications/{action['id']}"
     if tool=="create_survey":
         return {"poll":"/polls/new","vote":"/votes/new","live_poll":"/umfragen/neu"}[action["record_kind"]]
     if tool in ("survey_state","finalize_poll"):
@@ -65,6 +67,9 @@ def load(request, user, nonce, step):
 
 
 def validate(db, user, action):
+    if action["tool"] in agent_applications.TOOLS:
+        agent_applications.validate(db, user, action)
+        return
     from . import agent_surveys
     if action["tool"] in agent_surveys.TOOLS:
         if action["tool"]=="create_survey":agent_surveys.draft(user,action)
@@ -113,6 +118,9 @@ def view(db, user, plan, step):
     tool = action["tool"]
     if tool == "create_anliegen":
         fields["description_final"] = fields["description"]
+    if tool in agent_applications.TOOLS:
+        fields.pop("recipient_key", None)
+        fields["input_names"] = agent_applications.editor_fields(db, action)
     event_times = {}
     if tool in ("create_event", "update_event", "delete_event"):
         source = action
@@ -145,6 +153,11 @@ def view(db, user, plan, step):
 
 def edited(db, user, original, data):
     """The human edits a native form; normalization still checks the real services."""
+    if original["tool"] in agent_applications.TOOLS:
+        try:
+            return agent_applications.edited(db, user, original, data)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(422, str(exc)) from exc
     if original["tool"] in agent_forms.TOOLS:
         try:
             return agent_forms.edited(db, user, original, data)

@@ -110,6 +110,9 @@ def exercise(page):
     handoff('Verschiebe den Kalendertermin Von mir geprüfte Projektbesprechung auf den 14.11.2026 von 14 bis 15 Uhr', r'/kalender\?ansicht=termine&agent_plan=', 'start', '2026-11-14')
     handoff('Erstelle einen ganztägigen Kalendertermin Agent Ganztägig am 04.12.2026 im Projektkalender', r'/kalender\?ansicht=termine&agent_plan=', 'end', '2026-12-04')
     handoff('Lösche den Kalendertermin Agent Ganztägig', r'/kalender\?ansicht=termine&agent_plan=')
+    handoff('Notiere beim Antrag AUSR-2030-00001 intern: Ausrüstung vorgeprüft',
+            r'/forms/[0-9]+/applications/[0-9]+\?agent_plan=', 'text', 'Ausrüstung vorgeprüft')
+    expect(page.locator('#verlauf')).to_contain_text('Ausrüstung vorgeprüft')
     handoff('Erstelle eine Terminumfrage für 05.12.2030 und 06.12.2030 jeweils 9 bis 10 Uhr in Raum 2', r'/polls/new\?agent_plan=', 'title', 'Agent Terminfindung')
     handoff('Veröffentliche die Terminumfrage Agent Terminfindung', r'/polls/[0-9]+\?tab=conduct&agent_plan=')
     handoff('Lege den ersten Termin der Terminumfrage Agent Terminfindung ohne Benachrichtigung fest', r'/polls/[0-9]+\?tab=results&agent_plan=')
