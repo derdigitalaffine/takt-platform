@@ -4,7 +4,7 @@ Rooms and offices reference the canonical PortalLocation, Organization, User,
 Resource and Calendar models rather than copying those source records.
 """
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base, utcnow
 
@@ -104,3 +104,35 @@ class SignageRevision(Base):
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     __table_args__ = (UniqueConstraint("screen_id", "version"),)
+
+
+class SignageWayNode(Base):
+    """Indoor wayfinding node; coordinates are normalized for future SVG overlays."""
+    __tablename__ = "signage_way_nodes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    floor_id: Mapped[int] = mapped_column(ForeignKey("signage_floors.id", ondelete="CASCADE"), index=True)
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("signage_rooms.id", ondelete="SET NULL"), nullable=True, index=True)
+    label: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(20), default="corridor")
+    x_pct: Mapped[float] = mapped_column(Float, default=50.0)
+    y_pct: Mapped[float] = mapped_column(Float, default=50.0)
+    accessible: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SignageWayEdge(Base):
+    """Bidirectional or directed connection with accessibility semantics."""
+    __tablename__ = "signage_way_edges"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    from_node_id: Mapped[int] = mapped_column(ForeignKey("signage_way_nodes.id", ondelete="CASCADE"), index=True)
+    to_node_id: Mapped[int] = mapped_column(ForeignKey("signage_way_nodes.id", ondelete="CASCADE"), index=True)
+    distance_m: Mapped[int] = mapped_column(Integer, default=5)
+    accessible: Mapped[bool] = mapped_column(Boolean, default=True)
+    bidirectional: Mapped[bool] = mapped_column(Boolean, default=True)
+    __table_args__ = (UniqueConstraint("from_node_id", "to_node_id"),)
+
+
+class SignageDisplayAnchor(Base):
+    """Starting position of a physical wayfinding display."""
+    __tablename__ = "signage_display_anchors"
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), primary_key=True)
+    node_id: Mapped[int] = mapped_column(ForeignKey("signage_way_nodes.id", ondelete="CASCADE"), index=True)
