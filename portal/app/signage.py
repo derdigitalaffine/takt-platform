@@ -5,7 +5,7 @@ import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
-from .db import LOCAL_TZ, ResourceBooking, User, utcnow
+from .db import LOCAL_TZ, Resource, ResourceBooking, User, utcnow
 from .signage_models import SignageBuilding, SignageFloor, SignageOffice, SignageRoom, SignageScreen
 
 KINDS = {"agenda": "Terminübersicht", "room": "Digitales Türschild",
@@ -61,7 +61,7 @@ def _local(dt):
     return dt.replace(tzinfo=timezone.utc).astimezone(LOCAL_TZ) if dt.tzinfo is None else dt.astimezone(LOCAL_TZ)
 
 
-def events(db, screen: SignageScreen, *, public=True, now=None) -> list[dict]:
+def events(db, screen: SignageScreen, *, public=True, now=None, viewer=None) -> list[dict]:
     """Confirmed resource bookings. Never project applicant/participant contact details."""
     resource_id = screen.resource_id
     if not resource_id and screen.room_id:
@@ -80,7 +80,10 @@ def events(db, screen: SignageScreen, *, public=True, now=None) -> list[dict]:
         ResourceBooking.starts_at < end_utc,
         ResourceBooking.ends_at > start_utc
     ).order_by(ResourceBooking.starts_at).limit(40)).all()
-    show_titles = not public and screen.data_level == "title"
+    from . import resources as resource_acl
+    resource = db.get(Resource, resource_id)
+    show_titles = bool(not public and viewer and screen.data_level == "title"
+                       and resource_acl.level(db, viewer, resource) >= 2)
     return [{
         "start": _local(row.starts_at),
         "end": _local(row.ends_at),
@@ -118,9 +121,9 @@ def waypoints(db, screen: SignageScreen) -> list[dict]:
             if screen.org_id is None or building.org_id == screen.org_id]
 
 
-def context(db, screen: SignageScreen, public=True) -> dict:
+def context(db, screen: SignageScreen, public=True, viewer=None) -> dict:
     now = datetime.now(LOCAL_TZ)
-    day = events(db, screen, public=public, now=now)
+    day = events(db, screen, public=public, now=now, viewer=viewer)
     busy = next((ev for ev in day if ev["ongoing"]), None)
     later = [ev for ev in day if ev["start"] > now]
     room = db.get(SignageRoom, screen.room_id) if screen.room_id else None
