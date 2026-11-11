@@ -7,9 +7,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import branding, links, notify, signage
+from . import branding, links, notify, signage, calendars
 from .db import Organization, PortalLocation, Resource, User, get_settings, utcnow
 from .main import app, check_csrf, current_user, enabled_modules, flash, get_db, rate_limit, redirect, render, require, templates
+from .calendar_models import Calendar
 from .signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
                              SignageOffice, SignageRoom, SignageScreen)
 
@@ -62,6 +63,8 @@ def signage_home(request: Request, user: User = Depends(manage_user), db: Sessio
         locations=list(db.scalars(select(PortalLocation).where(PortalLocation.active.is_(True), PortalLocation.owner_id.is_(None)).order_by(PortalLocation.name))),
         organizations=list(db.scalars(select(Organization).order_by(Organization.name))),
         kinds=signage.KINDS,
+        calendars=[cal for cal in db.scalars(select(Calendar).where(Calendar.source == "free").order_by(Calendar.title))
+                   if calendars.access(db, user, cal)],
         resources=list(db.scalars(select(Resource).where(Resource.active.is_(True)).order_by(Resource.name))))
 
 
@@ -284,10 +287,14 @@ async def signage_structure(request: Request, user: User = Depends(manage_user),
         db.add(SignageFloor(building_id=bid, name=name, level=level))
     elif action == "room":
         fid, rid = _int(form.get("floor_id")), _int(form.get("resource_id"))
+        cid = _int(form.get("calendar_id"))
+        calendar = db.get(Calendar, cid) if cid else None
+        if cid and (not calendar or calendar.source != "free" or not calendars.access(db, user, calendar)):
+            raise HTTPException(403, "Kein Zugriff auf den gewählten Kalender.")
         if not fid or not db.get(SignageFloor, fid) or rid and not db.get(Resource, rid):
             raise HTTPException(422)
         db.add(SignageRoom(floor_id=fid, number=name[:40], name=str(form.get("label") or "").strip()[:180],
-                           resource_id=rid, accessible=form.get("accessible") == "1"))
+                           resource_id=rid, calendar_id=cid, accessible=form.get("accessible") == "1"))
     else:
         raise HTTPException(422)
     try:
@@ -296,6 +303,26 @@ async def signage_structure(request: Request, user: User = Depends(manage_user),
         db.rollback()
         raise HTTPException(409, "Eintrag bereits vorhanden oder Datenkonflikt.")
     flash(request, "Gebäudestammdaten gespeichert.")
+    return redirect("/signage#buildings")
+
+
+@app.post("/signage/room/{room_id:int}/calendar", dependencies=[Depends(check_csrf)])
+async def signage_update_room_calendar(room_id: int, request: Request,
+                                      user: User = Depends(manage_user),
+                                      db: Session = Depends(get_db)):
+    """Explicitly opt a room into a real TAKT calendar (no shadow events)."""
+    _enabled()
+    room = db.get(SignageRoom, room_id)
+    if not room:
+        raise HTTPException(404)
+    form = await request.form()
+    cid = _int(form.get("calendar_id"))
+    calendar = db.get(Calendar, cid) if cid else None
+    if cid and (not calendar or calendar.source != "free" or not calendars.access(db, user, calendar)):
+        raise HTTPException(403, "Der Kalender ist nicht freigegeben.")
+    room.calendar_id = cid
+    db.commit()
+    flash(request, "Raumkalender aktualisiert.")
     return redirect("/signage#buildings")
 
 
