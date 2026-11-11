@@ -53,8 +53,8 @@
   <div class="bk-calendar-guide"><span class="bk-guide-icon"><i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i></span>
     <div><strong>Zeitraum im Kalender aufziehen</strong><p class="mb-0">Aus jedem Bereich entstehen automatisch freie Buchungstermine. Zum Entfernen auf den grünen Bereich klicken. Für Pausen zwei getrennte Bereiche anlegen.</p></div>
   </div>{% endif %}
-  <div id="bk-window-status" class="bk-inline-status" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="bk-calendar" data-page="{{ page.id }}" data-initial="{{ initial_date }}" {% if level < 3 %}data-readonly="1"{% endif %}></div>
+  <div id="bk-window-status" class="bk-inline-status mt-2" role="status" aria-live="polite" aria-atomic="true"></div>
   {% if level >= 3 %}
   <details class="bk-window-form-wrap mt-3">
     <summary class="fw-semibold"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Zeitraum per Formular oder wöchentlich anlegen</summary>
