@@ -755,3 +755,66 @@ def test_existing_organization_can_be_employer_or_parent_of_new_employer():
         assert linked is not None
         assert linked.org.parent_id == parent_id
         assert linked.org.kind == "arbeitgeber"
+
+
+@pytest.mark.parametrize("revocation", ["none", "role", "permission", "mode"])
+def test_supervisor_au_queue_revalidates_access_at_delivery(monkeypatch, revocation):
+    """A queued medical attachment must never outlive its organizational authorization."""
+    from app.db import Organization
+    from app.org_models import OrgRoleGrant
+
+    email = f"delivery-guard-{revocation}@example.org"
+    _staff_user(email, "krank_admin")
+    with SessionLocal() as db:
+        node = Organization(name=f"Guard Organization {revocation}", kind="arbeitgeber")
+        db.add(node)
+        db.flush()
+        user = db.scalar(select(User).where(User.email == email))
+        grant = OrgRoleGrant(org_id=node.id, user_id=user.id,
+                             role="lead", include_children=True)
+        emp = KrankEmployer(name=f"Guard Employer {revocation}", org_id=node.id,
+                            notify_supervisors=True, supervisor_attachment_mode="original")
+        db.add_all([grant, emp])
+        db.commit()
+        employer_id, user_id, grant_id = emp.id, user.id, grant.id
+
+    c = public_client()
+    r = submit(c, "au", first_name="Nicht", last_name="Weitergeben",
+               employer=str(employer_id),
+               **{"from": "2026-10-05", "to": "2026-10-06", "first": "1"},
+               files={"file": ("vertraulich.pdf", PDF, "application/pdf")})
+    assert r.status_code == 303
+    with SessionLocal() as db:
+        note = db.scalar(select(Notification).where(
+            Notification.to_addr == email).order_by(Notification.id.desc()))
+        assert note is not None and note.attachments_json
+        original = json.loads(note.attachments_json)[0]
+        assert original["_krank_supervisor_guard"]["report_id"] > 0
+        nid = note.id
+        if revocation == "role":
+            db.delete(db.get(OrgRoleGrant, grant_id))
+        elif revocation == "permission":
+            person = db.get(User, user_id)
+            person.permissions = ""
+        elif revocation == "mode":
+            db.get(KrankEmployer, employer_id).supervisor_attachment_mode = "notice"
+        db.commit()
+
+    delivered = []
+    monkeypatch.setattr(notify, "deliver",
+                        lambda cfg, to, subject, body, attachments=None, reply_to=None:
+                        delivered.append((to, attachments)))
+    notify.process_queue()
+    messages = [files for addr, files in delivered if addr == email]
+    with SessionLocal() as db:
+        note = db.get(Notification, nid)
+        if revocation == "none":
+            assert note.status == "sent" and len(messages) == 1
+            assert len(messages[0]) == 1
+            assert "_krank_supervisor_guard" not in messages[0][0]
+        else:
+            assert not messages
+            assert note.status == "failed"
+            assert "AU-Zugriff" in note.error
+        assert note.attachments_json is None
+        assert "Weitergeben" not in note.body
