@@ -2613,6 +2613,9 @@ class KrankEmployer(Base):
     allow_remarks: Mapped[bool] = mapped_column(Boolean, default=False)
     subject_prefix: Mapped[str] = mapped_column(String(100), default="")
     attach_files: Mapped[bool] = mapped_column(Boolean, default=False)  # Mail mit PDF/Nachweis statt nur Hinweis + Link
+    attach_original_au: Mapped[bool] = mapped_column(Boolean, default=False)  # Originalbeleg zusätzlich zur Sammel-PDF
+    notify_supervisors: Mapped[bool] = mapped_column(Boolean, default=False)  # Leitung der verknüpften Orga nur mit Minimalhinweis
+    supervisor_attachment_mode: Mapped[str] = mapped_column(String(12), default="notice")  # notice | pdf | original
     dms_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     dms_area_id: Mapped[int | None] = mapped_column(ForeignKey("dms_areas.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -3094,7 +3097,10 @@ _NEW_COLUMNS = {
     "invitees": {"rsvp_status": "VARCHAR(16)", "rsvp_at": "DATETIME", "rsvp_comment": "TEXT",
                  "join_token": "VARCHAR(64)"},
     "law_levels": {"org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
-    "krank_employers": {"org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
+    "krank_employers": {"org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
+                        "attach_original_au": "BOOLEAN NOT NULL DEFAULT 0",
+                        "notify_supervisors": "BOOLEAN NOT NULL DEFAULT 0",
+                        "supervisor_attachment_mode": "VARCHAR(12) NOT NULL DEFAULT 'notice'"},
     "law_texts": {"internal": "BOOLEAN NOT NULL DEFAULT 0", "planned_md": "TEXT NOT NULL DEFAULT ''", "planned_valid_from": "VARCHAR(10) NOT NULL DEFAULT ''",
                   "planned_note": "VARCHAR(255) NOT NULL DEFAULT ''", "outline": "VARCHAR(20) NOT NULL DEFAULT ''",
                   "topics_json": "TEXT NOT NULL DEFAULT ''", "map_json": "TEXT NOT NULL DEFAULT '{}'"},
@@ -3182,6 +3188,21 @@ def init_db() -> None:
                 db.add(Setting(key=key, value=value))
         seed_law_levels(db)
         seed_orgs(db)
+        # Existing installations: turn unlinked Krankmelder employers into
+        # persistent nodes of the central organizational tree. Reuse a matching
+        # free organization, never merge two employers into the same node.
+        linked = set(db.scalars(select(KrankEmployer.org_id).where(
+            KrankEmployer.org_id.is_not(None))).all())
+        for legacy in db.scalars(select(KrankEmployer).where(KrankEmployer.org_id.is_(None))):
+            candidate = db.scalar(select(Organization).where(
+                Organization.name == legacy.name).order_by(Organization.id))
+            if candidate is None or candidate.id in linked:
+                candidate = Organization(name=legacy.name, kind="arbeitgeber",
+                                         color=legacy.color or "", active=legacy.active)
+                db.add(candidate)
+                db.flush()
+            legacy.org_id = candidate.id
+            linked.add(candidate.id)
         from .organization import seed as seed_organization
         seed_organization(db)
         from .anliegen import seed as seed_anliegen

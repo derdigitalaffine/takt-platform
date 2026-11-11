@@ -40,7 +40,7 @@ from . import csvsafe, links, mailtpl, notify
 from .config import settings
 from .db import (
     DmsArea, DmsRecord, GroupMember, KrankAccess, KrankEmployer, KrankEvent, KrankFeedback, KrankFile, KrankReport,
-    KrankResponsible, SessionLocal, User, get_settings, set_setting, to_local, utcnow,
+    KrankResponsible, Organization, SessionLocal, User, get_settings, set_setting, to_local, utcnow,
 )
 from .security import hash_password, hash_token, verify_password
 
@@ -610,7 +610,8 @@ def create(db, kind: str, form: dict, employer: KrankEmployer | None, upload: tu
     if user is not None:
         values["by_user"] = user.email
     report = KrankReport(ref_no=next_ref(db), kind=kind, status=initial_status(kind, bool(upload)),
-                         employer_id=employer.id, employer_name=employer.name, has_email=bool(values.get("email")),
+                         employer_id=employer.id, employer_name=(employer.org.name if employer.org else employer.name),
+                         has_email=bool(values.get("email")),
                          track_hash=hash_token(token))
     if user is not None and user.krank_history:
         report.user_id = user.id
@@ -686,8 +687,23 @@ def employee_reply(db, report: KrankReport, text: str, upload: tuple[str, bytes]
         raise ValueError("Bitte eine Datei auswählen oder eine Nachricht schreiben.")
     audit(db, None, report, "nachgereicht", ", ".join(parts))
     cfg = get_settings(db)
-    for to in staff_recipients(db, report.employer, cfg):
-        _mail(db, cfg, to, "krank_staff_update", report, ereignis=" und ".join(parts))
+    attachments = None
+    if upload and report.employer and report.employer.attach_files:
+        try:
+            attachments = [{"filename": f"{report.ref_no}.pdf", "mime": "application/pdf",
+                            "content_b64": base64.b64encode(pdf(report)).decode()}]
+            if report.employer.attach_original_au and report.kind in {"au", "child"}:
+                attachments.append({"filename": file_name(f), "mime": f.mime,
+                                    "content_b64": base64.b64encode(read_file(f)).decode()})
+        except Exception:  # noqa: BLE001
+            log.exception("Nachgereichten Nachweis für %s nicht als Mailanhang erzeugt", report.ref_no)
+            attachments = None
+    recipients = staff_recipients(db, report.employer, cfg)
+    for to in recipients:
+        _mail(db, cfg, to, "krank_staff_update", report, attachments=attachments,
+              ereignis=" und ".join(parts))
+    if upload:
+        _mail_supervisors(db, report, cfg, set(recipients), only_document=f)
     sync_dms(db, report)
 
 
@@ -718,6 +734,112 @@ def forget_user(db, user: User) -> int:
 
 
 # --- Mails ---------------------------------------------------------------------------------------------
+
+def supervisor_recipients(db, employer: KrankEmployer | None) -> list[str]:
+    """Only active organizational leads within the employer's ancestry.
+
+    Requires explicit employer opt-in. Never grants access to the report or
+    assumes a leadership role alone is permission to receive AU files.
+    """
+    if employer is None or not employer.notify_supervisors or employer.org is None:
+        return []
+    from .org_models import OrgRoleGrant
+    from .orgs import path as org_path
+
+    lineage = org_path(employer.org)
+    org_ids = {node.id for node in lineage if node.active}
+    if employer.org.id not in org_ids:
+        return []
+    grants = db.scalars(select(OrgRoleGrant).where(
+        OrgRoleGrant.org_id.in_(org_ids),
+        OrgRoleGrant.role.in_(("lead", "deputy")),
+    )).all()
+    recipients = []
+    for grant in grants:
+        if grant.org_id != employer.org.id and not grant.include_children:
+            continue
+        if grant.user_id:
+            person = db.get(User, grant.user_id)
+            if person is not None and person.active and EMAIL_RE.match(person.email or ""):
+                recipients.append(person.email.lower())
+        if grant.group_id:
+            group_members = db.scalars(select(GroupMember).where(GroupMember.group_id == grant.group_id)).all()
+            for membership in group_members:
+                person = db.get(User, membership.user_id)
+                if person is not None and person.active and EMAIL_RE.match(person.email or ""):
+                    recipients.append(person.email.lower())
+    return list(dict.fromkeys(recipients))
+
+
+def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set[str],
+                      only_document: KrankFile | None = None) -> None:
+    """Opt-in role notifications. Medical attachments require *existing* report access."""
+    employer = report.employer
+    mode = employer.supervisor_attachment_mode if employer else "notice"
+    if mode not in {"notice", "pdf", "original"}:
+        mode = "notice"
+    for recipient in supervisor_recipients(db, employer):
+        user = db.scalar(select(User).where(func.lower(User.email) == recipient))
+        authorized = bool(user and user.active and can_see(db, user, report))
+        attachments = None
+        if authorized and mode == "pdf":
+            try:
+                attachments = [{"filename": f"{report.ref_no}.pdf", "mime": "application/pdf",
+                                "content_b64": base64.b64encode(pdf(report)).decode()}]
+            except Exception:  # noqa: BLE001
+                log.exception("Vorgesetzten-PDF für %s nicht erzeugt", report.ref_no)
+        elif authorized and mode == "original" and report.kind in {"au", "child"}:
+            try:
+                files = ([only_document] if only_document is not None else
+                         [f for f in report.files if f.source in {"meldung", "nachgereicht", "import"}])
+                attachments = [{"filename": file_name(f), "mime": f.mime,
+                                "content_b64": base64.b64encode(read_file(f)).decode()} for f in files] or None
+            except Exception:  # noqa: BLE001
+                log.exception("Vorgesetzten-AU für %s nicht geladen", report.ref_no)
+        # Revalidate at actual SMTP delivery, because permissions can change
+        # while an AU message waits in the queue.
+        if attachments and user is not None:
+            attachments[0]["_krank_supervisor_guard"] = {
+                "report_id": report.id, "user_id": user.id, "mode": mode,
+            }
+        # Already notified as an HR recipient: do not send duplicate notices.
+        if recipient in exclude and not attachments:
+            continue
+        subject = f"Abwesenheitsmeldung: {report.employer_name}"[:255]
+        body = (f"Guten Tag,\n\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
+                f"für {period(report)} eingegangen.\n\n"
+                "Details zur Bearbeitung erhalten Sie nur im Rahmen Ihrer "
+                "bestehenden Berechtigungen. " +
+                ("Die ausdrücklich freigegebenen Nachweise sind beigefügt." if attachments else
+                 "Ärztliche Nachweise und weitere vertrauliche Angaben sind nicht beigefügt."))
+        if notify.enqueue(db, recipient, subject, body, "krank", cfg, attachments=attachments):
+            add_event(report, "mail", f"Vorgesetztenhinweis an {recipient}", by="System")
+
+
+def supervisor_attachment_authorized(db, recipient: str, guard: dict) -> bool:
+    """Recheck AU delivery against live organizational roles and case access."""
+    if not isinstance(guard, dict):
+        return False
+    report_id, user_id, mode = (
+        guard.get("report_id"), guard.get("user_id"), guard.get("mode")
+    )
+    if (type(report_id) is not int or type(user_id) is not int
+            or mode not in {"pdf", "original"}):
+        return False
+    report = db.get(KrankReport, report_id)
+    user = db.get(User, user_id)
+    if not report or not user or not user.active:
+        return False
+    employer = report.employer
+    if (employer is None or not employer.active
+            or not employer.notify_supervisors
+            or employer.supervisor_attachment_mode != mode):
+        return False
+    if (user.email or "").strip().lower() != recipient.strip().lower():
+        return False
+    return (user.email.lower() in supervisor_recipients(db, employer)
+            and can_see(db, user, report))
+
 
 def staff_recipients(db, employer: KrankEmployer | None, cfg: dict[str, str]) -> list[str]:
     """Hinterlegte Adressen des Arbeitgebers, Portal-Zuständige (Personen und Gruppen), globale Kopie;
@@ -768,10 +890,23 @@ def _mail_staff_new(db, report: KrankReport, cfg: dict[str, str]) -> None:
         try:
             attachments = [{"filename": f"{report.ref_no}.pdf", "mime": "application/pdf",
                             "content_b64": base64.b64encode(pdf(report)).decode()}]
+            if employer.attach_original_au and report.kind in {"au", "child"}:
+                for document in report.files:
+                    if document.source not in {"meldung", "nachgereicht", "import"}:
+                        continue
+                    attachments.append({
+                        "filename": file_name(document),
+                        "mime": document.mime,
+                        "content_b64": base64.b64encode(read_file(document)).decode(),
+                    })
         except Exception:  # noqa: BLE001  (Mail ohne PDF ist besser als keine Mail)
-            log.exception("PDF für %s nicht erzeugt", report.ref_no)
-    for to in staff_recipients(db, employer, cfg):
-        _mail(db, cfg, to, "krank_staff_full" if full else "krank_staff_notice", report, attachments=attachments)
+            log.exception("PDF/Originalnachweis für %s nicht erzeugt", report.ref_no)
+            attachments = None
+    recipients = staff_recipients(db, employer, cfg)
+    for to in recipients:
+        _mail(db, cfg, to, "krank_staff_full" if full and attachments else "krank_staff_notice",
+              report, attachments=attachments)
+    _mail_supervisors(db, report, cfg, set(recipients))
 
 
 def purge_sent(n) -> None:
@@ -1122,6 +1257,14 @@ def _import_rows(db, con, zf, uploads, counts, user) -> None:
     tables = _tables(con)
     cfg = get_settings(db)
     by_name = {e.name: e for e in employers(db)}
+
+    def employer_node(name: str, color: str = "", active: bool = True) -> Organization:
+        node = db.scalar(select(Organization).where(Organization.name == name).order_by(Organization.id))
+        if node is None:
+            node = Organization(name=name, kind="arbeitgeber", color=color or "", active=active)
+            db.add(node)
+        return node
+
     if "employers" in tables:
         cols = {r[1] for r in con.execute("PRAGMA table_info('employers')")}
         for row in con.execute("SELECT * FROM employers"):
@@ -1131,6 +1274,7 @@ def _import_rows(db, con, zf, uploads, counts, user) -> None:
             emp = KrankEmployer(name=name, active=bool(row["active"]) if "active" in cols else True,
                                 color=(row["color"] if "color" in cols and re.fullmatch(r"#[0-9A-Fa-f]{6}", str(row["color"] or "")) else "#3B82F6"),
                                 position=int(row["sort_order"] or 0) if "sort_order" in cols else len(by_name))
+            emp.org = employer_node(name, emp.color, emp.active)
             db.add(emp)
             by_name[name] = emp
             counts["employers"] += 1
@@ -1140,6 +1284,7 @@ def _import_rows(db, con, zf, uploads, counts, user) -> None:
             emp = by_name.get(str(row["employer"] or "").strip())
             if emp is None:
                 emp = KrankEmployer(name=str(row["employer"]).strip()[:200], position=len(by_name))
+                emp.org = employer_node(emp.name)
                 db.add(emp)
                 by_name[emp.name] = emp
                 counts["employers"] += 1

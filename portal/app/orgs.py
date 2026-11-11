@@ -29,6 +29,7 @@ KINDS = {
     "kita": ("Kita", "fa-children", False),
     "schule": ("Schule", "fa-school", False),
     "betrieb": ("Eigenbetrieb / Werk", "fa-industry", False),
+    "arbeitgeber": ("Arbeitgeber", "fa-briefcase", False),
 }
 BODY_KINDS = tuple(k for k, v in KINDS.items() if v[2])
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
