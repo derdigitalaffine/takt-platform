@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from . import knowledge as km, knowledge_sources as sources
+from . import knowledge as km, knowledge_approvals as approvals, knowledge_sources as sources
 from .knowledge_models import (
     KnowledgeAmendment, KnowledgeAmendmentRevision, KnowledgeArticle,
 )
@@ -139,6 +139,7 @@ def amendment_page(request: Request, article_id: int,
     def resolve_source(path):
         return sources.resolve_reference(db, user, path)
 
+    approvals_received = approvals.current_reviewers(db, space, article, proposal) if proposal.status == "review" else set()
     return render(
         request, "knowledge_amendment.html", user, space=space, item=article,
         proposal=proposal, history=rows, difference=comparison,
@@ -146,7 +147,10 @@ def amendment_page(request: Request, article_id: int,
         proposal_html=km.render_markdown(proposal.body_md, resolve_source),
         kinds=km.KINDS,
         can_edit=km.allowed(db, user, space, "edit", article),
-        can_publish=km.can_approve_amendment(db, user, space, article, proposal),
+        can_publish=(km.can_approve_amendment(db, user, space, article, proposal)
+                     and approvals.can_record(user, proposal, approvals_received)),
+        approvals_received=len(approvals_received),
+        can_return=_may_see_proposal(db, user, space, article),
     )
 
 
@@ -188,12 +192,12 @@ def save_amendment(request: Request, article_id: int, title: str = Form(...),
     return redirect(f"/wissen/artikel/{article_id}/entwurf")
 
 
-def _transition_proposal(db, proposal, version, status):
+def _transition_proposal(db, proposal, version, status, **fields):
     result = db.execute(update(KnowledgeAmendment).where(
         KnowledgeAmendment.id == proposal.id,
         KnowledgeAmendment.version == version,
         KnowledgeAmendment.status == proposal.status,
-    ).values(status=status, version=version + 1, updated_at=utcnow())
+    ).values(status=status, version=version + 1, updated_at=utcnow(), **fields)
       .execution_options(synchronize_session=False))
     if result.rowcount != 1:
         db.rollback()
@@ -223,6 +227,10 @@ def amendment_status(request: Request, article_id: int,
     elif status == "published" and proposal.status == "review":
         if not km.can_approve_amendment(db, user, space, article, proposal):
             raise HTTPException(403, "Für die Freigabe ist eine unabhängige, berechtigte Person erforderlich.")
+        if not approvals.register(db, user, space, article, proposal):
+            db.commit()
+            flash(request, "Fachliche Freigabe erfasst. Eine weitere unabhängige Prüfung steht aus.")
+            return redirect(f"/wissen/artikel/{article_id}/entwurf")
         if not km.update_article(db, article, proposal.base_version,
                                  title=proposal.title, kind=proposal.kind, body_md=proposal.body_md,
                                  **km.publication_fields()):
@@ -237,7 +245,8 @@ def amendment_status(request: Request, article_id: int,
         return redirect(f"/wissen/artikel/{article_id}")
     else:
         raise HTTPException(409, "Dieser Statuswechsel ist nicht zulässig.")
-    _transition_proposal(db, proposal, version, status)
+    fields = {"required_approvals": space.required_approvals} if status == "review" else {}
+    _transition_proposal(db, proposal, version, status, **fields)
     km.remember_amendment(db, proposal, user.id,
                           "submit" if status == "review" else "return")
     km.audit(db, user, space.id, article.id, "amendment_status", status)

@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import knowledge as km, knowledge_sources as sources
+from . import knowledge as km, knowledge_approvals as approvals, knowledge_sources as sources
 from .db import Organization, User
 from .knowledge_models import (KnowledgeAmendment, KnowledgeArticle, KnowledgeGrant,
                                KnowledgeSpace, KnowledgeRevision)
@@ -155,13 +155,15 @@ def knowledge_article(request: Request, article_id: int,
     )) if (item.status == "published" and (can_edit or can_publish)) else None
     if proposal and proposal.status == "applied":
         proposal = None
+    approvals_received = approvals.current_reviewers(db, space, item) if item.status == "review" else set()
     return render(request, "knowledge_article.html", user, space=space,
                   item=item, history=history, grants=grants, proposal=proposal,
                   article_html=km.render_markdown(
                       item.body_md, lambda path: sources.resolve_reference(db, user, path)) if item.body_md else None,
                   kinds=km.KINDS, statuses=km.STATUSES, authorities=km.AUTHORITIES,
                   can_edit=can_edit,
-                  can_approve=km.can_approve_article(db, user, space, item),
+                  can_approve=km.can_approve_article(db, user, space, item) and approvals.can_record(user, item, approvals_received),
+                  approvals_received=len(approvals_received),
                   can_confirm=km.can_confirm_review(db, user, space, item),
                   today=km.review_today(), can_manage=user.is_admin)
 
@@ -211,7 +213,15 @@ def knowledge_article_status(request: Request, article_id: int,
         raise HTTPException(409, "Dieser Statuswechsel ist nicht zulässig.")
     if not km.allowed(db, user, space, cap, item):
         raise HTTPException(403)
-    fields = km.publication_fields() if status == "published" else {}
+    fields = {}
+    if status == "review":
+        fields["required_approvals"] = space.required_approvals
+    elif status == "published":
+        if not approvals.register(db, user, space, item):
+            db.commit()
+            flash(request, "Fachliche Freigabe erfasst. Eine weitere unabhängige Prüfung steht aus.")
+            return redirect(f"/wissen/artikel/{article_id}")
+        fields = km.publication_fields()
     if not km.update_article(db, item, version, status=status, **fields):
         raise HTTPException(409, "Der Artikel wurde inzwischen geändert.")
     km.record_revision(db, item, user.id)

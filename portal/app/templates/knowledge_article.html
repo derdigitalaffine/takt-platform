@@ -21,10 +21,13 @@
       </form>
     </details>
   {% endif %}
+  {% if item.status == "review" and item.required_approvals > 1 %}
+  <p class="small text-secondary mt-3">{{ approvals_received }} von {{ item.required_approvals }} unabhängigen Freigaben erfasst</p>
+  {% endif %}
   <div class="knowledge-status-actions">
     {% if item.status=='draft' and can_edit %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="review"><button class="btn btn-outline-primary">Zur Prüfung einreichen</button></form>{% endif %}
     {% if item.status=='review' and can_edit %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="draft"><button class="btn btn-outline-secondary">Zur Überarbeitung zurückgeben</button></form>{% endif %}
-    {% if can_approve %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="published"><button class="btn btn-primary">Fachlich freigeben</button></form>{% endif %}
+    {% if can_approve %}<form action="/wissen/artikel/{{item.id}}/status" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="version" value="{{item.version}}"><input type="hidden" name="status" value="published"><button class="btn btn-primary">{{ 'Freigabe erfassen' if item.required_approvals > 1 else 'Fachlich freigeben' }}</button></form>{% endif %}
   </div>
   {% if can_confirm %}
   <details class="knowledge-form-card mt-4">

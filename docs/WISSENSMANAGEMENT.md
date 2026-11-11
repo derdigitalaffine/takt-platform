@@ -230,3 +230,25 @@ bieten keinen Einstieg zu diesen Verweisen.
 Die Fachmodule bleiben für ihre Fassungen und Regeln zuständig. Ein Verweis
 folgt dem aktuellen Objektstand. Er erzeugt weder eine Kopie noch eine
 Kenntnisnahme oder eine KI-Indizierung.
+
+## Anzahl der fachlichen Freigaben je Raum
+
+Die zentrale Administration wählt in der Raumverwaltung eine oder zwei
+unabhängige Prüfpersonen. Beim Einreichen übernimmt TAKT die aktuell
+geltende Anzahl für diese Fassung. Bereits eingereichte Fassungen behalten
+ihre Vorgabe. Nach einer Rückgabe und erneuten Einreichung beginnt die
+Prüfung mit der dann gültigen Raumregel.
+
+Jede beteiligte Prüfperson braucht weiterhin das globale Freigaberecht und
+die aktuellen Objekt- und Organisationsrechte. Wer an der Fassung
+mitgewirkt hat, darf keine Stimme für sie abgeben. TAKT zählt jede berechtigte
+Person einmal. Wenn vor der Veröffentlichung Rechte entzogen werden,
+berücksichtigt TAKT die betreffende Stimme bei der Veröffentlichung nicht.
+Während der Prüfung eines Änderungsentwurfs bleibt die bisherige Fassung
+veröffentlicht.
+
+Die Freigabehistorie speichert die Versionsnummer, den Zeitpunkt und die
+interne Benutzerzuordnung. Beim Löschen eines Benutzerkontos wird diese
+Zuordnung entfernt. Die fachlichen Entscheidungen enthalten keinen
+Artikeltext. Die bestehende Aufbewahrung von Wissensfassungen und der
+gesonderte Freigabeprozess für verbindliche Regelungen gelten weiterhin.

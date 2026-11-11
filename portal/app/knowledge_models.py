@@ -23,6 +23,7 @@ class KnowledgeSpace(Base):
     owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    required_approvals: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
 
 
@@ -45,6 +46,7 @@ class KnowledgeArticle(Base):
     owner_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    required_approvals: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     version: Mapped[int] = mapped_column(Integer, default=1)
     authority: Mapped[str] = mapped_column(String(20), default="unconfirmed")
     review_due_on: Mapped[object | None] = mapped_column(Date, nullable=True)
@@ -71,6 +73,7 @@ class KnowledgeAmendment(Base):
         ForeignKey("knowledge_articles.id", ondelete="CASCADE"), index=True
     )
     base_version: Mapped[int] = mapped_column(Integer)
+    required_approvals: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     version: Mapped[int] = mapped_column(Integer, default=1)
     cycle_start_version: Mapped[int] = mapped_column(Integer, default=1)
     title: Mapped[str] = mapped_column(String(200))
@@ -164,4 +167,21 @@ class KnowledgeAudit(Base):
     )
     action: Mapped[str] = mapped_column(String(50))
     detail: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
+
+
+class KnowledgeApproval(Base):
+    """A reviewer decision tied to a particular submitted version."""
+    __tablename__ = "knowledge_approvals"
+    __table_args__ = (UniqueConstraint("article_id", "amendment", "version", "reviewer_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_articles.id", ondelete="CASCADE")
+    )
+    amendment: Mapped[bool] = mapped_column(Boolean)
+    version: Mapped[int] = mapped_column(Integer)
+    reviewer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
