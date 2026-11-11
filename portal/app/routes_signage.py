@@ -517,6 +517,34 @@ async def signage_route_edge(request: Request, user: User = Depends(manage_user)
     return redirect("/signage#routing")
 
 
+@app.post("/signage/route/node/{node_id:int}/delete", dependencies=[Depends(check_csrf)])
+def signage_delete_route_node(node_id: int, request: Request,
+                              user: User = Depends(manage_user), db: Session = Depends(get_db)):
+    _enabled()
+    node = db.get(SignageWayNode, node_id)
+    if not node:
+        raise HTTPException(404)
+    # Explicit deletes are coordinated with the DB's ON DELETE CASCADE for edges
+    # and display anchors, so no screen can retain a stale starting node.
+    db.delete(node)
+    db.commit()
+    flash(request, "Wegepunkt entfernt. Betroffene Wege und Displaypositionen bitte prüfen.")
+    return redirect("/signage#routing")
+
+
+@app.post("/signage/route/edge/{edge_id:int}/delete", dependencies=[Depends(check_csrf)])
+def signage_delete_route_edge(edge_id: int, request: Request,
+                              user: User = Depends(manage_user), db: Session = Depends(get_db)):
+    _enabled()
+    edge = db.get(SignageWayEdge, edge_id)
+    if not edge:
+        raise HTTPException(404)
+    db.delete(edge)
+    db.commit()
+    flash(request, "Wegeverbindung entfernt.")
+    return redirect("/signage#routing")
+
+
 @app.post("/signage/{sid:int}/anchor", dependencies=[Depends(check_csrf)])
 async def signage_route_anchor(sid: int, request: Request,
                                user: User = Depends(manage_user), db: Session = Depends(get_db)):
