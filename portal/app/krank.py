@@ -774,8 +774,8 @@ def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set
         if recipient in exclude:
             continue
         subject = f"Abwesenheitsmeldung: {report.employer_name}"[:255]
-        body = (f"Guten Tag,\\n\\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
-                f"für {period(report)} eingegangen.\\n\\n"
+        body = (f"Guten Tag,\n\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
+                f"für {period(report)} eingegangen.\n\n"
                 "Ein ärztlicher Nachweis, Diagnosen und sonstige vertrauliche Angaben "
                 "werden nicht an Vorgesetzte versendet. Für Rückfragen wenden Sie "
                 "sich bitte an die zuständige Personalverwaltung.")
