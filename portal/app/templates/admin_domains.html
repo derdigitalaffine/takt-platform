@@ -22,7 +22,7 @@
     {% for key, (label, start, prefixes) in modules_public.items() %}{% set d = current.get(key, '') %}
     <tr>
       <td><div class="fw-semibold">{{ label }}</div>{% if key not in modules %}<span class="badge text-bg-secondary">Modul aus</span>{% endif %}</td>
-      <td><input class="form-control form-control-sm" name="{{ key }}" value="{{ d }}" placeholder="z. B. {{ {'krank': 'krank', 'applications': 'antraege', 'resources': 'buchen', 'laws': 'recht', 'maps': 'karte', 'forms': 'formulare', 'polls': 'umfrage', 'bookings': 'termine'}[key] }}.{{ hosts.portal.split('.', 1)[-1] if '.' in hosts.portal else 'example.de' }}" aria-label="Domain für {{ label }}"></td>
+      <td><input class="form-control form-control-sm" name="{{ key }}" value="{{ d }}" placeholder="z. B. {{ key }}.{{ hosts.portal.split('.', 1)[-1] if '.' in hosts.portal else 'example.de' }}" aria-label="Domain für {{ label }}"></td>
       <td class="small">{{ portal }}{{ start or prefixes[0] ~ '/…' }}{% if d %}<br><a href="https://{{ d }}{{ '/' if start else '' }}" target="_blank" rel="noopener">https://{{ d }}{{ '/' if start else prefixes[0] ~ '/…' }}</a>{% endif %}</td>
       <td class="small">{% if d %}{% set r = dns[d] %}
         {% if not r.resolves %}<span class="badge text-bg-danger">kein DNS-Eintrag</span>
@@ -43,5 +43,20 @@
   <div class="card-footer"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>
     <span class="small text-secondary ms-2">Domain leeren = Modul nur noch unter der Portal-Domain.</span></div>
 </form>
-<p class="small text-secondary mt-3">Die Ablage (DMS) hat keine öffentlichen Seiten und deshalb keine eigene Domain.</p>
+<section class="card mt-3" aria-labelledby="portal-only-heading">
+  <div class="card-header"><h2 class="h6 mb-0" id="portal-only-heading"><i class="fa-solid fa-lock me-2" aria-hidden="true"></i>Module ohne eigene öffentliche Domain</h2></div>
+  <div class="card-body">
+    <p class="text-secondary small mb-3">Diese Module bleiben bewusst unter der Portal-Domain. Interne Verwaltungsseiten werden nicht über zusätzliche Domains freigegeben. Neue Module müssen in der Domain-Richtlinie explizit eingeordnet werden; ein automatischer Test prüft die Vollständigkeit.</p>
+    <div class="row g-2">
+      {% for key, reason in portal_only.items() %}
+      <div class="col-md-6 col-xl-4">
+        <div class="border rounded-3 p-3 h-100">
+          <div class="fw-semibold">{{ module_registry[key][0] }}</div>
+          <div class="small text-secondary mt-1">{{ reason }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 {% endblock %}

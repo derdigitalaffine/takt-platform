@@ -2673,13 +2673,14 @@ def admin_recordings(request: Request, user: User = Depends(admin_user), db: Ses
 @app.get("/admin/domains")
 async def admin_domains(request: Request, check: str = "", user: User = Depends(admin_user), db: Session = Depends(get_db)):
     """Eigene Domains je Modul (zusätzlich zur Portal-Domain)."""
+    modhosts.assert_module_coverage(MODULES)
     cfg = get_settings(db)
     current = modhosts.domains(cfg)
     short = (cfg.get("short_domain") or "").strip().lower()
     names = [*current.values(), *([short] if short else [])]
     dns = await asyncio.gather(*(asyncio.to_thread(proxy.dns_check, d) for d in names))
     certs = await asyncio.gather(*(asyncio.to_thread(proxy.inspect, d) for d in names)) if check else []
-    return render(request, "admin_domains.html", user, cfg=cfg, modules_public=modhosts.MODULE_PUBLIC, current=current,
+    return render(request, "admin_domains.html", user, cfg=cfg, modules_public=modhosts.MODULE_PUBLIC, portal_only=modhosts.PORTAL_ONLY, module_registry=MODULES, current=current,
                   short=short, dns=dict(zip(names, dns)), certs=dict(zip(names, certs)), checked=bool(check),
                   hosts=proxy.hosts(), available=proxy.available(), public_ips=settings.public_ips,
                   portal=settings.portal_base_url)
@@ -2687,6 +2688,7 @@ async def admin_domains(request: Request, check: str = "", user: User = Depends(
 
 @app.post("/admin/domains", dependencies=[Depends(check_csrf)])
 async def admin_domains_save(request: Request, user: User = Depends(admin_user), db: Session = Depends(get_db)):
+    modhosts.assert_module_coverage(MODULES)
     form = await request.form()
     cfg = get_settings(db)
     new = {key: modhosts.clean(str(form.get(key) or "")) for key in modhosts.MODULE_PUBLIC}
