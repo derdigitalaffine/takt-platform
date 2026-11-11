@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app import booking_integration, bookings, calendar_sources, notify
 from app.calendar_models import Calendar, CalendarEvent
 from app.db import Booking, BookingPage, BookingType, BookingWindow, get_settings, to_local, utcnow
-from conftest import login, settings
+from conftest import csrf_of, login, settings
 from test_native_tasks import task_people
 
 
@@ -47,6 +47,7 @@ def test_assigned_booking_visible_only_to_staff_and_external_feeds_anonymous(db,
         c = login(provider.email, "task-passwort-123")
         detail = c.get(f"/kalender/buchungen/{booking.id}")
         assert detail.status_code == 200 and "Erika Vertraulich" in detail.text
+        assert "Anfrage bestätigen" in detail.text
         not_allowed = login(stranger.email, "task-passwort-123")
         assert not_allowed.get(f"/kalender/buchungen/{booking.id}").status_code == 404
 
@@ -57,6 +58,12 @@ def test_assigned_booking_visible_only_to_staff_and_external_feeds_anonymous(db,
         assert "Erika Vertraulich" not in feed
         assert "TENTATIVE" in feed
         assert "/b/m/" not in feed
+
+        confirmed = c.post(f"/kalender/buchungen/{booking.id}/bestaetigen",
+                           data={"csrf": csrf_of(detail.text)}, follow_redirects=False)
+        assert confirmed.status_code == 303
+        db.refresh(booking)
+        assert booking.status == "booked"
 
         bt.privacy_mode = "busy"
         db.commit()
