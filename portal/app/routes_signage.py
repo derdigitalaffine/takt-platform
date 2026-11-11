@@ -611,3 +611,25 @@ async def signage_office(request: Request, user: User = Depends(manage_user), db
     db.commit()
     flash(request, "Bürozuordnung gespeichert; öffentliche Freigabe wird separat gesteuert.")
     return redirect("/signage#offices")
+
+
+@app.post("/profile/signage/office/{office_id:int}/visibility",
+          dependencies=[Depends(check_csrf)])
+async def signage_own_directory_visibility(
+        office_id: int, request: Request,
+        user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """A person can withdraw (or explicitly enable) their own directory entry.
+
+    They may not invent workplace assignments or alter a colleague's location.
+    """
+    _enabled()
+    office = db.get(SignageOffice, office_id)
+    if not office or office.user_id != user.id:
+        raise HTTPException(404)
+    form = await request.form()
+    if form.get("public") not in ("0", "1"):
+        raise HTTPException(422)
+    office.public = form.get("public") == "1"
+    db.commit()
+    flash(request, "Sichtbarkeit deiner dienstlichen Bürozuordnung aktualisiert.")
+    return redirect("/profile#signage-offices")
