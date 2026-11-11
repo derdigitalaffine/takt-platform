@@ -770,6 +770,7 @@ class Notification(Base):
     reply_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # JSON-Liste von Anhängen: {"filename", "content", "calendar_method"?}
     attachments_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    guard_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # bounded delivery-time authorization metadata
 
 
 class ShortLink(Base):
@@ -3032,6 +3033,7 @@ _NEW_COLUMNS = {
                       "integration_json": "TEXT NOT NULL DEFAULT '{}'"},
     "booking_types": {"privacy_mode": "VARCHAR(12) NOT NULL DEFAULT 'inherit'",
                       "routing_json": "TEXT NOT NULL DEFAULT '{}'"},
+    "notifications": {"guard_json": "TEXT"},
     "bookings": {"type_id": "INTEGER REFERENCES booking_types(id) ON DELETE SET NULL",
                  "provider_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL", "answers_json": "TEXT NOT NULL DEFAULT ''",
                  "escalated_at": "DATETIME"},
