@@ -580,7 +580,7 @@ def escalate_pending_requests(db, *, now: datetime | None = None) -> int:
             f"Buchungsseite: {item.page.title}\n"
             "Bitte prüfen Sie die Anfrage zeitnah oder weisen Sie die Bearbeitung "
             "einer zuständigen Person zu.\n\n"
-            f"Anfragen in TAKT öffnen: {link}\n\n"
+            f"Anfragen in TAKT öffnen:\n{link}\n\n"
             "Aus Datenschutzgründen enthält diese Erinnerung keine Bürgerdaten.\n\n"
             + mailtpl.common_vars()["fusszeile"]
         )
@@ -591,11 +591,23 @@ def escalate_pending_requests(db, *, now: datetime | None = None) -> int:
 
 
 def send_escalations() -> int:
-    """Worker entry point: serialize idempotent escalation and commit queue items."""
+    """Worker entry point; avoid write locks until a request is genuinely overdue."""
+    from .booking_integration import escalation_hours
     from .leave import lock
     with SessionLocal() as db:
+        now = utcnow()
+        due = db.scalars(select(Booking).where(
+            Booking.status == "requested",
+            Booking.escalated_at.is_(None),
+            Booking.created_at < now,
+            Booking.starts_at > now,
+        )).all()
+        if not any(escalation_hours(b.page) and
+                   b.created_at <= now - timedelta(hours=escalation_hours(b.page))
+                   and b.page.owner is not None and b.page.owner.active for b in due):
+            return 0
         lock(db)
-        count = escalate_pending_requests(db)
+        count = escalate_pending_requests(db, now=now)
         db.commit()
     return count
 
