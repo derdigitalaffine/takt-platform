@@ -213,10 +213,13 @@ def waypoints(db, screen: SignageScreen) -> list[dict]:
         .where(SignageBuilding.active.is_(True))
         .order_by(SignageBuilding.name, SignageFloor.level, SignageRoom.number).limit(150)).all()
     origin = db.get(SignageDisplayAnchor, screen.id)
-    nodes = db.scalars(select(SignageWayNode).join(
+    nodes_query = select(SignageWayNode).join(
         SignageFloor, SignageWayNode.floor_id == SignageFloor.id).join(
         SignageBuilding, SignageFloor.building_id == SignageBuilding.id).where(
-        SignageBuilding.active.is_(True)).limit(3000)).all() if origin else []
+        SignageBuilding.active.is_(True))
+    if screen.org_id is not None:
+        nodes_query = nodes_query.where(SignageBuilding.org_id == screen.org_id)
+    nodes = db.scalars(nodes_query.limit(3000)).all() if origin else []
     edge_rows = db.scalars(select(SignageWayEdge).limit(7000)).all() if nodes else []
     nodes_by_id = {node.id: node for node in nodes}
     simple_paths = shortest_paths(nodes, edge_rows, origin.node_id) if origin else {}
@@ -240,7 +243,8 @@ def waypoints(db, screen: SignageScreen) -> list[dict]:
         dict(number=room.number, label=room.name or "Raum", building=building.name,
              floor=floor.name, accessible=room.accessible,
              route=describe(simple_paths.get(room_node.get(room.id))),
-             accessible_route=describe(accessible_paths.get(room_node.get(room.id))))
+             accessible_route=(describe(accessible_paths.get(room_node.get(room.id)))
+                               if room.accessible else None))
         for room, floor, building in rows
         if screen.org_id is None or building.org_id == screen.org_id
     ]
