@@ -552,3 +552,50 @@ def test_new_employer_creates_organization_node_and_uses_org_name():
         node = db.get(Organization, emp.org_id)
         assert node.name == emp.name
         assert node.kind == "arbeitgeber"
+
+
+def test_supervisor_original_or_pdf_requires_existing_report_access():
+    from app.db import Organization
+    from app.org_models import OrgRoleGrant
+    import base64
+
+    _staff_user("manager-au@example.org", "krank_admin")
+    with SessionLocal() as db:
+        node = Organization(name="Arbeitgeber mit AU-Policy", kind="arbeitgeber")
+        db.add(node)
+        db.flush()
+        person = db.scalar(select(User).where(User.email == "manager-au@example.org"))
+        db.add(OrgRoleGrant(org_id=node.id, user_id=person.id, role="lead",
+                            include_children=True))
+        emp = KrankEmployer(name="Arbeitgeber AU-Policy", org_id=node.id,
+                            notify_supervisors=True, supervisor_attachment_mode="original")
+        db.add(emp)
+        db.commit()
+        employer_id = emp.id
+
+    pc = public_client()
+    submit(pc, "au", first_name="Anna", last_name="Original", employer=str(employer_id),
+           **{"from": "2026-10-05", "to": "2026-10-06", "first": "1"},
+           files={"file": ("ärztliche-au.pdf", PDF, "application/pdf")})
+    with SessionLocal() as db:
+        notice = db.scalar(select(Notification).where(
+            Notification.to_addr == "manager-au@example.org").order_by(Notification.id.desc()))
+        originals = json.loads(notice.attachments_json)
+        assert len(originals) == 1
+        assert originals[0]["filename"] == "ärztliche-au.pdf"
+        assert base64.b64decode(originals[0]["content_b64"]) == PDF
+        emp = db.get(KrankEmployer, employer_id)
+        emp.supervisor_attachment_mode = "pdf"
+        db.commit()
+
+    submit(pc, "au", first_name="Bernd", last_name="Sammelpdf", employer=str(employer_id),
+           **{"from": "2026-10-05", "to": "2026-10-06", "first": "1"},
+           files={"file": ("original-au.pdf", PDF, "application/pdf")})
+    with SessionLocal() as db:
+        notice = db.scalar(select(Notification).where(
+            Notification.to_addr == "manager-au@example.org").order_by(Notification.id.desc()))
+        files = json.loads(notice.attachments_json)
+        assert len(files) == 1
+        assert files[0]["filename"].startswith("KM-")
+        assert files[0]["filename"].endswith(".pdf")
+        assert base64.b64decode(files[0]["content_b64"]).startswith(b"%PDF")
