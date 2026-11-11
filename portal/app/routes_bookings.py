@@ -169,6 +169,27 @@ def booking_events(page_id: int, user: User = Depends(current_user), db: Session
     return JSONResponse(bk.calendar_events(_bpage(db, page_id, user, sh.VIEW)[0]))
 
 
+def _window_change_payload(page: BookingPage, message: str) -> dict:
+    """Aktuelle Kalenderdaten und kleine Vorschau ohne erneutes Laden der gesamten Seite."""
+    free = bk.bookable(page)
+    days = bk.group_by_day(free)
+    return {
+        "ok": True, "message": message, "events": bk.calendar_events(page),
+        "availability": {
+            "free_count": sum(s["free"] for s in free),
+            "slot_count": len(bk.slots(page)),
+            "window_count": len(page.windows),
+            "days": [
+                {"label": f'{day["weekday_long"]}, {day["full"]}',
+                 "count": len(day["slots"]),
+                 "slots": [{"time": slot["time"], "free": slot["free"]}
+                           for slot in day["slots"][:8]]}
+                for day in days[:7]
+            ],
+        },
+    }
+
+
 @app.post("/bookings/{page_id}/windows", dependencies=[Depends(check_csrf)])
 async def booking_window_add(request: Request, page_id: int, user: User = Depends(current_user),
                              db: Session = Depends(get_db)):
@@ -192,13 +213,15 @@ async def booking_window_add(request: Request, page_id: int, user: User = Depend
             if error:
                 break
             created += 1
-    if created:
-        db.commit()
-    else:
+    if error:
+        # Eine Wiederholung ist eine Transaktion: nie nur einzelne Wochen übernehmen.
         db.rollback()
+    else:
+        db.commit()
     if ajax:
-        return JSONResponse({"ok": not error, "error": error, "events": bk.calendar_events(page)},
-                            status_code=200 if not error else 422)
+        if error:
+            return JSONResponse({"ok": False, "error": error}, status_code=422)
+        return JSONResponse(_window_change_payload(page, f"{created} Zeitbereich(e) hinzugefügt."))
     if error:
         flash(request, error, "error")
     else:
@@ -220,7 +243,7 @@ def booking_window_delete(request: Request, page_id: int, wid: int, user: User =
     msg = "Zeitbereich entfernt." + (f" {len(affected)} Buchung(en) darin bleiben bestehen – sagen Sie sie bei "
                                      "Bedarf unten ab." if affected else "")
     if request.headers.get("x-requested-with") == "fetch":
-        return JSONResponse({"ok": True, "message": msg, "events": bk.calendar_events(page)})
+        return JSONResponse(_window_change_payload(page, msg))
     flash(request, msg)
     return redirect(f"/bookings/{page.id}#kalender")
 
@@ -237,7 +260,10 @@ def booking_windows_clear(request: Request, page_id: int, user: User = Depends(c
             db.delete(w)
             removed += 1
     db.commit()
-    flash(request, f"{removed} künftige Zeitbereiche entfernt. Bestehende Buchungen bleiben erhalten.")
+    msg = f"{removed} künftige Zeitbereiche entfernt. Bestehende Buchungen bleiben erhalten."
+    if request.headers.get("x-requested-with") == "fetch":
+        return JSONResponse(_window_change_payload(page, msg))
+    flash(request, msg)
     return redirect(f"/bookings/{page.id}#kalender")
 
 
