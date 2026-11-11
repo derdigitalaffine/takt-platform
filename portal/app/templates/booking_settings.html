@@ -80,6 +80,17 @@
             <option value="type" {% if integration.get('external_calendar') == 'type' %}selected{% endif %}>Terminart ohne Bürgerdaten (außer vertrauliche Arten)</option>
           </select></div>
       </div>
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6 col-lg-4">
+          <label class="form-label" for="booking-escalation-hours">Unbestätigte Anfragen erneut melden</label>
+          <div class="input-group">
+            <input class="form-control" type="number" id="booking-escalation-hours" name="approval_escalation_hours"
+                   min="0" max="168" step="1" value="{{ integration.get('approval_escalation_hours', 0) }}">
+            <span class="input-group-text">Std.</span>
+          </div>
+          <div class="form-text">0 = aus (Standard). Bei einer offenen Terminanfrage erhält die aktuell zuständige Person nach Ablauf der Frist einmalig eine Erinnerung. Der Seitenbesitzer wird nur mit der bestehenden Benachrichtigungseinstellung informiert.</div>
+        </div>
+      </div>
       {{ sw('staff_calendar_attachment', 'Kalenderdatei zusätzlich in interne Benachrichtigungen aufnehmen', integration.get('staff_calendar_attachment', False), 'Optional: Mitarbeitende können Termin-ICS-Dateien importieren. Wer den TAKT-Kalender bereits abonniert hat, braucht diese Option nicht.') }}
       <p class="form-text">Kalenderdateien für Bürger werden weiterhin automatisch mit verbindlichen Bestätigungen, Änderungen und Absagen verschickt. Erinnerungen, Vorlagen und Branding bleiben über die zentrale E-Mail-Konfiguration verwaltbar.</p>
       <a href="/kalender?ansicht=termine" class="btn btn-sm btn-outline-secondary"><i class="fa-regular fa-calendar me-1"></i>Kalendermodul öffnen</a>
