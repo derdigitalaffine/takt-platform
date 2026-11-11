@@ -795,8 +795,8 @@ def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set
         if recipient in exclude and not attachments:
             continue
         subject = f"Abwesenheitsmeldung: {report.employer_name}"[:255]
-        body = (f"Guten Tag,\\n\\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
-                f"für {period(report)} eingegangen.\\n\\n"
+        body = (f"Guten Tag,\n\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
+                f"für {period(report)} eingegangen.\n\n"
                 "Details zur Bearbeitung erhalten Sie nur im Rahmen Ihrer "
                 "bestehenden Berechtigungen. " +
                 ("Die ausdrücklich freigegebenen Nachweise sind beigefügt." if attachments else
