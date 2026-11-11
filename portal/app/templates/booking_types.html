@@ -53,8 +53,18 @@
 <a class="btn btn-outline-secondary" href="/bookings/{{ page.id }}"><i class="fa-solid fa-arrow-left me-1"></i>Zur Buchungsseite</a>
 <a class="btn btn-outline-secondary" href="/b/{{ page.public_token }}" target="_blank"><i class="fa-regular fa-eye me-1"></i>Bürgersicht</a>
 {% endcall %}</div>
+<nav class="bk-section-nav" aria-label="Terminarten konfigurieren">
+  <a href="#arten-liste"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Terminarten</a>
+  <a href="#neue-terminart"><i class="fa-solid fa-plus" aria-hidden="true"></i>Neue Terminart</a>
+  <a href="#sprechzeiten"><i class="fa-regular fa-clock" aria-hidden="true"></i>Sprechzeiten</a>
+  <a href="#ausnahmen"><i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i>Ausnahmen</a>
+</nav>
+<div class="bk-calendar-guide mb-3"><span class="bk-guide-icon"><i class="fa-solid fa-list-ol" aria-hidden="true"></i></span>
+  <div><strong>In drei Schritten zu buchbaren Terminen</strong><p class="mb-0">Terminart anlegen, zuständige Personen zuweisen und anschließend deren wöchentliche Sprechzeiten festlegen. Freie Zeiten erscheinen automatisch in der Buchung.</p></div>
+</div>
 {% if not page.extended %}<div class="alert alert-warning">Der erweiterte Umfang ist für diese Seite nicht eingeschaltet – die Terminarten wirken erst, wenn Sie ihn in den <a href="/bookings/{{ page.id }}/settings">Einstellungen</a> einschalten.</div>{% endif %}
 
+<div id="arten-liste"></div>
 {% for t in page.types %}
 <div class="card mb-3 {{ 'opacity-75' if not t.active }}" id="art-{{ t.id }}">
   <div class="card-header d-flex flex-wrap align-items-center gap-2">
@@ -65,11 +75,11 @@
   </div>
   <div class="card-body">
     <div class="small mb-3">{% if previews[t.id] %}<i class="fa-regular fa-calendar-check text-success me-1"></i>Nächste freie Termine: {% for s in previews[t.id] %}{{ label(s.start) }}{{ ', ' if not loop.last }}{% endfor %}{% else %}<i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>Zurzeit keine freien Termine – Zuständige und Sprechzeiten prüfen.{% endif %}</div>
-    <details><summary class="mb-2">Bearbeiten</summary>{{ type_form(t) }}</details>
+    <details class="bk-window-form-wrap"><summary class="mb-2 fw-semibold"><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Terminart bearbeiten</summary>{{ type_form(t) }}</details>
   </div>
 </div>
 {% endfor %}
-<div class="card mb-4 border-primary-subtle"><div class="card-header"><i class="fa-solid fa-plus me-2"></i>Neue Terminart</div><div class="card-body">{{ type_form() }}</div></div>
+<div class="card mb-4 border-primary-subtle" id="neue-terminart"><div class="card-header"><i class="fa-solid fa-plus me-2"></i>Neue Terminart</div><div class="card-body">{{ type_form() }}</div></div>
 
 <div class="row g-4">
   <div class="col-12 col-xl-7" id="sprechzeiten"><div class="card h-100"><div class="card-header"><i class="fa-regular fa-clock me-2"></i>Sprechzeiten (wöchentlich)</div>
