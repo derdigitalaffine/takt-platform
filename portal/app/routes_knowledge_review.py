@@ -11,19 +11,16 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from . import knowledge as km
+from . import knowledge as km, knowledge_sources as sources
 from .knowledge_models import (
     KnowledgeAmendment, KnowledgeAmendmentRevision, KnowledgeArticle,
 )
 from .db import User, utcnow
 from .main import (
     app, check_csrf, current_user, flash, get_db, rate_limit, redirect,
-    render, templates,
+    render,
 )
 from .routes_knowledge import _article, _reader, _require_text, _space
-
-templates.env.filters["knowledge_markdown"] = km.render_markdown
-
 
 def _proposal(db, article_id: int) -> KnowledgeAmendment:
     result = db.scalar(select(KnowledgeAmendment).where(
@@ -69,7 +66,8 @@ def knowledge_preview(request: Request, body_md: str = Form(""),
         _space(db, user, space_id, "edit")
     if len(body_md) > 60000:
         raise HTTPException(422, "Text ist zu lang.")
-    return JSONResponse({"html": str(km.render_markdown(body_md))},
+    preview = km.render_markdown(body_md, lambda path: sources.resolve_reference(db, user, path))
+    return JSONResponse({"html": str(preview)},
                         headers={"Cache-Control": "no-store"})
 
 
@@ -138,9 +136,14 @@ def amendment_page(request: Request, article_id: int,
         fromfile="Veröffentlichte Fassung", tofile="Änderungsentwurf",
         lineterm="",
     ))[:15000]
+    def resolve_source(path):
+        return sources.resolve_reference(db, user, path)
+
     return render(
         request, "knowledge_amendment.html", user, space=space, item=article,
         proposal=proposal, history=rows, difference=comparison,
+        article_html=km.render_markdown(article.body_md, resolve_source),
+        proposal_html=km.render_markdown(proposal.body_md, resolve_source),
         kinds=km.KINDS,
         can_edit=km.allowed(db, user, space, "edit", article),
         can_publish=km.can_approve_amendment(db, user, space, article, proposal),

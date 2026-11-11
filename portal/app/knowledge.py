@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import select, update
 from markdown_it import MarkdownIt
+from markdown_it.token import Token
 from markupsafe import Markup
 
 from .db import LOCAL_TZ, Group, GroupMember, Organization, User, get_settings, utcnow
@@ -47,9 +48,39 @@ EDITOR_AUTHORITIES = {"unconfirmed", "experience", "verified"}
 _MD = MarkdownIt("commonmark", {"html": False, "linkify": False}).enable("table")
 
 
-def render_markdown(raw: str | None) -> Markup:
-    """Render stored Markdown without ever treating embedded HTML as trusted."""
-    return Markup(_MD.render(raw or ""))
+def parse_markdown(raw: str | None):
+    return _MD.parse(raw or "")
+
+
+def render_markdown(raw: str | None, resolve_source=None) -> Markup:
+    """Render Markdown and replace reserved reference labels using live ACLs."""
+    from .knowledge_sources import REFERENCE
+
+    tokens = parse_markdown(raw)
+    sources = {}
+    for token in tokens:
+        if not token.children:
+            continue
+        rewritten = []
+        children = iter(token.children)
+        for child in children:
+            href = child.attrGet("href") if child.type == "link_open" else None
+            if not href or not REFERENCE.fullmatch(href):
+                rewritten.append(child)
+                continue
+            if href not in sources:
+                sources[href] = resolve_source(href) if resolve_source else None
+            source = sources[href]
+            for close in children:
+                if close.type == "link_close":
+                    break
+            if source is None:
+                rewritten.append(Token("text", "", 0, content="Quelle nicht verfügbar"))
+                continue
+            child.attrs.pop("title", None)
+            rewritten.extend((child, Token("text", "", 0, content=source.label), close))
+        token.children = rewritten
+    return Markup(_MD.renderer.render(tokens, _MD.options, {}))
 
 
 def remember_amendment(db, proposal, actor_id: int, action: str) -> None:

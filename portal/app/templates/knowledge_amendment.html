@@ -14,12 +14,12 @@
     <section class="knowledge-compare-pane" aria-labelledby="published-title">
       <div class="knowledge-compare-head"><h2 id="published-title">Veröffentlichte Fassung</h2><span>Version {{item.version}}</span></div>
       <p class="fw-semibold">{{item.title}}</p>
-      <div class="knowledge-markdown">{{item.body_md|knowledge_markdown}}</div>
+      <div class="knowledge-markdown">{{article_html}}</div>
     </section>
     <section class="knowledge-compare-pane" aria-labelledby="proposed-title">
       <div class="knowledge-compare-head"><h2 id="proposed-title">Änderungsentwurf</h2><span>Stand {{proposal.version}}</span></div>
       <p class="fw-semibold">{{proposal.title}}</p>
-      <div class="knowledge-markdown">{{proposal.body_md|knowledge_markdown}}</div>
+      <div class="knowledge-markdown">{{proposal_html}}</div>
     </section>
   </div>
   {% if proposal.status == "draft" and can_edit %}

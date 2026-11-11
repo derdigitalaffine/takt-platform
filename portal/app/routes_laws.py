@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import law_catalog as catalog, law_io, laws as lx, laws_meta, links, sessions
+from .knowledge_sources import contextual_link
 from .db import Form as FormModel
 from .db import (
     LawAttachment, LawLevel, LawSection, LawText, LawVersion, SessionLocal, User, get_settings, set_setting,
@@ -198,6 +199,7 @@ def _law_page(request: Request, db: Session, embed: bool, slug: str, anchor: str
         if version is not None:
             map_link += f'?version={version.id}'
     return _cookieless(request, render(request, "recht_law.html", user, law=law, roots=roots, flat=flat, current=current,
+                  knowledge_source=contextual_link(db, user, "rechtstext", law) if not embed and version is None else None,
                   map_link=map_link,
                   prev=flat[idx - 1] if current and idx > 0 else None,
                   next=flat[idx + 1] if current and idx + 1 < len(flat) else None,

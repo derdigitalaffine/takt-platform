@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import applications as apps, forms as fm, worker, workflow as wf
+from .knowledge_sources import contextual_link
 from .db import (
     LOCAL_TZ, ApplicationDocument, ApplicationRequest, ApplicationTask, FormResponse, Group, Process,
     RequestTemplate, User, utcnow, to_local,
@@ -554,6 +555,7 @@ def process_editor(request: Request, process_id: int, user: User = Depends(proce
         by_id = {a.id: a for a in dms.areas(db)}
         dms_areas = [(a, d, dms.label(a, by_id)) for a, d in dms.tree(db)]
     return render(request, "process_editor.html", user, process=process, editor=editor, usage=use,
+                  knowledge_source=contextual_link(db, user, "prozess", process),
                   hints=wf.check(definition, db), dms_areas=dms_areas)
 
 

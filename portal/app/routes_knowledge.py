@@ -1,9 +1,10 @@
 """Manual, organization-scoped TAKT Wissen UI; no implicit AI/RAG ingestion."""
 from fastapi import Depends, Form, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import knowledge as km
+from . import knowledge as km, knowledge_sources as sources
 from .db import Organization, User
 from .knowledge_models import (KnowledgeAmendment, KnowledgeArticle, KnowledgeGrant,
                                KnowledgeSpace, KnowledgeRevision)
@@ -156,6 +157,8 @@ def knowledge_article(request: Request, article_id: int,
         proposal = None
     return render(request, "knowledge_article.html", user, space=space,
                   item=item, history=history, grants=grants, proposal=proposal,
+                  article_html=km.render_markdown(
+                      item.body_md, lambda path: sources.resolve_reference(db, user, path)) if item.body_md else None,
                   kinds=km.KINDS, statuses=km.STATUSES, authorities=km.AUTHORITIES,
                   can_edit=can_edit,
                   can_approve=km.can_approve_article(db, user, space, item),
@@ -296,3 +299,30 @@ def knowledge_article_scope(request: Request, article_id: int,
         km.audit(db, user, space.id, item.id, "scope_change", scope)
         db.commit()
     return redirect(f"/wissen/artikel/{article_id}")
+
+
+@app.get("/wissen/quelle/{kind}/{row_id:int}/{fingerprint}")
+@app.get("/wissen/quelle/{kind}/{row_id:int}/{fingerprint}/wissen")
+def knowledge_source(request: Request, kind: str, row_id: int, fingerprint: str,
+                     user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _reader(user, db)
+    reference = f"/wissen/quelle/{kind}/{row_id}/{fingerprint}"
+    source = sources.resolve_reference(db, user, reference)
+    if source is None:
+        raise HTTPException(404, "Quelle nicht verfügbar.")
+    if not request.url.path.endswith("/wissen"):
+        return RedirectResponse(source.url, status_code=303, headers={"Cache-Control": "private, no-store"})
+
+    articles = []
+    query = (select(KnowledgeArticle, KnowledgeSpace).join(KnowledgeSpace)
+             .where(KnowledgeArticle.status == "published", KnowledgeArticle.body_md.contains(reference))
+             .order_by(KnowledgeArticle.title, KnowledgeArticle.id))
+    for item, space in db.execute(query.execution_options(yield_per=100)):
+        if km.allowed(db, user, space, article=item) and reference in sources.references_in(km.parse_markdown(item.body_md)):
+            articles.append((item, space))
+            if len(articles) == 60:
+                break
+    response = render(request, "knowledge_source.html", user, source=source, articles=articles,
+                      snippet=f"[{sources.TYPES[kind].label}]({reference})" if user.can("knowledge_edit") else None)
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
