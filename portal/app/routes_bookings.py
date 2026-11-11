@@ -84,7 +84,7 @@ def bookings_list(request: Request, all: str = "", user: User = Depends(current_
     upcoming = dict(db.execute(select(Booking.page_id, func.count(Booking.id))
                                .where(Booking.status == "booked", Booking.starts_at >= now)
                                .group_by(Booking.page_id)).all())
-    free = {p.id: sum(s["free"] for s in bk.free_slots(db, p)) for p in list(pages) + [p for p, _ in shared]
+    free = {p.id: sum(s["free"] for s in bk.free_slots(db, p)) for p in list(pages) + [p for p, _ in shared]}
     return render(request, "bookings.html", user, pages=pages, upcoming=upcoming, free=free, show_all=show_all,
                   shared=shared, levels=sh.LEVELS["booking"])
 
