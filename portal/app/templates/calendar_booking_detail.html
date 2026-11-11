@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Bürgertermin · Kalender{% endblock %}
+{% block content %}
+<div class="planning-workspace" style="max-width:52rem;margin-inline:auto">
+  <nav class="mb-3"><a class="ds-back-link" href="/kalender?ansicht=termine"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Zurück zum Kalender</a></nav>
+  <section class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <span class="rounded-3 p-3 bg-primary-subtle text-primary"><i class="fa-regular fa-calendar-check fa-lg" aria-hidden="true"></i></span>
+        <div class="flex-grow-1">
+          <p class="text-secondary small fw-semibold mb-1">TAKT · Terminbuchung</p>
+          <h1 class="h4 mb-0">{{ booking.type.name if booking.type and show_details else page.title }}</h1>
+        </div>
+        {% if booking.status == 'requested' %}<span class="badge text-bg-warning">Bestätigung ausstehend</span>
+        {% else %}<span class="badge text-bg-success">Gebucht</span>{% endif %}
+      </div>
+      <dl class="row g-2 mb-3">
+        <dt class="col-sm-3 text-secondary">Termin</dt><dd class="col-sm-9 fw-semibold">{{ when }}</dd>
+        {% if show_details %}
+        <dt class="col-sm-3 text-secondary">Bürger:in</dt><dd class="col-sm-9">{{ booking.name }}</dd>
+        {% if booking.type %}<dt class="col-sm-3 text-secondary">Anliegen</dt><dd class="col-sm-9">{{ booking.type.name }}</dd>{% endif %}
+        {% if booking.provider %}<dt class="col-sm-3 text-secondary">Zuständig</dt><dd class="col-sm-9">{{ booking.provider.name }}</dd>{% endif %}
+        {% if booking.type and booking.type.location %}<dt class="col-sm-3 text-secondary">Ort</dt><dd class="col-sm-9">{{ booking.type.location }}</dd>
+        {% elif page.location %}<dt class="col-sm-3 text-secondary">Ort</dt><dd class="col-sm-9">{{ page.location }}</dd>{% endif %}
+        {% else %}<dt class="col-sm-3 text-secondary">Details</dt><dd class="col-sm-9 text-secondary">Aus Datenschutzgründen nur als belegter Zeitraum sichtbar.</dd>{% endif %}
+      </dl>
+      <div class="d-flex flex-wrap gap-2">
+        {% if can_open %}<a class="btn btn-primary" href="/bookings/{{ page.id }}{% if can_manage %}?status={{ 'requested' if booking.status == 'requested' else 'upcoming' }}{% endif %}"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>{{ 'Buchung verwalten' if can_manage else 'Buchungsübersicht öffnen' }}</a>{% endif %}
+        <a class="btn btn-outline-secondary" href="/kalender?ansicht=termine">Kalender anzeigen</a>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
