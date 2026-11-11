@@ -2,6 +2,7 @@
 import json
 from datetime import timedelta
 from hmac import compare_digest
+from types import SimpleNamespace
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
@@ -176,6 +177,37 @@ def signage_preview(sid: int, request: Request, user: User = Depends(manage_user
         return _render_display(request, db, screen, public=False, viewer=user)
     finally:
         screen.enabled = active
+
+
+@app.post("/signage/{sid:int}/preview-live", dependencies=[Depends(check_csrf)])
+async def signage_live_preview(sid: int, request: Request,
+                               user: User = Depends(manage_user),
+                               db: Session = Depends(get_db)):
+    """Read-only WYSIWYG preview of unsaved form values; never flush to the DB."""
+    original = _screen(db, sid)
+    form = await request.form()
+    kind = str(form.get("kind") or original.kind)
+    if kind not in signage.KINDS:
+        raise HTTPException(422, "Unbekannte Vorlage.")
+    rid, room_id, org_id = (_int(form.get(k)) for k in
+                             ("resource_id", "room_id", "org_id"))
+    if (rid and not db.get(Resource, rid)
+            or room_id and not db.get(SignageRoom, room_id)
+            or org_id and not db.get(Organization, org_id)):
+        raise HTTPException(422, "Datenquelle nicht gefunden.")
+    draft = SimpleNamespace(
+        id=original.id, owner_id=original.owner_id,
+        name=(str(form.get("name") or original.name).strip()[:180] or original.name),
+        subtitle=str(form.get("subtitle") or "")[:250],
+        direction=str(form.get("direction") or "")[:100],
+        kind=kind, resource_id=rid, room_id=room_id, org_id=org_id,
+        enabled=True, data_level="title" if form.get("data_level") == "title" else "busy",
+        theme_json=json.dumps(signage.theme({
+            key: str(form.get(key) or "") for key in signage.THEME_DEFAULTS
+        })),
+        layout_json=json.dumps(signage.widgets(form.get("layout_json"), kind)),
+    )
+    return _render_display(request, db, draft, public=False, viewer=user)
 
 
 @app.get("/signage/view/{sid:int}")
