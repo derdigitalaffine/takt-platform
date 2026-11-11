@@ -185,3 +185,31 @@ def context(db, screen: SignageScreen, public=True, viewer=None) -> dict:
                 room=room, staff=staff_directory(db, screen) if screen.kind == "directory" else [],
                 waypoints=waypoints(db, screen) if screen.kind == "wayfinder" else [],
                 public=public)
+
+
+def design_snapshot(screen: SignageScreen) -> str:
+    """Only presentation state is versioned; publication/ACL/links are not."""
+    return json.dumps({
+        "name": screen.name,
+        "kind": screen.kind,
+        "subtitle": screen.subtitle,
+        "direction": screen.direction,
+        "theme": theme(screen.theme_json),
+        "widgets": widgets(screen.layout_json, screen.kind),
+    }, ensure_ascii=False, sort_keys=True)
+
+
+def apply_design_snapshot(screen: SignageScreen, snapshot: str) -> None:
+    """Restore allowlisted presentation fields, never visibility or source ACLs."""
+    state = json.loads(snapshot)
+    if not isinstance(state, dict):
+        raise ValueError("Invalid design revision")
+    kind = state.get("kind")
+    if kind not in KINDS:
+        raise ValueError("Invalid design revision kind")
+    screen.kind = kind
+    screen.name = str(state.get("name") or screen.name).strip()[:180] or screen.name
+    screen.subtitle = str(state.get("subtitle") or "")[:250]
+    screen.direction = str(state.get("direction") or "")[:100]
+    screen.theme_json = json.dumps(theme(state.get("theme")))
+    screen.layout_json = json.dumps(widgets(state.get("widgets"), kind))
