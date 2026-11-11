@@ -3,10 +3,11 @@ import hashlib
 import json
 import re
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from sqlalchemy import select
 from .db import LOCAL_TZ, Resource, ResourceBooking, User, utcnow
 from .signage_models import SignageBuilding, SignageFloor, SignageOffice, SignageRoom, SignageScreen
+from .calendar_models import Calendar, CalendarEvent
 
 KINDS = {"agenda": "Terminübersicht", "room": "Digitales Türschild",
          "directory": "Personen und Büros", "wayfinder": "Wegweiser",
@@ -61,35 +62,86 @@ def _local(dt):
     return dt.replace(tzinfo=timezone.utc).astimezone(LOCAL_TZ) if dt.tzinfo is None else dt.astimezone(LOCAL_TZ)
 
 
+def _calendar_date(value: str) -> datetime:
+    """Convert TAKT calendar ISO date/datetime values to the portal's local zone."""
+    if len(value) == 10:
+        return datetime.combine(date.fromisoformat(value), time.min, LOCAL_TZ)
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return parsed.replace(tzinfo=LOCAL_TZ) if parsed.tzinfo is None else parsed.astimezone(LOCAL_TZ)
+
+
 def events(db, screen: SignageScreen, *, public=True, now=None, viewer=None) -> list[dict]:
-    """Confirmed resource bookings. Never project applicant/participant contact details."""
-    resource_id = screen.resource_id
-    if not resource_id and screen.room_id:
-        room = db.get(SignageRoom, screen.room_id)
-        resource_id = room.resource_id if room else None
-    if not resource_id:
-        return []
+    """Busy-only projection by default from canonical bookings and explicit room calendar.
+
+    A manager must explicitly bind the room calendar. Its original owner must
+    retain view permission; public/link readers can never see title or contact.
+    """
     now = now or datetime.now(LOCAL_TZ)
     begin = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end = begin + timedelta(days=1)
     start_utc = begin.astimezone(timezone.utc).replace(tzinfo=None)
     end_utc = end.astimezone(timezone.utc).replace(tzinfo=None)
-    rows = db.scalars(select(ResourceBooking).where(
-        ResourceBooking.resource_id == resource_id,
-        ResourceBooking.status == "confirmed",
-        ResourceBooking.starts_at < end_utc,
-        ResourceBooking.ends_at > start_utc
-    ).order_by(ResourceBooking.starts_at).limit(40)).all()
-    from . import resources as resource_acl
-    resource = db.get(Resource, resource_id)
-    show_titles = bool(not public and viewer and screen.data_level == "title"
-                       and resource_acl.level(db, viewer, resource) >= 2)
-    return [{
-        "start": _local(row.starts_at),
-        "end": _local(row.ends_at),
-        "title": (row.title or "Belegt") if show_titles else "Belegt",
-        "ongoing": _local(row.starts_at) <= now < _local(row.ends_at),
-    } for row in rows]
+    room = db.get(SignageRoom, screen.room_id) if screen.room_id else None
+    resource_id = screen.resource_id or (room.resource_id if room else None)
+    result = []
+
+    if resource_id:
+        from . import resources as resource_acl
+        resource = db.get(Resource, resource_id)
+        if resource:
+            show_titles = bool(not public and viewer and screen.data_level == "title"
+                               and resource_acl.level(db, viewer, resource) >= 2)
+            rows = db.scalars(select(ResourceBooking).where(
+                ResourceBooking.resource_id == resource_id,
+                ResourceBooking.status == "confirmed",
+                ResourceBooking.starts_at < end_utc,
+                ResourceBooking.ends_at > start_utc
+            ).order_by(ResourceBooking.starts_at).limit(40)).all()
+            for row in rows:
+                result.append(dict(
+                    start=_local(row.starts_at), end=_local(row.ends_at),
+                    title=(row.title or "Belegt") if show_titles else "Belegt",
+                    source="resource"))
+
+    if room and room.calendar_id:
+        from . import calendars, calendar_recurrence
+        calendar = db.get(Calendar, room.calendar_id)
+        # No birthdays, source projections or implicit publication of private
+        # calendars: only an explicit free calendar whose active manager can read.
+        manager = db.get(User, screen.owner_id) if screen.owner_id else None
+        if (calendar and calendar.source == "free" and manager
+                and calendars.access(db, manager, calendar)):
+            can_title = bool(not public and viewer and screen.data_level == "title"
+                             and calendars.access(db, viewer, calendar))
+            # recurrence.occurrences handles exceptions and exact day overlap.
+            rows = db.scalars(select(CalendarEvent).where(
+                CalendarEvent.calendar_id == calendar.id).order_by(CalendarEvent.id).limit(1000)).all()
+            for row in rows:
+                if not calendars.event_access(db, manager, calendar, row):
+                    continue
+                try:
+                    occurrences = calendar_recurrence.occurrences(
+                        row, begin.astimezone(timezone.utc), end.astimezone(timezone.utc))
+                except (ValueError, TypeError):
+                    # A corrupt legacy event must not break every room display.
+                    continue
+                for event in occurrences:
+                    start = _calendar_date(event["start"])
+                    finish = _calendar_date(event["end"])
+                    if start < end and finish > begin:
+                        result.append(dict(
+                            start=start, end=finish,
+                            title=(event.get("title") or "Belegt") if can_title else "Belegt",
+                            source="calendar"))
+                    if len(result) >= 150:
+                        break
+                if len(result) >= 150:
+                    break
+
+    # Overlapping bookings and events are both shown as occupancy; never
+    # interpolate people, descriptions or raw iCalendar data into templates.
+    result.sort(key=lambda ev: (ev["start"], ev["end"]))
+    return [{**ev, "ongoing": ev["start"] <= now < ev["end"]} for ev in result[:100]]
 
 
 def staff_directory(db, screen: SignageScreen) -> list[dict]:
