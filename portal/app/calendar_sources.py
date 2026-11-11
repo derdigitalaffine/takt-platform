@@ -237,6 +237,11 @@ def project(db, user, kind, start, end, *, channel="web"):
                     description=description,
                     status="requested" if row.status == "requested" else "booked",
                 )
+                if channel == "web" and out:
+                    out[-1]["classNames"] = [
+                        "takt-booking-event",
+                        "takt-booking-requested" if row.status == "requested" else "takt-booking-confirmed",
+                    ]
     elif kind == "tasks":
         from . import tasks
         from .task_models import Task
