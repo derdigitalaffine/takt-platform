@@ -18,6 +18,7 @@
     <div class="sg-editor-properties">
       <form action="/signage/{{ screen.id }}/save" method="post" id="sg-design-form">
         <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="version" value="{{ screen.version }}">
         <input type="hidden" id="sg-layout-json" name="layout_json" value="{{ selected_widgets|tojson|forceescape }}">
         <details class="sg-panel" open><summary><i class="fa-solid fa-sliders me-2"></i>Anzeige & Inhalt</summary>
           <div class="sg-form-stack">
@@ -80,6 +81,28 @@
       </div>
       <p class="sg-muted mt-2">Die Anzeige aktualisiert sich selbst. Widgetauswahl und Datenverknüpfungen werden nach dem Speichern übernommen.</p>
       <div class="sg-panel">
+        <div class="sg-panel-head"><div><span class="sg-eyebrow">VERSIONEN & SICHERHEIT</span>
+          <h2>Designverlauf</h2><p>Entwürfe lassen sich zurückholen. Freigabelinks, Sichtbarkeit und Datenquellen werden dabei nicht verändert.</p>
+        </div><span class="sg-pill sg-pill-neutral">Aktuell v{{ screen.version }}</span></div>
+        <div class="sg-revisions">
+        {% for rev in revisions %}
+          <div class="sg-link-row">
+            <div><strong>Version {{ rev.version }}</strong>
+              <small class="d-block sg-muted">{{ rev.created_at.strftime('%d.%m.%Y · %H:%M') }} UTC {% if rev.version == screen.version %}· Aktuell{% endif %}</small>
+            </div>
+            {% if rev.version != screen.version %}
+              <form method="post" action="/signage/{{ screen.id }}/revision/{{ rev.id }}/restore">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <input type="hidden" name="version" value="{{ screen.version }}">
+                <button class="btn btn-sm btn-outline-secondary" type="submit"
+                        aria-label="Designversion {{ rev.version }} wiederherstellen">Wiederherstellen</button>
+              </form>
+            {% else %}<span class="sg-pill sg-pill-success">Aktuell</span>{% endif %}
+          </div>
+        {% endfor %}
+        </div>
+      </div>
+      <div class="sg-panel">
         <h2>Freigabelinks</h2>
         {% if screen.visibility == 'public' %}<p>Diese Anzeige ist öffentlich erreichbar.</p><a target="_blank" rel="noopener" href="/signage/view/{{ screen.id }}" class="btn btn-outline-primary">Öffentliche Anzeige öffnen</a>{% elif screen.visibility == 'link' %}
         <p>Jeder neu erzeugte Link ist zeitlich begrenzt und jederzeit einzeln widerrufbar.</p>
@@ -94,7 +117,7 @@
         <h2>Geräte & Monitoring</h2>
         <p class="sg-muted">Player nutzen separate Zugangsdaten und melden ihren Zustand über die Heartbeat-API.</p>
         <form method="post" action="/signage/{{ screen.id }}/device" class="sg-create-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Gerätename<input class="form-control" name="name" placeholder="z. B. Empfang EG" maxlength="180" required></label><button class="btn btn-outline-primary" type="submit">Geräteschlüssel erstellen</button></form>
-        <div class="sg-links">{% for device in devices %}<div class="sg-link-row"><div><strong>{{ device.name }}</strong><small class="d-block sg-muted">#{{ device.id }} · {% if device.revoked %}gesperrt{% elif device.last_seen_at %}zuletzt {{ device.last_seen_at.strftime('%d.%m.%Y %H:%M') }} UTC{% else %}noch kein Heartbeat{% endif %}</small></div>{% if not device.revoked %}<form method="post" action="/signage/{{ screen.id }}/device/{{ device.id }}/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger">Sperren</button></form>{% endif %}</div>{% endfor %}</div>
+        <div class="sg-links">{% for device in devices %}<div class="sg-link-row"><div><strong>{{ device.name }}</strong><small class="d-block sg-muted">#{{ device.id }} · {% if device.revoked %}<span class="sg-status-offline">Gesperrt</span>{% elif device.last_seen_at and (now - device.last_seen_at).total_seconds() < 300 %}<span class="sg-status-online">Online</span>{% elif device.last_seen_at %}<span class="sg-status-offline">Offline</span> · zuletzt {{ device.last_seen_at.strftime('%d.%m.%Y %H:%M') }} UTC{% else %}Noch kein Heartbeat{% endif %}</small></div>{% if not device.revoked %}<form method="post" action="/signage/{{ screen.id }}/device/{{ device.id }}/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger">Sperren</button></form>{% endif %}</div>{% endfor %}</div>
       </div>
     </div>
   </div>
