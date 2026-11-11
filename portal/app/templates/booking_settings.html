@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}{{ 'Einstellungen' if page else 'Neue Buchungsseite' }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/workspace-heading.css"><link rel="stylesheet" href="/static/booking-workspace.css">{% endblock %}
 {% macro sw(name, label, on, help='', disabled=False) %}
 <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" role="switch" id="s-{{ name }}" name="{{ name }}" value="1" {% if on %}checked{% endif %} {% if disabled %}disabled{% endif %}>
   <label class="form-check-label" for="s-{{ name }}">{{ label }}{% if help %}<div class="form-text mt-0">{{ help }}</div>{% endif %}</label></div>
@@ -10,10 +11,10 @@
   <div class="input-group"><input class="form-control" type="number" id="n-{{ name }}" name="{{ name }}" min="{{ min }}" max="{{ max }}" value="{{ value }}"><span class="input-group-text">{{ unit }}</span></div>
   {% if help %}<div class="form-text">{{ help }}</div>{% endif %}</div>
 {% endmacro %}
-{% block content %}
-{% call m.page_head('Einstellungen: ' ~ page.title if page else 'Neue Buchungsseite', '' if page else 'Danach legen Sie im Kalender fest, wann gebucht werden kann.') %}
+{% block content %}<div class="booking-workspace">
+<div class="bk-workspace-heading">{% call m.page_head('Einstellungen: ' ~ page.title if page else 'Neue Buchungsseite', '' if page else 'Danach legen Sie im Kalender fest, wann gebucht werden kann.') %}
   <a class="ds-back btn btn-outline-secondary" href="{{ '/bookings/' ~ page.id if page else '/bookings' }}"><i class="fa-solid fa-arrow-left me-1"></i>Zurück</a>
-{% endcall %}
+{% endcall %}</div>
 <form method="post" class="row g-4">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-header"><i class="fa-solid fa-circle-info me-2"></i>Was wird gebucht?</div><div class="card-body">
@@ -53,4 +54,5 @@
   </div></div></div>
   <div class="col-12"><button class="btn btn-primary btn-lg" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>{{ 'Speichern' if page else 'Anlegen und Zeiten festlegen' }}</button></div>
 </form>
+</div>
 {% endblock %}

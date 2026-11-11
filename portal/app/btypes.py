@@ -144,6 +144,10 @@ def check(db, page: BookingPage, bt: BookingType, start: datetime, provider_id: 
     if keep is not None and keep.provider_id and provider_id is None:
         provider_id = keep.provider_id if keep.starts_at != start else None
     day = to_local(start).date()
+    first = to_local(utcnow()).date()
+    # Das Prüf-API darf das in der Vorschau geltende Buchungslimit nicht umgehen.
+    if day < first or day > first + timedelta(days=max(1, page.days_ahead)):
+        return None, "Dieser Termin liegt außerhalb des buchbaren Zeitraums."
     slot = next((s for s in slots(db, page, bt, provider_id, keep, until=day) if s["start"] == start), None)
     if slot is None and keep is not None and provider_id is not None:
         slot = next((s for s in slots(db, page, bt, None, keep, until=day) if s["start"] == start), None)

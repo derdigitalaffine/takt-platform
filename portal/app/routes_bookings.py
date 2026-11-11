@@ -84,7 +84,7 @@ def bookings_list(request: Request, all: str = "", user: User = Depends(current_
     upcoming = dict(db.execute(select(Booking.page_id, func.count(Booking.id))
                                .where(Booking.status == "booked", Booking.starts_at >= now)
                                .group_by(Booking.page_id)).all())
-    free = {p.id: sum(s["free"] for s in bk.bookable(p)) for p in list(pages) + [p for p, _ in shared]}
+    free = {p.id: sum(s["free"] for s in bk.free_slots(db, p)) for p in list(pages) + [p for p, _ in shared]}
     return render(request, "bookings.html", user, pages=pages, upcoming=upcoming, free=free, show_all=show_all,
                   shared=shared, levels=sh.LEVELS["booking"])
 
@@ -116,7 +116,8 @@ def booking_detail(request: Request, page_id: int, user: User = Depends(current_
     users = db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)).all()
     groups = db.scalars(select(Group).order_by(Group.name)).all()
     free_slots = bk.free_slots(db, page)
-    first = min([w.starts_at for w in page.windows if w.ends_at >= now], default=now)
+    first = min([s["start"] for s in free_slots] or
+                [w.starts_at for w in page.windows if w.ends_at >= now], default=now)
     link = bk.public_link(page)
     qp = request.query_params
     filt = {"status": qp.get("status") if qp.get("status") in bk.STATUS_FILTERS else "upcoming",

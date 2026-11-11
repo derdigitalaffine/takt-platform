@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Terminarten – {{ page.title }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/workspace-heading.css"><link rel="stylesheet" href="/static/booking-workspace.css">{% endblock %}
 {% macro type_form(t=None) %}
 {% set fid = 'bt-' ~ (t.id if t else 'neu') %}
 <form method="post" action="/bookings/{{ page.id }}/arten" class="row g-3">
@@ -47,11 +48,11 @@
   <div class="col-12"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>{{ 'Speichern' if t else 'Terminart anlegen' }}</button></div>
 </form>
 {% endmacro %}
-{% block content %}
-{% call m.page_head('Terminarten: ' ~ page.title, 'Bürger:innen wählen zuerst die Terminart, dann einen freien Termin bei einer zuständigen Person. Freie Termine ergeben sich aus den Sprechzeiten – abzüglich Ausnahmen, Feiertagen' ~ (' ' if page.holidays_closed else ' (abgeschaltet) ') ~ 'und Abwesenheiten der Mitarbeitenden.') %}
+{% block content %}<div class="booking-workspace">
+<div class="bk-workspace-heading">{% call m.page_head('Terminarten: ' ~ page.title, 'Bürger:innen wählen zuerst die Terminart, dann einen freien Termin bei einer zuständigen Person. Freie Termine ergeben sich aus den Sprechzeiten – abzüglich Ausnahmen, Feiertagen' ~ (' ' if page.holidays_closed else ' (abgeschaltet) ') ~ 'und Abwesenheiten der Mitarbeitenden.') %}
 <a class="btn btn-outline-secondary" href="/bookings/{{ page.id }}"><i class="fa-solid fa-arrow-left me-1"></i>Zur Buchungsseite</a>
 <a class="btn btn-outline-secondary" href="/b/{{ page.public_token }}" target="_blank"><i class="fa-regular fa-eye me-1"></i>Bürgersicht</a>
-{% endcall %}
+{% endcall %}</div>
 {% if not page.extended %}<div class="alert alert-warning">Der erweiterte Umfang ist für diese Seite nicht eingeschaltet – die Terminarten wirken erst, wenn Sie ihn in den <a href="/bookings/{{ page.id }}/settings">Einstellungen</a> einschalten.</div>{% endif %}
 
 {% for t in page.types %}
@@ -105,5 +106,6 @@
         <form method="post" action="/bookings/{{ page.id }}/ausnahmen/{{ c.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-link text-danger p-0" type="submit" aria-label="Ausnahme löschen"><i class="fa-regular fa-trash-can"></i></button></form></li>
       {% else %}<li class="list-group-item text-secondary px-0">Keine Ausnahmen. Feiertage{{ '' if page.holidays_closed else ' (abgeschaltet)' }} und eingetragene Abwesenheiten werden automatisch berücksichtigt.</li>{% endfor %}</ul>
     </div></div></div>
+</div>
 </div>
 {% endblock %}

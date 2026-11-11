@@ -198,3 +198,58 @@ def test_custom_fields_validation_mail_and_export():
     assert "Rechtsform:" in detail
     csv = admin.get(f"/bookings/{page_id}/export.csv?status=all").text
     assert "Gewerbeanmeldung" in csv and "Rechtsform: GmbH" in csv
+
+
+def test_extended_horizon_cannot_be_bypassed_by_direct_booking():
+    page_id, a_id, b_id, anna, ben = make_page()
+    from datetime import datetime, time
+    from app import bookings as bk
+    with SessionLocal() as db:
+        page, bt = db.get(BookingPage, page_id), db.get(BookingType, b_id)
+        page.days_ahead = 2
+        db.commit()
+        far_day = tomorrow() + timedelta(days=7)
+        far_start = bk.to_utc(datetime.combine(far_day, time(9, 0)))
+        slot, error = btypes.check(db, page, bt, far_start)
+        assert slot is None and "außerhalb" in error
+        near_start = bk.to_utc(datetime.combine(tomorrow(), time(9, 0)))
+        slot, error = btypes.check(db, page, bt, near_start)
+        assert not error and slot is not None
+
+
+def test_extended_shared_provider_conflicts_across_types_and_requests():
+    page_id, a_id, b_id, anna, ben = make_page(approval=True)
+    with SessionLocal() as db:
+        page = db.get(BookingPage, page_id)
+        a, b = db.get(BookingType, a_id), db.get(BookingType, b_id)
+        d = tomorrow()
+        start = next(s["start"] for s in day_slots(btypes.slots(db, page, a, anna), d)
+                     if to_local(s["start"]).strftime("%H:%M") == "09:00")
+        db.add(Booking(page_id=page_id, type_id=a_id, provider_id=anna, starts_at=start,
+                       ends_at=start + timedelta(hours=1), name="Anfrage",
+                       email="wait@example.org", token="bt-cross-type-request",
+                       status="requested"))
+        db.commit()
+        # Auch eine noch nicht bestätigte 60-Minuten-Anfrage blockiert Anna
+        # für 15-Minuten-Termine einer anderen Terminart plus 30 Minuten Puffer.
+        times = [to_local(s["start"]).strftime("%H:%M")
+                 for s in day_slots(btypes.slots(db, page, b, anna), d)]
+        assert "08:30" in times and "09:00" not in times
+        assert "10:15" not in times and "10:30" in times
+        # Der andere Anbieter bleibt für die erste Terminart verfügbar.
+        available = next(s for s in day_slots(btypes.slots(db, page, a), d)
+                         if s["start"] == start)
+        assert available["providers"] == [ben]
+
+
+def test_extended_pages_report_availability_in_management_list():
+    page_id, a_id, b_id, anna, ben = make_page()
+    admin = login(*ADMIN)
+    html = admin.get("/bookings").text
+    match = re.search(r'Bürgerbüro Termine.*?Optionen', html, re.S)
+    assert match is not None
+    with SessionLocal() as db:
+        from app import bookings as bk
+        page = db.get(BookingPage, page_id)
+        assert sum(s["free"] for s in bk.free_slots(db, page)) > 0
+    assert "buchbar" in html

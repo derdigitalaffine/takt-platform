@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}{{ page.title }} · Terminbuchung{% endblock %}
-{% block content %}
-{% call m.page_head(page.title, (page.slot_minutes ~ ' Minuten' ~ (' + ' ~ page.pause_minutes ~ ' Minuten Pause' if page.pause_minutes else '') ~ (' · Videokonferenz' if page.online else (' · ' ~ page.location if page.location else '')))) %}
+{% block head %}<link rel="stylesheet" href="/static/workspace-heading.css"><link rel="stylesheet" href="/static/booking-workspace.css">{% endblock %}
+{% block content %}<div class="booking-workspace">
+<div class="bk-workspace-heading">{% call m.page_head(page.title, (page.slot_minutes ~ ' Minuten' ~ (' + ' ~ page.pause_minutes ~ ' Minuten Pause' if page.pause_minutes else '') ~ (' · Videokonferenz' if page.online else (' · ' ~ page.location if page.location else '')))) %}
   {% if level >= 3 %}<a class="btn btn-outline-secondary" href="/bookings/{{ page.id }}/settings"><i class="fa-solid fa-sliders me-1"></i>Einstellungen</a>{% endif %}
   <a class="btn btn-outline-secondary" href="{{ public_url }}" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Buchungsseite</a>
   <div class="dropdown"><button class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-label="Weitere Aktionen"><i class="fa-solid fa-ellipsis"></i></button>
@@ -19,14 +20,14 @@
       <li><button class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#delete-modal"><i class="fa-regular fa-trash-can fa-fw me-2"></i>Löschen</button></li>
       {% endif %}
     </ul></div>
-{% endcall %}
+{% endcall %}</div>
 
 {% if level < 4 %}<div class="mb-3"><span class="badge text-bg-info"><i class="fa-solid fa-share-nodes me-1"></i>geteilt von {{ page.owner.name if page.owner else '–' }} · {{ share_levels[level][0] }}</span></div>{% endif %}
 {% if not page.active %}<div class="alert alert-warning"><i class="fa-solid fa-pause me-1"></i>Buchungen sind pausiert – die Buchungsseite zeigt einen Hinweis, bestehende Termine bleiben.</div>{% endif %}
 
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">{{ m.stat('fa-user-check', upcoming | length, 'anstehende Termine') }}</div>
-  <div class="col-6 col-lg-3">{{ m.stat('fa-door-open', free_count, 'freie Plätze') }}</div>
+  <div class="col-6 col-lg-3">{{ m.stat('fa-door-open', free_count, 'buchbare Optionen' if page.extended else 'freie Plätze') }}</div>
   <div class="col-6 col-lg-3">{{ m.stat('fa-table-cells', slot_count, 'Zeitfenster') }}</div>
   <div class="col-6 col-lg-3">{{ m.stat('fa-envelope', (page.invites | selectattr('email', 'in', booked_emails) | list | length) ~ ' / ' ~ (page.invites | length), 'Eingeladene mit Termin') }}</div>
 </div>
@@ -61,6 +62,36 @@
   {% endif %}
 </div></div>
 {% endif %}
+
+
+<section class="card bk-availability mb-4" id="freie-zeiten" aria-labelledby="bk-free-heading">
+  <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div><h2 class="h6 mb-1" id="bk-free-heading"><i class="fa-regular fa-calendar-check me-2" aria-hidden="true"></i>Nächste buchbare Termine</h2>
+      <p class="small text-secondary mb-0">{{ 'Verfügbare Beginnzeiten aus Sprechzeiten aller aktiven Terminarten.' if page.extended else 'Automatisch berechnet aus den freigegebenen Zeitbereichen, der Termindauer und dem Vorlauf.' }}</p></div>
+    <a class="btn btn-sm btn-outline-primary" href="{{ public_url }}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>Buchung ausprobieren</a>
+  </div>
+  <div class="card-body">
+    {% if free_days %}
+    <div class="bk-availability-grid">
+      {% for d in free_days[:7] %}
+      <div class="bk-day-preview">
+        <div class="d-flex justify-content-between flex-wrap gap-1 mb-2"><strong>{{ d.weekday_long }}, {{ d.full }}</strong><span class="small text-secondary">{{ d.slots | length }} Zeiten</span></div>
+        <div class="d-flex flex-wrap gap-2">{% for s in d.slots[:8] %}<span class="bk-time-chip">{{ s.time }}{% if s.free > 1 %}<small>· {{ s.free }} frei</small>{% endif %}</span>{% endfor %}
+          {% if d.slots | length > 8 %}<span class="small text-secondary align-self-center">+ {{ d.slots | length - 8 }} weitere</span>{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="small text-secondary mb-0 mt-3">Vorschau der nächsten sieben verfügbaren Tage. Alle buchbaren Zeiten stehen auf der öffentlichen Buchungsseite.</p>
+    {% else %}
+    <div class="bk-empty" role="status"><i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i><div>
+      <strong class="d-block text-body">Zurzeit keine buchbaren Termine</strong>
+      {% if page.extended %}Prüfe, ob aktive Terminarten zuständige Personen mit Sprechzeiten haben. Auch Vorlauf, Ausnahmen, Feiertage und Abwesenheiten können Zeiten sperren.
+      {% elif page.windows %}Zeitbereiche sind vorhanden. Prüfe, ob sie in der Zukunft liegen, lang genug für einen Termin sind und der eingestellte Vorlauf bereits erfüllt ist.
+      {% else %}Lege zuerst einen Zeitbereich im Kalender an. Daraus entstehen die freien Buchungsslots automatisch.{% endif %}
+    </div></div>
+    {% endif %}
+  </div>
+</section>
 
 <div class="card mb-4" id="buchungen"><div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
   <span><i class="fa-solid fa-list-check me-2"></i>Terminliste <span class="badge text-bg-light border">{{ listed | length }}</span></span>
@@ -216,4 +247,5 @@
 <script src="/static/vendor/fullcalendar/index.global.min.js"></script>
 <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
 <script src="/static/booking-calendar.js"></script>
+</div>
 {% endblock %}

@@ -69,32 +69,47 @@ def add_window(db, page: BookingPage, start: datetime, end: datetime) -> str:
     return ""
 
 
-def slots(page: BookingPage, include_past: bool = False) -> list[dict]:
-    """Alle Zeitfenster mit Belegung: {start, end, booked, free}."""
+def slots(page: BookingPage, include_past: bool = False, exclude: Booking | None = None) -> list[dict]:
+    """Zeitfenster inklusive realer Belegung; auch überlappende Altbuchungen sperren einen Slot.
+
+    Die Slots werden aus den Zeitbereichen berechnet (nicht als Datensätze gespeichert).
+    So bleiben sie nach Änderungen an Dauer/Pause und nach Absagen konsistent.
+    """
+    from heapq import heappop, heappush
+
     step = timedelta(minutes=page.slot_minutes + page.pause_minutes)
     length = timedelta(minutes=page.slot_minutes)
-    counts: dict[datetime, int] = {}
-    for b in page.bookings:
-        if b.status == "booked":
-            counts[b.starts_at] = counts.get(b.starts_at, 0) + 1
     now = utcnow()
     found: dict[datetime, dict] = {}
     for w in page.windows:
         t = w.starts_at
         while t + length <= w.ends_at:
             if (include_past or t >= now) and t not in found:
-                booked = counts.get(t, 0)
-                found[t] = {"start": t, "end": t + length, "booked": booked, "free": max(page.capacity - booked, 0)}
+                found[t] = {"start": t, "end": t + length}
             t += step
-    return sorted(found.values(), key=lambda s: s["start"])
+
+    result = sorted(found.values(), key=lambda s: s["start"])
+    busy = sorted((b for b in page.bookings if b.status in ("booked", "requested")
+                   and (exclude is None or b.id != exclude.id)), key=lambda b: b.starts_at)
+    active_ends: list[tuple[datetime, int]] = []
+    index = 0
+    for slot in result:
+        while index < len(busy) and busy[index].starts_at < slot["end"]:
+            heappush(active_ends, (busy[index].ends_at, index))
+            index += 1
+        while active_ends and active_ends[0][0] <= slot["start"]:
+            heappop(active_ends)
+        slot["booked"] = len(active_ends)
+        slot["free"] = max(page.capacity - len(active_ends), 0)
+    return result
 
 
 def bookable(page: BookingPage, keep: Booking | None = None) -> list[dict]:
-    """Zeitfenster, die Gäste jetzt buchen können (Vorlauf beachtet). keep: eigene Buchung beim Umbuchen."""
+    """Jetzt buchbare Slots. Beim Umbuchen blockiert die eigene Buchung den neuen Slot nicht."""
     earliest = utcnow() + timedelta(hours=page.min_notice_hours)
     result = []
-    for s in slots(page):
-        own = keep is not None and keep.status == "booked" and keep.starts_at == s["start"]
+    for s in slots(page, exclude=keep):
+        own = keep is not None and keep.status in ("booked", "requested") and keep.starts_at == s["start"]
         if s["start"] >= earliest and (s["free"] > 0 or own):
             result.append({**s, "own": own})
     return result
