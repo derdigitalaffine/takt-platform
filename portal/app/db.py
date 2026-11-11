@@ -457,6 +457,7 @@ class CirculationRecipient(Base):
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # pending approval escalation
     escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     decision: Mapped[str] = mapped_column(String(24), default="")
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -3030,7 +3031,9 @@ _NEW_COLUMNS = {
                       "integration_json": "TEXT NOT NULL DEFAULT '{}'"},
     "booking_types": {"privacy_mode": "VARCHAR(12) NOT NULL DEFAULT 'inherit'"},
     "bookings": {"type_id": "INTEGER REFERENCES booking_types(id) ON DELETE SET NULL",
-                 "provider_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL", "answers_json": "TEXT NOT NULL DEFAULT ''"},
+                 "provider_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+                 "answers_json": "TEXT NOT NULL DEFAULT ''",
+                 "review_escalated_at": "DATETIME"},
     "votes": {"chart": "VARCHAR(8) NOT NULL DEFAULT 'bar'", "archived_at": "DATETIME", "used_at": "DATETIME"},
     "polls": {"published_at": "DATETIME", "archived_at": "DATETIME", "used_at": "DATETIME"},
     "live_polls": {"opened_at": "DATETIME", "archived_at": "DATETIME", "used_at": "DATETIME"},
