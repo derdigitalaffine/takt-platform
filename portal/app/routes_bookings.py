@@ -60,11 +60,28 @@ def _apply(page: BookingPage, data) -> None:
         page.holidays_closed = flag("holidays_closed")
     page.online, page.notify_owner = flag("online"), flag("notify_owner")
     page.confirm_text = str(data.get("confirm_text", "")).replace("\r\n", "\n").strip()[:2000]
+    if "integration_form" in data:
+        import json
+        from . import booking_integration
+        opts = booking_integration.options(page)
+        opts.update({
+            "calendar_conflicts": flag("calendar_conflicts"),
+            "conflict_sources": [key for key in ("personal", "meetings")
+                                 if flag("conflict_" + key)],
+            "staff_calendar_attachment": flag("staff_calendar_attachment"),
+            "mail_digest": flag("mail_digest"),
+        })
+        page.integration_json = json.dumps(opts, ensure_ascii=False)
+
 
 
 def _settings_ctx(page: BookingPage | None, user: User) -> dict:
+    from . import booking_integration
+    integration = booking_integration.options(page) if page else {
+        "calendar_conflicts": True, "conflict_sources": ["personal", "meetings"],
+        "staff_calendar_attachment": False, "mail_digest": False}
     return {"page": page, "slot_choices": SLOT_CHOICES, "pause_choices": PAUSE_CHOICES, "durations": DURATIONS,
-            "can_video": user.can("video")}
+            "can_video": user.can("video"), "integration": integration}
 
 
 # --- Verwaltung --------------------------------------------------------------------------
@@ -388,7 +405,7 @@ def booking_copy(request: Request, page_id: int, user: User = Depends(booking_us
     page, level = _bpage(db, page_id, user, sh.VIEW)
     clone = BookingPage(owner_id=user.id, public_token=new_link_token(), title=(page.title + " (Kopie)")[:255])
     for col in ("description", "location", "slot_minutes", "pause_minutes", "capacity", "min_notice_hours",
-                "cancel_hours", "max_per_person", "invite_only", "listed", "ask_phone", "online", "notify_owner",
+                "cancel_hours", "max_per_person", "invite_only", "listed", "ask_phone", "online", "notify_owner", "integration_json",
                 "reminder_hours", "confirm_text"):
         setattr(clone, col, getattr(page, col))
     db.add(clone)
