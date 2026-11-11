@@ -119,3 +119,23 @@ html[data-agent-embedded] .ai-welcome-title { font-size: 17px; }
 html[data-agent-embedded] .ai-welcome-copy { font-size: 12px; }
 html[data-agent-embedded] .ai-welcome-actions button { padding: 8px 10px; font-size: 11px; }
 @media (max-width:580px) { .agent-dock-panel .agent-dock-head { min-height: 52px; } }
+
+/* Roomier agent dock with a stable reading column and accessible header actions. */
+@media (min-width: 581px) {
+  .agent-dock-panel { width: min(610px, calc(100vw - 24px)); border-radius: 16px; }
+}
+.agent-dock-panel .agent-dock-head { gap: .75rem; }
+.agent-dock-panel .agent-dock-brand { flex: 1; min-width: 0; }
+.agent-dock-panel .agent-dock-actions { flex: none; }
+.agent-dock-panel .agent-dock-actions :is(a, button):focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 3px;
+  border-radius: .35rem;
+}
+html[data-agent-embedded] .ai-chat-history { padding: 18px 16px; }
+html[data-agent-embedded] .ai-message--assistant .ai-message-bubble { min-width: 0; }
+html[data-agent-embedded] .ai-message-markdown { overflow-wrap: anywhere; }
+html[data-agent-embedded] .ai-sources-list { max-height: 12rem; }
+@media (max-width: 580px) {
+  html[data-agent-embedded] .ai-chat-history { padding: 12px 9px; }
+}
