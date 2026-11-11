@@ -93,3 +93,12 @@
 @media(max-width:900px) {.sg-editor-grid{grid-template-columns:1fr}.sg-preview-column{position:static}.sg-preview-column>.sg-panel{margin-top:18px}}
 @media(max-width:650px) {.sg-metrics{grid-template-columns:1fr 1fr}.sg-structure-grid{grid-template-columns:1fr}.sg-editor-toolbar{display:block}.sg-toolbar-actions{margin-top:12px}.sg-intro-icon{display:none}.sg-page-intro{margin-top:10px}}
 @media(prefers-reduced-motion:reduce) {.sg-workspace *{transition:none!important;animation:none!important}}
+
+.sg-revisions {max-height:260px;overflow-y:auto;scrollbar-width:thin}
+.sg-revisions .sg-link-row:first-child {border-top:0}
+.sg-status-online {font-weight:700;color:#168851}
+.sg-status-offline {font-weight:700;color:#be4656}
+.sg-inline-calendar {display:flex;gap:6px;align-items:center;min-width:220px}
+.sg-inline-calendar select {max-width:205px;min-width:135px}
+.sg-inline-calendar button {white-space:nowrap}
+@media(max-width:650px) {.sg-inline-calendar{min-width:190px;flex-wrap:wrap}}
