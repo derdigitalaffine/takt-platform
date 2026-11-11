@@ -46,7 +46,7 @@ def test_simple_window_generates_publicly_bookable_slots_and_updates_preview():
     day = future_day()
     detail = admin.get(f"/bookings/{page_id}")
     assert detail.status_code == 200
-    assert "Noch keine buchbaren Termine" in detail.text
+    assert "Zurzeit keine buchbaren Termine" in detail.text
     response = admin.post(f"/bookings/{page_id}/windows", data={
         "csrf": csrf_of(detail.text), "date": day.isoformat(), "from": "09:00", "to": "11:00"
     })
