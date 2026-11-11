@@ -423,8 +423,32 @@ def calendar_booking_detail(
         request, "calendar_booking_detail.html", user,
         booking=booking, page=page, show_details=show_details,
         can_open=level >= shares.VIEW, can_manage=level >= shares.EDIT,
+        can_confirm=booking.status == "requested" and (level >= shares.EDIT or booking.provider_id == user.id),
         when=bk.label(booking.starts_at, booking.ends_at),
     )
+
+
+@app.post("/kalender/buchungen/{bid:int}/bestaetigen", dependencies=[Depends(check_csrf)])
+def calendar_booking_confirm(
+    bid: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Confirm a pending citizen appointment from its calendar event card."""
+    from .db import Booking
+    from . import shares, bookings as bk, worker
+    from .leave import lock
+    lock(db)
+    booking = db.get(Booking, bid)
+    if not booking:
+        raise HTTPException(404)
+    if booking.status != "requested":
+        raise HTTPException(409, "Diese Anfrage ist bereits bearbeitet.")
+    if (shares.access_level(db, "booking", booking.page, user) < shares.EDIT
+            and booking.provider_id != user.id):
+        raise HTTPException(403)
+    bk.confirm(db, booking)
+    db.commit()
+    worker.wake()
+    return redirect(f"/kalender/buchungen/{booking.id}")
 
 
 @app.get("/kalender/quellen/{kind}/data")
