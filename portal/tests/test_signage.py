@@ -372,3 +372,63 @@ def test_navigation_graph_respects_organizational_boundaries():
         points = signage.waypoints(db, screen)
         assert [point["number"] for point in points] == ["A1"]
         assert "VERTRAULICH B" not in str(points)
+
+def test_self_service_public_office_opt_in_and_revocation():
+    c = _admin()
+    with SessionLocal() as db:
+        admin = db.scalar(select(User).where(User.email == ADMIN[0]))
+        building = SignageBuilding(name="Profilbüro Rathaus")
+        db.add(building); db.flush()
+        floor = SignageFloor(building_id=building.id, name="1. OG", level=1)
+        db.add(floor); db.flush()
+        room = SignageRoom(floor_id=floor.id, number="1.20", name="Büro")
+        db.add(room); db.flush()
+        office = SignageOffice(user_id=admin.id, room_id=room.id, public=False)
+        db.add(office); db.commit()
+        office_id = office.id
+    view = c.get("/profile")
+    assert view.status_code == 200
+    assert "Profilbüro Rathaus" in view.text
+    assert "Nicht öffentlich" in view.text
+    csrf = csrf_of(view.text)
+    response = c.post(f"/profile/signage/office/{office_id}/visibility",
+                      data={"csrf": csrf, "public": "1"})
+    assert response.status_code == 303
+    with SessionLocal() as db:
+        assert db.get(SignageOffice, office_id).public is True
+    assert "Im Besucherwegweiser sichtbar" in c.get("/profile").text
+    assert c.post(f"/profile/signage/office/{office_id}/visibility",
+                  data={"csrf": csrf, "public": "0"}).status_code == 303
+    with SessionLocal() as db:
+        assert db.get(SignageOffice, office_id).public is False
+
+
+def test_employee_cannot_modify_a_colleagues_public_office_entry():
+    c = _admin()
+    with SessionLocal() as db:
+        person = User(name="Other signaged staff", email="other-sg@example.org", password_hash="unused")
+        building = SignageBuilding(name="Büro anderer Person")
+        db.add_all([person, building]); db.flush()
+        floor = SignageFloor(building_id=building.id, name="EG", level=0)
+        db.add(floor); db.flush()
+        room = SignageRoom(floor_id=floor.id, number="R12")
+        db.add(room); db.flush()
+        office = SignageOffice(user_id=person.id, room_id=room.id, public=False)
+        db.add(office); db.commit()
+        office_id = office.id
+    csrf = csrf_of(c.get("/profile").text)
+    assert c.post(f"/profile/signage/office/{office_id}/visibility",
+                  data={"csrf": csrf, "public": "1"}).status_code == 404
+    with SessionLocal() as db:
+        assert db.get(SignageOffice, office_id).public is False
+
+
+def test_signage_access_log_redaction_avoids_bearer_token_leak():
+    import logging
+    from app.routes_signage import _RedactSignageLinks
+    secret = signage.token()
+    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1,
+                               "%s", (f"GET /signage/l/91/{secret} HTTP/1.1",), None)
+    assert _RedactSignageLinks().filter(record)
+    assert secret not in record.args[0]
+    assert "/signage/l/91/[redacted]" in record.args[0]
