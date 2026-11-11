@@ -698,9 +698,12 @@ def employee_reply(db, report: KrankReport, text: str, upload: tuple[str, bytes]
         except Exception:  # noqa: BLE001
             log.exception("Nachgereichten Nachweis für %s nicht als Mailanhang erzeugt", report.ref_no)
             attachments = None
-    for to in staff_recipients(db, report.employer, cfg):
+    recipients = staff_recipients(db, report.employer, cfg)
+    for to in recipients:
         _mail(db, cfg, to, "krank_staff_update", report, attachments=attachments,
               ereignis=" und ".join(parts))
+    if upload:
+        _mail_supervisors(db, report, cfg, set(recipients), only_document=f)
     sync_dms(db, report)
 
 
@@ -768,7 +771,8 @@ def supervisor_recipients(db, employer: KrankEmployer | None) -> list[str]:
     return list(dict.fromkeys(recipients))
 
 
-def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set[str]) -> None:
+def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set[str],
+                      only_document: KrankFile | None = None) -> None:
     """Opt-in role notifications. Medical attachments require *existing* report access."""
     employer = report.employer
     mode = employer.supervisor_attachment_mode if employer else "notice"
@@ -786,7 +790,8 @@ def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set
                 log.exception("Vorgesetzten-PDF für %s nicht erzeugt", report.ref_no)
         elif authorized and mode == "original" and report.kind in {"au", "child"}:
             try:
-                files = [f for f in report.files if f.source in {"meldung", "nachgereicht", "import"}]
+                files = ([only_document] if only_document is not None else
+                         [f for f in report.files if f.source in {"meldung", "nachgereicht", "import"}])
                 attachments = [{"filename": file_name(f), "mime": f.mime,
                                 "content_b64": base64.b64encode(read_file(f)).decode()} for f in files] or None
             except Exception:  # noqa: BLE001
