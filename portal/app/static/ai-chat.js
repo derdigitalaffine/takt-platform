@@ -177,14 +177,29 @@
   function addAnswerMetadata(bubble, data) {
     if (!data || typeof data !== 'object') return;
     if (Array.isArray(data.sources) && data.sources.length) {
-      var block = document.createElement('div');
+      var block = document.createElement('details');
       block.className = 'ai-message-sources';
-      var heading = document.createElement('strong');
-      heading.className = 'small';
-      heading.textContent = 'Verwendete interne Quellen';
-      block.appendChild(heading);
+      block.setAttribute('data-ai-sources', '');
+      var summary = document.createElement('summary');
+      summary.className = 'ai-sources-summary';
+      var folder = document.createElement('i');
+      folder.className = 'fa-regular fa-folder-open';
+      folder.setAttribute('aria-hidden', 'true');
+      summary.appendChild(folder);
+      var title = document.createElement('span');
+      title.textContent = 'Quellen';
+      summary.appendChild(title);
+      var count = document.createElement('span');
+      count.className = 'ai-sources-count';
+      summary.appendChild(count);
+      var chevron = document.createElement('i');
+      chevron.className = 'fa-solid fa-chevron-down ai-sources-chevron';
+      chevron.setAttribute('aria-hidden', 'true');
+      summary.appendChild(chevron);
+      block.appendChild(summary);
       var list = document.createElement('ul');
-      list.className = 'small mb-0';
+      list.className = 'ai-sources-list';
+      var seen = new Set();
       data.sources.forEach(function (source) {
         if (!source || typeof source.url !== 'string' || typeof source.title !== 'string') return;
         var url;
@@ -197,15 +212,29 @@
               url.hostname === 'localhost' || url.hostname.endsWith('.localhost')) return;
         } else if (!source.url.startsWith('/') || source.url.startsWith('//') ||
                    url.origin !== window.location.origin) return;
+        var href = external ? url.href : url.pathname + url.search + url.hash;
+        if (seen.has(href)) return;
+        seen.add(href);
         var item = document.createElement('li');
         var link = document.createElement('a');
-        link.href = external ? url.href : url.pathname + url.search + url.hash;
+        link.href = href;
         if (external) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
-        link.textContent = source.title;
+        var fileIcon = document.createElement('i');
+        fileIcon.className = external ? 'fa-solid fa-globe' : 'fa-regular fa-file-lines';
+        fileIcon.setAttribute('aria-hidden', 'true');
+        link.appendChild(fileIcon);
+        var label = document.createElement('span');
+        label.textContent = source.title;
+        link.appendChild(label);
+        var arrow = document.createElement('i');
+        arrow.className = 'fa-solid fa-arrow-up-right-from-square';
+        arrow.setAttribute('aria-hidden', 'true');
+        link.appendChild(arrow);
         item.appendChild(link);
         list.appendChild(item);
       });
       if (list.children.length) {
+        count.textContent = String(list.children.length);
         block.appendChild(list);
         bubble.appendChild(block);
       }

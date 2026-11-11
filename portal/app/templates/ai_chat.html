@@ -97,12 +97,12 @@
               <div class="ai-message-label">{{ 'Du · Portalauftrag' if item.role == 'user' and item.content.lower().startswith('/takt ') else 'Du' if item.role == 'user' else 'TAKT Agent' }}</div>
               {% if item.role == 'assistant' %}<div class="ai-message-text ai-message-markdown text-break" data-ai-message-text>{{ item.html }}</div>{% else %}<div class="ai-message-text text-break" data-ai-message-text>{{ item.content }}</div>{% endif %}
               {% if item.sources %}
-              <div class="ai-message-sources">
-                <strong class="small">Verwendete interne Quellen</strong>
-                <ul class="small mb-0">
-                  {% for source in item.sources %}<li><a href="{{ source.url }}">{{ source.title }}</a></li>{% endfor %}
+              <details class="ai-message-sources" data-ai-sources>
+                <summary class="ai-sources-summary"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><span>Quellen</span><span class="ai-sources-count">{{ item.sources|length }}</span><i class="fa-solid fa-chevron-down ai-sources-chevron" aria-hidden="true"></i></summary>
+                <ul class="ai-sources-list">
+                  {% for source in item.sources %}<li><a href="{{ source.url }}" {% if source.kind == 'web' %}target="_blank" rel="noopener noreferrer"{% endif %}><i class="fa-regular fa-file-lines" aria-hidden="true"></i><span>{{ source.title }}</span><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a></li>{% endfor %}
                 </ul>
-              </div>
+              </details>
               {% endif %}
               {% if item.model %}<div class="ai-message-model">Modell: {{ item.model }}</div>{% endif %}
               {% if item.forkable and item.id %}
