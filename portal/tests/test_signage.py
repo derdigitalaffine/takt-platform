@@ -8,7 +8,8 @@ from sqlalchemy import select
 
 from conftest import client, csrf_of, login, settings
 from app import signage
-from app.db import Resource, ResourceBooking, SessionLocal, User, utcnow
+from app.db import LOCAL_TZ, Resource, ResourceBooking, SessionLocal, User, utcnow
+from app.calendar_models import Calendar, CalendarEvent
 from app.signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
                                 SignageOffice, SignageRoom, SignageScreen)
 
@@ -148,3 +149,50 @@ def test_device_heartbeat_needs_valid_bearer():
     assert client().post(f"/signage/api/device/{did}/heartbeat").status_code == 403
     ok = client().post(f"/signage/api/device/{did}/heartbeat", headers={"Authorization": f"Bearer {secret}"})
     assert ok.status_code == 200 and ok.json()["screen_id"] == sid
+
+def test_calendar_event_occupancy_requires_explicit_room_binding_and_does_not_leak_title():
+    c = _admin()
+    with SessionLocal() as db:
+        admin = db.scalar(select(User).where(User.email == ADMIN[0]))
+        cal = Calendar(owner_id=admin.id, title="Vertraulicher Raumkalender", visibility="private", source="free")
+        building = SignageBuilding(name="Kalender Testgebäude")
+        db.add_all([cal, building]); db.flush()
+        floor = SignageFloor(building_id=building.id, name="EG", level=0)
+        db.add(floor); db.flush()
+        room = SignageRoom(floor_id=floor.id, number="K1", name="Konferenz")
+        db.add(room); db.flush()
+        from datetime import datetime
+        local_now = datetime.now(LOCAL_TZ)
+        event = CalendarEvent(
+            calendar_id=cal.id, uid="private-signage-room-event",
+            title="GEHEIMER PERSONALTERMIN", starts_at=(local_now - timedelta(minutes=10)).isoformat(),
+            ends_at=(local_now + timedelta(minutes=60)).isoformat())
+        db.add(event); db.commit()
+        room_id, calendar_id = room.id, cal.id
+    sid = _screen(c, name="Kalenderraum", kind="room", visibility="public", data_level="title")
+    with SessionLocal() as db:
+        row = db.get(SignageScreen, sid)
+        row.room_id = room_id
+        db.commit()
+    url = f"/signage/view/{sid}"
+    assert "GEHEIMER PERSONALTERMIN" not in client().get(url).text
+    # No accidental calendar publication merely because the screen exists.
+    assert "Heute sind keine bestätigten Buchungen eingetragen" in client().get(url).text
+    csrf = csrf_of(c.get("/signage").text)
+    r = c.post(f"/signage/room/{room_id}/calendar",
+               data={"csrf": csrf, "calendar_id": str(calendar_id)})
+    assert r.status_code == 303
+    page = client().get(url)
+    assert page.status_code == 200
+    assert "Belegt" in page.text
+    assert "GEHEIMER PERSONALTERMIN" not in page.text
+    # Internal admin preview with explicit title option and existing calendar ACL.
+    assert "GEHEIMER PERSONALTERMIN" in c.get(f"/signage/{sid}/preview").text
+
+
+def test_calendar_date_conversion_uses_local_timezone_for_day_and_aware_iso():
+    from datetime import datetime
+    day = signage._calendar_date("2026-11-11")
+    assert day.hour == 0 and day.tzinfo == LOCAL_TZ
+    dt = signage._calendar_date("2026-11-11T13:00:00+00:00")
+    assert dt.hour == 14
