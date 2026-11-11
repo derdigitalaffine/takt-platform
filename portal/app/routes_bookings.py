@@ -425,6 +425,14 @@ def booking_copy(request: Request, page_id: int, user: User = Depends(booking_us
                 "cancel_hours", "max_per_person", "invite_only", "listed", "ask_phone", "online", "notify_owner", "integration_json",
                 "reminder_hours", "confirm_text"):
         setattr(clone, col, getattr(page, col))
+    # A copy is a new booking page with a new creator: retain the user's
+    # chosen calendar switches but rebind organizational closure scope.
+    import json
+    from . import booking_integration
+    opts = booking_integration.options(clone)
+    opts.pop("creator_org_id", None)
+    opts["creator_org_id"] = booking_integration.creator_org_id(db, clone)
+    clone.integration_json = json.dumps(opts, ensure_ascii=False)
     db.add(clone)
     db.commit()
     flash(request, "Kopie angelegt – ohne Zeitbereiche, Buchungen und Einladungen.")
