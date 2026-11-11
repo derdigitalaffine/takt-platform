@@ -21,14 +21,20 @@
       {% endif %}
     </ul></div>
 {% endcall %}</div>
+<nav class="bk-section-nav" aria-label="Bereiche der Terminbuchung">
+  <a href="#kalender"><i class="fa-regular fa-calendar" aria-hidden="true"></i>{{ 'Terminarten' if page.extended else 'Zeitbereiche' }}</a>
+  <a href="#freie-zeiten"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i>Freie Termine</a>
+  <a href="#buchungen"><i class="fa-solid fa-list-check" aria-hidden="true"></i>Buchungen</a>
+  {% if level >= 2 %}<a href="#einladungen"><i class="fa-regular fa-envelope" aria-hidden="true"></i>Einladungen</a>{% endif %}
+</nav>
 
 {% if level < 4 %}<div class="mb-3"><span class="badge text-bg-info"><i class="fa-solid fa-share-nodes me-1"></i>geteilt von {{ page.owner.name if page.owner else '–' }} · {{ share_levels[level][0] }}</span></div>{% endif %}
 {% if not page.active %}<div class="alert alert-warning"><i class="fa-solid fa-pause me-1"></i>Buchungen sind pausiert – die Buchungsseite zeigt einen Hinweis, bestehende Termine bleiben.</div>{% endif %}
 
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">{{ m.stat('fa-user-check', upcoming | length, 'anstehende Termine') }}</div>
-  <div class="col-6 col-lg-3">{{ m.stat('fa-door-open', free_count, 'buchbare Optionen' if page.extended else 'freie Plätze') }}</div>
-  <div class="col-6 col-lg-3">{{ m.stat('fa-table-cells', slot_count, 'Zeitfenster') }}</div>
+  <div class="col-6 col-lg-3" data-bk-stat="free">{{ m.stat('fa-door-open', free_count, 'buchbare Optionen' if page.extended else 'freie Plätze') }}</div>
+  <div class="col-6 col-lg-3" data-bk-stat="slots">{{ m.stat('fa-table-cells', slot_count, 'Zeitfenster') }}</div>
   <div class="col-6 col-lg-3">{{ m.stat('fa-envelope', (page.invites | selectattr('email', 'in', booked_emails) | list | length) ~ ' / ' ~ (page.invites | length), 'Eingeladene mit Termin') }}</div>
 </div>
 
@@ -38,16 +44,22 @@
   <ul class="list-group list-group-flush">{% for t in page.types %}<li class="list-group-item d-flex flex-wrap gap-2"><strong class="flex-grow-1">{{ t.name }}</strong><span class="small text-secondary">{{ t.duration_minutes }} Min. · {{ t.providers | map(attribute='name') | join(', ') or 'ohne Zuständige' }}{% if t.approval %} · mit Bestätigung{% endif %}{% if not t.active %} · nicht angeboten{% endif %}</span></li>
   {% else %}<li class="list-group-item text-secondary small">Noch keine Terminarten – bitte anlegen.</li>{% endfor %}</ul></div>
 {% else %}
-<div class="card mb-4" id="kalender"><div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-  <span><i class="fa-regular fa-calendar me-2"></i>Wann kann gebucht werden?</span>
-  <span class="small text-secondary d-flex gap-3"><span><span class="bk-legend bk-legend-window"></span>freigegeben</span><span><span class="bk-legend bk-legend-booking"></span>gebucht</span></span>
+<div class="card mb-4 bk-calendar-card" id="kalender"><div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <div><h2 class="h6 mb-1"><i class="fa-regular fa-calendar me-2" aria-hidden="true"></i>Zeitbereiche festlegen</h2>
+    <span class="small text-secondary"><strong data-bk-window-count>{{ page.windows | length }}</strong> Bereiche eingerichtet · {{ page.slot_minutes }} Min. je Termin{% if page.pause_minutes %} + {{ page.pause_minutes }} Min. Pause{% endif %}</span></div>
+  <span class="small text-secondary d-flex flex-wrap gap-3"><span><span class="bk-legend bk-legend-window"></span>freigegeben</span><span><span class="bk-legend bk-legend-booking"></span>gebucht</span></span>
 </div><div class="card-body">
-  {% if level >= 3 %}<p class="small text-secondary"><i class="fa-solid fa-hand-pointer me-1"></i><strong>Mit der Maus über den Kalender ziehen</strong>, um einen Zeitbereich freizugeben – er wird automatisch in Termine zu {{ page.slot_minutes }} Minuten{% if page.pause_minutes %} mit {{ page.pause_minutes }} Minuten Pause{% endif %} geteilt. <strong>Klick auf einen grünen Bereich</strong> entfernt ihn. Für Mittagspausen einfach zwei Bereiche anlegen.</p>{% endif %}
-  <div id="bk-calendar" data-page="{{ page.id }}" data-initial="{{ initial_date }}" {% if level < 3 %}data-readonly="1"{% endif %}></div>
   {% if level >= 3 %}
-  <details class="mt-3">
-    <summary class="small fw-semibold">Zeitbereich per Formular hinzufügen (auch wöchentlich wiederholt)</summary>
-    <form method="post" action="/bookings/{{ page.id }}/windows" class="row g-2 align-items-end mt-1">
+  <div class="bk-calendar-guide"><span class="bk-guide-icon"><i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i></span>
+    <div><strong>Zeitraum im Kalender aufziehen</strong><p class="mb-0">Aus jedem Bereich entstehen automatisch freie Buchungstermine. Zum Entfernen auf den grünen Bereich klicken. Für Pausen zwei getrennte Bereiche anlegen.</p></div>
+  </div>{% endif %}
+  <div id="bk-calendar" data-page="{{ page.id }}" data-initial="{{ initial_date }}" {% if level < 3 %}data-readonly="1"{% endif %}></div>
+  <div id="bk-window-status" class="bk-inline-status mt-2" role="status" aria-live="polite" aria-atomic="true"></div>
+  {% if level >= 3 %}
+  <details class="bk-window-form-wrap mt-3">
+    <summary class="fw-semibold"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Zeitraum per Formular oder wöchentlich anlegen</summary>
+    <p class="small text-secondary mt-2 mb-2">Für wiederkehrende Sprechzeiten und die exakte Uhrzeit. Die Änderung wird sofort im Kalender angezeigt – ohne die Ansicht zu verlassen.</p>
+    <form method="post" action="/bookings/{{ page.id }}/windows" class="row g-2 align-items-end mt-1" data-bk-window-form>
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div class="col-sm-4 col-lg-3"><label class="form-label small" for="wd">Tag</label><input class="form-control form-control-sm" type="date" id="wd" name="date" required></div>
       <div class="col-6 col-sm-2"><label class="form-label small" for="wf">von</label><input class="form-control form-control-sm" type="time" id="wf" name="from" required></div>
@@ -55,6 +67,7 @@
       <div class="col-sm-4 col-lg-3"><label class="form-label small" for="wr">wöchentlich wiederholen</label>
         <select class="form-select form-select-sm" id="wr" name="repeat_weeks"><option value="0">nein</option>{% for n in [1,2,3,4,6,8,12,26,52] %}<option value="{{ n }}">weitere {{ n }} Wochen</option>{% endfor %}</select></div>
       <div class="col-sm-auto"><button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-plus me-1"></i>Hinzufügen</button></div>
+      <div class="col-12"><span class="small" data-bk-form-status role="status" aria-live="polite"></span></div>
     </form>
     <form method="post" action="/bookings/{{ page.id }}/windows/clear" class="mt-3"><input type="hidden" name="csrf" value="{{ csrf }}">
       <button class="btn btn-sm btn-outline-danger" data-confirm-title="Alle künftigen Zeitbereiche entfernen?" data-confirm="Bestehende Buchungen bleiben erhalten."><i class="fa-regular fa-trash-can me-1"></i>Alle künftigen Zeitbereiche entfernen</button></form>
@@ -70,7 +83,7 @@
       <p class="small text-secondary mb-0">{{ 'Verfügbare Beginnzeiten aus Sprechzeiten aller aktiven Terminarten.' if page.extended else 'Automatisch berechnet aus den freigegebenen Zeitbereichen, der Termindauer und dem Vorlauf.' }}</p></div>
     <a class="btn btn-sm btn-outline-primary" href="{{ public_url }}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>Buchung ausprobieren</a>
   </div>
-  <div class="card-body">
+  <div class="card-body" id="bk-availability-content" aria-live="polite" aria-atomic="true">
     {% if free_days %}
     <div class="bk-availability-grid">
       {% for d in free_days[:7] %}
@@ -242,10 +255,10 @@
   </form>
 </div></div></div>
 <script type="application/json" id="bk-events">{{ events | tojson }}</script>
+</div>
 {% endblock %}
 {% block scripts %}
 <script src="/static/vendor/fullcalendar/index.global.min.js"></script>
 <script src="/static/vendor/fullcalendar/de.global.min.js"></script>
 <script src="/static/booking-calendar.js"></script>
-</div>
 {% endblock %}
