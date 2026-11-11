@@ -15,9 +15,14 @@
 <div class="bk-workspace-heading">{% call m.page_head('Einstellungen: ' ~ page.title if page else 'Neue Buchungsseite', '' if page else 'Danach legen Sie im Kalender fest, wann gebucht werden kann.') %}
   <a class="ds-back btn btn-outline-secondary" href="{{ '/bookings/' ~ page.id if page else '/bookings' }}"><i class="fa-solid fa-arrow-left me-1"></i>Zurück</a>
 {% endcall %}</div>
+<nav class="bk-section-nav" aria-label="Einstellungsbereiche">
+  <a href="#buchungs-grunddaten"><i class="fa-solid fa-circle-info" aria-hidden="true"></i>Grunddaten</a>
+  <a href="#buchungs-zeiten"><i class="fa-regular fa-clock" aria-hidden="true"></i>Zeiten und Regeln</a>
+  <a href="#buchungs-terminarten"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Erweiterter Modus</a>
+</nav>
 <form method="post" class="row g-4">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-header"><i class="fa-solid fa-circle-info me-2"></i>Was wird gebucht?</div><div class="card-body">
+  <div class="col-12 col-xl-6" id="buchungs-grunddaten"><div class="card h-100"><div class="card-header"><i class="fa-solid fa-circle-info me-2"></i>Was wird gebucht?</div><div class="card-body">
     <div class="mb-3"><label class="form-label" for="t">Titel</label><input class="form-control" id="t" name="title" required maxlength="255" value="{{ page.title if page else '' }}" placeholder="z. B. Vorstellungsgespräche Sachbearbeitung Bauamt"></div>
     <div class="mb-3"><label class="form-label" for="d">Beschreibung <span class="text-secondary">(sehen die Gäste)</span></label><textarea class="form-control" id="d" name="description" rows="3" maxlength="5000">{{ page.description if page else '' }}</textarea></div>
     <div class="mb-3"><label class="form-label" for="l">Ort</label><input class="form-control" id="l" name="location" maxlength="255" value="{{ page.location if page else '' }}" placeholder="z. B. Rathaus Otterberg, Zimmer 12"></div>
@@ -26,7 +31,7 @@
     <textarea class="form-control" id="ct" name="confirm_text" rows="2" maxlength="2000" placeholder="z. B. Bitte bringen Sie Ihre Zeugnisse und einen Lichtbildausweis mit.">{{ page.confirm_text if page else '' }}</textarea>
   </div></div></div>
 
-  <div class="col-12 col-xl-6"><div class="card h-100"><div class="card-header"><i class="fa-regular fa-clock me-2"></i>Zeitfenster</div><div class="card-body row g-3">
+  <div class="col-12 col-xl-6" id="buchungs-zeiten"><div class="card h-100"><div class="card-header"><i class="fa-regular fa-clock me-2"></i>Zeiten und Buchungsregeln</div><div class="card-body row g-3">
     <div class="col-sm-6 col-lg-4"><label class="form-label" for="sm">Dauer je Termin</label>
       <select class="form-select" id="sm" name="slot_minutes">{% for d in slot_choices %}<option value="{{ d }}" {% if (page.slot_minutes if page else 30) == d %}selected{% endif %}>{{ d }} Minuten</option>{% endfor %}</select></div>
     <div class="col-sm-6 col-lg-4"><label class="form-label" for="pm">Pause danach</label>
@@ -43,7 +48,7 @@
       {{ sw('notify_owner', 'Mich bei jeder Buchung, Verschiebung und Absage per Mail informieren', page.notify_owner if page else True) }}
     </div>
   </div></div></div>
-  <div class="col-12"><div class="card border-primary-subtle"><div class="card-header"><i class="fa-solid fa-layer-group me-2"></i>Erweiterter Umfang: Terminarten</div><div class="card-body row g-3">
+  <div class="col-12" id="buchungs-terminarten"><div class="card border-primary-subtle"><div class="card-header"><i class="fa-solid fa-layer-group me-2"></i>Erweiterter Umfang: Terminarten</div><div class="card-body row g-3">
     <input type="hidden" name="extended_form" value="1">
     <div class="col-12">{{ sw('extended', 'Mehrere Terminarten anbieten', page.extended if page else False, 'Z. B. „Bauberatung 45 Min.“, „Gewerbeanmeldung 15 Min.“ – je Art eigene Dauer, Puffer, Vorlauf, Ort oder Videokonferenz, zuständige Mitarbeitende mit wiederkehrenden Sprechzeiten und auf Wunsch Bestätigung vor dem Termin. Bürger:innen wählen erst das Thema, dann den Termin. Die Zeitbereiche im Kalender oben gelten dann nicht.') }}</div>
     <div class="col-sm-4"><label class="form-label" for="n-days_ahead">Buchbar im Voraus</label>
@@ -52,7 +57,8 @@
       <select class="form-select" id="n-step" name="step_minutes">{% for st in [5, 10, 15, 20, 30, 60] %}<option value="{{ st }}" {% if (page.step_minutes if page else 15) == st %}selected{% endif %}>alle {{ st }} Minuten</option>{% endfor %}</select></div>
     <div class="col-sm-4 d-flex align-items-end">{{ sw('holidays_closed', 'An Feiertagen keine Termine', page.holidays_closed if page else True) }}</div>
   </div></div></div>
-  <div class="col-12"><button class="btn btn-primary btn-lg" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>{{ 'Speichern' if page else 'Anlegen und Zeiten festlegen' }}</button></div>
+  <div class="col-12"><div class="bk-save-row"><div><strong>{{ 'Änderungen übernehmen' if page else 'Buchungsseite einrichten' }}</strong><p class="small text-secondary mb-0">Danach {{ 'werden Verfügbarkeiten automatisch neu berechnet.' if page else 'kannst du die buchbaren Zeitbereiche festlegen.' }}</p></div>
+    <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1"></i>{{ 'Speichern' if page else 'Anlegen und Zeiten festlegen' }}</button></div></div>
 </form>
 </div>
 {% endblock %}
