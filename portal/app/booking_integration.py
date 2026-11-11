@@ -71,7 +71,7 @@ def internal_busy(db, user_id: int, start: datetime, end: datetime, *, scopes=No
     from .calendar_recurrence import occurrences
     from .db import Meeting
 
-    selected = set(scopes or SCOPES).intersection(SCOPES)
+    selected = set(SCOPES if scopes is None else scopes).intersection(SCOPES)
     busy = []
     if start >= end or not selected:
         return busy
