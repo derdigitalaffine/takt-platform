@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from . import access, bookings as bk, shares as sh, shortlinks as sl, worker
-from .db import Booking, BookingInvite, BookingPage, BookingWindow, Group, User, to_local, utcnow
+from .db import Booking, BookingInvite, BookingPage, BookingWindow, Group, Organization, User, to_local, utcnow
 from .main import (
     app, check_csrf, current_user, home_for, flash, get_db, rate_limit, redirect, render, require, session_user,
 )
