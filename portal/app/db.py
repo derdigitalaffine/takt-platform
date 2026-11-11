@@ -3186,6 +3186,21 @@ def init_db() -> None:
                 db.add(Setting(key=key, value=value))
         seed_law_levels(db)
         seed_orgs(db)
+        # Existing installations: turn unlinked Krankmelder employers into
+        # persistent nodes of the central organizational tree. Reuse a matching
+        # free organization, never merge two employers into the same node.
+        linked = set(db.scalars(select(KrankEmployer.org_id).where(
+            KrankEmployer.org_id.is_not(None))).all())
+        for legacy in db.scalars(select(KrankEmployer).where(KrankEmployer.org_id.is_(None))):
+            candidate = db.scalar(select(Organization).where(
+                Organization.name == legacy.name).order_by(Organization.id))
+            if candidate is None or candidate.id in linked:
+                candidate = Organization(name=legacy.name, kind="arbeitgeber",
+                                         color=legacy.color or "", active=legacy.active)
+                db.add(candidate)
+                db.flush()
+            legacy.org_id = candidate.id
+            linked.add(candidate.id)
         from .organization import seed as seed_organization
         seed_organization(db)
         from .anliegen import seed as seed_anliegen
