@@ -2473,6 +2473,7 @@ def admin_modules(request: Request, user: User = Depends(admin_user), db: Sessio
     from .db import (BookingPage, DmsRecord, Form as FormModel, FormResponse, KrankReport, LawText, Poll,
                      Resource as ResourceModel, ShortLink, UserMap)
     from .db import Circulation, Seminar
+    from .signage_models import SignageScreen
     stats = {"seminars": db.scalar(select(func.count(Seminar.id))),"circulations": db.scalar(select(func.count(Circulation.id))), "bookings": db.scalar(select(func.count(BookingPage.id))),
              "dms": db.scalar(select(func.count(DmsRecord.id))),
              "maps": db.scalar(select(func.count(UserMap.id))),
@@ -2482,7 +2483,8 @@ def admin_modules(request: Request, user: User = Depends(admin_user), db: Sessio
              "forms": db.scalar(select(func.count(FormModel.id))),
              "polls": db.scalar(select(func.count(Poll.id))),
              "krank": db.scalar(select(func.count(KrankReport.id))),
-             "resources": db.scalar(select(func.count(ResourceModel.id)))}
+             "resources": db.scalar(select(func.count(ResourceModel.id))),
+             "signage": db.scalar(select(func.count(SignageScreen.id)))}
     return render(request, "admin_modules.html", user, all_modules=MODULES, stats=stats)
 
 
