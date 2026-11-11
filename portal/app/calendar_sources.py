@@ -91,6 +91,10 @@ def project(db, user, kind, start, end, *, channel="web"):
 
             if seminar_hybrid.is_seminar_room(db, row):
                 continue
+            # Videokonferenzen, die aus Bürgerbuchungen entstanden sind, sind
+            # über die Buchungsquelle bereits sichtbar: keine Doppelanzeige.
+            if db.scalar(select(Booking.id).where(Booking.meeting_id == row.id).limit(1)) is not None:
+                continue
             add(
                 row.id,
                 row.title,
@@ -201,18 +205,35 @@ def project(db, user, kind, start, end, *, channel="web"):
                 )
                 out.append(event)
     elif kind == "bookings":
-        from . import shares, bookings
+        from . import shares, bookings, booking_integration
 
         for page in db.scalars(select(BookingPage)):
-            if shares.access_level(db, "booking", page, user) < shares.VIEW:
-                continue
-            for row in bookings.active_bookings(page):
+            level = shares.access_level(db, "booking", page, user)
+            # A personally assigned appointment belongs in the employee's
+            # calendar even when their role grants no access to the whole page.
+            rows = [row for row in bookings.active_bookings(page)
+                    if level >= shares.VIEW or row.provider_id == user.id]
+            for row in rows:
+                responsible = row.provider_id == user.id or (
+                    row.provider_id is None and page.owner_id == user.id)
+                visibility = booking_integration.calendar_visibility(
+                    row, channel=channel, can_edit=level >= shares.EDIT,
+                    responsible=responsible)
+                description = ""
+                if visibility == "detail":
+                    title = page.title + ": " + row.name
+                    if row.type is not None:
+                        title = row.type.name + ": " + row.name
+                else:
+                    title = "Bürgertermin (belegt)"
                 add(
                     row.id,
-                    page.title + ": " + row.name,
+                    ("Anfrage: " if row.status == "requested" and channel == "web" else "") + title,
                     row.starts_at,
                     row.ends_at,
-                    "/bookings/" + str(page.id),
+                    "/kalender/buchungen/" + str(row.id) if channel == "web" else "",
+                    description=description,
+                    status="requested" if row.status == "requested" else "booked",
                 )
     elif kind == "tasks":
         from . import tasks
@@ -337,6 +358,7 @@ def to_ics(events, name):
                 if props.get("source") in ("closures", "tasks")
                 else "OPAQUE"
             ),
+            "status": "TENTATIVE" if props.get("status") == "requested" else "CONFIRMED",
         }
         for key, prop in [("start", "dtstart"), ("end", "dtend")]:
             event[prop] = (
