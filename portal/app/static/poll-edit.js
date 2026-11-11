@@ -85,5 +85,10 @@
     if (!options.length) { ev.preventDefault(); document.getElementById('gen-hint').textContent = 'Bitte mindestens einen Terminvorschlag anlegen.'; return; }
     document.getElementById('options-json').value = JSON.stringify(options);
   });
+  form.taktAgentPopulate = function (fields) {
+    options = JSON.parse(JSON.stringify(fields.options || []));
+    list.closest('.card').setAttribute('data-agent-editor', ''); render();
+  };
+  form.taktAgentSerialize = function () { document.getElementById('options-json').value = JSON.stringify(options); };
   render();
 })();

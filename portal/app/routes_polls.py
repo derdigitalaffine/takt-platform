@@ -152,12 +152,12 @@ def poll_state(request: Request, poll_id: int, action: str = Form(...), user: Us
         lifecycle.require_owner(poll,user)
         if poll.expires_at and poll.expires_at < utcnow():
             raise HTTPException(409, "Bitte zunächst die abgelaufene Frist ändern.")
-        poll.published_at = poll.published_at or utcnow()
-        poll.public_token = poll.public_token or new_link_token()
-        poll.closed = False
+        from .survey_commands import state
+        state(db,user,"poll",poll,action)
         flash(request,"Terminumfrage veröffentlicht und geöffnet.")
     elif action == "close":
-        poll.closed = True
+        from .survey_commands import state
+        state(db,user,"poll",poll,action)
         flash(request, "Abstimmung beendet. Die Ergebnisse bleiben sichtbar.")
 
     elif action in ("renew", "enable_link") and not poll.published_at:
@@ -182,10 +182,8 @@ def poll_final(request: Request, poll_id: int, option_id: int = Form(...), notif
                db: Session = Depends(get_db)):
     """Termin festlegen: Abstimmung schließen, auf Wunsch alle informieren oder eine Besprechung anlegen."""
     poll, level = _poll(db, poll_id, user, sh.EDIT)
-    opt = next((o for o in poll.options if o.id == option_id), None)
-    if opt is None:
-        raise HTTPException(404)
-    poll.final_option_id, poll.closed = opt.id, True
+    from .survey_commands import choose_final
+    opt, _ = choose_final(db,user,poll,option_id)
     label = pl.option_parts(opt)["label"]
     if create_meeting == "1" and user.can("video"):
         starts_at, minutes = pl.option_start_local(opt, poll)

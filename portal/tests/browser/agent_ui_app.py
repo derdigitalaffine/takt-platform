@@ -7,14 +7,14 @@ from app.calendar_models import Calendar, CalendarEvent
 from app.anliegen_models import AnliegenCategory, Anliegen
 from app.task_models import Task
 from app.security import hash_password
-from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, Organization, KrankEmployer, set_setting
+from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, Organization, KrankEmployer, Poll, Vote, LivePoll, set_setting
 from app.org_models import OrgMembership
 from app.leave_models import LeavePolicy, LeaveRequest
 from app import leave
 from sqlalchemy import select
 
 with SessionLocal() as db:
-    for module in ('ai', 'calendars', 'forms', 'dms', 'anliegen', 'krank'):
+    for module in ('ai', 'calendars', 'forms', 'dms', 'anliegen', 'krank', 'polls'):
         set_setting(db, 'module_' + module, '1')
     set_setting(db, 'ai_knowledge_enabled', '1')
     user = db.scalar(select(User).where(User.email == 'browser@example.org'))
@@ -55,6 +55,31 @@ async def complete(provider, messages, **kwargs):
         if 'Geburtstag' in prompt or prompt == 'ja':
             searches = []
             actions = [dict(tool='create_form', title='Geburtstage der Belegschaft', fields=[dict(type='short', title='Name', required=True), dict(type='date', title='Geburtstag', required=False)])]
+        elif prompt.startswith('Erstelle eine Terminumfrage'):
+            searches=[]
+            actions=[dict(tool='create_survey',record_kind='poll',title='Agent Terminfindung',description='Gemeinsamen Termin finden',location='Raum 2',duration=60,options=[dict(date='2030-12-05',start='09:00',end='10:00'),dict(date='2030-12-06',start='09:00',end='10:00')])]
+        elif prompt.startswith('Veröffentliche die Terminumfrage'):
+            row=db.scalar(select(Poll).where(Poll.title=='Agent Terminfindung'))
+            searches=[dict(tool='search_surveys',query='Agent Terminfindung')]
+            actions=[dict(tool='survey_state',record_kind='poll',id=row.id,operation='publish')]
+        elif prompt.startswith('Lege den ersten Termin'):
+            row=db.scalar(select(Poll).where(Poll.title=='Agent Terminfindung'))
+            searches=[dict(tool='search_surveys',query='Agent Terminfindung')]
+            actions=[dict(tool='finalize_poll',id=row.id,option_id=row.options[0].id,notify=False)]
+        elif prompt.startswith('Erstelle eine anonyme Abstimmung'):
+            searches=[]
+            actions=[dict(tool='create_survey',record_kind='vote',title='Agent Abstimmung',secrecy='anonymous',access=['public'],results='live',questions=[dict(title='Welche Variante?',kind='single',options=['Variante A','Variante B'])])]
+        elif prompt.startswith('Starte die Abstimmung') or prompt.startswith('Beende die Abstimmung'):
+            row=db.scalar(select(Vote).where(Vote.title=='Agent Abstimmung'))
+            searches=[dict(tool='search_surveys',query='Agent Abstimmung')]
+            actions=[dict(tool='survey_state',record_kind='vote',id=row.id,operation='start' if prompt.startswith('Starte') else 'close')]
+        elif prompt.startswith('Erstelle eine Live-Umfrage'):
+            searches=[]
+            actions=[dict(tool='create_survey',record_kind='live_poll',title='Agent Live-Runde',pacing='free',questions=[dict(title='Ein Begriff?',kind='words'),dict(title='Wie bewertest du den Termin?',kind='scale',min=1,max=5)])]
+        elif prompt.startswith('Starte die Live-Umfrage') or prompt.startswith('Beende die Live-Umfrage'):
+            row=db.scalar(select(LivePoll).where(LivePoll.title=='Agent Live-Runde'))
+            searches=[dict(tool='search_surveys',query='Agent Live-Runde')]
+            actions=[dict(tool='survey_state',record_kind='live_poll',id=row.id,operation='open' if prompt.startswith('Starte') else 'close')]
         elif prompt.startswith('Verschiebe den Kalendertermin'):
             event = db.scalar(select(CalendarEvent).where(CalendarEvent.title == 'Von mir geprüfte Projektbesprechung'))
             searches = [dict(tool='search_events', query='Von mir geprüfte Projektbesprechung')]

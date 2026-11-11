@@ -227,6 +227,12 @@ def plan_instructions(user, prompt, findings, categories, requester_id, focus=No
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
         "move_dms": "move_dms(id,area_id): freigegebene manuelle Wissensakte in berechtigten Zielbereich verschieben",
     }.items() if allowed(user, modules.WRITE[tool]))
+    if allowed(user,"surveys"):
+        capabilities.extend(["survey_state(record_kind=poll|vote|live_poll,id,operation): nur exakte operations aus Suchergebnis; Publizieren/Start ausdrücklich bestätigen, kann öffentliche Teilnahme und Einladungen aktivieren",
+                             "finalize_poll(id,option_id,notify=false): zuvor gefundene Terminumfrage und konkreten poll_option festlegen, Umfrage schließen; keine Videokonferenz anlegen"])
+        kinds=(["poll"] if user.can("polls") else [])+(["vote","live_poll"] if user.can("votes") else [])
+        if kinds:
+            capabilities.append("create_survey(record_kind="+"|".join(kinds)+",title,description?,duration=60?,location?,secrecy=secret|anonymous|open?,access=[invite|public|codes]?,results=after_end|after_vote|live|owner?,allow_change=false?,pacing=moderated|free?,options=[{date:YYYY-MM-DD,start:HH:MM?,end:HH:MM?,note?}]? für poll; questions=[{title,kind,options:[Antworttexte],min?,max?,points?,abstain?}]? für vote oder live_poll): geschlossenen Entwurf MIT Fragen oder Terminvorschlägen; vote single|multi|rank|points, live_poll single|multi|yesno|scale|stars|slider|words|open|qa|rank|quiz; quiz benötigt correct=[richtige Antwortnummern ab 1], points?,seconds?,partial?,nickname?; slider min,max,step?,unit?; niemals veröffentlichen oder abstimmen als Teil der Anlage")
     if allowed(user, "anliegen") and user.is_admin:
         capabilities.append("configure_anliegen_category(id,title,routing=person|lead,assignee_id?,enabled=true|false,apply_open=false): nur nicht-vertrauliche Kategorien, bestehende Zuständigkeiten ausschließlich bei explizitem Auftrag migrieren")
     from .agent_precision import context as precision_context, focused
@@ -275,10 +281,10 @@ def normalize_plan(reply, user, findings, categories, db):
             raise ValueError("Nicht unterstützte KI-Aktion.")
         if tool in modules.WRITE:
             action = modules.normalize(db, user, raw, findings)
-            if tool in ("create_form", "create_leave"):
+            if tool in ("create_form", "create_leave", "create_survey"):
                 proposals.append(action)
                 continue
-            key = ("krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else "event" if tool in ("update_event", "delete_event") else modules.KINDS[tool], action["id"])
+            key = (action["record_kind"] if tool in ("survey_state", "finalize_poll") else "krank" if tool in ("set_krank_status", "add_krank_note", "send_krank_message") else "leave" if tool in ("edit_leave", "leave_command") else "event" if tool in ("update_event", "delete_event") else modules.KINDS[tool], action["id"])
             if key in seen:
                 raise ValueError("Mehrere Änderungen am selben Vorgang sind nicht zulässig.")
             seen.add(key)
@@ -580,6 +586,14 @@ def reference_accessible(db, user, source):
         if kind == "person":
             return bool((allowed(user, "tasks") or (allowed(user, "anliegen") and user.can("anliegen_manage")))
                         and (person := db.get(User, rid)) and person.active)
+        if kind in ("poll","vote","live_poll","poll_option"):
+            require(user,"surveys")
+            from . import agent_surveys, survey_commands
+            from .db import PollOption
+            if kind=="poll_option":
+                option=db.get(PollOption,rid)
+                return bool(option and survey_commands.level(db,user,"poll",db.get(agent_surveys.Poll,option.poll_id))>=1)
+            return survey_commands.level(db,user,kind,db.get(agent_surveys.MODELS[kind],rid))>=1
         if kind == "leave":
             require(user, "leave")
             from .leave_models import LeaveRequest
@@ -619,6 +633,13 @@ def reference_accessible(db, user, source):
 def reference_revision(db, kind, rid):
     """Pin only the metadata exposed by module lookups, never user credentials."""
     import hashlib
+    from . import agent_surveys
+    from .db import PollOption
+    if kind in agent_surveys.MODELS:
+        return agent_surveys.revision(db,kind,db.get(agent_surveys.MODELS[kind],rid))
+    if kind=="poll_option":
+        row=db.get(PollOption,rid)
+        return agent_surveys.revision(db,"poll",db.get(agent_surveys.Poll,row.poll_id)) if row else None
     from .calendar_models import Calendar, CalendarEvent
     from .leave_models import LeaveRequest
     from .db import Form, Process, DmsRecord, DmsArea

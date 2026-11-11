@@ -107,5 +107,11 @@
     document.getElementById('questions-json').value = locked ? '' : JSON.stringify(items);
     if (locked) document.getElementById('questions-json').removeAttribute('name');
   });
+  form.taktAgentPopulate = function (fields) {
+    if (locked) return;
+    items = JSON.parse(JSON.stringify(fields.questions || []));
+    root.parentElement.setAttribute('data-agent-editor', ''); render();
+  };
+  form.taktAgentSerialize = function () { if (!locked) document.getElementById('questions-json').value = JSON.stringify(items); };
   render();
 })();
