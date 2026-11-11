@@ -46,10 +46,11 @@ Die Rechtevorschau `/wissen/raum/<id>/verwaltung` erklärt die zum
 Abfragezeitpunkt wirksamen Raumrechte für jeweils sichtbare Personen;
 die verbindliche Entscheidung trifft immer dieselbe `knowledge.allowed()`-
 Logik. Artikel können zusätzliche Sperren, Entwurfs- und Freigaberegeln haben.
-Globale Benutzer- und Gruppenverzeichnisse dürfen delegierte Redakteure
-nicht durchsuchen. Erweiterte Artikelrechte und eine artikelspezifische
-Rechtevorschau bleiben der zentralen Administration bzw. einem Folgeausbau
-vorbehalten.
+Globale Benutzer- und Gruppenverzeichnisse bleiben der zentralen
+Administration vorbehalten. Sie kann unter **Artikelrechte verwalten**
+die effektiven Rechte einer Person für einen konkreten Artikel prüfen.
+Die Vorschau berücksichtigt Raum- und Artikelregeln, Organisationsrollen,
+Leserechte und den Entwurfsstatus.
 Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfolgen.
 
 ## Redaktionsprozess in P1

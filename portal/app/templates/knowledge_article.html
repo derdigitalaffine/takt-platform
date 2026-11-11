@@ -45,6 +45,7 @@
   </details>
   {% if can_manage %}
     <details class="knowledge-form-card mt-3"><summary>Artikelrechte verwalten</summary>
+      <p class="mt-3"><a href="/wissen/artikel/{{ item.id }}/rechtevorschau">Effektive Artikelrechte prüfen</a></p>
       <form class="row g-2 mt-3" action="/wissen/artikel/{{item.id}}/schutz" method="post"><input type="hidden" name="csrf" value="{{csrf}}"><div class="col-sm-8"><label for="edit-scope" class="form-label">Rechte übernehmen oder auf direkte Freigaben begrenzen</label><select id="edit-scope" class="form-select" name="scope"><option value="inherit" {{'selected' if item.scope=='inherit'}}>Rechte des Wissensraums übernehmen</option><option value="restricted" {{'selected' if item.scope=='restricted'}}>Nur direkt berechtigte Personen</option></select></div><div class="col-sm-4 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Schutz speichern</button></div></form>
       {% for g in grants %}<div class="knowledge-grant">{{g.principal_kind}} #{{g.principal_id}} · {{g.capability}} · {{g.effect}}</div>{% endfor %}
       <form class="row g-2 mt-3" action="/wissen/article/{{item.id}}/rechte" method="post"><input type="hidden" name="csrf" value="{{csrf}}">

@@ -1,0 +1,33 @@
+  <section class="knowledge-form-card" aria-labelledby="k-people-title">
+    <div class="knowledge-section-title mt-0"><h2 id="k-people-title">Person auswählen</h2><span class="small text-secondary">Maximal 120 Treffer je Suche</span></div>
+    <form method="get" action="{{ preview_url }}" class="knowledge-people-search">
+      <label class="visually-hidden" for="k-member-search">Nach Namen suchen</label>
+      <input class="form-control" id="k-member-search" type="search" name="q" value="{{query}}" maxlength="80" placeholder="Kollegin oder Kollegen suchen …">
+      <button class="btn btn-outline-primary" type="submit">Suchen</button>
+    </form>
+    <form method="get" action="{{ preview_url }}" class="knowledge-person-picker mt-3">
+      <input type="hidden" name="q" value="{{query}}">
+      <label for="k-person" class="form-label">Effektive Rechte anzeigen</label>
+      <div class="d-flex gap-2 flex-wrap">
+        <select class="form-select flex-grow-1" name="person" id="k-person" required>
+          <option value="">Person wählen</option>
+          {% for p in people %}<option value="{{p.id}}" {{'selected' if selected and selected.id==p.id}}>{{p.name}}{{' · ' ~ p.email if not delegated}}</option>{% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Rechte prüfen</button>
+      </div>
+      {% if not people %}<p class="form-text">Keine Personen im freigegebenen Suchbereich gefunden.</p>{% endif %}
+    </form>
+    {% if selected %}
+    <div class="knowledge-section-title"><h2>Effektive Berechtigungen für {{selected.name}}</h2></div>
+    <div class="knowledge-reason-list">
+      {% for entry in explanation %}
+      <div class="knowledge-reason-row">
+        <strong>{{entry.label}}</strong>
+        <span class="knowledge-reason-state {{'knowledge-reason-yes' if entry.allowed else 'knowledge-reason-no'}}">{{'Erlaubt' if entry.allowed else 'Gesperrt'}}</span>
+        <span class="knowledge-reason-text">{{entry.reason}}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="form-text">Die Anzeige wird bei jedem Aufruf aus den aktuellen Berechtigungen berechnet.{% if not item %} Für noch unveröffentlichte Artikel gelten zusätzliche Redaktionsrechte; für einzelne Artikel können besondere Sperren greifen.{% endif %}</p>
+    {% endif %}
+  </section>
