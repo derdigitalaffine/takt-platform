@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Cancel obsolete suites for a PR when a new fix is pushed; keep main independent.
+concurrency:
+  group: portal-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
@@ -109,6 +114,8 @@ jobs:
         run: python tests/browser/agent_ui_smoke.py
       - name: Save browser screenshots and server log
         if: always()
+        # Screenshot evidence is best-effort; API outage must not fail passing browser tests.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: tasks-browser
@@ -140,6 +147,8 @@ jobs:
         run: python tests/browser/survey_ui_smoke.py
       - name: Save survey screenshots and server log
         if: always()
+        # Screenshot evidence is best-effort; API outage must not fail passing browser tests.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: surveys-browser
@@ -181,6 +190,8 @@ jobs:
         run: python tests/browser/seminar_ui_smoke.py
       - name: Save seminar screenshots and server log
         if: always()
+        # Screenshot evidence is best-effort; API outage must not fail passing browser tests.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: seminars-browser
@@ -222,6 +233,8 @@ jobs:
         run: python tests/browser/board_ui_smoke.py
       - name: Save Kanban screenshots and server log
         if: always()
+        # Screenshot evidence is best-effort; API outage must not fail passing browser tests.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: kanban-browser
@@ -251,6 +264,8 @@ jobs:
         run: python tests/browser/leave_ui_smoke.py
       - name: Save calendar and leave evidence
         if: always()
+        # Screenshot evidence is best-effort; API outage must not fail passing browser tests.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: calendars-browser
