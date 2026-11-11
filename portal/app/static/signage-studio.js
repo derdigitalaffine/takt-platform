@@ -16,7 +16,7 @@
   const previewStatus = document.getElementById('sg-live-status');
   let refreshTimer = null;
   let controller = null;
-  const previewEndpoint = form.action.replace(/\\/save$/, '/preview-live');
+  const previewEndpoint = form.action.replace(/save$/, 'preview-live');
   function queueLivePreview() {
     if (!frame || !previewStatus) return;
     clearTimeout(refreshTimer);
