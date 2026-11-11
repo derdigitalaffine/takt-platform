@@ -396,6 +396,106 @@ async def create_closure(
     return dict(id=closed.id)
 
 
+@app.get("/kalender/buchungen")
+def calendar_booking_overview(
+    request: Request, scope: str = "mine", status: str = "open",
+    page: int | None = None, q: str = "",
+    user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Focused booking desk within TAKT calendars, never a second booking store.
+
+    Only direct assignees or people already authorized for the booking page
+    receive an event. The template gets explicitly redacted dictionaries,
+    not ORM booking objects containing secret citizen access tokens.
+    """
+    from datetime import timedelta
+    from sqlalchemy import or_, and_
+    from . import bookings as bk, booking_integration as integration, shares
+    from .db import Booking, BookingPage, utcnow
+
+    if not calendar_sources.enabled(db, "bookings"):
+        raise HTTPException(404)
+    scope = scope if scope in ("mine", "team") else "mine"
+    status = status if status in ("open", "requested", "booked", "past") else "open"
+    query_text = " ".join((q or "").strip().split())[:80]
+    needle = query_text.casefold()
+    now = utcnow()
+    start = now - timedelta(days=30) if status == "past" else now - timedelta(days=1)
+    end = now if status == "past" else now + timedelta(days=180)
+    # Restrict at the SQL layer before applying a bounded result limit.
+    # Otherwise other departments' appointments could exhaust the limit
+    # and crowd an authorized person's own terms out of the overview.
+    all_pages = list(db.scalars(select(BookingPage)))
+    view_ids = {
+        item.id for item in all_pages
+        if shares.access_level(db, "booking", item, user) >= shares.VIEW
+    }
+    owned_simple_ids = {
+        item.id for item in all_pages if item.owner_id == user.id
+    }
+    allowed = (
+        or_(Booking.provider_id == user.id,
+            and_(Booking.provider_id.is_(None),
+                 Booking.page_id.in_(owned_simple_ids)))
+        if scope == "mine" else
+        or_(Booking.provider_id == user.id, Booking.page_id.in_(view_ids))
+    )
+    query = (
+        select(Booking).where(
+            allowed,
+            Booking.status.in_(("requested", "booked")),
+            Booking.starts_at < end,
+            Booking.ends_at > start,
+        ).order_by(Booking.starts_at, Booking.id).limit(4000)
+    )
+    cards = []
+    page_options: dict[int, str] = {}
+    for booking in db.scalars(query):
+        unit = booking.page
+        level = shares.access_level(db, "booking", unit, user)
+        assigned = booking.provider_id == user.id or (
+            booking.provider_id is None and unit.owner_id == user.id)
+        if not assigned and (scope == "mine" or level < shares.VIEW):
+            continue
+        page_options[unit.id] = unit.title
+        if page is not None and unit.id != page:
+            continue
+        if status in ("booked", "requested") and booking.status != status:
+            continue
+        if status == "past" and booking.ends_at >= now:
+            continue
+        if status != "past" and booking.ends_at < now:
+            continue
+        visibility = integration.calendar_visibility(
+            booking, can_edit=level >= shares.EDIT, responsible=assigned)
+        detail = visibility == "detail"
+        subject = (booking.type.name if booking.type else unit.title) if detail else "Bürgertermin (belegt)"
+        title = (booking.name if detail else "Details geschützt")
+        if needle and needle not in (subject + " " + title + " " + unit.title).casefold():
+            continue
+        cards.append({
+            "id": booking.id,
+            "page": unit.title,
+            "subject": subject,
+            "guest": title,
+            "when": bk.label(booking.starts_at, booking.ends_at),
+            "status": booking.status,
+            "status_label": "Bestätigung ausstehend" if booking.status == "requested" else "Bestätigt",
+            "provider": booking.provider.name if detail and booking.provider else "",
+            "can_confirm": detail and booking.status == "requested"
+                           and (assigned or level >= shares.EDIT),
+        })
+        if len(cards) >= 500:
+            break
+    return render(
+        request, "calendar_bookings.html", user,
+        entries=cards, scope=scope, status=status,
+        chosen_page=page, query_text=query_text,
+        page_options=sorted(page_options.items(), key=lambda item: item[1].casefold()),
+        is_truncated=len(cards) >= 500,
+    )
+
+
 @app.get("/kalender/buchungen/{bid:int}")
 def calendar_booking_detail(
     request: Request, bid: int, user: User = Depends(current_user), db: Session = Depends(get_db)

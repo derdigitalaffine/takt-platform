@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Bürgertermine · Kalender{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/planning-polish.css"><link rel="stylesheet" href="/static/workspace-heading.css">{% endblock %}
+{% block content %}
+<div class="planning-workspace">
+  {% call m.page_head('Bürgertermine', 'Meine Termine, Terminanfragen und freigegebene Buchungsseiten – direkt im TAKT-Kalender.') %}
+    <a class="btn btn-outline-secondary" href="/kalender?ansicht=termine"><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>Zur Monatsansicht</a>
+    {% if user.can("bookings") %}<a class="btn btn-outline-primary" href="/bookings"><i class="fa-solid fa-sliders me-1" aria-hidden="true"></i>Buchungsseiten verwalten</a>{% endif %}
+  {% endcall %}
+
+  <section class="card border-0 shadow-sm mb-4" aria-label="Bürgertermine filtern">
+    <div class="card-body p-3 p-md-4">
+      <form action="/kalender/buchungen" method="get" class="row g-3 align-items-end">
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label fw-semibold" for="bk-scope">Kalenderbereich</label>
+          <select class="form-select" id="bk-scope" name="scope">
+            <option value="mine" {% if scope == 'mine' %}selected{% endif %}>Mir zugewiesen</option>
+            <option value="team" {% if scope == 'team' %}selected{% endif %}>Team und berechtigte Buchungsseiten</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label fw-semibold" for="bk-status">Terminstatus</label>
+          <select class="form-select" id="bk-status" name="status">
+            <option value="open" {% if status == 'open' %}selected{% endif %}>Alle anstehenden Termine</option>
+            <option value="requested" {% if status == 'requested' %}selected{% endif %}>Unbestätigte Anfragen</option>
+            <option value="booked" {% if status == 'booked' %}selected{% endif %}>Bestätigte Termine</option>
+            <option value="past" {% if status == 'past' %}selected{% endif %}>Letzte 30 Tage</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label fw-semibold" for="bk-page">Buchungsseite</label>
+          <select class="form-select" id="bk-page" name="page">
+            <option value="">Alle berechtigten Seiten</option>
+            {% for id, title in page_options %}<option value="{{ id }}" {% if chosen_page == id %}selected{% endif %}>{{ title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+          <label class="form-label fw-semibold" for="bk-search">Suche</label>
+          <div class="input-group">
+            <input class="form-control" type="search" name="q" id="bk-search" maxlength="80" value="{{ query_text }}" placeholder="Termin oder Name">
+            <button class="btn btn-primary" type="submit" aria-label="Bürgertermine filtern"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></button>
+          </div>
+        </div>
+      </form>
+      <p class="small text-secondary mb-0 mt-3"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>Details erscheinen nur mit der passenden Berechtigung. Andere Personen sehen höchstens den belegten Zeitraum. Externe Kalenderabonnements bleiben datensparsam.</p>
+    </div>
+  </section>
+
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <h2 class="h5 mb-0">{{ 'Meine zugewiesenen Bürgertermine' if scope == 'mine' else 'Bürgertermine im berechtigten Bereich' }}</h2>
+    <span class="text-secondary small">{{ entries | length }} Termin{{ 'e' if entries | length != 1 else '' }}{% if is_truncated %} · Anzeige auf 500 begrenzt{% endif %}</span>
+  </div>
+  {% if entries %}
+    <div class="row g-3" role="list" aria-label="Bürgertermine">
+      {% for entry in entries %}
+      <div class="col-12 col-xl-6" role="listitem">
+        <article class="card h-100 shadow-sm border-0">
+          <div class="card-body p-3 p-md-4">
+            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+              <span class="text-secondary small"><i class="fa-solid fa-building me-1" aria-hidden="true"></i>{{ entry.page }}</span>
+              {% if entry.status == 'requested' %}
+                <span class="badge text-bg-warning"><i class="fa-regular fa-clock me-1" aria-hidden="true"></i>{{ entry.status_label }}</span>
+              {% else %}
+                <span class="badge text-bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>{{ entry.status_label }}</span>
+              {% endif %}
+            </div>
+            <h3 class="h6 mb-2">{{ entry.subject }}</h3>
+            <p class="mb-2 fw-semibold"><i class="fa-regular fa-calendar me-2 text-secondary" aria-hidden="true"></i>{{ entry.when }}</p>
+            <p class="small text-secondary mb-1"><i class="fa-regular fa-user me-2" aria-hidden="true"></i>{{ entry.guest }}</p>
+            {% if entry.provider %}<p class="small text-secondary mb-0"><i class="fa-solid fa-user-check me-2" aria-hidden="true"></i>{{ entry.provider }}</p>{% endif %}
+          </div>
+          <div class="card-footer bg-transparent border-0 pt-0 px-3 px-md-4 pb-3 d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-primary btn-sm" href="/kalender/buchungen/{{ entry.id }}"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>Termin ansehen</a>
+            {% if entry.can_confirm %}
+              <form method="post" action="/kalender/buchungen/{{ entry.id }}/bestaetigen">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Bestätigen</button>
+              </form>
+            {% endif %}
+          </div>
+        </article>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <section class="card border-0 shadow-sm text-center p-4 p-md-5" aria-live="polite">
+      <div class="text-primary fs-1 mb-2"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i></div>
+      <h2 class="h5">Hier sind gerade keine passenden Termine</h2>
+      <p class="text-secondary mb-3">Prüfe die gewählten Filter oder wechsle in die Teamansicht, wenn du berechtigte gemeinsame Buchungsseiten sehen möchtest.</p>
+      <div><a class="btn btn-outline-primary" href="/kalender/buchungen">Filter zurücksetzen</a></div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}
