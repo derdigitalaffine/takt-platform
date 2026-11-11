@@ -2,6 +2,7 @@
 Sprechzeiten, Ausnahmen, Feiertage, Abwesenheiten, Verteilung, Bestätigung durch Mitarbeitende, Bürgersicht."""
 
 import re
+from urllib.parse import quote
 from datetime import date, timedelta
 
 import pytest
@@ -105,9 +106,11 @@ def test_public_flow_distribution_and_mails():
     html = c.get("/b/bt-buergerbuero-token-123").text
     assert "Worum geht es?" in html and "Bauberatung" in html and "Gewerbeanmeldung" in html
     html = c.get(f"/b/bt-buergerbuero-token-123?art={a_id}").text
-    assert "Lageplan mitbringen" in html and 'name="art"' in html
+    assert 'name="art"' in html and "Weiter zu Ihren Angaben" in html
     slot = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', html).group(1)
-    data = {"csrf": csrf_of(html), "art": str(a_id), "slot": slot, "name": "Bürger Eins", "email": "eins@example.org"}
+    details = c.get(f"/b/bt-buergerbuero-token-123?art={a_id}&step=details&slot={quote(slot, safe='')}").text
+    assert "Lageplan mitbringen" in details and "Ihre Angaben" in details
+    data = {"csrf": csrf_of(details), "art": str(a_id), "slot": slot, "name": "Bürger Eins", "email": "eins@example.org"}
     r = c.post("/b/bt-buergerbuero-token-123", data=data, follow_redirects=True)
     assert "Telefonnummer" in r.text                               # Telefon ist bei dieser Art Pflicht
     r = c.post("/b/bt-buergerbuero-token-123", data={**data, "phone": "0631 1"}, follow_redirects=False)
@@ -133,8 +136,10 @@ def test_approval_flow_and_management_page():
     page_id, a_id, b_id, anna, ben = make_page(approval=True, choose=True)
     c = client()
     html = c.get(f"/b/bt-buergerbuero-token-123?art={a_id}&person={ben}").text
-    assert "Ansprechperson" in html and "Termin anfragen" in html
+    assert "Ansprechperson" in html and "Weiter zu Ihren Angaben" in html
     slot = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', html).group(1)
+    details = c.get(f"/b/bt-buergerbuero-token-123?art={a_id}&person={ben}&step=details&slot={quote(slot, safe='')}").text
+    assert "Termin anfragen" in details and f'name="person" value="{ben}"' in details
     r = c.post("/b/bt-buergerbuero-token-123", data={"csrf": csrf_of(html), "art": str(a_id), "person": str(ben),
                                                      "slot": slot, "name": "Anfrage", "email": "anfrage@example.org",
                                                      "phone": "1"})
@@ -181,9 +186,11 @@ def test_custom_fields_validation_mail_and_export():
     assert fields[1]["options"] == ["Einzelunternehmen", "GmbH"] and fields[0]["required"] and not fields[2]["required"]
     c = client()
     html = c.get(f"/b/bt-buergerbuero-token-123?art={b_id}").text
-    assert 'name="q_f2"' in html and "<option>GmbH</option>" in html
+    assert 'name="q_f2"' not in html
     slot = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', html).group(1)
-    base = {"csrf": csrf_of(html), "art": str(b_id), "slot": slot, "name": "Gewerbe", "email": "gew@example.org"}
+    details = c.get(f"/b/bt-buergerbuero-token-123?art={b_id}&step=details&slot={quote(slot, safe='')}").text
+    assert 'name="q_f2"' in details and "<option>GmbH</option>" in details
+    base = {"csrf": csrf_of(details), "art": str(b_id), "slot": slot, "name": "Gewerbe", "email": "gew@example.org"}
     bad = c.post("/b/bt-buergerbuero-token-123", data={**base, "q_f1": "Bäckerei", "q_f2": "AG"}, follow_redirects=True)
     assert "aus der Liste" in bad.text
     ok = c.post("/b/bt-buergerbuero-token-123", data={**base, "q_f1": "Bäckerei", "q_f2": "GmbH", "q_f3": "2026-11-01"})
@@ -253,3 +260,47 @@ def test_extended_pages_report_availability_in_management_list():
         page = db.get(BookingPage, page_id)
         assert sum(s["free"] for s in bk.free_slots(db, page)) > 0
     assert "buchbar" in html
+
+
+def test_public_wizard_shows_one_day_and_paginates_available_days():
+    page_id, a_id, _, _, _ = make_page()
+    c = client()
+    base = "/b/bt-buergerbuero-token-123"
+    choose = c.get(base).text
+    assert "Worum geht es?" in choose and 'data-booking-type=' in choose
+    assert 'name="slot"' not in choose
+
+    times = c.get(f"{base}?art={a_id}").text
+    assert "Wann passt es Ihnen?" in times
+    assert 'name="name"' not in times
+    assert len(re.findall(r'class="bk-day-option[ "]', times)) == 7
+    assert "Weitere Tage" in times
+    assert times.count('name="slot"') == 7
+    value = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', times).group(1)
+    details = c.get(f"{base}?art={a_id}&step=details&slot={quote(value, safe='')}").text
+    assert "Ihre Angaben" in details and 'name="name"' in details
+    assert 'name="slot" value="' + value + '"' in details
+    assert 'name="email"' in details and "Zurück zum Termin" in details
+
+    later = c.get(f"{base}?art={a_id}&step=times&offset=7").text
+    assert len(re.findall(r'class="bk-day-option[ "]', later)) <= 7
+    assert "Vorherige Tage" in later
+    assert 'name="slot"' in later
+    bad = c.get(f"{base}?art={a_id}&step=details&slot=invalid").text
+    assert "nicht mehr verfügbar" in bad
+    assert 'name="name"' not in bad
+
+
+def test_public_wizard_preserves_provider_selection_through_steps():
+    _, a_id, _, _, ben = make_page(choose=True, approval=True)
+    c = client()
+    base = "/b/bt-buergerbuero-token-123"
+    times = c.get(f"{base}?art={a_id}&person={ben}").text
+    assert f'name="person" value="{ben}"' in times
+    value = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', times).group(1)
+    details = c.get(f"{base}?art={a_id}&person={ben}&step=details&slot={quote(value, safe='')}").text
+    assert f'name="person" value="{ben}"' in details
+    assert "Termin anfragen" in details
+    assert "Lageplan mitbringen" in details
+    # Beim Zurückgehen wird die gewählte Terminart beibehalten.
+    assert f"art={a_id}" in details

@@ -1,103 +1,164 @@
 {% extends "base.html" %}
 {% block title %}{{ page.title if page else 'Terminbuchung' }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/booking-public.css">{% endblock %}
 {% macro header(page) %}
-<div class="card mb-3 border-top border-primary border-4"><div class="card-body">
-  <div class="small text-secondary mb-1"><i class="fa-solid fa-calendar-plus me-1"></i>Terminbuchung{% if page.owner and not page.extended %} bei {{ page.owner.name }}{% endif %}</div>
-  <h1 class="h3 mb-2">{{ page.title }}</h1>
-  {% if page.description %}<div class="text-secondary mb-2">{{ page.description | richtext }}</div>{% endif %}
-  {% if not page.extended %}<div class="small text-secondary d-flex flex-wrap gap-3">
-    <span><i class="fa-regular fa-clock me-1"></i>{{ page.slot_minutes }} Minuten</span>
-    {% if page.online %}<span><i class="fa-solid fa-video me-1"></i>Videokonferenz im Browser</span>{% elif page.location %}<span><i class="fa-solid fa-location-dot me-1"></i>{{ page.location }}</span>{% endif %}
-  </div>{% endif %}
-</div></div>
+<header class="bk-public-hero">
+  <div class="bk-public-eyebrow"><span class="bk-public-icon"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i></span>Terminbuchung{% if page.owner and not page.extended %} · {{ page.owner.name }}{% endif %}</div>
+  <h1>{{ page.title }}</h1>
+  {% if page.description %}
+    {% if page.description | length > 240 %}<p class="bk-public-intro">{{ page.description | truncate(220) }}</p>
+    <details class="bk-description-more"><summary>Weitere Informationen zum Angebot</summary><div class="bk-public-description">{{ page.description | richtext }}</div></details>
+    {% else %}<div class="bk-public-intro">{{ page.description | richtext }}</div>{% endif %}
+  {% endif %}
+  {% if not page.extended %}<div class="bk-public-facts"><span><i class="fa-regular fa-clock" aria-hidden="true"></i>{{ page.slot_minutes }} Minuten</span>
+    {% if page.online %}<span><i class="fa-solid fa-video" aria-hidden="true"></i>Videokonferenz</span>{% elif page.location %}<span><i class="fa-solid fa-location-dot" aria-hidden="true"></i>{{ page.location }}</span>{% endif %}</div>{% endif %}
+</header>
+{% endmacro %}
+{% macro progress(page, types, mode, step, times_url, types_url) %}
+{% set chooser = page.extended and types | length != 1 %}
+{% set stage = 1 if mode == 'types' else (2 if step == 'times' else 3) %}
+<nav class="bk-progress" aria-label="Fortschritt der Terminbuchung">
+  <ol>
+    {% if chooser %}
+    <li class="{{ 'is-active' if stage == 1 else 'is-done' }}" {% if stage == 1 %}aria-current="step"{% endif %}>
+      {% if stage > 1 %}<a href="{{ types_url }}" aria-label="Zur Terminartauswahl"><span class="bk-progress-number"><i class="fa-solid fa-check" aria-hidden="true"></i></span><span>Terminart</span></a>
+      {% else %}<span><span class="bk-progress-number">1</span><span>Terminart</span></span>{% endif %}
+    </li>{% endif %}
+    <li class="{{ 'is-active' if stage == 2 else 'is-done' if stage == 3 else '' }}" {% if stage == 2 %}aria-current="step"{% endif %}>
+      {% if stage == 3 %}<a href="{{ times_url }}"><span class="bk-progress-number"><i class="fa-solid fa-check" aria-hidden="true"></i></span><span>Termin</span></a>
+      {% else %}<span><span class="bk-progress-number">{{ 2 if chooser else 1 }}</span><span>Termin</span></span>{% endif %}
+    </li>
+    <li class="{{ 'is-active' if stage == 3 else '' }}" {% if stage == 3 %}aria-current="step"{% endif %}>
+      <span><span class="bk-progress-number">{{ 3 if chooser else 2 }}</span><span>Ihre Angaben</span></span>
+    </li>
+  </ol>
+</nav>
 {% endmacro %}
 {% block content %}
-<div class="form-fill" style="max-width: 56rem">
+<div class="bk-citizen" id="bk-citizen">
 {% if mode == 'missing' %}
-  <div class="card mt-3"><div class="card-body p-5 text-center"><i class="fa-solid fa-link-slash fa-3x text-secondary mb-3"></i>
-    <h1 class="h4">Link nicht gefunden</h1><p class="text-secondary mb-0">Der Link ist ungültig oder wurde ersetzt. Bitte wenden Sie sich an die Stelle, die Ihnen den Link geschickt hat.</p></div></div>
+  <section class="bk-public-panel bk-public-empty"><i class="fa-solid fa-link-slash fa-2x text-secondary" aria-hidden="true"></i>
+    <h1 class="h4 mt-3">Link nicht gefunden</h1><p class="text-secondary mb-0">Der Link ist ungültig oder wurde ersetzt. Bitte wenden Sie sich an die Stelle, die Ihnen den Link geschickt hat.</p></section>
 {% elif mode == 'paused' %}
-  {{ header(page) }}<div class="alert alert-secondary"><i class="fa-solid fa-pause me-1"></i>Zurzeit können keine Termine gebucht werden.</div>
+  {{ header(page) }}<div class="alert alert-secondary"><i class="fa-solid fa-pause me-1" aria-hidden="true"></i>Zurzeit können keine Termine gebucht werden.</div>
 {% elif mode == 'invite_only' %}
-  {{ header(page) }}<div class="alert alert-info"><i class="fa-solid fa-envelope me-1"></i>Diese Termine sind nur mit persönlicher Einladung buchbar. Bitte verwenden Sie den Link aus Ihrer Einladungsmail.</div>
-
+  {{ header(page) }}<div class="alert alert-info"><i class="fa-solid fa-envelope me-1" aria-hidden="true"></i>Diese Termine sind nur mit persönlicher Einladung buchbar. Bitte verwenden Sie den Link aus Ihrer Einladungsmail.</div>
 {% elif mode == 'types' %}
   {{ header(page) }}
-  <h2 class="h5 mb-3"><span class="badge rounded-pill text-bg-primary me-2">1</span>Worum geht es?</h2>
-  {% if types %}
-  <div class="row g-3 mb-5">{% for t in types %}
-    <div class="col-md-6"><a class="card h-100 text-reset text-decoration-none pub-tile" href="?art={{ t.id }}{% if invite %}&i={{ invite.token }}{% endif %}">
-      <div class="card-body"><h3 class="h6 mb-1">{{ t.name }}</h3>
-        <div class="small text-secondary mb-2"><i class="fa-regular fa-clock me-1"></i>{{ summary(t) }}{% if t.approval %} · Bestätigung durch uns{% endif %}</div>
-        {% if t.description %}<p class="small mb-0">{{ t.description | truncate(220) }}</p>{% endif %}</div>
-      <div class="card-footer small text-primary">Termin wählen <i class="fa-solid fa-arrow-right"></i></div></a></div>
-  {% endfor %}</div>
-  {% else %}<div class="alert alert-warning">Zurzeit werden hier keine Termine angeboten.</div>{% endif %}
-
+  {{ progress(page, types, mode, '', start_url, start_url) }}
+  <section class="bk-public-panel" aria-labelledby="bk-types-title">
+    <div class="bk-public-panel-heading"><div><span class="bk-public-kicker">Schritt 1</span><h2 id="bk-types-title">Worum geht es?</h2>
+      <p>Wählen Sie das Anliegen aus, für das Sie einen Termin benötigen.</p></div></div>
+    {% if types %}
+      {% if types | length > 6 %}<label class="bk-public-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <span class="visually-hidden">Terminarten durchsuchen</span><input type="search" id="bk-type-search" placeholder="Terminart suchen …" autocomplete="off"></label>{% endif %}
+      <div class="bk-type-grid" id="bk-type-grid">{% for t in types %}
+        <a class="bk-type-choice" href="?art={{ t.id }}{% if invite %}&amp;i={{ invite.token }}{% endif %}" data-booking-type="{{ t.name | lower }}">
+          <span class="bk-type-choice-main"><span class="bk-type-symbol"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span>
+            <span class="bk-type-title">{{ t.name }}</span></span>
+          <span class="bk-type-meta"><i class="fa-regular fa-clock" aria-hidden="true"></i>{{ summary(t) }}{% if t.approval %} · Bestätigung erforderlich{% endif %}</span>
+          {% if t.description %}<span class="bk-type-description">{{ t.description | truncate(190) }}</span>{% endif %}
+          <span class="bk-type-action">Termine ansehen <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+        </a>
+      {% endfor %}</div>
+      <p id="bk-search-empty" class="bk-public-empty-search" hidden>Keine passende Terminart gefunden.</p>
+    {% else %}<div class="bk-no-results"><i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i>Zurzeit werden hier keine Termine angeboten.</div>{% endif %}
+  </section>
 {% elif mode == 'book' %}
   {{ header(page) }}
+  {{ progress(page, types, mode, step, times_url, types_url) }}
   {% if bt %}
-  <div class="card mb-3"><div class="card-body d-flex flex-wrap gap-3 align-items-start">
-    <div class="flex-grow-1"><div class="small text-secondary">Terminart</div><div class="fw-semibold">{{ bt.name }}</div>
-      <div class="small text-secondary"><i class="fa-regular fa-clock me-1"></i>{{ summary(bt) }}{% if bt.approval %} · Wir bestätigen Ihren Termin nach Prüfung per E-Mail.{% endif %}</div>
-      {% if bt.description %}<div class="small mt-1">{{ bt.description | richtext }}</div>{% endif %}
-      {% if bt.docs_hint %}<div class="alert alert-info small py-2 mt-2 mb-0"><i class="fa-solid fa-folder-open me-1"></i><strong>Bitte mitbringen:</strong> {{ bt.docs_hint | richtext }}</div>{% endif %}</div>
-    {% if types | length > 1 %}<a class="btn btn-sm btn-outline-secondary" href="?{% if invite %}i={{ invite.token }}{% endif %}"><i class="fa-solid fa-arrow-left me-1"></i>andere Terminart</a>{% endif %}
-  </div>
-  {% if bt.choose_provider and bt.providers | length > 1 %}
-  <form method="get" class="card-footer d-flex flex-wrap gap-2 align-items-center"><input type="hidden" name="art" value="{{ bt.id }}">{% if invite %}<input type="hidden" name="i" value="{{ invite.token }}">{% endif %}
-    <label class="small" for="bk-person">Ansprechperson</label>
-    <select class="form-select form-select-sm w-auto" id="bk-person" name="person"><option value="">egal – erster freier Termin</option>{% for p in bt.providers if p.active %}<option value="{{ p.id }}" {% if person == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
-    <button class="btn btn-sm btn-outline-primary" type="submit">Termine zeigen</button></form>
-  {% endif %}
-  </div>
-  {% endif %}
-  {% if not days %}
-  <div class="alert alert-warning"><i class="fa-regular fa-calendar-xmark me-1"></i>Zurzeit sind alle Termine vergeben. Bitte versuchen Sie es später noch einmal{% if page.owner %} oder melden Sie sich bei {{ page.owner.name }}{% endif %}.</div>
-  {% else %}
-  <form method="post" class="mb-5" id="bk-form">
-    <input type="hidden" name="csrf" value="{{ csrf }}">{% if invite %}<input type="hidden" name="i" value="{{ invite.token }}">{% endif %}
-    {% if bt %}<input type="hidden" name="art" value="{{ bt.id }}">{% if person %}<input type="hidden" name="person" value="{{ person }}">{% endif %}{% endif %}
-    <div class="d-none" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
-    <div class="card mb-3"><div class="card-header fw-semibold"><span class="badge rounded-pill text-bg-primary me-2">1</span>Termin wählen</div><div class="card-body">
-      <div class="d-flex flex-wrap gap-1 mb-3" role="navigation" aria-label="Tage">
-        {% for d in days %}<a class="btn btn-sm btn-outline-secondary" href="#tag-{{ d.key }}">{{ d.weekday }} {{ d.date }} <span class="badge text-bg-light">{{ d.slots | length }}</span></a>{% endfor %}
-      </div>
-      {% for d in days %}
-      <div class="bk-day mb-3" id="tag-{{ d.key }}">
-        <div class="fw-semibold mb-2">{{ d.weekday_long }}, {{ d.full }}</div>
-        <div class="d-flex flex-wrap gap-2 bk-slot">
-          {% for s in d.slots %}{% set val = s.iso ~ '+00:00' %}
-          <input type="radio" class="btn-check" name="slot" id="s-{{ loop.index }}-{{ d.key }}" value="{{ val }}" required {% if selected == val %}checked{% endif %}>
-          <label class="btn btn-outline-primary" for="s-{{ loop.index }}-{{ d.key }}">{{ s.time }}{% if page.capacity > 1 and not bt %}<span class="d-block small">{{ s.free }} frei</span>{% endif %}</label>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-    </div></div>
-    <div class="card"><div class="card-header fw-semibold"><span class="badge rounded-pill text-bg-primary me-2">2</span>Ihre Angaben</div><div class="card-body row g-3">
-      <div class="col-md-6"><label class="form-label" for="bn">Name</label><input class="form-control" id="bn" name="name" required maxlength="120" autocomplete="name" value="{{ invite.name if invite else (member.name if member else '') }}"></div>
-      <div class="col-md-6"><label class="form-label" for="be">E-Mail <span class="text-secondary">(für die Bestätigung)</span></label>
-        <input class="form-control" id="be" name="email" type="email" required maxlength="255" autocomplete="email" value="{{ invite.email if invite else (member.email if member else '') }}" {% if invite %}readonly{% endif %}></div>
-      {% set phone_mode = bt.phone_mode if bt else ('required' if page.ask_phone else 'none') %}
-      {% if phone_mode != 'none' %}<div class="col-md-6"><label class="form-label" for="bp">Telefon{% if phone_mode == 'optional' %} <span class="text-secondary">(optional)</span>{% endif %}</label><input class="form-control" id="bp" name="phone" type="tel" {% if phone_mode == 'required' %}required{% endif %} maxlength="60" autocomplete="tel"></div>{% endif %}
-      {% for f in fields or [] %}{% set fidq = 'q_' ~ f.key %}
-      <div class="{{ 'col-12' if f.kind in ('textarea', 'checkbox') else 'col-md-6' }}">
-        {% if f.kind == 'checkbox' %}<div class="form-check"><input class="form-check-input" type="checkbox" id="{{ fidq }}" name="{{ fidq }}" value="1" {% if f.required %}required{% endif %}><label class="form-check-label" for="{{ fidq }}">{{ f.label }}</label></div>
-        {% else %}<label class="form-label" for="{{ fidq }}">{{ f.label }}{% if not f.required %} <span class="text-secondary">(optional)</span>{% endif %}</label>
-          {% if f.kind == 'textarea' %}<textarea class="form-control" id="{{ fidq }}" name="{{ fidq }}" rows="3" maxlength="2000" {% if f.required %}required{% endif %}></textarea>
-          {% elif f.kind == 'select' %}<select class="form-select" id="{{ fidq }}" name="{{ fidq }}" {% if f.required %}required{% endif %}><option value="">– bitte wählen –</option>{% for o in f.options %}<option>{{ o }}</option>{% endfor %}</select>
-          {% else %}<input class="form-control" id="{{ fidq }}" name="{{ fidq }}" type="{{ {'date': 'date', 'number': 'text'}.get(f.kind, 'text') }}" {% if f.kind == 'number' %}inputmode="decimal"{% endif %} maxlength="2000" {% if f.required %}required{% endif %}>{% endif %}
-        {% endif %}{% if f.help %}<div class="form-text">{{ f.help }}</div>{% endif %}
-      </div>
-      {% endfor %}
-      <div class="col-12"><label class="form-label" for="bno">Nachricht <span class="text-secondary">(optional)</span></label><textarea class="form-control" id="bno" name="note" rows="2" maxlength="2000"></textarea></div>
-      <div class="col-12 small text-secondary"><i class="fa-solid fa-shield-halved me-1"></i>Ihre Angaben werden nur für diesen Termin verwendet. Absagen oder Verschieben ist bis {{ page.cancel_hours }} Stunden vorher über den Link in der Bestätigung möglich.</div>
-      <div class="col-12"><button class="btn btn-primary btn-lg" type="submit"><i class="fa-solid fa-calendar-check me-1"></i>{{ 'Termin anfragen' if bt and bt.approval else 'Termin verbindlich buchen' }}</button></div>
-    </div></div>
-  </form>
+    <div class="bk-selected-type"><span class="bk-selected-type-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+      <div class="bk-selected-type-info"><span class="bk-public-kicker">Ihr Anliegen</span><strong>{{ bt.name }}</strong>
+        <span class="small text-secondary">{{ summary(bt) }}{% if bt.approval %} · Termin wird bestätigt{% endif %}</span></div>
+      {% if types | length > 1 %}<a href="{{ types_url }}" class="bk-edit-link"><i class="fa-solid fa-pen" aria-hidden="true"></i><span class="d-none d-sm-inline">Ändern</span><span class="visually-hidden d-sm-none">Terminart ändern</span></a>{% endif %}
+    </div>
   {% endif %}
 
+  {% if step == 'times' %}
+  <section class="bk-public-panel" aria-labelledby="bk-time-title">
+    <div class="bk-public-panel-heading"><div><span class="bk-public-kicker">Nächster Schritt</span><h2 id="bk-time-title">Wann passt es Ihnen?</h2>
+      <p>Wählen Sie zuerst einen Tag und dann eine verfügbare Uhrzeit.</p></div></div>
+    {% if invalid_slot %}<div class="alert alert-warning">Der ausgewählte Termin ist nicht mehr verfügbar. Bitte wählen Sie eine andere Uhrzeit.</div>{% endif %}
+    {% if bt and bt.choose_provider and bt.providers | length > 1 %}
+      <form method="get" class="bk-person-filter">
+        <input type="hidden" name="step" value="times"><input type="hidden" name="art" value="{{ bt.id }}">
+        {% if invite %}<input type="hidden" name="i" value="{{ invite.token }}">{% endif %}
+        <label for="bk-person">Ansprechperson</label>
+        <div><select class="form-select" id="bk-person" name="person">
+          <option value="">Egal – erster freier Termin</option>{% for p in bt.providers if p.active %}<option value="{{ p.id }}" {% if person == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+        </select><button type="submit" class="btn btn-outline-primary">Anzeigen</button></div>
+      </form>
+    {% endif %}
+    {% if active_day %}
+      <div class="bk-day-head"><h3>Tag auswählen</h3><span>{{ days | length }} Tage mit freien Terminen</span></div>
+      <div class="bk-days-pager">
+        {% if prev_days %}<a class="bk-pager-arrow" href="{{ prev_days }}" aria-label="Vorherige Tage"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a>{% else %}<span class="bk-pager-arrow is-disabled" aria-hidden="true"><i class="fa-solid fa-chevron-left"></i></span>{% endif %}
+        <div class="bk-day-options">
+          {% for d in day_nav %}<a href="{{ public_link(step='times', day=d.key) }}" class="bk-day-option {{ 'is-selected' if active_day.key == d.key }}" {% if active_day.key == d.key %}aria-current="date"{% endif %}>
+            <span>{{ d.weekday }}</span><strong>{{ d.date }}</strong><small>{{ d.slots | length }} frei</small></a>{% endfor %}
+        </div>
+        {% if next_days %}<a class="bk-pager-arrow" href="{{ next_days }}" aria-label="Weitere Tage"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>{% else %}<span class="bk-pager-arrow is-disabled" aria-hidden="true"><i class="fa-solid fa-chevron-right"></i></span>{% endif %}
+      </div>
+      <form method="get" action="/b/{{ page.public_token }}" class="bk-slots-form">
+        <input type="hidden" name="step" value="details">
+        {% if invite %}<input type="hidden" name="i" value="{{ invite.token }}">{% endif %}
+        {% if bt %}<input type="hidden" name="art" value="{{ bt.id }}">{% if person %}<input type="hidden" name="person" value="{{ person }}">{% endif %}{% endif %}
+        <div class="bk-day-head mt-3"><h3 id="bk-time-choice">{{ active_day.weekday_long }}, {{ active_day.full }}</h3><span>Uhrzeit auswählen</span></div>
+        <div class="bk-slot-options" role="group" aria-labelledby="bk-time-choice">{% for s in active_day.slots %}{% set val = s.iso ~ '+00:00' %}
+          <input type="radio" class="btn-check" name="slot" id="s-{{ loop.index }}-{{ active_day.key }}" value="{{ val }}" required {% if selected == val %}checked{% endif %}>
+          <label class="bk-slot-option" for="s-{{ loop.index }}-{{ active_day.key }}"><i class="fa-regular fa-clock" aria-hidden="true"></i>{{ s.time }}{% if page.capacity > 1 and not bt %}<small>{{ s.free }} frei</small>{% endif %}</label>
+        {% endfor %}</div>
+        <div class="bk-public-actions"><span class="small text-secondary"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Unverbindliche Auswahl</span>
+          <button class="btn btn-primary bk-primary-action" type="submit">Weiter zu Ihren Angaben <i class="fa-solid fa-arrow-right ms-2" aria-hidden="true"></i></button></div>
+      </form>
+    {% else %}<div class="bk-no-results"><i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i><strong>Zurzeit sind keine Termine frei.</strong>
+        <p>Bitte versuchen Sie es später noch einmal{% if page.owner %} oder wenden Sie sich an {{ page.owner.name }}{% endif %}.</p></div>{% endif %}
+  </section>
+  {% elif step == 'details' %}
+  <section class="bk-public-panel" aria-labelledby="bk-details-title">
+    <div class="bk-public-panel-heading"><div><span class="bk-public-kicker">Letzter Schritt</span><h2 id="bk-details-title">Ihre Angaben</h2>
+      <p>Tragen Sie Ihre Kontaktdaten ein, damit wir Ihnen die Terminbestätigung zusenden können.</p></div></div>
+    <div class="bk-selected-slot"><span class="bk-selected-slot-icon"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i></span>
+      <div><span class="small text-secondary d-block">Ihr ausgewählter Termin</span><strong>{{ chosen_day.weekday_long }}, {{ chosen_day.full }} · {{ chosen_slot.time }} Uhr</strong></div>
+      <a class="bk-edit-link" href="{{ times_url }}"><i class="fa-solid fa-pen" aria-hidden="true"></i>Ändern</a></div>
+    {% if bt and bt.description %}<details class="bk-booking-hint"><summary>Informationen zu {{ bt.name }}</summary><div>{{ bt.description | richtext }}</div></details>{% endif %}
+    {% if bt and bt.docs_hint %}<div class="bk-docs-note"><i class="fa-solid fa-folder-open" aria-hidden="true"></i><div><strong>Bitte mitbringen</strong><div>{{ bt.docs_hint | richtext }}</div></div></div>{% endif %}
+    <form method="post" id="bk-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if invite %}<input type="hidden" name="i" value="{{ invite.token }}">{% endif %}
+      {% if bt %}<input type="hidden" name="art" value="{{ bt.id }}">{% if person %}<input type="hidden" name="person" value="{{ person }}">{% endif %}{% endif %}
+      <input type="hidden" name="slot" value="{{ selected }}">
+      <div class="d-none" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+      <div class="bk-fields-grid">
+        <div><label class="form-label" for="bn">Vollständiger Name <span class="text-danger">*</span></label>
+          <input class="form-control" id="bn" name="name" required maxlength="120" autocomplete="name" value="{{ invite.name if invite else (member.name if member else '') }}"></div>
+        <div><label class="form-label" for="be">E-Mail-Adresse <span class="text-danger">*</span></label>
+          <input class="form-control" id="be" name="email" type="email" required maxlength="255" autocomplete="email" value="{{ invite.email if invite else (member.email if member else '') }}" {% if invite %}readonly{% endif %}>
+          <div class="form-text">Hierhin erhalten Sie Ihre Bestätigung.</div></div>
+        {% set phone_mode = bt.phone_mode if bt else ('required' if page.ask_phone else 'none') %}
+        {% if phone_mode != 'none' %}<div><label class="form-label" for="bp">Telefonnummer{% if phone_mode == 'optional' %} <span class="text-secondary">(optional)</span>{% else %} <span class="text-danger">*</span>{% endif %}</label>
+          <input class="form-control" id="bp" name="phone" type="tel" {% if phone_mode == 'required' %}required{% endif %} maxlength="60" autocomplete="tel"></div>{% endif %}
+        {% for f in fields or [] %}{% set fidq = 'q_' ~ f.key %}
+        <div class="{{ 'bk-field-wide' if f.kind in ('textarea', 'checkbox') else '' }}">
+          {% if f.kind == 'checkbox' %}<div class="form-check"><input class="form-check-input" type="checkbox" id="{{ fidq }}" name="{{ fidq }}" value="1" {% if f.required %}required{% endif %}>
+            <label class="form-check-label" for="{{ fidq }}">{{ f.label }}</label></div>
+          {% else %}<label class="form-label" for="{{ fidq }}">{{ f.label }}{% if not f.required %} <span class="text-secondary">(optional)</span>{% endif %}</label>
+            {% if f.kind == 'textarea' %}<textarea class="form-control" id="{{ fidq }}" name="{{ fidq }}" rows="3" maxlength="2000" {% if f.required %}required{% endif %}></textarea>
+            {% elif f.kind == 'select' %}<select class="form-select" id="{{ fidq }}" name="{{ fidq }}" {% if f.required %}required{% endif %}><option value="">– bitte wählen –</option>{% for o in f.options %}<option>{{ o }}</option>{% endfor %}</select>
+            {% else %}<input class="form-control" id="{{ fidq }}" name="{{ fidq }}" type="{{ {'date': 'date', 'number': 'text'}.get(f.kind, 'text') }}" {% if f.kind == 'number' %}inputmode="decimal"{% endif %} maxlength="2000" {% if f.required %}required{% endif %}>{% endif %}
+          {% endif %}{% if f.help %}<div class="form-text">{{ f.help }}</div>{% endif %}
+        </div>{% endfor %}
+        <div class="bk-field-wide"><label class="form-label" for="bno">Zusätzliche Nachricht <span class="text-secondary">(optional)</span></label>
+          <textarea class="form-control" id="bno" name="note" rows="2" maxlength="2000"></textarea></div>
+      </div>
+      <div class="bk-privacy-note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+        <span>Ihre Angaben werden für diese Terminbuchung verarbeitet. Verschieben oder absagen können Sie bis {{ page.cancel_hours }} Stunden vorher über den Link in Ihrer Bestätigung.</span></div>
+      <div class="bk-public-actions"><a href="{{ times_url }}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zurück zum Termin</a>
+        <button class="btn btn-primary bk-primary-action" type="submit"><i class="fa-solid fa-calendar-check me-1" aria-hidden="true"></i>{{ 'Termin anfragen' if bt and bt.approval else 'Termin verbindlich buchen' }}</button></div>
+    </form>
+  </section>
+  {% endif %}
 {% elif mode == 'manage' %}
   {{ header(page) }}
   {% if booking.status == 'cancelled' %}
@@ -137,6 +198,8 @@
   <p class="small text-secondary">Verschieben oder Absagen ist online nur bis {{ page.cancel_hours }} Stunden vor dem Termin möglich. Bitte wenden Sie sich direkt an {{ page.owner.name if page.owner else 'die anbietende Stelle' }}.</p>
   {% endif %}
   {% endif %}
+
 {% endif %}
 </div>
+<script src="/static/booking-public.js" defer></script>
 {% endblock %}
