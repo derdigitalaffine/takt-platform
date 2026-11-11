@@ -20,7 +20,7 @@ def _range():
 
 def test_assigned_booking_visible_only_to_staff_and_external_feeds_anonymous(db, task_people):
     owner, provider, stranger = task_people[:3]
-    settings(module_bookings="1")
+    settings(module_bookings="1", module_calendars="1")
     token = secrets.token_hex(12)
     page = BookingPage(owner_id=owner.id, title="Bürgerbüro", public_token=token)
     db.add(page)
