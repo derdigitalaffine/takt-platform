@@ -18,7 +18,7 @@ _DOMAIN = re.compile(
     r"\b(?:aufgab\w*|todo\w*|anliegen|mängel|mangel|beschaffung|"
     r"büromaterial|büromöbel|bestellung\w*|formular\w*|"
     r"kalender\w*|termin\w*|einzeltermin\w*|urlaub\w*|besprechung\w*|akte\w*|"
-    r"dms|vorgang\w*|prozess\w*|status|priorität|"
+    r"umfrage\w*|abstimmung\w*|wortwolke|quiz|dms|vorgang\w*|prozess\w*|status|priorität|"
     r"zuständigkeit\w*|kolleg\w*)\b",
     re.I,
 )

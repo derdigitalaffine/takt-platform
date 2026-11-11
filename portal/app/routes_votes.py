@@ -164,17 +164,18 @@ def vote_state(request: Request, vote_id: int, action: str = Form(...), user: Us
         if vote.ends_at and vote.ends_at < utcnow():
             flash(request, "Das Ende liegt in der Vergangenheit – bitte unter „Bearbeiten“ ändern.", "error")
             return redirect(f"/votes/{vote.id}")
-        vote.status = "open"
-        vote.opened_at = vote.opened_at or utcnow()
-        n = vt.send_pending_invites(db, vote, user)
+        from .survey_commands import state
+        n = state(db,user,"vote",vote,action)
         flash(request, "Abstimmung läuft." + (f" {n} Einladung(en) verschickt." if n else ""))
     elif action == "pause" and vote.status == "open":
-        vote.status = "draft"
+        from .survey_commands import state
+        state(db,user,"vote",vote,action)
         flash(request, "Abstimmung angehalten – bis zum erneuten Start kann niemand abstimmen.")
     elif action == "close" and vote.status != "closed":
         if level < sh.EDIT and vote.results != "live":
             raise HTTPException(403)
-        vt.close(db, vote)
+        from .survey_commands import state
+        state(db,user,"vote",vote,action)
         flash(request, "Abstimmung beendet, Ergebnis festgeschrieben.")
     db.commit()
     nxt = request.query_params.get("next", "")

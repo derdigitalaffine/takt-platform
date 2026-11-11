@@ -36,7 +36,20 @@
       move_dms: `form[action="/dms/move"]`
     };
     let form;
-    if (tool === 'set_task_status') {
+    if (tool === 'create_survey') {
+      form = document.querySelector({poll:'#poll-form',vote:'#vote-form',live_poll:'form[action="/votes/live/new"]'}[data.fields.record_kind]);
+    } else if (tool === 'survey_state') {
+      const base = {poll:'/polls/',vote:'/votes/',live_poll:'/votes/live/'}[data.fields.record_kind] + id;
+      const op = data.fields.operation === 'publish' ? 'reopen' : data.fields.operation;
+      form = [...document.querySelectorAll(`form[action="${base}/${data.fields.record_kind === 'live_poll' ? 'status' : 'state'}"]`)].find(f =>
+        f.querySelector(`input[name="action"][value="${op}"], button[name="action"][value="${op}"]`));
+      if (form) for (const button of form.querySelectorAll('button[name="action"]')) {
+        if (button.value !== op) {button.disabled = true;button.hidden = true;}
+      }
+    } else if (tool === 'finalize_poll') {
+      form = [...document.querySelectorAll(`form[action="/polls/${id}/final"]`)].find(f => f.querySelector(`input[name="option_id"][value="${data.fields.option_id}"]`));
+    }
+    if (['create_survey','survey_state','finalize_poll'].includes(tool)) { /* Selected using the exact native record and operation above. */ } else if (tool === 'set_task_status') {
       form = Array.from(document.querySelectorAll(`form[action="/aufgaben/${id}/aktion"]`))
         .find(f => f.elements.action?.value === 'status' && f.elements.status?.value === data.fields.status);
     } else if (tool === 'set_anliegen_status') {
@@ -68,6 +81,7 @@
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
       create_form: ['title'],
+      create_survey: ['title','description','location','duration','options_json','questions_json','secrecy','access','results','allow_change','pacing'], survey_state: [], finalize_poll: [],
       set_krank_status: ['note'], add_krank_note: ['text'], send_krank_message: ['text'],
       create_leave: ['starts_on', 'ends_on', 'start_half', 'end_half'],
       edit_leave: ['starts_on', 'ends_on', 'start_half', 'end_half'], leave_command: ['reason'],
@@ -80,6 +94,7 @@
       update_event: ['title', 'description', 'location', 'start', 'end', 'start_time', 'end_time', 'all_day'], delete_event: [],
       copy_form: [], move_dms: ['area_id']
     }[tool];
+    if (tool === "create_survey") form.taktAgentPopulate?.(fields);
     function hidden(name, value) {
       let input = form.querySelector(`input[type="hidden"][name="${name}"]`);
       if (!input) { input = document.createElement('input'); input.type = 'hidden'; input.name = name; form.appendChild(input); }
@@ -99,6 +114,13 @@
     }
     for (const [name, value] of Object.entries(fields)) {
       const control = form.elements.namedItem(name);
+      if (tool === 'create_survey' && ['access','secrecy'].includes(name)) {
+        for (const input of form.querySelectorAll(`[name="${name}"]`)) {
+          input.checked = Array.isArray(value) ? value.includes(input.value) : value === input.value;
+          input.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+        continue;
+      }
       if (!control || !('value' in control) || typeof control.dispatchEvent !== 'function') continue;
       if (control.type === 'checkbox') control.checked = value === true;
       else if (control.tomselect) control.tomselect.setValue(value == null ? '' : String(value), true);
@@ -119,6 +141,7 @@
     }
     // Only fields implemented by the tool can be changed in this proposal.
     for (const control of form.querySelectorAll('input, select, textarea, button')) {
+      if (tool === 'create_survey' && control.closest('[data-agent-editor]')) continue;
       if (control.type === 'submit' || control.name === 'csrf' || control.name === 'agent_timezone') continue;
       if (!allowed.includes(control.name)) {
         control.disabled = true; control.tomselect?.disable();
@@ -131,8 +154,12 @@
       if (parent.tagName === 'DETAILS') parent.open = true;
     }
     // Copy/status actions otherwise live in menus; expose their native form here.
-    if (['copy_form', 'set_task_status', 'create_leave', 'edit_leave'].includes(tool)) banner.after(form);
+    if (['copy_form', 'set_task_status', 'create_leave', 'edit_leave', 'survey_state', 'finalize_poll'].includes(tool)) banner.after(form);
     else form.before(banner);
+    // The next page is the explicit server review; suppress the native quick-action dialog here.
+    for (const element of [form, ...form.querySelectorAll('[data-confirm]')]) {
+      for (const attribute of [...element.attributes]) if (attribute.name.startsWith('data-confirm')) element.removeAttribute(attribute.name);
+    }
     const submit = form.querySelector('button[type="submit"]:not(:disabled), button:not([type]):not(:disabled)');
     if (submit) { submit.className = 'btn btn-primary'; submit.textContent = 'Vorschlag prüfen'; }
     hidden('csrf', document.querySelector('meta[name="csrf"]')?.content || '');
@@ -141,6 +168,7 @@
     // Capture before calendar/task progressive-enhancement handlers.
     form.addEventListener('submit', event => {
       event.preventDefault(); event.stopImmediatePropagation();
+      form.taktAgentSerialize?.();
       if (form.reportValidity()) HTMLFormElement.prototype.submit.call(form);
     }, true);
     banner.replaceChildren();
