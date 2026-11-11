@@ -71,6 +71,7 @@
 {% endif %}
 
 <div class="lex-titlebar mb-3">
+  {% if map_link %}<a class="btn btn-primary float-md-end mb-2 lex-noprint" href="{{map_link}}"><i class="fa-solid fa-map-location-dot me-2"></i>Auf Karte anzeigen</a>{% endif %}
   <div class="small text-secondary mb-1 d-flex align-items-center gap-1">{% if law.level and law.level.org and law.level.org.logo %}<img class="org-logo me-1" src="{{ org_logo(law.level.org) }}" alt="">{% else %}<i class="fa-solid fa-scale-balanced me-1"></i>{% endif %}<span>{{ doc_types.get(law.doc_type, law.doc_type) }}{% if law.level %} · {{ law.level.name }}{% endif %}</span></div>
   <h1 class="mb-1">{{ law.title }}{% if law.short_title %} <span class="text-secondary fw-normal">({{ law.short_title }})</span>{% endif %}</h1>
   <div class="small text-secondary d-flex flex-wrap gap-3">

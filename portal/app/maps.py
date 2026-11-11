@@ -770,6 +770,17 @@ def clean_drawings(raw) -> list[dict]:
                     "properties": {"name": " ".join(str(props.get("name") or "").split())[:200],
                                    "color": color if _COLOR_RE.match(color) else "#d62828",
                                    "kind": {"Point": "point", "LineString": "line", "Polygon": "polygon"}[geom["type"]]}})
+        shape = props.get('shape')
+        if shape in ('circle', 'rectangle') and geom['type'] == 'Polygon':
+            out[-1]['properties']['shape'] = shape
+            if shape == 'circle':
+                ring = geom['coordinates'][0][:-1]
+                a, b = ring[0], ring[len(ring)//2]
+                p1,p2=math.radians(a[1]),math.radians(b[1])
+                h=math.sin((p2-p1)/2)**2+math.cos(p1)*math.cos(p2)*math.sin(math.radians(b[0]-a[0])/2)**2
+                out[-1]['properties']['radius_m']=6371008.8*math.asin(math.sqrt(min(1,h)))
+        elif shape == 'text' and geom['type'] == 'Point':
+            out[-1]['properties']['shape'] = shape
     return out
 
 

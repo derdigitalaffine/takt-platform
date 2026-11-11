@@ -67,12 +67,14 @@ def map_bundle(db: Session, request: Request, user: User | None, state: dict | N
 
 # --- Kartenbrowser ------------------------------------------------------------------
 
-def _browser(request: Request, db: Session, embed: bool, saved: UserMap | None = None):
+def _browser(request: Request, db: Session, embed: bool, saved: UserMap | None = None, plan=None):
     user = None if embed else session_user(request, db)
     if embed and get_settings(db).get("maps_embed", "1") != "1":
         raise HTTPException(404, "Das Einbinden des Kartenbrowsers ist auf diesem Server abgeschaltet.")
     state = mp.view_state(saved.state_json) if saved else {}
     bundle = map_bundle(db, request, user, state)
+    if plan:
+        bundle['plan'] = plan
     can_edit = bool(user) and not embed
     ctx = {"bundle": bundle, "saved": saved, "can_edit": can_edit, "embed": embed,
            "layout": "base_embed.html" if embed else "base.html", "R": EMBED if embed else "/karte",
@@ -82,6 +84,33 @@ def _browser(request: Request, db: Session, embed: bool, saved: UserMap | None =
     response = render(request, "map.html", user, **ctx)
     if not user and "jsm_session" not in request.cookies:
         request.session.clear()   # Besucher ohne Anmeldung bekommen kein Cookie
+    return response
+
+
+@app.get('/karte/recht/{law_id}')
+def law_map_browser(request: Request, law_id: int, version: int | None = None, db: Session = Depends(get_db)):
+    from . import law_maps
+    from .db import LawText
+    from .routes_laws import _visible_law, _version
+    if 'maps' not in enabled_modules() or 'laws' not in enabled_modules():
+        raise HTTPException(404)
+    user = session_user(request, db)
+    law = db.get(LawText, law_id)
+    if law is None:
+        raise HTTPException(404)
+    law = _visible_law(db, law.slug, user)
+    item = _version(db, law.slug, version, user)[1] if version is not None else law
+    data = law_maps.state(item)
+    saved = law_maps.available_map(db, data, user)
+    attachment = law_maps.available_attachment(db, law, data, user)
+    if not data or (not saved and not data.get('geometry')):
+        raise HTTPException(404, 'Für diese Fassung ist keine zugängliche Karte hinterlegt.')
+    plan = dict(title=item.title or law.title, url=f'/recht/{law.slug}'+(f'/fassung/{version}' if version else ''),
+                version=item.version_note, valid_from=item.valid_from, valid_until=item.valid_until,
+                geometry=data.get('geometry'), pdf=f'/recht/{law.slug}/anlage/{attachment.id}' if attachment else '',
+                pdf_label=attachment.name if attachment else '')
+    response = _browser(request, db, False, saved, plan)
+    response.headers['Cache-Control'] = 'private, no-store'
     return response
 
 

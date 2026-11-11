@@ -2528,6 +2528,7 @@ class LawText(Base):
     attachments: Mapped[list["LawAttachment"]] = relationship(back_populates="law", cascade="all, delete-orphan",
                                                               order_by="LawAttachment.position", passive_deletes=True)
     topics_json: Mapped[str] = mapped_column(Text, default="")  # empty = editorial suggestions; [] = no topics
+    map_json: Mapped[str] = mapped_column(Text, default="{}")
     # Vorbereitete neue Fassung: wird am Tag des Inkrafttretens automatisch übernommen (siehe laws.apply_planned)
     planned_md: Mapped[str] = mapped_column(Text, default="")
     planned_valid_from: Mapped[str] = mapped_column(String(10), default="")
@@ -2566,6 +2567,7 @@ class LawVersion(Base):
     saved_by: Mapped[str] = mapped_column(String(255), default="")
     version_note: Mapped[str] = mapped_column(String(255), default="")
     body_md: Mapped[str] = mapped_column(Text, default="")
+    map_json: Mapped[str] = mapped_column(Text, default="{}")
     # Öffentlich abrufbare frühere Fassung mit Geltungszeitraum (sonst nur interne Sicherung einer Korrektur)
     public: Mapped[bool] = mapped_column(Boolean, default=False)
     title: Mapped[str] = mapped_column(String(400), default="")
@@ -3095,10 +3097,10 @@ _NEW_COLUMNS = {
     "krank_employers": {"org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
     "law_texts": {"internal": "BOOLEAN NOT NULL DEFAULT 0", "planned_md": "TEXT NOT NULL DEFAULT ''", "planned_valid_from": "VARCHAR(10) NOT NULL DEFAULT ''",
                   "planned_note": "VARCHAR(255) NOT NULL DEFAULT ''", "outline": "VARCHAR(20) NOT NULL DEFAULT ''",
-                  "topics_json": "TEXT NOT NULL DEFAULT ''"},
+                  "topics_json": "TEXT NOT NULL DEFAULT ''", "map_json": "TEXT NOT NULL DEFAULT '{}'"},
     "law_attachments": {"internal": "BOOLEAN NOT NULL DEFAULT 0"},
     "law_versions": {"internal": "BOOLEAN NOT NULL DEFAULT 0", "public": "BOOLEAN NOT NULL DEFAULT 0", "title": "VARCHAR(400) NOT NULL DEFAULT ''",
-                     "valid_from": "VARCHAR(10) NOT NULL DEFAULT ''", "valid_until": "VARCHAR(10) NOT NULL DEFAULT ''"},
+                     "valid_from": "VARCHAR(10) NOT NULL DEFAULT ''", "valid_until": "VARCHAR(10) NOT NULL DEFAULT ''", "map_json": "TEXT NOT NULL DEFAULT '{}'"},
 }
 
 

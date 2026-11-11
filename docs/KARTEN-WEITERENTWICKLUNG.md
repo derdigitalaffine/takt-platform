@@ -1,6 +1,6 @@
 # Karten: Quellenbibliothek und nächste Produktentscheidungen
 
-Stand: 10. November 2026. Grundlage: Repository-main (`22cf746`) und Interview mit dem Auftraggeber.
+Stand 11. November 2026. Grundlage: Repository-main (`22cf746`) und Interview mit dem Auftraggeber.
 
 ## Zielbild
 
@@ -28,25 +28,17 @@ Die [offizielle Funktionsübersicht](https://www.masterportal.org/features/featu
 
 Ein Teil der Funktionen ist regional spezialisiert oder ein Add-on mit eigenen Voraussetzungen. Masterportal ist eine geeignete fachliche Referenz; eine Übernahme des gesamten Viewers sollte separat gegen den bestehenden MapLibre-Unterbau abgewogen werden.
 
-## Empfohlene Reihenfolge
+## Kartenarbeitsplatz
 
-1. **Plan und Rechtstext verbinden.** Pro Fassung des Rechtstextes den Geltungsbereich, zugehörige Kartenebenen, Anlagen und räumliche Daten pflegen. „Auf Karte anzeigen“ zoomt zum Plan und öffnet eine Informationsansicht mit Titel, Gültigkeit und Rücklink. Umgekehrt führt der Kartenklick zum zugehörigen Rechtstext. Öffentliche Zugriffe müssen die Freigabe von Rechtstext, Dokument und Ebene unabhängig prüfen.
-2. **Gemischte Planformate unterstützen.** WMS als Kartenebene, GeoJSON/XPlanung über einen validierten Import. Ein gewöhnliches PDF zunächst als Dokument neben dem eingezeichneten Geltungsbereich. Eine passgenaue Rasterüberlagerung erfordert Georeferenzierung; bloßes Hochladen reicht dafür nicht. Im bestehenden Rechtstextmodul ist „Neue Fassung vorbereiten“ eine zeitliche Versionierung, kein räumlicher Planeditor.
-3. **Messen und Zeichnen als eigenständige Werkzeuge.** Punkt, Linie, Polygon, Rechteck, Kreis, Text; Stützpunkte bearbeiten, Objekte verschieben/kopieren, Rückgängig/Wiederholen, Farben und Beschriftung. Geodätische Längen/Flächen, wählbare Einheiten, Umfang, Teilstrecken und Radius. Danach Fangfunktion und Puffer mit geeigneter Geometrieberechnung. Temporäre Messungen und gespeicherte Zeichnungen klar unterscheiden.
-4. **Verwertbare Ergebnisse.** Kartenblatt mit Titel, Maßstab, Legende, Quellen, Datum und Zeichnungen. Gespeicherte Ausschnitte und rechtegeprüfte Freigaben; anschließend Planvergleich und Zeitstände. Höhenprofil erst mit einer belastbaren Geländedatenquelle.
+Im Rechtstexteditor öffnet „Kartenbezug bearbeiten“ einen Kartenausschnitt zum Zeichnen des Geltungsbereichs. Ein Polygon in WGS84 kann auch als GeoJSON eingegeben werden. Die Redaktion wählt optional eine gespeicherte Karte mit Fachlayern und eine PDF-Anlage des Textes. Im veröffentlichten Rechtstext öffnet „Auf Karte anzeigen“ die Planansicht. Sie zeigt den Geltungsbereich und bietet den Rücksprung zum Rechtstext sowie die PDF-Ansicht daneben. Die Freigaben des Texts, der Karte und der Anlage werden bei jedem Aufruf geprüft.
 
-## Oberfläche
+Frühere Fassungen behalten ihren Geltungsbereich und die Zuordnung zu Karte und Anlage. Verknüpfte Karten und Dateien werden über ihre jeweils aktuellen Freigaben geladen. Ein PDF erscheint neben der Karte. Für eine lagegenaue Überlagerung braucht es georeferenzierte Plandaten, etwa über einen WMS in der verknüpften Karte.
 
-„Mein Überblick“ und „Aufgaben“ sind die vereinbarten Referenzen: gemeinsamer kompakter Seitenkopf, klare Typografie, ruhige Kartenflächen und einheitliche Aktionen. Der Portalrahmen sowie die Übersicht und Aufgabenliste beruhen auf Bootstrap/Jinja; die Aufgabenboards verwenden inzwischen React und Mantine 9.8.0 (`portal/ui/board.jsx`). Deren Provider übernimmt die Portalschrift und reagiert auf den globalen Hell-/Dunkelmodus. Diese Anbindung ist die konkrete Vorlage für weitere Mantine-Flächen. Die Quellenbibliothek nutzt vorhandene Komponenten und Themevariablen. Eine Mantine-Umstellung des Kartenmoduls ist noch nicht implementiert.
+„Messen & Zeichnen“ bietet Strecke, Fläche, Rechteck, Kreis, Punkt und Text. Messwerte erscheinen beim Setzen der Punkte. Stützpunkte von Linien und Flächen können verschoben werden. Die Fangfunktion berücksichtigt Punkte und Grenzen eigener Zeichnungen, ausgewählter Flurstücke und des Geltungsbereichs. Um ausgewählte Punkte lässt sich ein Umkreis mit metrischem Radius zeichnen. Kopieren, Rückgängig und Wiederholen stehen im Werkzeugbereich. Anonyme Besucher arbeiten temporär und können exportieren. Dauerhaftes Speichern setzt eine Anmeldung voraus.
 
-Für den späteren Kartenarbeitsplatz empfehlen sich getrennte Bereiche „Suchen“, „Ebenen“, „Messen & Zeichnen“ und „Sammlung“ mit einer gemeinsamen Objektinformation. Auf Mobilgeräten arbeitet dieselbe Struktur in einer unteren, vergrößerbaren Ablage. Mantine würde die Bedienoberfläche liefern; die eigentliche Kartenfläche kann weiterhin MapLibre rendern. Schrift, Farben, Abstände, Fokus und Dialogverhalten müssen produktweit zusammenpassen.
+Das Kartenblatt enthält Ausschnitt, Maßstab in der Kartenmitte, Datum, Quellen und die Liste der Zeichnungen mit Messwerten. Der Browser kann es als PDF speichern. Für die angegebene Größe wird mit 100 Prozent Skalierung gedruckt. Im Kartenbereich stehen auch PNG und GeoJSON bereit.
 
-## Offene Interviewfragen
-
-- Soll bei PDFs zunächst ein Geltungsbereich genügen, oder ist passgenaue Georeferenzierung Pflicht für die erste Version?
-- Dürfen Bürger anonym messen/zeichnen und exportieren? Welche Aktionen erfordern Anmeldung, welche ein besonderes Bearbeitungsrecht?
-- Welche drei Werkzeuge sind zuerst unverzichtbar: Abstand/Fläche, Kreis/Radius, Beschriftung, Puffer, Fangfunktion, Höhenprofil oder maßstäblicher PDF-Druck?
-- Sollen Zeichnungen nur in eigenen Karten leben oder auch als gemeinsame Fachobjekte bearbeitbar sein?
+Die Oberfläche nutzt Mantine wie die Aufgabenboards und übernimmt die Portalschrift sowie den Hell-/Dunkelmodus. Die Karte läuft mit MapLibre. Ebenen, Zeichnen, Flurstücke und Planbezug haben eigene Bereiche. Auf dem Handy öffnen sich die Werkzeuge in einer Ablage unter der Karte.
 
 ## Ausgewählte Primärquellen
 
