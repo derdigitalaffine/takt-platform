@@ -769,17 +769,39 @@ def supervisor_recipients(db, employer: KrankEmployer | None) -> list[str]:
 
 
 def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set[str]) -> None:
-    """Opt-in minimal absence notice; no medical details, portal link or attachments."""
-    for recipient in supervisor_recipients(db, report.employer):
-        if recipient in exclude:
+    """Opt-in role notifications. Medical attachments require *existing* report access."""
+    employer = report.employer
+    mode = employer.supervisor_attachment_mode if employer else "notice"
+    if mode not in {"notice", "pdf", "original"}:
+        mode = "notice"
+    for recipient in supervisor_recipients(db, employer):
+        user = db.scalar(select(User).where(func.lower(User.email) == recipient))
+        authorized = bool(user and user.active and can_see(db, user, report))
+        attachments = None
+        if authorized and mode == "pdf":
+            try:
+                attachments = [{"filename": f"{report.ref_no}.pdf", "mime": "application/pdf",
+                                "content_b64": base64.b64encode(pdf(report)).decode()}]
+            except Exception:  # noqa: BLE001
+                log.exception("Vorgesetzten-PDF für %s nicht erzeugt", report.ref_no)
+        elif authorized and mode == "original" and report.kind in {"au", "child"}:
+            try:
+                files = [f for f in report.files if f.source in {"meldung", "nachgereicht", "import"}]
+                attachments = [{"filename": file_name(f), "mime": f.mime,
+                                "content_b64": base64.b64encode(read_file(f)).decode()} for f in files] or None
+            except Exception:  # noqa: BLE001
+                log.exception("Vorgesetzten-AU für %s nicht geladen", report.ref_no)
+        # Already notified as an HR recipient: do not send duplicate notices.
+        if recipient in exclude and not attachments:
             continue
         subject = f"Abwesenheitsmeldung: {report.employer_name}"[:255]
-        body = (f"Guten Tag,\n\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
-                f"für {period(report)} eingegangen.\n\n"
-                "Ein ärztlicher Nachweis, Diagnosen und sonstige vertrauliche Angaben "
-                "werden nicht an Vorgesetzte versendet. Für Rückfragen wenden Sie "
-                "sich bitte an die zuständige Personalverwaltung.")
-        if notify.enqueue(db, recipient, subject, body, "krank", cfg):
+        body = (f"Guten Tag,\\n\\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
+                f"für {period(report)} eingegangen.\\n\\n"
+                "Details zur Bearbeitung erhalten Sie nur im Rahmen Ihrer "
+                "bestehenden Berechtigungen. " +
+                ("Die ausdrücklich freigegebenen Nachweise sind beigefügt." if attachments else
+                 "Ärztliche Nachweise und weitere vertrauliche Angaben sind nicht beigefügt."))
+        if notify.enqueue(db, recipient, subject, body, "krank", cfg, attachments=attachments):
             add_event(report, "mail", f"Vorgesetztenhinweis an {recipient}", by="System")
 
 
