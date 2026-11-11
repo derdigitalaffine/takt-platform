@@ -12,6 +12,7 @@ Portal auf die Person mit den wenigsten Terminen in der Woche.
 """
 
 import re
+import json
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
@@ -43,8 +44,90 @@ def valid_time(value: str) -> str | None:
     return v if TIME_RE.match(v) else None
 
 
-def active_types(page: BookingPage) -> list[BookingType]:
-    return [t for t in page.types if t.active and any(p.active for p in t.providers)]
+def routing(bt: BookingType | None) -> dict:
+    """Validated optional scheduling policy; legacy booking types remain manual."""
+    if bt is None:
+        return {}
+    try:
+        raw = json.loads(bt.routing_json or "{}")
+    except (ValueError, TypeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _org_staff(db, policy: dict) -> tuple[list[User], dict[int, int]]:
+    """Eligible active staff in a selected node (optionally including descendants).
+
+    Organization membership alone does not grant access to customer details or
+    edit rights; this is an assignment pool only. Inactive or non-staff
+    membership, and zero-capacity assignments, cannot receive bookings.
+    """
+    from .db import Organization
+    from .org_models import OrgMembership
+
+    try:
+        root_id = int(policy.get("org_id") or 0)
+    except (TypeError, ValueError):
+        return [], {}
+    root = db.get(Organization, root_id)
+    if not root or not root.active:
+        return [], {}
+    ids = {root_id}
+    if policy.get("include_children", True) is True:
+        rows = db.execute(select(Organization.id, Organization.parent_id, Organization.active)).all()
+        children: dict[int, list[int]] = {}
+        for oid, parent_id, active in rows:
+            if active and parent_id is not None:
+                children.setdefault(parent_id, []).append(oid)
+        frontier = [root_id]
+        while frontier:
+            current = frontier.pop()
+            for oid in children.get(current, ()):
+                if oid not in ids:
+                    ids.add(oid)
+                    frontier.append(oid)
+    capacity: dict[int, int] = {}
+    for uid, percent in db.execute(
+        select(OrgMembership.user_id, OrgMembership.capacity_percent).where(
+            OrgMembership.org_id.in_(ids),
+            OrgMembership.counts_staff.is_(True),
+            OrgMembership.capacity_percent > 0)
+    ):
+        capacity[uid] = max(capacity.get(uid, 0), percent)
+    if not capacity:
+        return [], {}
+    users = list(db.scalars(select(User).where(
+        User.id.in_(capacity), User.active.is_(True)).order_by(User.name, User.id)))
+    return users, {u.id: capacity[u.id] for u in users}
+
+
+def providers_for(db, bt: BookingType) -> list[User]:
+    """Explicit staff, organizational membership, or both; no implicit grants."""
+    explicit = [p for p in bt.providers if p.active]
+    policy = routing(bt)
+    mode = policy.get("mode", "manual")
+    if mode not in ("organization", "mixed"):
+        return explicit
+    organizational, _capacity = _org_staff(db, policy)
+    if mode == "organization":
+        return organizational
+    combined = {p.id: p for p in explicit}
+    for person in organizational:
+        combined.setdefault(person.id, person)
+    return sorted(combined.values(), key=lambda p: (p.name.casefold(), p.id))
+
+
+def provider_capacity(db, bt: BookingType) -> dict[int, int]:
+    policy = routing(bt)
+    if policy.get("mode") not in ("organization", "mixed"):
+        return {}
+    _staff, capacity = _org_staff(db, policy)
+    return capacity
+
+
+def active_types(page: BookingPage, db=None) -> list[BookingType]:
+    return [t for t in page.types if t.active and any(
+        p.active for p in (providers_for(db, t) if db is not None else t.providers))]
 
 
 def _blocked_days(db, page: BookingPage, user_id: int, first: date, last: date) -> set[date]:
@@ -82,7 +165,7 @@ def slots(db, page: BookingPage, bt: BookingType, provider_id: int | None = None
           until: date | None = None) -> list[dict]:
     """Freie Beginnzeiten der Terminart: [{start, end, providers: [user_id …], free}] (UTC, sortiert)."""
     from . import holidays
-    providers = [p for p in bt.providers if p.active and (provider_id is None or p.id == provider_id)]
+    providers = [p for p in providers_for(db, bt) if provider_id is None or p.id == provider_id]
     if not providers:
         return []
     now = utcnow()
@@ -133,7 +216,7 @@ def slots(db, page: BookingPage, bt: BookingType, provider_id: int | None = None
     return out
 
 
-def pick_provider(db, candidates: list[int], start: datetime) -> int:
+def pick_provider(db, candidates: list[int], start: datetime, *, capacity: dict[int, int] | None = None) -> int:
     """Weighted fair scheduling: lowest booked minutes in the current local week.
 
     The provider allowlist remains the skill/eligibility filter. In equal
@@ -152,7 +235,10 @@ def pick_provider(db, candidates: list[int], start: datetime) -> int:
         pid = booked.provider_id
         minutes[pid] += max(1, int((booked.ends_at - booked.starts_at).total_seconds() / 60))
         counts[pid] += 1
-    return min(candidates, key=lambda c: (minutes[c], counts[c], candidates.index(c)))
+    capacity = capacity or {}
+    return min(candidates, key=lambda c: (
+        minutes[c] * 100 / max(1, capacity.get(c, 100)),
+        counts[c], candidates.index(c)))
 
 
 def check(db, page: BookingPage, bt: BookingType, start: datetime, provider_id: int | None = None,
@@ -170,7 +256,8 @@ def check(db, page: BookingPage, bt: BookingType, start: datetime, provider_id: 
         slot = next((s for s in slots(db, page, bt, None, keep, until=day) if s["start"] == start), None)
     if slot is None:
         return None, "Dieser Termin ist leider nicht mehr frei. Bitte wählen Sie einen anderen."
-    chosen = provider_id if provider_id in slot["providers"] else pick_provider(db, slot["providers"], start)
+    chosen = provider_id if provider_id in slot["providers"] else pick_provider(
+        db, slot["providers"], start, capacity=provider_capacity(db, bt))
     return {**slot, "provider_id": chosen}, ""
 
 
@@ -182,10 +269,10 @@ def weekly_plan(page: BookingPage) -> dict[int, list[BookingHours]]:
     return out
 
 
-def all_providers(page: BookingPage) -> list[User]:
+def all_providers(page: BookingPage, db=None) -> list[User]:
     seen: dict[int, User] = {}
     for t in page.types:
-        for p in t.providers:
+        for p in (providers_for(db, t) if db is not None else t.providers):
             seen[p.id] = p
     return sorted(seen.values(), key=lambda u: u.name)
 
