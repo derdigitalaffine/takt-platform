@@ -858,3 +858,31 @@ def test_late_au_proof_obeys_supervisor_original_delivery_policy():
         assert len(files) == 1
         assert files[0]["filename"] == "später-original.pdf"
         assert base64.b64decode(files[0]["content_b64"]) == PDF
+
+
+def test_legacy_employer_migration_reuses_node_and_is_idempotent():
+    from app.db import Organization, init_db
+
+    with SessionLocal() as db:
+        existing = Organization(name="Legacy Org Migration Test", kind="verwaltung")
+        db.add(existing)
+        db.flush()
+        already = KrankEmployer(name=existing.name)
+        orphan = KrankEmployer(name="Legacy Orphan Migration Test")
+        db.add_all([already, orphan])
+        db.commit()
+        existing_id, employer_id, orphan_id = existing.id, already.id, orphan.id
+    init_db()
+    with SessionLocal() as db:
+        linked = db.get(KrankEmployer, employer_id)
+        created = db.get(KrankEmployer, orphan_id)
+        assert linked.org_id == existing_id
+        assert created.org_id is not None
+        created_node_id = created.org_id
+        assert db.get(Organization, created_node_id).kind == "arbeitgeber"
+    init_db()
+    with SessionLocal() as db:
+        assert db.get(KrankEmployer, employer_id).org_id == existing_id
+        assert db.get(KrankEmployer, orphan_id).org_id == created_node_id
+        assert db.scalar(select(Organization).where(
+            Organization.name == "Legacy Orphan Migration Test")).id == created_node_id
