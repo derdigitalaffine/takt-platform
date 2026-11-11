@@ -694,13 +694,13 @@ def test_admin_mail_preferences_are_validated_and_saved():
         db.add(emp)
         db.commit()
         eid = emp.id
+        org_id = node.id
     admin = login("admin@example.org", "admin-passwort-123")
     edit = admin.get(f"/krankmelder/arbeitgeber/{eid}")
     assert edit.status_code == 200
     assert "Original-AU" in edit.text
     assert "Vorgesetzte aus der Organisationsstruktur" in edit.text
     csrf = csrf_of(edit.text)
-    org_id = node.id
     r = admin.post(f"/krankmelder/arbeitgeber/{eid}", data={
         "csrf": csrf, "org_id": str(org_id), "active": "1",
         "attach_files": "1", "attach_original_au": "1",
