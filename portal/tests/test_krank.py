@@ -472,3 +472,83 @@ def test_all_pages_render():
     r = admin.post(f"/krankmelder/{rid}/loeschen", data={"csrf": token, "reason": "Test"})
     assert r.status_code == 303
     assert pc.get(f"/krank/s/{q['s']}").status_code == 404
+
+
+def test_original_au_is_opt_in_and_consolidated_pdf_is_default():
+    """The original medical proof must never be sent without explicit consent."""
+    for original, expected in ((False, 1), (True, 2)):
+        emp_id = employer(f"AU Versand {original}", attach_files=True,
+                          attach_original_au=original)
+        pc = public_client()
+        submit(pc, "au", first_name="Test", last_name="Nachweis", employer=str(emp_id),
+               **{"from": "2026-10-05", "to": "2026-10-06", "first": "1"},
+               files={"file": ("original-au.pdf", PDF, "application/pdf")})
+        with SessionLocal() as db:
+            n = db.scalars(select(Notification).where(
+                Notification.to_addr == "personal@example.org",
+                Notification.attachments_json.is_not(None),
+            ).order_by(Notification.id.desc())).first()
+            attachments = json.loads(n.attachments_json)
+            assert len(attachments) == expected
+            assert attachments[0]["filename"].startswith("KM-")
+            if original:
+                assert attachments[1]["filename"] == "original-au.pdf"
+                import base64
+                assert base64.b64decode(attachments[1]["content_b64"]) == PDF
+
+
+def test_supervisor_notice_uses_org_roles_without_medical_documents():
+    from app.db import Organization
+    from app.org_models import OrgRoleGrant
+
+    _staff_user("lead-krank@example.org", "video")
+    _staff_user("outside-krank@example.org", "video")
+    with SessionLocal() as db:
+        parent = Organization(name="Arbeitgeber-Mutter", kind="verwaltung")
+        department = Organization(name="Arbeitgeber-Fachbereich", kind="fachbereich", parent=parent)
+        outside = Organization(name="Fremder Bereich", kind="fachbereich")
+        db.add_all([parent, department, outside])
+        db.flush()
+        leader = db.scalar(select(User).where(User.email == "lead-krank@example.org"))
+        outsider = db.scalar(select(User).where(User.email == "outside-krank@example.org"))
+        db.add_all([
+            OrgRoleGrant(org_id=parent.id, user_id=leader.id, role="lead", include_children=True),
+            OrgRoleGrant(org_id=outside.id, user_id=outsider.id, role="lead", include_children=True),
+        ])
+        emp = KrankEmployer(name="Leitungs-Arbeitgeber", org_id=department.id,
+                            notify_supervisors=True, attach_files=True)
+        db.add(emp)
+        db.commit()
+        eid = emp.id
+    pc = public_client()
+    submit(pc, "au", first_name="Klara", last_name="Personal", employer=str(eid),
+           **{"from": "2026-10-05", "to": "2026-10-06", "first": "1"},
+           files={"file": ("beleg.pdf", PDF, "application/pdf")})
+    with SessionLocal() as db:
+        notice = db.scalar(select(Notification).where(
+            Notification.to_addr == "lead-krank@example.org").order_by(Notification.id.desc()))
+        assert notice is not None
+        assert notice.attachments_json is None
+        assert "Klara Personal" in notice.body
+        assert "AU-Bescheinigung" not in notice.body
+        assert "krankmelder/" not in notice.body
+        assert db.scalar(select(Notification.id).where(
+            Notification.to_addr == "outside-krank@example.org")) is None
+
+
+def test_new_employer_creates_organization_node_and_uses_org_name():
+    from app.db import Organization
+
+    admin = login("admin@example.org", "admin-passwort-123")
+    token = csrf_of(admin.get("/krankmelder/verwaltung").text)
+    res = admin.post("/krankmelder/arbeitgeber/neu", data={
+        "csrf": token, "name": "Arbeitgeber als Org-Knoten"
+    })
+    assert res.status_code == 303
+    with SessionLocal() as db:
+        emp = db.scalar(select(KrankEmployer).where(
+            KrankEmployer.name == "Arbeitgeber als Org-Knoten"))
+        assert emp is not None and emp.org_id is not None
+        node = db.get(Organization, emp.org_id)
+        assert node.name == emp.name
+        assert node.kind == "arbeitgeber"
