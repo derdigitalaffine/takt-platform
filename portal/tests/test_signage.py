@@ -61,7 +61,7 @@ def test_public_display_never_shows_booking_titles_or_applicants():
         resource = Resource(name="Sitzungsraum Signage", slug="signage-privacy-room")
         db.add(resource)
         db.flush()
-        row = ResourceBooking(ref="signage-confidential", resource_id=resource.id,
+        row = ResourceBooking(ref="signage-confidential", token="signage-fixture-secret", resource_id=resource.id,
             starts_at=utcnow() - timedelta(minutes=5),
             ends_at=utcnow() + timedelta(minutes=45), status="confirmed",
             title="VERTRAULICHE PERSONALBERATUNG", name="DATENSCHUTZ TESTPERSON",
