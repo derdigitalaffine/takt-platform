@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="refresh" content="60">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>{{ screen.name }} · TAKT Signage</title>
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/static/signage-display.css">
+</head>
+<body style="--sg-bg:{{ theme.background }};--sg-fg:{{ theme.foreground }};--sg-accent:{{ theme.accent }}">
+  <main class="sd-stage" aria-label="Digitale Anzeige {{ screen.name }}">
+    <header class="sd-header">
+      <div class="sd-brand">
+        {% if org_logo %}<img src="{{ org_logo }}" alt="Organisationswappen" class="sd-logo">
+        {% elif ui.logo %}<img src="{{ ui.logo }}" alt="" class="sd-logo">{% endif %}
+        <span class="sd-brand-name">{{ ui.name }}</span>
+      </div>
+      <span class="sd-header-meta"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> {{ screen.name }}</span>
+    </header>
+    <section class="sd-content">
+      <div class="sd-title-row">
+        <div><span class="sd-overline">TAKT · {{ {'room':'RAUMÜBERSICHT','agenda':'TERMINE HEUTE','directory':'MITARBEITERVERZEICHNIS','wayfinder':'WEGWEISER','info':'INFORMATIONEN'}[screen.kind] }}</span>
+        <h1>{{ (room.number ~ ' · ' if room else '') ~ screen.name }}</h1>
+        {% if screen.subtitle %}<p class="sd-subtitle">{{ screen.subtitle }}</p>{% endif %}</div>
+        <div class="sd-time-wrap"><strong data-sg-time>{{ now.strftime('%H:%M') }}</strong><span data-sg-date>{{ now.strftime('%d.%m.%Y') }}</span></div>
+      </div>
+      <div class="sd-widgets">
+      {% for widget in widgets %}
+        {% if widget == 'clock' %}
+        <section class="sd-tile sd-clock" aria-label="Datum und Uhrzeit"><i class="fa-regular fa-clock" aria-hidden="true"></i><div><strong data-sg-time>{{ now.strftime('%H:%M') }}</strong><span>Stand {{ now.strftime('%d.%m.%Y') }}</span></div></section>
+        {% elif widget == 'status' %}
+        <section class="sd-tile sd-availability {{ 'sd-occupied' if busy else 'sd-free' }}" aria-label="Raumstatus">
+          <div><span class="sd-overline">AKTUELLER RAUMSTATUS</span><strong><i class="fa-solid {{ 'fa-circle' if busy else 'fa-circle-check' }}" aria-hidden="true"></i> {{ 'Belegt' if busy else 'Frei' }}</strong></div>
+          <p>{% if busy %}Voraussichtlich frei ab {{ busy.end.strftime('%H:%M') }} Uhr{% elif next_event %}Frei bis {{ next_event.start.strftime('%H:%M') }} Uhr{% else %}Heute keine weiteren Buchungen{% endif %}</p>
+        </section>
+        {% elif widget == 'agenda' %}
+        <section class="sd-tile sd-agenda" aria-label="Termine"><h2><i class="fa-regular fa-calendar" aria-hidden="true"></i> Raumtermine</h2>
+          {% if events %}
+          <div class="sd-event-list">
+            {% for event in events[:12] %}
+            <div class="sd-event {{ 'sd-now' if event.ongoing else '' }}">
+              <div class="sd-event-time">{{ event.start.strftime('%H:%M') }}–{{ event.end.strftime('%H:%M') }}</div>
+              <div class="sd-event-title">{{ event.title }}{% if event.ongoing %}<span class="sd-now-badge">Jetzt</span>{% endif %}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}<div class="sd-empty"><i class="fa-solid fa-calendar-check"></i><p>Heute sind keine bestätigten Buchungen eingetragen.</p></div>{% endif %}
+        </section>
+        {% elif widget == 'directory' %}
+        <section class="sd-tile sd-directory" aria-label="Öffentlich freigegebene Mitarbeiter"><h2><i class="fa-solid fa-users" aria-hidden="true"></i> Personen und Büros</h2>
+          {% if staff %}<div class="sd-directory-grid">{% for person in staff %}<article class="sd-person"><strong>{{ person.name }}</strong><span>{{ person.building }} · {{ person.floor }} · Raum {{ person.room }}</span></article>{% endfor %}</div>
+          {% else %}<div class="sd-empty">Es sind keine Personen für dieses Verzeichnis freigegeben.</div>{% endif %}
+        </section>
+        {% elif widget == 'wayfinder' %}
+        <section class="sd-tile sd-wayfinder" aria-label="Raumwegweiser"><h2><i class="fa-solid fa-signs-post" aria-hidden="true"></i> Wegweiser</h2>
+          {% if screen.direction %}<div class="sd-direction"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><strong>{{ screen.direction }}</strong></div>{% endif %}
+          {% if waypoints %}<div class="sd-directory-grid">{% for point in waypoints[:24] %}<article class="sd-person"><strong>{{ point.label }} · {{ point.number }}</strong><span>{{ point.building }} · {{ point.floor }}{% if point.accessible %} · barrierefrei{% endif %}</span></article>{% endfor %}</div>
+          {% else %}<div class="sd-empty">Noch keine Räume hinterlegt.</div>{% endif %}
+        </section>
+        {% elif widget == 'message' %}
+        <section class="sd-tile sd-message" aria-label="Hinweise"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><div><h2>Willkommen</h2><p>{{ screen.subtitle or 'Willkommen in unserer Einrichtung.' }}</p></div></section>
+        {% endif %}
+      {% endfor %}
+      </div>
+    </section>
+    <footer class="sd-footer"><span>{{ ui.product }} · Digitale Informationen</span><span>Anzeige wird automatisch aktualisiert</span></footer>
+  </main>
+  <script src="/static/signage-display.js" defer></script>
+</body>
+</html>
