@@ -136,18 +136,6 @@ def test_approval_flow_and_management_page():
     page_id, a_id, b_id, anna, ben = make_page(approval=True, choose=True)
     c = client()
     html = c.get(f"/b/bt-buergerbuero-token-123?art={a_id}&person={ben}").text
-    if "Ansprechperson" not in html:
-        with SessionLocal() as debug_db:
-            debug_page = debug_db.get(BookingPage, page_id)
-            debug_bt = debug_db.get(BookingType, a_id)
-            print("ROUTING DEBUG", {"page": page_id, "extended": debug_page.extended,
-                                   "types": [t.id for t in btypes.active_types(debug_page, debug_db)],
-                                   "providers": [(u.id, u.active) for u in debug_bt.providers],
-                                   "resolved": [(u.id, u.active) for u in btypes.providers_for(debug_db, debug_bt)],
-                                   "policy": btypes.routing(debug_bt),
-                                   "has_steps": "Wann passt es Ihnen?" in html,
-                                   "has_types": "Worum geht es?" in html,
-                                   "has_next": "Weiter zu Ihren Angaben" in html})
     assert "Ansprechperson" in html and "Weiter zu Ihren Angaben" in html
     slot = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', html).group(1)
     details = c.get(f"/b/bt-buergerbuero-token-123?art={a_id}&person={ben}&step=details&slot={quote(slot, safe='')}").text
