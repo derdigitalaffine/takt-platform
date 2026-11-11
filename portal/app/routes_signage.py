@@ -1,5 +1,7 @@
 """Digital Signage routes: management, privacy-scoped kiosks and revocable credentials."""
 import json
+import logging
+import re
 from datetime import timedelta
 from hmac import compare_digest
 from types import SimpleNamespace
@@ -15,6 +17,25 @@ from .calendar_models import Calendar
 from .signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
                              SignageOffice, SignageRoom, SignageScreen, SignageRevision,
                              SignageWayNode, SignageWayEdge, SignageDisplayAnchor)
+
+class _RedactSignageLinks(logging.Filter):
+    """Avoid logging bearer URLs in Uvicorn access logs.
+
+    Reverse-proxy access logs still require their own redaction policy.
+    """
+    _secret = re.compile(r"(/signage/l/\\d+/)[A-Za-z0-9_-]{32,128}")
+
+    def filter(self, record):
+        if isinstance(record.args, tuple):
+            record.args = tuple(self._secret.sub(r"\\1[redacted]", arg) if isinstance(arg, str)
+                                else arg for arg in record.args)
+        if isinstance(record.msg, str):
+            record.msg = self._secret.sub(r"\\1[redacted]", record.msg)
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_RedactSignageLinks())
+
 
 manage_user = require("signage_manage")
 VISIBLE = {"private", "public", "link"}
