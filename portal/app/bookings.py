@@ -272,7 +272,10 @@ def _notify_owner(db, b: Booking, event: str, *, previous: str = "") -> None:
     targets = []
     if b.provider is not None and b.provider.active:
         targets.append(b.provider)
-    if page.notify_owner and page.owner is not None and page.owner.active and page.owner not in targets:
+    from . import booking_integration
+    owner_must_handle_request = (b.status == "requested" and b.provider not in targets)
+    if (page.owner is not None and page.owner.active and page.owner not in targets
+            and (booking_integration.owner_mail_enabled(page, event) or owner_must_handle_request)):
         targets.append(page.owner)
     if not targets:
         return
@@ -284,7 +287,6 @@ def _notify_owner(db, b: Booking, event: str, *, previous: str = "") -> None:
             "nachricht": "\n\n".join(x for x in (_answers_text(b), b.note or "") if x), "frei": free,
             "link": f"{settings.portal_base_url}/bookings/{page.id}",
             "vorher": previous, "status": "Bestätigung erforderlich" if b.status == "requested" else b.status}), cfg)
-        from . import booking_integration
         opts = booking_integration.options(page)
         method = ("CANCEL" if event == "Absage" else "PUBLISH") if b.status == "booked" or event == "Absage" else ""
         att = ([{"filename": "buergertermin.ics", "content": calendar_staff(db, b, method),
