@@ -396,6 +396,37 @@ async def create_closure(
     return dict(id=closed.id)
 
 
+@app.get("/kalender/buchungen/{bid:int}")
+def calendar_booking_detail(
+    request: Request, bid: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Restricted details for a single appointment visible via the calendar.
+
+    An assigned provider can see their own appointment without being granted
+    blanket access to the rest of a booking page.
+    """
+    from .db import Booking
+    from . import shares, booking_integration
+    booking = db.get(Booking, bid)
+    if not booking or booking.status not in ("booked", "requested"):
+        raise HTTPException(404)
+    page = booking.page
+    level = shares.access_level(db, "booking", page, user)
+    responsible = booking.provider_id == user.id or (
+        booking.provider_id is None and page.owner_id == user.id)
+    if level < shares.VIEW and not responsible:
+        raise HTTPException(404)
+    show_details = booking_integration.calendar_visibility(
+        booking, can_edit=level >= shares.EDIT, responsible=responsible) == "detail"
+    from . import bookings as bk
+    return render(
+        request, "calendar_booking_detail.html", user,
+        booking=booking, page=page, show_details=show_details,
+        can_open=level >= shares.VIEW, can_manage=level >= shares.EDIT,
+        when=bk.label(booking.starts_at, booking.ends_at),
+    )
+
+
 @app.get("/kalender/quellen/{kind}/data")
 def inline_source_events(
     kind: str,
