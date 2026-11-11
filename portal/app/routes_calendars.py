@@ -66,7 +66,7 @@ def calendar_page(
         dict(key=kind, label=meta[0],
              suggested=(kind in (
                  {"holidays", "closures", "seminars", "leave", "birthdays"} if year_mode
-                 else {"meetings", "seminars", "tasks", "leave", "holidays", "closures", "birthdays"}
+                 else {"meetings", "seminars", "bookings", "tasks", "leave", "holidays", "closures", "birthdays"}
              )))
         for kind, meta in calendar_sources.SOURCES.items()
         if calendar_sources.enabled(db, kind) and kind not in attached
@@ -90,7 +90,7 @@ def calendar_page(
         source_choices=source_choices,
         recommended_sources=(
             {"holidays", "closures", "seminars", "leave"} if year_mode
-            else {"meetings", "seminars", "tasks", "leave", "holidays", "closures"}
+            else {"meetings", "seminars", "bookings", "tasks", "leave", "holidays", "closures"}
         ),
         has_closure_source=any(c.source == "closures" for c in rows),
         sources={
