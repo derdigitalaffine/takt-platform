@@ -12,7 +12,38 @@
     });
     return;
   }
-  const list = document.getElementById('sg-widget-list');
+  const frame = document.getElementById('sg-live-frame');
+  const previewStatus = document.getElementById('sg-live-status');
+  let refreshTimer = null;
+  let controller = null;
+  const previewEndpoint = form.action.replace(/\\/save$/, '/preview-live');
+  function queueLivePreview() {
+    if (!frame || !previewStatus) return;
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(async () => {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      previewStatus.textContent = 'Vorschau wird aktualisiert …';
+      try {
+        const response = await fetch(previewEndpoint, {
+          method: 'POST', body: new FormData(form),
+          headers: { 'Accept': 'text/html' },
+          credentials: 'same-origin', signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const html = await response.text();
+        frame.srcdoc = html;
+        previewStatus.textContent = 'Aktuelle Vorschau, noch nicht gespeichert';
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          previewStatus.textContent = 'Vorschau momentan nicht erreichbar. Gespeichertes Design bleibt verfügbar.';
+        }
+      }
+    }, 650);
+  }
+  form.addEventListener('input', queueLivePreview);
+  form.addEventListener('change', queueLivePreview);
+    const list = document.getElementById('sg-widget-list');
   const hidden = document.getElementById('sg-layout-json');
   let initial = [];
   try { initial = JSON.parse(hidden.value); } catch (_) { /* defaults remain */ }
@@ -23,6 +54,7 @@
   function sync() {
     hidden.value = JSON.stringify([...list.querySelectorAll('.sg-widget-choice')]
       .filter(item => item.querySelector('input').checked).map(item => item.dataset.widget));
+    queueLivePreview();
   }
   list.addEventListener('change', sync);
   list.addEventListener('click', event => {
@@ -71,7 +103,6 @@
     });
   }));
   const colors = [...form.querySelectorAll('input[type=color]')];
-  const frame = document.getElementById('sg-live-frame');
   const contrastMessage = document.getElementById('sg-contrast-alert');
   function luminance(hex) {
     const rgb = [1,3,5].map(i => parseInt(hex.slice(i, i+2), 16)/255)
