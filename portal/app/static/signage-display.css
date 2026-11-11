@@ -67,3 +67,14 @@ body {overflow-x:hidden}
 .sd-search:focus-visible {outline:4px solid var(--sg-accent);outline-offset:3px}
 .sd-person[hidden] {display:none}
 .sd-search-status {min-height:1.2em;font-size:clamp(.8rem,1.1vw,1.1rem);opacity:.72;margin:0 0 16px}
+
+/* Generated indoor route steps and accessible alternatives. */
+.sd-route-details {border-top:1px solid color-mix(in srgb,var(--sg-fg) 20%,transparent);padding:13px 0 0}
+.sd-route-details summary {list-style:none;cursor:pointer;border-radius:8px;color:var(--sg-accent);font-size:clamp(.86rem,1.14vw,1.2rem);font-weight:730}
+.sd-route-details summary::-webkit-details-marker {display:none}
+.sd-route-details summary:focus-visible {outline:4px solid var(--sg-accent);outline-offset:6px}
+.sd-route-details summary i {margin-right:9px}
+.sd-route-details ol {padding:0 0 0 1.7rem;margin:15px 0 0;line-height:1.85;color:var(--sg-fg);font-size:clamp(.86rem,1.1vw,1.25rem)}
+.sd-route-details li {padding:5px 0}
+.sd-route-unavailable {opacity:.5;font-size:clamp(.78rem,1vw,1.1rem)}
+.sd-route-accessible {color:#77edc1;font-size:clamp(.78rem,1vw,1.1rem);font-weight:640}
