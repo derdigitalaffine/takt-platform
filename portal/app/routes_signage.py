@@ -12,7 +12,7 @@ from .db import Organization, PortalLocation, Resource, User, get_settings, utcn
 from .main import app, check_csrf, current_user, enabled_modules, flash, get_db, rate_limit, redirect, render, require, templates
 from .calendar_models import Calendar
 from .signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
-                             SignageOffice, SignageRoom, SignageScreen)
+                             SignageOffice, SignageRoom, SignageScreen, SignageRevision)
 
 manage_user = require("signage_manage")
 VISIBLE = {"private", "public", "link"}
@@ -80,6 +80,9 @@ async def signage_new(request: Request, user: User = Depends(manage_user), db: S
     screen = SignageScreen(name=name, kind=kind, visibility="private", owner_id=user.id,
                            layout_json=json.dumps(signage.TEMPLATES[kind]))
     db.add(screen)
+    db.flush()
+    db.add(SignageRevision(screen_id=screen.id, version=1,
+                           snapshot_json=signage.design_snapshot(screen), actor_id=user.id))
     db.commit()
     return redirect(f"/signage/{screen.id}/edit")
 
@@ -95,6 +98,8 @@ def signage_edit(sid: int, request: Request, user: User = Depends(manage_user), 
         resources=list(db.scalars(select(Resource).where(Resource.active.is_(True)).order_by(Resource.name))),
         rooms=list(db.scalars(select(SignageRoom).order_by(SignageRoom.number))),
         organizations=list(db.scalars(select(Organization).order_by(Organization.name))),
+        revisions=list(db.scalars(select(SignageRevision).where(SignageRevision.screen_id == sid)
+                                  .order_by(SignageRevision.version.desc()).limit(30))),
         devices=devices, keys=keys, now=utcnow())
 
 
@@ -102,6 +107,8 @@ def signage_edit(sid: int, request: Request, user: User = Depends(manage_user), 
 async def signage_save(sid: int, request: Request, user: User = Depends(manage_user), db: Session = Depends(get_db)):
     screen = _screen(db, sid)
     form = await request.form()
+    if str(form.get("version") or "").isdigit() and int(form["version"]) != screen.version:
+        raise HTTPException(409, "Die Anzeige wurde zwischenzeitlich geändert. Bitte neu laden.")
     kind = str(form.get("kind") or screen.kind)
     if kind not in signage.KINDS:
         raise HTTPException(422)
@@ -127,8 +134,35 @@ async def signage_save(sid: int, request: Request, user: User = Depends(manage_u
     screen.resource_id, screen.room_id, screen.org_id = rid, room_id, org_id
     screen.version += 1
     screen.updated_at = utcnow()
+    db.add(SignageRevision(screen_id=sid, version=screen.version,
+                           snapshot_json=signage.design_snapshot(screen), actor_id=user.id))
     db.commit()
     flash(request, "Anzeige gespeichert und aktualisiert.")
+    return redirect(f"/signage/{sid}/edit")
+
+
+@app.post("/signage/{sid:int}/revision/{revision_id:int}/restore",
+          dependencies=[Depends(check_csrf)])
+async def signage_restore_revision(sid: int, revision_id: int, request: Request,
+                                  user: User = Depends(manage_user),
+                                  db: Session = Depends(get_db)):
+    screen = _screen(db, sid)
+    revision = db.get(SignageRevision, revision_id)
+    if not revision or revision.screen_id != sid:
+        raise HTTPException(404)
+    form = await request.form()
+    if str(form.get("version") or "").isdigit() and int(form["version"]) != screen.version:
+        raise HTTPException(409, "Die Anzeige wurde zwischenzeitlich geändert.")
+    try:
+        signage.apply_design_snapshot(screen, revision.snapshot_json)
+    except (ValueError, TypeError, KeyError):
+        raise HTTPException(422, "Diese Designversion ist nicht lesbar.")
+    screen.version += 1
+    screen.updated_at = utcnow()
+    db.add(SignageRevision(screen_id=sid, version=screen.version,
+                           snapshot_json=signage.design_snapshot(screen), actor_id=user.id))
+    db.commit()
+    flash(request, f"Designversion {revision.version} wurde wiederhergestellt. Zugriffsrechte und Freigaben bleiben unverändert.")
     return redirect(f"/signage/{sid}/edit")
 
 
