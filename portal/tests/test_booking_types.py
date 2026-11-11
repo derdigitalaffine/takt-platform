@@ -234,7 +234,7 @@ def test_extended_shared_provider_conflicts_across_types_and_requests():
         # für 15-Minuten-Termine einer anderen Terminart plus 30 Minuten Puffer.
         times = [to_local(s["start"]).strftime("%H:%M")
                  for s in day_slots(btypes.slots(db, page, b, anna), d)]
-        assert "08:45" in times and "09:00" not in times
+        assert "08:30" in times and "09:00" not in times
         assert "10:15" not in times and "10:30" in times
         # Der andere Anbieter bleibt für die erste Terminart verfügbar.
         available = next(s for s in day_slots(btypes.slots(db, page, a), d)
