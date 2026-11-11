@@ -292,6 +292,10 @@ async def _security_headers(request: Request, call_next):
     if request.url.path in {"/agent", "/ki"}:
         frame_ancestors = "'self'"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    elif re.fullmatch(r"/signage/\d+/preview", request.url.path):
+        # Only authenticated design-studio previews may be framed by TAKT itself.
+        frame_ancestors = "'self'"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
     elif prefix:
         # Einbettbar (iframe): nur die freigegebenen Webseiten, ohne Liste alle
         with SessionLocal() as db:
