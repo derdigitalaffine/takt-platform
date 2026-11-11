@@ -98,11 +98,19 @@ def test_secure_link_is_hash_only_and_revocable():
         assert token not in row.token_hash
         key_id = row.id
     path = urlsplit(url).path
-    assert client().get(path).status_code == 200
+    visitor = client()
+    exchange = visitor.get(path)
+    assert exchange.status_code == 303
+    assert exchange.headers["location"] == f"/signage/access/{sid}"
+    assert "httponly" in exchange.headers["set-cookie"].lower()
+    assert "secure" in exchange.headers["set-cookie"].lower()
+    assert visitor.get(f"/signage/access/{sid}").status_code == 200
+    assert client().get(f"/signage/access/{sid}").status_code == 404
     csrf = csrf_of(c.get(f"/signage/{sid}/edit").text)
     revoked = c.post(f"/signage/{sid}/link/{key_id}/revoke", data={"csrf": csrf})
     assert revoked.status_code == 303
     assert client().get(path).status_code == 404
+    assert visitor.get(f"/signage/access/{sid}").status_code == 404
 
 
 def test_directory_requires_explicit_public_approval():
@@ -149,6 +157,16 @@ def test_device_heartbeat_needs_valid_bearer():
     assert client().post(f"/signage/api/device/{did}/heartbeat").status_code == 403
     ok = client().post(f"/signage/api/device/{did}/heartbeat", headers={"Authorization": f"Bearer {secret}"})
     assert ok.status_code == 200 and ok.json()["screen_id"] == sid
+    feed = client().get(f"/signage/api/device/{did}/manifest",
+                        headers={"Authorization": f"Bearer {secret}"})
+    assert feed.status_code == 200 and feed.json()["screen"]["id"] == sid
+    assert feed.headers["cache-control"] == "no-store"
+    assert client().get(f"/signage/api/device/{did}/manifest").status_code == 403
+    csrf = csrf_of(c.get(f"/signage/{sid}/edit").text)
+    assert c.post(f"/signage/{sid}/device/{did}/revoke",
+                  data={"csrf": csrf}).status_code == 303
+    assert client().get(f"/signage/api/device/{did}/manifest",
+                        headers={"Authorization": f"Bearer {secret}"}).status_code == 403
 
 def test_calendar_event_occupancy_requires_explicit_room_binding_and_does_not_leak_title():
     c = _admin()
