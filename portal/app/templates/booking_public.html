@@ -35,7 +35,7 @@
 </nav>
 {% endmacro %}
 {% block content %}
-<main class="bk-citizen" id="bk-citizen">
+<div class="bk-citizen" id="bk-citizen">
 {% if mode == 'missing' %}
   <section class="bk-public-panel bk-public-empty"><i class="fa-solid fa-link-slash fa-2x text-secondary" aria-hidden="true"></i>
     <h1 class="h4 mt-3">Link nicht gefunden</h1><p class="text-secondary mb-0">Der Link ist ungültig oder wurde ersetzt. Bitte wenden Sie sich an die Stelle, die Ihnen den Link geschickt hat.</p></section>
@@ -200,6 +200,6 @@
   {% endif %}
 
 {% endif %}
-</main>
+</div>
 <script src="/static/booking-public.js" defer></script>
 {% endblock %}
