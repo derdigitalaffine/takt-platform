@@ -52,7 +52,7 @@
 @media(prefers-reduced-motion:reduce){.booking-workspace *, .booking-workspace *::before,.booking-workspace *::after{scroll-behavior:auto;transition:none}}
 
 /* Direktnavigation und Kalenderbedienung: keine erzwungenen Sprünge beim Speichern. */
-.booking-workspace :is(#kalender,#freie-zeiten,#buchungen,#einladungen,#ausnahmen,#sprechzeiten){scroll-margin-top:5rem}
+.booking-workspace :is(#kalender,#freie-zeiten,#buchungen,#einladungen,#ausnahmen,#sprechzeiten,#arten-liste,#neue-terminart,#buchungs-grunddaten,#buchungs-zeiten,#buchungs-terminarten){scroll-margin-top:5rem}
 .booking-workspace .bk-section-nav{display:flex;flex-wrap:wrap;gap:.45rem;margin:-.1rem 0 1.2rem}
 .booking-workspace .bk-section-nav a{display:inline-flex;align-items:center;gap:.5rem;padding:.52rem .85rem;min-height:2.55rem;border:1px solid var(--bs-border-color);border-radius:.65rem;color:var(--bs-secondary-color);background:var(--bs-body-bg);font-size:.86rem;font-weight:650;text-decoration:none;transition:background-color .16s,border-color .16s,color .16s}
 .booking-workspace .bk-section-nav a:hover{color:var(--bs-primary-text-emphasis);border-color:var(--bs-primary-border-subtle);background:var(--bs-primary-bg-subtle)}
@@ -78,3 +78,11 @@
  .booking-workspace .bk-calendar-guide{padding:.75rem}
  .booking-workspace .bk-window-form-wrap{padding:.85rem}
 }
+
+.booking-workspace .bk-overview-strip,.booking-workspace .bk-save-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.85rem;padding:1rem 1.1rem;background:var(--bs-tertiary-bg);border:1px solid var(--bs-border-color);border-radius:.85rem}
+.booking-workspace .bk-overview-strip strong,.booking-workspace .bk-save-row strong{font-size:.94rem}
+.booking-workspace .bk-booking-tile{transition:box-shadow .18s,border-color .18s,transform .18s}
+.booking-workspace .bk-booking-tile:hover{border-color:var(--bs-primary-border-subtle);box-shadow:0 .4rem 1.35rem rgba(0,0,0,.07);transform:translateY(-1px)}
+.booking-workspace .bk-save-row{background:var(--bs-primary-bg-subtle);border-color:var(--bs-primary-border-subtle)}
+.booking-workspace .bk-save-row .btn{min-height:2.75rem}
+@media(prefers-reduced-motion:reduce){.booking-workspace .bk-booking-tile:hover{transform:none}}
