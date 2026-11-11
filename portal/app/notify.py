@@ -122,20 +122,19 @@ def _build(cfg: dict[str, str], to_addr: str, subject: str, body: str,
     for att in attachments or []:
         method = att.get("calendar_method")
         if method:
-            # RFC 5545 iTIP calendar alternative for Outlook/Google/Apple.
-            # The HTML part must remain the LAST supported alternative so that
-            # receiving mail clients display the branded booking message instead
-            # of a plain generic calendar preview. Keep the iTIP bytes base64-
-            # encoded to preserve CRLF and the original METHOD header.
+            # CalConnect iMIP interoperability layout:
+            # multipart/mixed [multipart/alternative(plain, branded HTML),
+            #                  text/calendar;method=REQUEST, application/ics].
+            # The calendar is NOT an alternative to the HTML body: otherwise
+            # some clients render a generic invite instead of the styled mail.
+            # Preserve original RFC 5545 CRLF via base64 transfer encoding.
             part = Message()
             part["Content-Type"] = f'text/calendar; charset="UTF-8"; method={method}'
             part["Content-Transfer-Encoding"] = "base64"
             part.set_payload(base64.encodebytes(att["content"].encode("utf-8")).decode("ascii"))
-            # Current multipart/alternative is [plain, HTML (or HTML+CID logo)].
-            # Insert before HTML; append() would put the calendar last and some
-            # mail clients then hide the beautifully formatted HTML altogether.
-            alternatives = msg.get_payload()
-            alternatives.insert(len(alternatives) - 1, part)
+            if msg.get_content_type() != "multipart/mixed":
+                msg.make_mixed()  # wraps HTML+plain as the first MIME sibling
+            msg.attach(part)
     for att in attachments or []:
         if att.get("calendar_method"):
             msg.add_attachment(att["content"].encode("utf-8"), maintype="application", subtype="ics",
