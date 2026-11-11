@@ -190,7 +190,7 @@ def booking_events(page_id: int, user: User = Depends(current_user), db: Session
     return JSONResponse(bk.calendar_events(_bpage(db, page_id, user, sh.VIEW)[0]))
 
 
-def _window_change_payload(page: BookingPage, message: str) -> dict:
+def _window_change_payload(db: Session, page: BookingPage, message: str) -> dict:
     """Aktuelle Kalenderdaten und kleine Vorschau ohne erneutes Laden der gesamten Seite."""
     free = bk.bookable(page, db=db)
     days = bk.group_by_day(free)
@@ -242,7 +242,7 @@ async def booking_window_add(request: Request, page_id: int, user: User = Depend
     if ajax:
         if error:
             return JSONResponse({"ok": False, "error": error}, status_code=422)
-        return JSONResponse(_window_change_payload(page, f"{created} Zeitbereich(e) hinzugefügt."))
+        return JSONResponse(_window_change_payload(db, page, f"{created} Zeitbereich(e) hinzugefügt."))
     if error:
         flash(request, error, "error")
     else:
@@ -264,7 +264,7 @@ def booking_window_delete(request: Request, page_id: int, wid: int, user: User =
     msg = "Zeitbereich entfernt." + (f" {len(affected)} Buchung(en) darin bleiben bestehen – sagen Sie sie bei "
                                      "Bedarf unten ab." if affected else "")
     if request.headers.get("x-requested-with") == "fetch":
-        return JSONResponse(_window_change_payload(page, msg))
+        return JSONResponse(_window_change_payload(db, page, msg))
     flash(request, msg)
     return redirect(f"/bookings/{page.id}#kalender")
 
@@ -283,7 +283,7 @@ def booking_windows_clear(request: Request, page_id: int, user: User = Depends(c
     db.commit()
     msg = f"{removed} künftige Zeitbereiche entfernt. Bestehende Buchungen bleiben erhalten."
     if request.headers.get("x-requested-with") == "fetch":
-        return JSONResponse(_window_change_payload(page, msg))
+        return JSONResponse(_window_change_payload(db, page, msg))
     flash(request, msg)
     return redirect(f"/bookings/{page.id}#kalender")
 
