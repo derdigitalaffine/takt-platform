@@ -23,8 +23,14 @@ def btypes_page(request: Request, page_id: int, user: User = Depends(current_use
     providers = btypes.all_providers(page, db)
     organizations = list(db.scalars(select(Organization).where(
         Organization.active.is_(True)).order_by(Organization.name)))
+    from . import booking_integration
+    oid = booking_integration.creator_org_id(db, page)
+    unit = db.get(Organization, oid) if oid else None
     return render(request, "booking_types.html", user, page=page, users=_users(db),
                   providers=providers, organizations=organizations, routing=btypes.routing,
+                  org_closures=booking_integration.options(page).get("org_closures", True) is not False,
+                  creator_org_name=unit.name if unit else "",
+                  calendar_module_enabled=booking_integration.calendars_enabled(db),
                   plan=btypes.weekly_plan(page), weekdays=btypes.WEEKDAYS, durations=btypes.DURATIONS,
                   phone_modes=btypes.PHONE_MODES, summary=btypes.summary, field_kinds=btypes.FIELD_KINDS,
                   fields=btypes.fields, max_fields=btypes.MAX_FIELDS, can_video=user.can("video"),
@@ -140,6 +146,24 @@ def btypes_hours_delete(request: Request, page_id: int, hid: int, user: User = D
     db.delete(h)
     db.commit()
     return redirect(f"/bookings/{page.id}/arten#sprechzeiten")
+
+
+@app.post("/bookings/{page_id}/ausnahmen/schliesszeiten", dependencies=[Depends(check_csrf)])
+async def booking_org_closures_toggle(
+    request: Request, page_id: int, user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Save a single page-level opt-out without resetting its other settings."""
+    page, _level = _bpage(db, page_id, user, sh.EDIT)
+    data = await request.form()
+    import json
+    from . import booking_integration
+    settings = booking_integration.options(page)
+    settings["org_closures"] = data.get("org_closures") == "1"
+    page.integration_json = json.dumps(settings, ensure_ascii=False)
+    db.commit()
+    flash(request, "Schließtag-Einstellung übernommen. Bestehende Termine bleiben unverändert.")
+    return redirect(f"/bookings/{page.id}/arten#ausnahmen")
 
 
 @app.post("/bookings/{page_id}/ausnahmen", dependencies=[Depends(check_csrf)])
