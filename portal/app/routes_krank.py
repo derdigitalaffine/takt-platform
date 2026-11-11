@@ -929,6 +929,11 @@ async def krank_employer_save(request: Request, emp_id: int, user: User = Depend
     emp.attach_files = form.get("attach_files") == "1"
     emp.attach_original_au = emp.attach_files and form.get("attach_original_au") == "1"
     emp.notify_supervisors = form.get("notify_supervisors") == "1"
+    supervisor_mode = str(form.get("supervisor_attachment_mode") or "notice")
+    emp.supervisor_attachment_mode = (
+        supervisor_mode if emp.notify_supervisors and supervisor_mode in {"notice", "pdf", "original"}
+        else "notice"
+    )
     emp.subject_prefix = str(form.get("subject_prefix") or "").strip()[:100]
     emp.dms_enabled = form.get("dms_enabled") == "1"
     area = str(form.get("dms_area_id") or "")
