@@ -159,7 +159,9 @@ def search_instructions(user, focus=None):
         kinds.append("search_anliegen(query,scope=all|assigned|reported|orders|unassigned,status?,category_id?)")
         if user.can("anliegen_manage") and not allowed(user, "tasks"):
             kinds.append("search_people(query) für Zuständigkeitsänderungen")
-    kinds.extend(tool + ("(query=Name|ID|Datum,scope=own|manageable|decisions,status?)" if tool == "search_leave_requests" else "(query=Name|ID,start=YYYY-MM-DD?,end=YYYY-MM-DD?)" if tool == "search_events" else "(query)") for tool, module in modules.READ.items() if allowed(user, module))
+    if allowed(user, "applications"):
+        kinds.append("search_applications(query=Aktenzeichen|Antragsart|Name,scope=all|mine,status?)")
+    kinds.extend(tool + ("(query=Name|ID|Datum,scope=own|manageable|decisions,status?)" if tool == "search_leave_requests" else "(query=Name|ID,start=YYYY-MM-DD?,end=YYYY-MM-DD?)" if tool == "search_events" else "(query)") for tool, module in modules.READ.items() if tool != "search_applications" and allowed(user, module))
     from .agent_precision import focused
     kinds = focused(kinds, focus)
     # The example must never name an unavailable/unfocused tool. This is
@@ -223,6 +225,8 @@ def plan_instructions(user, prompt, findings, categories, requester_id, focus=No
         "create_event": "create_event(id=calendar_id,title,description,location,start,end,all_day=false): Einzeltermin; Uhrzeiten mit expliziter ISO-Zeitzone, ganztägig YYYY-MM-DD mit Enddatum einschließlich; keine Einladungen/Ressourcenbuchungen",
         "update_event": "update_event(id=event_id,title?,description?,location?,start?,end?,all_day?): nur editable=true, bestehende nicht geänderte Angaben beibehalten; keine Serie",
         "delete_event": "delete_event(id=event_id): nur bei ausdrücklichem Löschauftrag, einzelner editierbarer freier Kalendertermin; keine Serie",
+        "application_command": "application_command(id,operation=status|note|message|assign|due|take,status=received|in_progress|query|payment|approved|rejected|done|withdrawn?,text?,inform=false?,person?,group?,due=YYYY-MM-DD?): bestehenden Antrag aus Suche bearbeiten. Person/Gruppe exakt benennen. due leer nur bei gewünschter Aufhebung. note bleibt intern, message wird verschickt.",
+        "application_step": "application_step(id,task_id,operation=claim|done|approved|rejected,comment?): konkreten offenen Arbeitsschritt aus step.operations. Prüfpunkte und Fachfelder bestätigt die Person in der Fachmaske. Ablehnungsgrund aus Auftrag übernehmen; niemals erfinden.",
         "create_form": "create_form(title,description?,fields=[{type,title,description?,required?,options?,subtype?,min?,max?}]): geschlossenen internen Formularentwurf mit konkreten Fragen öffnen. Typen short|long|radio|checkbox|dropdown|date|time|scale|heading|text|pagebreak|file|address|geo; options=[Antworttexte] bei Auswahl, short subtype=number|email|phone|text. Keine Vorab-Erlaubnis erfragen.",
         "edit_form": "edit_form(id,title?,description?,fields?): nur gefundenen Formularentwurf mit editable=true bearbeiten. fields ergänzt ausschließlich neue Bausteine mit der gleichen Struktur wie create_form. Keine Antragstypen oder Veröffentlichungen.",
         "copy_form": "copy_form(id): geschlossenes Formular als neuen Entwurf kopieren, kein Veröffentlichen",
@@ -566,6 +570,9 @@ def execute(db, user, actions):
         db.add(AgentAudit(actor_id=user.id, tool=action["tool"], target_url=result["url"],
                           target_id=result["target_id"]))
     db.commit()
+    if any(action["tool"] in ("application_command", "application_step") for action in actions):
+        from . import worker
+        worker.wake()
     _badge_cache.clear()
     return results
 
@@ -611,6 +618,11 @@ def reference_accessible(db, user, source):
             row = db.get(CalendarEvent, rid)
             cal = db.get(Calendar, row.calendar_id) if row else None
             return bool(row and cal and cal.source == "free" and calendars.event_access(db, user, cal, row))
+        if kind == "application":
+            require(user, "applications")
+            from . import agent_applications
+            from .db import FormResponse
+            return agent_applications.visible(db, user, db.get(FormResponse, rid))
         if kind == "form":
             require(user, "forms")
             row = db.get(Form, rid)
@@ -638,6 +650,10 @@ def reference_revision(db, kind, rid):
     from .db import PollOption
     if kind in agent_surveys.MODELS:
         return agent_surveys.revision(db,kind,db.get(agent_surveys.MODELS[kind],rid))
+    if kind == "application":
+        from . import agent_applications
+        from .db import FormResponse
+        return agent_applications.revision(db, db.get(FormResponse, rid))
     if kind=="poll_option":
         row=db.get(PollOption,rid)
         return agent_surveys.revision(db,"poll",db.get(agent_surveys.Poll,row.poll_id)) if row else None

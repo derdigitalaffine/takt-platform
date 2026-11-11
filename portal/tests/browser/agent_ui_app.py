@@ -7,14 +7,14 @@ from app.calendar_models import Calendar, CalendarEvent
 from app.anliegen_models import AnliegenCategory, Anliegen
 from app.task_models import Task
 from app.security import hash_password
-from app.db import SessionLocal, User, Form, DmsArea, DmsRecord, Organization, KrankEmployer, Poll, Vote, LivePoll, set_setting
+from app.db import SessionLocal, User, Form, FormResponse, DmsArea, DmsRecord, Organization, KrankEmployer, Poll, Vote, LivePoll, set_setting
 from app.org_models import OrgMembership
 from app.leave_models import LeavePolicy, LeaveRequest
 from app import leave
 from sqlalchemy import select
 
 with SessionLocal() as db:
-    for module in ('ai', 'calendars', 'forms', 'dms', 'anliegen', 'krank', 'polls'):
+    for module in ('ai', 'calendars', 'forms', 'dms', 'anliegen', 'krank', 'polls', 'applications'):
         set_setting(db, 'module_' + module, '1')
     set_setting(db, 'ai_knowledge_enabled', '1')
     user = db.scalar(select(User).where(User.email == 'browser@example.org'))
@@ -25,7 +25,10 @@ with SessionLocal() as db:
     cal = Calendar(owner_id=user.id, title='Projektkalender', source='free')
     form = Form(owner_id=user.id, title='Projektformular', internal=True, active=False)
     source = DmsArea(name='Quelle'); dest = DmsArea(name='Projektablage')
-    db.add_all([cal, form, source, dest]); db.flush()
+    application = Form(owner_id=user.id, title='Agent Ausrüstungsantrag', kind='application')
+    db.add_all([cal, form, application, source, dest]); db.flush()
+    db.add(FormResponse(form_id=application.id, ref_no='AUSR-2030-00001',
+                        status='received', assignee_id=user.id))
     record = DmsRecord(area_id=source.id, title='Projektwissen', note='Freigegeben', kind='manuell')
     db.add(record); db.flush()
     db.add_all([AIDmsSource(record_id=record.id), AIProvider(name='Fixture', base_url='https://llm.invalid', model_id='fixture', active=True)])
@@ -55,6 +58,10 @@ async def complete(provider, messages, **kwargs):
         if 'Geburtstag' in prompt or prompt == 'ja':
             searches = []
             actions = [dict(tool='create_form', title='Geburtstage der Belegschaft', fields=[dict(type='short', title='Name', required=True), dict(type='date', title='Geburtstag', required=False)])]
+        elif prompt.startswith('Notiere beim Antrag AUSR-2030-00001'):
+            row = db.scalar(select(FormResponse).where(FormResponse.ref_no == 'AUSR-2030-00001'))
+            searches = [dict(tool='search_applications', query=row.ref_no)]
+            actions = [dict(tool='application_command', id=row.id, operation='note', text='Ausrüstung vorgeprüft')]
         elif prompt.startswith('Erstelle eine Terminumfrage'):
             searches=[]
             actions=[dict(tool='create_survey',record_kind='poll',title='Agent Terminfindung',description='Gemeinsamen Termin finden',location='Raum 2',duration=60,options=[dict(date='2030-12-05',start='09:00',end='10:00'),dict(date='2030-12-06',start='09:00',end='10:00')])]

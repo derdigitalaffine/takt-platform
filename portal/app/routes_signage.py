@@ -23,14 +23,14 @@ class _RedactSignageLinks(logging.Filter):
 
     Reverse-proxy access logs still require their own redaction policy.
     """
-    _secret = re.compile(r"(/signage/l/\\d+/)[A-Za-z0-9_-]{32,128}")
+    _secret = re.compile(r"(/signage/l/\d+/)[A-Za-z0-9_-]{32,128}")
 
     def filter(self, record):
         if isinstance(record.args, tuple):
-            record.args = tuple(self._secret.sub(r"\\1[redacted]", arg) if isinstance(arg, str)
+            record.args = tuple(self._secret.sub(r"\1[redacted]", arg) if isinstance(arg, str)
                                 else arg for arg in record.args)
         if isinstance(record.msg, str):
-            record.msg = self._secret.sub(r"\\1[redacted]", record.msg)
+            record.msg = self._secret.sub(r"\1[redacted]", record.msg)
         return True
 
 
