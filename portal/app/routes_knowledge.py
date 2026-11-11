@@ -1,12 +1,10 @@
 """Manual, organization-scoped TAKT Wissen UI; no implicit AI/RAG ingestion."""
-from datetime import datetime, timedelta
-
 from fastapi import Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import knowledge as km
-from .db import LOCAL_TZ, Organization, User, utcnow
+from .db import Organization, User
 from .knowledge_models import (KnowledgeAmendment, KnowledgeArticle, KnowledgeGrant,
                                KnowledgeSpace, KnowledgeRevision)
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
@@ -156,12 +154,13 @@ def knowledge_article(request: Request, article_id: int,
     )) if (item.status == "published" and (can_edit or can_publish)) else None
     if proposal and proposal.status == "applied":
         proposal = None
-    today = datetime.now(LOCAL_TZ).date()
     return render(request, "knowledge_article.html", user, space=space,
                   item=item, history=history, grants=grants, proposal=proposal,
                   kinds=km.KINDS, statuses=km.STATUSES, authorities=km.AUTHORITIES,
-                  can_edit=can_edit, can_publish=can_publish,
-                  today=today, can_manage=user.is_admin)
+                  can_edit=can_edit,
+                  can_approve=km.can_approve_article(db, user, space, item),
+                  can_confirm=km.can_confirm_review(db, user, space, item),
+                  today=km.review_today(), can_manage=user.is_admin)
 
 
 @app.post("/wissen/artikel/{article_id:int}/save", dependencies=[Depends(check_csrf)])
@@ -179,9 +178,8 @@ def knowledge_save_article(request: Request, article_id: int,
     if kind not in km.KINDS:
         raise HTTPException(422)
     title, body_md = _require_text(title, body_md)
-    item.title, item.kind, item.body_md = title, kind, body_md
-    item.version += 1
-    item.updated_at = utcnow()
+    if not km.update_article(db, item, version, title=title, kind=kind, body_md=body_md):
+        raise HTTPException(409, "Der Artikel wurde inzwischen geändert. Bitte neu laden.")
     km.record_revision(db, item, user.id)
     km.audit(db, user, space.id, item.id, "article_edit", f"v{item.version}")
     db.commit()
@@ -204,23 +202,17 @@ def knowledge_article_status(request: Request, article_id: int,
         cap = "edit"
     elif status == "published" and item.status == "review":
         cap = "publish"
-        content_author = db.scalar(select(KnowledgeRevision.id).where(
-            KnowledgeRevision.article_id == item.id,
-            KnowledgeRevision.status == "draft",
-            KnowledgeRevision.editor_id == user.id,
-        ).limit(1))
-        if item.owner_id == user.id or content_author is not None:
-            raise HTTPException(403, "Vier-Augen-Freigabe: Wer die aktuelle Fassung bearbeitet hat, darf sie nicht selbst freigeben.")
+        if not km.can_approve_article(db, user, space, item):
+            raise HTTPException(403, "Für die Freigabe ist eine unabhängige, berechtigte Person erforderlich.")
     else:
         raise HTTPException(409, "Dieser Statuswechsel ist nicht zulässig.")
     if not km.allowed(db, user, space, cap, item):
         raise HTTPException(403)
-    if status == "published":
-        item.authority = "verified"
-        item.published_at = utcnow()
-        item.last_reviewed_at = utcnow()
-        item.review_due_on = datetime.now(LOCAL_TZ).date() + timedelta(days=365)
-    km.change_status(db, item, user, status)
+    fields = km.publication_fields() if status == "published" else {}
+    if not km.update_article(db, item, version, status=status, **fields):
+        raise HTTPException(409, "Der Artikel wurde inzwischen geändert.")
+    km.record_revision(db, item, user.id)
+    km.audit(db, user, space.id, item.id, "status", status)
     db.commit()
     flash(request, "Wissensstatus aktualisiert.")
     return redirect(f"/wissen/artikel/{article_id}")

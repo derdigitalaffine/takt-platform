@@ -4,11 +4,11 @@
 {% block content %}
 <div class="knowledge-ui">
   <nav class="knowledge-breadcrumb" aria-label="Pfad"><a href="/wissen">Wissen</a><i class="fa-solid fa-chevron-right"></i><span>Wissensprüfungen</span></nav>
-  <header class="knowledge-head"><div><span class="knowledge-eyebrow">REDAKTION · QUALITÄT</span><h1>Meine Wissensprüfungen</h1><p>Offene Freigaben und fällige Überprüfungen aus deinen berechtigten Wissensräumen – ohne KI-Auswertung oder Personenranking.</p></div></header>
+  <header class="knowledge-head"><div><span class="knowledge-eyebrow">REDAKTION · QUALITÄT</span><h1>Meine Wissensprüfungen</h1><p>Fachliche Freigaben und Wiedervorlagen aus deinen Wissensräumen.</p></div></header>
   <div class="knowledge-review-summary">
     <div><span>Fachliche Freigaben</span><strong>{{articles|length}}</strong></div>
     <div><span>Änderungsvorschläge</span><strong>{{amendments|length}}</strong></div>
-    <div><span>Prüffristen (30 Tage)</span><strong>{{due|length}}</strong></div>
+    <div><span>Prüffristen auf dieser Seite</span><strong>{{due|length}}</strong></div>
   </div>
   <section aria-labelledby="k-review-new">
     <div class="knowledge-section-title"><h2 id="k-review-new">Neue Beiträge freigeben</h2></div>
@@ -20,8 +20,13 @@
   </section>
   <section aria-labelledby="k-review-due">
     <div class="knowledge-section-title"><h2 id="k-review-due">Anstehende Wissensreviews</h2><span class="small text-secondary">bis {{deadline.strftime('%d.%m.%Y')}}</span></div>
-    <div class="knowledge-list">{% for item, space in due %}<a href="/wissen/artikel/{{item.id}}" class="knowledge-list-row"><span class="knowledge-small-icon"><i class="fa-regular fa-calendar-check"></i></span><span class="knowledge-list-copy"><strong>{{item.title}}</strong><small>{{space.title}} · Prüfung am {{item.review_due_on.strftime('%d.%m.%Y')}}</small></span><span class="knowledge-status {{'knowledge-review-overdue' if item.review_due_on < today}}">{{'Überfällig' if item.review_due_on < today else 'Bald fällig'}}</span><i class="fa-solid fa-chevron-right"></i></a>{% else %}<p class="knowledge-empty">Aktuell keine fälligen oder bald fälligen Prüfungen.</p>{% endfor %}</div>
+    <div class="knowledge-list">{% for item, space in due %}<a href="/wissen/artikel/{{item.id}}" class="knowledge-list-row"><span class="knowledge-small-icon"><i class="fa-regular fa-calendar-check"></i></span><span class="knowledge-list-copy"><strong>{{item.title}}</strong><small>{{space.title}} · Prüfung am {{item.review_due_on.strftime('%d.%m.%Y')}}</small></span><span class="knowledge-status {{'knowledge-review-overdue' if item.review_due_on < today}}">{{'Überfällig' if item.review_due_on < today else ('Heute fällig' if item.review_due_on == today else 'Bald fällig')}}</span><i class="fa-solid fa-chevron-right"></i></a>{% else %}<p class="knowledge-empty">Aktuell keine fälligen oder bald fälligen Prüfungen.</p>{% endfor %}</div>
+    {% if due_page > 1 or more_due %}
+    <nav aria-label="Seiten der Wissensreviews" class="d-flex gap-2 mt-3">
+      {% if due_page > 1 %}<a class="btn btn-outline-secondary" href="?due_page={{due_page - 1}}#k-review-due">Vorherige Seite</a>{% endif %}
+      {% if more_due %}<a class="btn btn-outline-secondary" href="?due_page={{due_page + 1}}#k-review-due">Nächste Seite</a>{% endif %}
+    </nav>
+    {% endif %}
   </section>
-  <p class="knowledge-footnote"><i class="fa-solid fa-shield-halved me-1"></i>Nur aktuell freigegebene, fachlich prüfbare Inhalte werden angezeigt. Diese Übersicht sendet keine automatischen E-Mails oder Erinnerungen.</p>
 </div>
 {% endblock %}

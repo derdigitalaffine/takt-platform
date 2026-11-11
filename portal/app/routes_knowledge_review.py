@@ -3,7 +3,7 @@
 Published content is immutable to readers until a second authorized reviewer
 promotes the candidate. No AI or external indexing occurs here.
 """
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from difflib import unified_diff
 
 from fastapi import Depends, Form, HTTPException, Request
@@ -14,9 +14,8 @@ from sqlalchemy.orm import Session
 from . import knowledge as km
 from .knowledge_models import (
     KnowledgeAmendment, KnowledgeAmendmentRevision, KnowledgeArticle,
-    KnowledgeRevision,
 )
-from .db import LOCAL_TZ, User, utcnow
+from .db import User, utcnow
 from .main import (
     app, check_csrf, current_user, flash, get_db, rate_limit, redirect,
     render, templates,
@@ -43,10 +42,6 @@ def _may_see_proposal(db, user, space, item) -> bool:
     return km.allowed(db, user, space, "edit", item) or _can_review(db, user, space, item)
 
 
-def _today() -> date:
-    return datetime.now(LOCAL_TZ).date()
-
-
 def _validate_due_on(value: str) -> date | None:
     if not value:
         return None
@@ -54,7 +49,8 @@ def _validate_due_on(value: str) -> date | None:
         result = date.fromisoformat(value)
     except ValueError as exc:
         raise HTTPException(422, "Prüfdatum muss ein gültiges Datum sein.") from exc
-    if result < _today() - timedelta(days=3650) or result > _today() + timedelta(days=3650):
+    today = km.review_today()
+    if not today <= result <= today + timedelta(days=3650):
         raise HTTPException(422, "Prüfdatum liegt außerhalb des zulässigen Zeitraums.")
     return result
 
@@ -87,7 +83,13 @@ def start_amendment(request: Request, article_id: int,
     _, article = _article(db, user, article_id, "edit")
     if article.status != "published":
         raise HTTPException(409, "Nur freigegebene Artikel erhalten separate Änderungsentwürfe.")
-    if version != article.version:
+    # Serialize proposal creation/reuse with review confirmations and publication.
+    current = db.execute(update(KnowledgeArticle).where(
+        KnowledgeArticle.id == article_id,
+        KnowledgeArticle.version == version,
+        KnowledgeArticle.status == "published",
+    ).values(version=KnowledgeArticle.version).execution_options(synchronize_session=False))
+    if current.rowcount != 1:
         raise HTTPException(409, "Die freigegebene Fassung wurde inzwischen geändert.")
     proposal = db.scalar(select(KnowledgeAmendment).where(
         KnowledgeAmendment.article_id == article.id))
@@ -141,8 +143,7 @@ def amendment_page(request: Request, article_id: int,
         proposal=proposal, history=rows, difference=comparison,
         kinds=km.KINDS,
         can_edit=km.allowed(db, user, space, "edit", article),
-        can_publish=_can_review(db, user, space, article)
-        and user.id not in {proposal.creator_id, proposal.last_editor_id},
+        can_publish=km.can_approve_amendment(db, user, space, article, proposal),
     )
 
 
@@ -184,6 +185,19 @@ def save_amendment(request: Request, article_id: int, title: str = Form(...),
     return redirect(f"/wissen/artikel/{article_id}/entwurf")
 
 
+def _transition_proposal(db, proposal, version, status):
+    result = db.execute(update(KnowledgeAmendment).where(
+        KnowledgeAmendment.id == proposal.id,
+        KnowledgeAmendment.version == version,
+        KnowledgeAmendment.status == proposal.status,
+    ).values(status=status, version=version + 1, updated_at=utcnow())
+      .execution_options(synchronize_session=False))
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "Der Entwurf wurde inzwischen geändert.")
+    db.expire(proposal)
+
+
 @app.post("/wissen/artikel/{article_id:int}/entwurf/status",
           dependencies=[Depends(check_csrf)])
 def amendment_status(request: Request, article_id: int,
@@ -204,46 +218,23 @@ def amendment_status(request: Request, article_id: int,
         if not (_may_see_proposal(db, user, space, article)):
             raise HTTPException(403)
     elif status == "published" and proposal.status == "review":
-        if not _can_review(db, user, space, article):
-            raise HTTPException(403)
-        content_author = db.scalar(select(KnowledgeAmendmentRevision.id).where(
-            KnowledgeAmendmentRevision.article_id == article_id,
-            KnowledgeAmendmentRevision.version >= proposal.cycle_start_version,
-            KnowledgeAmendmentRevision.action.in_(("start", "edit")),
-            KnowledgeAmendmentRevision.actor_id == user.id,
-        ).limit(1))
-        if (user.id in {proposal.creator_id, proposal.last_editor_id}
-                or content_author is not None):
-            raise HTTPException(403, "Vier-Augen-Freigabe: Wer die aktuelle Fassung bearbeitet hat, darf sie nicht selbst freigeben.")
-        result = db.execute(update(KnowledgeArticle).where(
-            KnowledgeArticle.id == article.id, KnowledgeArticle.version == proposal.base_version,
-            KnowledgeArticle.status == "published",
-        ).values(
-            title=proposal.title, kind=proposal.kind, body_md=proposal.body_md,
-            authority="verified", version=article.version + 1,
-            published_at=utcnow(), last_reviewed_at=utcnow(),
-            review_due_on=_today() + timedelta(days=365),
-            updated_at=utcnow(),
-        ).execution_options(synchronize_session=False))
-        if result.rowcount != 1:
-            db.rollback()
+        if not km.can_approve_amendment(db, user, space, article, proposal):
+            raise HTTPException(403, "Für die Freigabe ist eine unabhängige, berechtigte Person erforderlich.")
+        if not km.update_article(db, article, proposal.base_version,
+                                 title=proposal.title, kind=proposal.kind, body_md=proposal.body_md,
+                                 **km.publication_fields()):
             raise HTTPException(409, "Die veröffentlichte Fassung wurde parallel geändert.")
-        db.expire(article)
+        _transition_proposal(db, proposal, version, "applied")
         km.record_revision(db, article, user.id)
         km.audit(db, user, space.id, article.id, "amendment_publish",
                  f"published_v{article.version}")
-        proposal.status = "applied"
-        proposal.version += 1
-        proposal.updated_at = utcnow()
         km.remember_amendment(db, proposal, user.id, "publish")
         db.commit()
         flash(request, "Neue Wissensfassung fachlich freigegeben.")
         return redirect(f"/wissen/artikel/{article_id}")
     else:
         raise HTTPException(409, "Dieser Statuswechsel ist nicht zulässig.")
-    proposal.status = status
-    proposal.version += 1
-    proposal.updated_at = utcnow()
+    _transition_proposal(db, proposal, version, status)
     km.remember_amendment(db, proposal, user.id,
                           "submit" if status == "review" else "return")
     km.audit(db, user, space.id, article.id, "amendment_status", status)
@@ -264,22 +255,20 @@ def knowledge_governance(request: Request, article_id: int,
     space, article = _article(db, user, article_id, "publish")
     if article.status != "published":
         raise HTTPException(409, "Nur veröffentlichte Artikel können bestätigt werden.")
-    if article.owner_id == user.id:
+    if not km.can_confirm_review(db, user, space, article):
         raise HTTPException(403, "Die eigene Wissensbeschreibung muss unabhängig geprüft werden.")
     if authority not in km.EDITOR_AUTHORITIES:
         raise HTTPException(422, "Verbindliche Anweisungen müssen über den offiziellen Regelwerksprozess freigegeben werden.")
     due = _validate_due_on(review_due_on)
-    result = db.execute(update(KnowledgeArticle).where(
-        KnowledgeArticle.id == article_id, KnowledgeArticle.version == version,
-        KnowledgeArticle.status == "published",
-    ).values(
-        authority=authority, review_due_on=due, last_reviewed_at=utcnow(),
-        version=version + 1, updated_at=utcnow(),
-    ).execution_options(synchronize_session=False))
-    if result.rowcount != 1:
-        db.rollback()
+    if not km.update_article(db, article, version, authority=authority,
+                             review_due_on=due, last_reviewed_at=utcnow()):
         raise HTTPException(409, "Artikel wurde inzwischen geändert.")
-    db.expire(article)
+    # A metadata-only review does not change the content underlying a proposal.
+    db.execute(update(KnowledgeAmendment).where(
+        KnowledgeAmendment.article_id == article_id,
+        KnowledgeAmendment.base_version == version,
+        KnowledgeAmendment.status.in_(("draft", "review")),
+    ).values(base_version=version + 1))
     km.record_revision(db, article, user.id)
     km.audit(db, user, space.id, article.id, "review_confirm", authority)
     db.commit()

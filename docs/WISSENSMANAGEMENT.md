@@ -188,3 +188,22 @@ sein, bevor ein PR gemergt wird.
   Autorisierungs-, CSRF-, Versions- und Vier-Augen-Tests.
 - Auslösung im CI-Job `tasks-browser` zusätzlich zu allen bisherigen
   Tests. Ein PR darf bei Fehlern nicht gemergt werden.
+
+## Fällige Prüfungen und laufende Überarbeitungen
+
+Die Prüfungsübersicht zeigt Wiedervorlagen bis einschließlich 30 Tage im
+Voraus. Überfällige Termine stehen zuerst. TAKT verwendet den lokalen
+Portal-Kalendertag und kennzeichnet heute fällige Beiträge gesondert. Die
+Seitengröße wird erst nach der Rechteprüfung angewendet. Auch ältere Beiträge
+mit einem fälligen Termin bleiben dadurch auffindbar.
+
+Bei einer Prüfbestätigung kann die prüfende Person einen neuen Termin ab heute
+setzen oder das Datumsfeld leeren, um die Wiedervorlage zu entfernen. Eine
+Bestätigung ändert nur die Qualitäts- und Terminmetadaten der aktuellen
+Fassung. Ein laufender Änderungsentwurf auf dieser Fassung kann weiter
+bearbeitet und nach der Vier-Augen-Prüfung veröffentlicht werden.
+
+Für die Freigabe verwenden Prüfungsübersicht, Artikelseite und Statuswechsel
+dieselben Regeln zu Zugriffsrechten und Mitwirkung an der Fassung.
+Parallele Änderungen an derselben Version führen zu einem Konflikt mit
+Aufforderung zum Neuladen. Die Übersicht arbeitet ohne Versand oder KI.

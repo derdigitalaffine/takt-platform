@@ -4,11 +4,13 @@ Capability checks are live and deny-first. Global permission alone never
 exposes an organization's knowledge; organization membership/explicit grants
 are additionally required. Excluded material never enters RAG by default.
 """
-from sqlalchemy import select
+from datetime import datetime, timedelta
+
+from sqlalchemy import select, update
 from markdown_it import MarkdownIt
 from markupsafe import Markup
 
-from .db import Group, GroupMember, Organization, User, get_settings, utcnow
+from .db import LOCAL_TZ, Group, GroupMember, Organization, User, get_settings, utcnow
 from .org_models import OrgMembership
 from .knowledge_models import (
     KnowledgeArticle, KnowledgeAudit, KnowledgeGrant, KnowledgeRevision,
@@ -181,14 +183,57 @@ def audit(db, actor, space_id: int | None, article_id: int | None,
                           detail=detail[:255]))
 
 
-def change_status(db, item: KnowledgeArticle, actor, status: str) -> None:
-    if status not in STATUSES:
-        raise ValueError("Unbekannter Status")
-    item.status = status
-    item.version += 1
-    item.updated_at = utcnow()
-    record_revision(db, item, actor.id)
-    audit(db, actor, item.space_id, item.id, "status", status)
+def review_today():
+    return datetime.now(LOCAL_TZ).date()
+
+
+def publication_fields():
+    now = utcnow()
+    return dict(authority="verified", published_at=now, last_reviewed_at=now,
+                review_due_on=review_today() + timedelta(days=365))
+
+
+def can_approve_article(db, user, space, item):
+    if (item.status != "review" or item.owner_id == user.id
+            or not allowed(db, user, space, "publish", item)):
+        return False
+    return db.scalar(select(KnowledgeRevision.id).where(
+        KnowledgeRevision.article_id == item.id,
+        KnowledgeRevision.status == "draft",
+        KnowledgeRevision.editor_id == user.id,
+    ).limit(1)) is None
+
+
+def can_approve_amendment(db, user, space, item, proposal):
+    if (item.status != "published" or proposal.status != "review"
+            or proposal.base_version != item.version
+            or user.id in {proposal.creator_id, proposal.last_editor_id}
+            or not allowed(db, user, space, "publish", item)):
+        return False
+    return db.scalar(select(KnowledgeAmendmentRevision.id).where(
+        KnowledgeAmendmentRevision.article_id == item.id,
+        KnowledgeAmendmentRevision.version >= proposal.cycle_start_version,
+        KnowledgeAmendmentRevision.action.in_(("start", "edit")),
+        KnowledgeAmendmentRevision.actor_id == user.id,
+    ).limit(1)) is None
+
+
+def can_confirm_review(db, user, space, item):
+    return (item.status == "published" and item.owner_id != user.id
+            and allowed(db, user, space, "publish", item))
+
+
+def update_article(db, item, version, **fields):
+    result = db.execute(update(KnowledgeArticle).where(
+        KnowledgeArticle.id == item.id,
+        KnowledgeArticle.version == version,
+        KnowledgeArticle.status == item.status,
+    ).values(version=version + 1, updated_at=utcnow(), **fields)
+      .execution_options(synchronize_session=False))
+    if result.rowcount != 1:
+        return False
+    db.expire(item)
+    return True
 
 
 def principal_exists(db, kind: str, target_id: int) -> bool:

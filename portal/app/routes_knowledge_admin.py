@@ -3,17 +3,17 @@
 No external calls, scheduled contacts, AI indexing, or global user-directory
 access for delegated room administrators.
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
+from itertools import islice
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Query, Request
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from . import knowledge as km
-from .db import LOCAL_TZ, Group, Organization, User
+from .db import Group, Organization, User
 from .knowledge_models import (
-    KnowledgeAmendment, KnowledgeAmendmentRevision, KnowledgeArticle, KnowledgeGrant, KnowledgeRevision,
-    KnowledgeSpace,
+    KnowledgeAmendment, KnowledgeArticle, KnowledgeGrant, KnowledgeSpace,
 )
 from .org_models import OrgMembership
 from .main import app, current_user, get_db, render
@@ -94,59 +94,50 @@ def knowledge_management(request: Request, space_id: int, q: str = "",
                   capabilities=km.CAP_PERMS, delegated=not user.is_admin)
 
 
-def _reviewable(db: Session, user: User, item: KnowledgeArticle, space) -> bool:
-    return (item.owner_id != user.id and km.allowed(db, user, space, "publish", item))
-
-
 @app.get("/wissen/pruefungen")
 def knowledge_review_queue(request: Request,
+                           due_page: int = Query(1, ge=1, le=1_000_000),
                            user: User = Depends(current_user),
                            db: Session = Depends(get_db)):
-    """Live restricted inbox – never a cross-tenant report."""
+    """Apply each lane's ACL and review rules before limiting its visible rows."""
     _reader(user, db)
     if not user.can("knowledge_publish"):
         raise HTTPException(403)
-    today = datetime.now(LOCAL_TZ).date()
+    today = km.review_today()
     deadline = today + timedelta(days=30)
-    articles = []
-    amendments = []
-    due = []
-    spaces = {}
-    for item in db.scalars(select(KnowledgeArticle).where(
-        KnowledgeArticle.status.in_(("published", "review")),
-    ).order_by(KnowledgeArticle.updated_at.desc()).limit(3000)):
-        space = spaces.get(item.space_id)
-        if item.space_id not in spaces:
-            space = db.get(KnowledgeSpace, item.space_id)
-            spaces[item.space_id] = space
-        if not space or not _reviewable(db, user, item, space):
-            continue
-        if item.status == "review":
-            # Don't show an unapprovable draft to one of its content authors.
-            author = db.scalar(select(KnowledgeRevision.id).where(
-                KnowledgeRevision.article_id == item.id,
-                KnowledgeRevision.status == "draft",
-                KnowledgeRevision.editor_id == user.id,
-            ).limit(1))
-            if author is None:
-                articles.append((item, space))
-        if item.status == "published":
-            if item.review_due_on and item.review_due_on <= deadline:
-                due.append((item, space))
-            proposal = db.scalar(select(KnowledgeAmendment).where(
-                KnowledgeAmendment.article_id == item.id,
-                KnowledgeAmendment.status == "review",
-            ))
-            if proposal and user.id not in {proposal.creator_id, proposal.last_editor_id}:
-                contributed = db.scalar(select(KnowledgeAmendmentRevision.id).where(
-                    KnowledgeAmendmentRevision.article_id == item.id,
-                    KnowledgeAmendmentRevision.version >= proposal.cycle_start_version,
-                    KnowledgeAmendmentRevision.action.in_(("start", "edit")),
-                    KnowledgeAmendmentRevision.actor_id == user.id,
-                ).limit(1))
-                if contributed is None:
-                    amendments.append((item, space))
-    due.sort(key=lambda pair: pair[0].review_due_on)
+    with_space = select(KnowledgeArticle, KnowledgeSpace).join(KnowledgeSpace)
+    recent_first = (KnowledgeArticle.updated_at.desc(), KnowledgeArticle.id.desc())
+
+    pending = with_space.where(KnowledgeArticle.status == "review").order_by(*recent_first)
+    articles = list(islice(
+        ((item, space) for item, space in db.execute(pending.execution_options(yield_per=100))
+         if km.can_approve_article(db, user, space, item)),
+        100,
+    ))
+
+    proposed = (with_space.add_columns(KnowledgeAmendment).join(
+        KnowledgeAmendment, KnowledgeAmendment.article_id == KnowledgeArticle.id)
+        .where(KnowledgeArticle.status == "published", KnowledgeAmendment.status == "review",
+               KnowledgeAmendment.base_version == KnowledgeArticle.version)
+        .order_by(KnowledgeAmendment.updated_at.desc(), KnowledgeArticle.id.desc()))
+    amendments = list(islice(
+        ((item, space) for item, space, proposal in db.execute(proposed.execution_options(yield_per=100))
+         if km.can_approve_amendment(db, user, space, item, proposal)),
+        100,
+    ))
+
+    due_query = with_space.where(
+        KnowledgeArticle.status == "published",
+        KnowledgeArticle.review_due_on <= deadline,
+        KnowledgeArticle.owner_id.is_distinct_from(user.id),
+    ).order_by(KnowledgeArticle.review_due_on, KnowledgeArticle.id)
+    page_size = 150
+    due = list(islice(
+        ((item, space) for item, space in db.execute(due_query.execution_options(yield_per=100))
+         if km.can_confirm_review(db, user, space, item)),
+        (due_page - 1) * page_size, due_page * page_size + 1,
+    ))
     return render(request, "knowledge_reviews.html", user,
-                  articles=articles[:100], amendments=amendments[:100],
-                  due=due[:150], today=today, deadline=deadline)
+                  articles=articles, amendments=amendments, due=due[:page_size],
+                  due_page=due_page, more_due=len(due) > page_size,
+                  today=today, deadline=deadline)

@@ -421,3 +421,62 @@ def test_knowledge_markdown_tables_and_untrusted_html_are_safe():
     assert "<img " not in malicious
     assert "<script>" not in malicious
     assert 'href="javascript:' not in malicious
+
+
+def test_review_inbox_prioritizes_due_dates_over_recent_articles(sample):
+    from datetime import timedelta
+    from sqlalchemy import insert
+    from app.knowledge import review_today
+
+    _, space_id, article_id, _, _, reviewer_id = sample
+    _, reviewer = _publish_sample(sample)
+    today = review_today()
+    with SessionLocal() as db:
+        article = db.get(KnowledgeArticle, article_id)
+        article.review_due_on = today - timedelta(days=1)
+        db.execute(insert(KnowledgeArticle), [
+            {"space_id": space_id, "owner_id": reviewer_id, "title": "Andere Fassung",
+             "status": "published", "review_due_on": today + timedelta(days=90)}
+            for _ in range(3001)
+        ])
+        db.commit()
+
+    page = reviewer.get("/wissen/pruefungen")
+    assert page.status_code == 200
+    assert "Beschaffung Dienstmaterial" in page.text
+    assert "Überfällig" in page.text
+    assert "Andere Fassung" not in page.text
+
+
+def test_review_confirmation_keeps_submitted_amendment_publishable(sample):
+    from datetime import timedelta
+    from app.knowledge import review_today
+
+    _, _, article_id, *_ = sample
+    author, reviewer = _publish_sample(sample)
+    article = f"/wissen/artikel/{article_id}"
+    proposal = article + "/entwurf"
+    author_csrf = csrf_of(author.get(article).text)
+    reviewer_csrf = csrf_of(reviewer.get(article).text)
+    assert author.post(proposal + "/start", data={
+        "csrf": author_csrf, "version": 3,
+    }).status_code == 303
+    assert author.post(proposal + "/save", data={
+        "csrf": author_csrf, "version": 1, "title": "Neue Fassung", "body_md": "Neue Schritte",
+    }).status_code == 303
+    assert author.post(proposal + "/status", data={
+        "csrf": author_csrf, "version": 2, "status": "review",
+    }).status_code == 303
+    payload = {"csrf": reviewer_csrf, "authority": "verified", "version": 3}
+    assert reviewer.post(article + "/pruefung", data={
+        **payload, "review_due_on": (review_today() - timedelta(days=1)).isoformat(),
+    }).status_code == 422
+    assert reviewer.post(article + "/pruefung", data={
+        **payload, "review_due_on": review_today().isoformat(),
+    }).status_code == 303
+    assert "Heute fällig" in reviewer.get("/wissen/pruefungen").text
+    assert "Neue Fassung" not in reviewer.get(article).text
+    assert reviewer.post(proposal + "/status", data={
+        "csrf": reviewer_csrf, "version": 3, "status": "published",
+    }).status_code == 303
+    assert "Neue Fassung" in reviewer.get(article).text
