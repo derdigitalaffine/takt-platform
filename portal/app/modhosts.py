@@ -20,7 +20,7 @@ MODULE_PUBLIC = {
     "polls": ("Terminumfragen & Abstimmungen", "", ("/t", "/v", "/l")),
     "bookings": ("Terminbuchung", "/b", ("/b",)),
     "resources": ("Ressourcenbuchung", "/r", ("/r", "/r-embed")),
-    "signage": ("Digital Signage", "", ("/signage/view", "/signage/l")),
+    "signage": ("Digital Signage", "", ("/signage/view", "/signage/l", "/signage/access")),
     "laws": ("Rechtstexte", "/recht", ("/recht", "/recht-embed")),
     "maps": ("Kartenbrowser", "/karte", ("/karte", "/karte-embed")),
     "krank": ("BlueOtter Krankmelder", "/krank", ("/krank", "/krank-embed")),
