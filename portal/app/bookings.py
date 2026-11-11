@@ -212,7 +212,24 @@ def calendar(db, b: Booking, method: str = "REQUEST") -> str:
                      minutes=int((b.ends_at - b.starts_at).total_seconds() // 60), title=title,
                      description=text, location=link or location, url=link or manage_link(b),
                      organizer=planning.organizer_identity(cfg, responsible(b)),
-                     attendees=[(b.name, b.email)], cancelled=method == "CANCEL")
+                     attendees=[(b.name, b.email)], cancelled=method == "CANCEL", rsvp=False)
+
+
+def calendar_staff(db, b: Booking, method: str = "PUBLISH") -> str:
+    """Internal appointment ICS, deliberately without guest booking tokens."""
+    cfg = get_settings(db)
+    page = b.page
+    url = f"{settings.portal_base_url}/kalender/buchungen/{b.id}"
+    return ics.build(
+        method=method, uid=_uid(b).replace("booking-", "booking-staff-", 1),
+        sequence=b.sequence, start=b.starts_at,
+        minutes=int((b.ends_at - b.starts_at).total_seconds() // 60),
+        title="Bürgertermin – " + page.title,
+        description="Termindetails im berechtigten TAKT-Kalender: " + url,
+        location=(b.type.location if b.type else page.location) or "",
+        url=url, organizer=planning.organizer_identity(cfg, responsible(b)),
+        attendees=[], cancelled=method == "CANCEL", rsvp=False,
+    )
 
 
 def _values(db, b: Booking, extra: dict | None = None) -> dict:
@@ -223,6 +240,12 @@ def _values(db, b: Booking, extra: dict | None = None) -> dict:
     who = responsible(b)
     values = {"name": b.name, "titel": f"{page.title} – {b.type.name}" if b.type else page.title,
               "termin": label(b.starts_at, b.ends_at),
+              "terminart": b.type.name if b.type else page.title,
+              "datum": to_local(b.starts_at).strftime("%d.%m.%Y"),
+              "uhrzeit": to_local(b.starts_at).strftime("%H:%M") + "–" + to_local(b.ends_at).strftime("%H:%M") + " Uhr",
+              "status": "Bestätigung ausstehend" if b.status == "requested" else (
+                  "Abgesagt" if b.status == "cancelled" else "Bestätigt"),
+              "vorher": "", "unterlagen": b.type.docs_hint if b.type else "",
               "ort": f"Ort: {location}" if location and not link else "",
               "videolink": f"Teilnahme per Videokonferenz (im Browser, ohne Installation):\n{link}" if link else "",
               "verwalten": manage_link(b), "absagefrist": f"{page.cancel_hours} Stunden",
@@ -243,7 +266,7 @@ def _send_guest(db, b: Booking, key: str, method: str, extra: dict | None = None
                           reply_to=deputy or (who.email if who else None), attachments=att)
 
 
-def _notify_owner(db, b: Booking, event: str) -> None:
+def _notify_owner(db, b: Booking, event: str, *, previous: str = "") -> None:
     """Zuständige Person (Terminart) und – wenn eingestellt – Besitzer:in der Seite informieren."""
     page = b.page
     targets = []
@@ -259,8 +282,14 @@ def _notify_owner(db, b: Booking, event: str) -> None:
         subject, body = mailtpl.render(db, "booking_owner", _values(db, b, {
             "ereignis": event, "name": who.name, "gast": f"{b.name} <{b.email}>" + (f", Tel. {b.phone}" if b.phone else ""),
             "nachricht": "\n\n".join(x for x in (_answers_text(b), b.note or "") if x), "frei": free,
-            "link": f"{settings.portal_base_url}/bookings/{page.id}"}), cfg)
-        notify.enqueue(db, who.email, subject, body, "booking_owner", cfg)
+            "link": f"{settings.portal_base_url}/bookings/{page.id}",
+            "vorher": previous, "status": "Bestätigung erforderlich" if b.status == "requested" else b.status}), cfg)
+        from . import booking_integration
+        opts = booking_integration.options(page)
+        method = ("CANCEL" if event == "Absage" else "PUBLISH") if b.status == "booked" or event == "Absage" else ""
+        att = ([{"filename": "buergertermin.ics", "content": calendar_staff(db, b, method),
+                 "calendar_method": method}] if opts.get("staff_calendar_attachment") is True and method else None)
+        notify.enqueue(db, who.email, subject, body, "booking_owner", cfg, attachments=att)
 
 
 # --- Buchen, Umbuchen, Absagen -----------------------------------------------------------
@@ -340,6 +369,7 @@ def confirm(db, b: Booking) -> None:
     b.status = "booked"
     _meeting_for(db, b)
     _send_guest(db, b, "booking_confirm", "REQUEST")
+    _notify_owner(db, b, "Termin bestätigt")
 
 
 def move(db, b: Booking, start: datetime) -> str:
@@ -353,6 +383,7 @@ def move(db, b: Booking, start: datetime) -> str:
         slot, error = check(b.page, start, b.email, keep=b, db=db)
     if error:
         return error
+    old_label = label(b.starts_at, b.ends_at)
     b.starts_at, b.ends_at, b.sequence, b.reminded_at = slot["start"], slot["end"], b.sequence + 1, None
     if slot.get("provider_id"):
         b.provider_id = slot["provider_id"]
@@ -361,8 +392,9 @@ def move(db, b: Booking, start: datetime) -> str:
         if meeting:
             meeting.starts_at = b.starts_at
             meeting.ics_sequence = (meeting.ics_sequence or 0) + 1
-    _send_guest(db, b, "booking_update", "REQUEST" if b.status == "booked" else "")
-    _notify_owner(db, b, "Termin verschoben")
+    _send_guest(db, b, "booking_update", "REQUEST" if b.status == "booked" else "",
+                {"vorher": old_label})
+    _notify_owner(db, b, "Termin verschoben", previous=old_label)
     return ""
 
 
