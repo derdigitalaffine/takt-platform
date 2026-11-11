@@ -886,3 +886,34 @@ def test_legacy_employer_migration_reuses_node_and_is_idempotent():
         assert db.get(KrankEmployer, orphan_id).org_id == created_node_id
         assert db.scalar(select(Organization).where(
             Organization.name == "Legacy Orphan Migration Test")).id == created_node_id
+
+
+def test_signed_in_person_gets_org_employer_prefill_only_if_unique():
+    from app.db import Organization
+    from app.org_models import OrgMembership
+    import re
+
+    email = "unique-org-employer-prefill@example.org"
+    _staff_user(email, "video")
+    with SessionLocal() as db:
+        parent = Organization(name="Unique Employer Root", kind="verwaltung")
+        department = Organization(name="Unique Employer Department", kind="fachbereich", parent=parent)
+        db.add_all([parent, department])
+        db.flush()
+        person = db.scalar(select(User).where(User.email == email))
+        db.add(OrgMembership(user_id=person.id, org_id=department.id, is_primary=True))
+        first = KrankEmployer(name="Unique Employer Primary", org_id=parent.id)
+        db.add(first)
+        db.commit()
+        emp_id, department_id = first.id, department.id
+    c = login(email, "passwort-123")
+    html = c.get("/krank/au").text
+    options = html.split('name="employer"', 1)[1].split("</select>", 1)[0]
+    assert re.search(r'<option[^>]*value="' + str(emp_id) + r'"[^>]*selected', options)
+
+    with SessionLocal() as db:
+        db.add(KrankEmployer(name="Unique Employer Alternative", org_id=department_id))
+        db.commit()
+    html = c.get("/krank/au").text
+    options = html.split('name="employer"', 1)[1].split("</select>", 1)[0]
+    assert not re.search(r'<option[^>]*selected', options)
