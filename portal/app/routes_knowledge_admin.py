@@ -17,7 +17,7 @@ from .knowledge_models import (
 )
 from .org_models import OrgMembership
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
-from .routes_knowledge import _reader, _space
+from .routes_knowledge import _article, _reader, _space
 
 
 def _matches_name(raw: str) -> str:
@@ -65,31 +65,44 @@ def _grants_visible_to(db, actor, space):
     return output
 
 
+def _rights_preview(db, user, space, query, person, article=None):
+    query = " ".join(query.split())[:80]
+    selected = db.get(User, person) if person else None
+    if person and not km.eligible_subject(db, user, space, selected):
+        raise HTTPException(403)
+    return dict(query=query, selected=selected, people=_people(db, user, space, query),
+                explanation=km.explain_access(db, selected, space, article) if selected else [])
+
+
+@app.get("/wissen/artikel/{article_id:int}/rechtevorschau")
+def knowledge_article_permissions_preview(request: Request, article_id: int, q: str = "",
+                                          person: int = Query(0, ge=0, le=2_147_483_647),
+                                          user: User = Depends(current_user), db: Session = Depends(get_db)):
+    _reader(user, db)
+    if not user.is_admin:
+        raise HTTPException(403)
+    space, article = _article(db, user, article_id)
+    preview = _rights_preview(db, user, space, q, person, article)
+    return render(request, "knowledge_article_permissions.html", user, space=space, item=article,
+                  delegated=False, preview_url=f"/wissen/artikel/{article_id}/rechtevorschau", **preview)
+
+
 @app.get("/wissen/raum/{space_id:int}/verwaltung")
 def knowledge_management(request: Request, space_id: int, q: str = "",
-                         person: int = 0,
+                         person: int = Query(0, ge=0, le=2_147_483_647),
                          user: User = Depends(current_user),
                          db: Session = Depends(get_db)):
     _reader(user, db)
     space = _space(db, user, space_id, "manage")
     if not km.can_manage_space(db, user, space):
         raise HTTPException(403)
-    q = " ".join(q.split())[:80]
-    people = _people(db, user, space, q)
-    selected = None
-    explanation = []
-    if person:
-        selected = db.get(User, person)
-        if not km.eligible_subject(db, user, space, selected):
-            # Do not allow enumeration across organizational boundaries.
-            raise HTTPException(403)
-        explanation = km.explain_space_access(db, selected, space)
+    preview_url = f"/wissen/raum/{space.id}/verwaltung"
+    preview = _rights_preview(db, user, space, q, person)
     groups = list(db.scalars(select(Group).order_by(Group.name).limit(200))) if user.is_admin else []
     orgs = list(db.scalars(select(Organization).where(
         Organization.active.is_(True)).order_by(Organization.name).limit(200))) if user.is_admin else []
     return render(request, "knowledge_management.html", user,
-                  space=space, people=people, query=q, selected=selected,
-                  explanation=explanation, groups=groups, orgs=orgs,
+                  space=space, preview_url=preview_url, groups=groups, orgs=orgs, **preview,
                   rules=_grants_visible_to(db, user, space),
                   capabilities=km.CAP_PERMS, delegated=not user.is_admin)
 

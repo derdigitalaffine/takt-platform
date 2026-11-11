@@ -178,7 +178,7 @@ def allowed(db, user, space, cap: str = "read", article=None) -> bool:
     if not _raw_allowed(db, user, space, cap, article):
         return False
     # Non-read permissions also require at least the ability to read the object.
-    if cap != "read" and not _raw_allowed(db, user, space, "read", article):
+    if cap != "read" and not allowed(db, user, space, "read", article):
         return False
     if article is not None and article.status != "published" and cap == "read":
         # Mere read grants never disclose unpublished material.
@@ -332,14 +332,17 @@ def eligible_subject(db, actor, space: KnowledgeSpace, target: User | None) -> b
     ).limit(1)) is not None
 
 
-def explain_space_access(db, target: User, space: KnowledgeSpace) -> list[dict]:
+def explain_access(db, target: User, space: KnowledgeSpace, article=None) -> list[dict]:
     """Trace rights for a manager's authorized subject; final verdict from allowed().
 
     Explanations never override runtime authorization.
     """
-    rules = [g for g in _grants(db, "space", space.id)
-             if _principal_matches(db, target, g)]
-    own = space.owner_id == target.id
+    grants = _grants(db, "space", space.id)
+    if article is not None:
+        grants.extend(_grants(db, "article", article.id))
+    rules = [g for g in grants if _principal_matches(db, target, g)]
+    restricted = article is not None and article.scope == "restricted"
+    owns_article = article is not None and article.owner_id == target.id
     org_member = bool(space.org_id and _org_scope(
         db, target, space.org_id, include_children=False
     ))
@@ -349,7 +352,7 @@ def explain_space_access(db, target: User, space: KnowledgeSpace) -> list[dict]:
     }
     outcomes = []
     for capability, label in descriptions.items():
-        permit = allowed(db, target, space, capability)
+        permit = allowed(db, target, space, capability, article)
         matching_denies = [g for g in rules if g.effect == "deny"
                            and g.capability in {"read", capability}]
         matching_allows = [g for g in rules if g.effect == "allow"
@@ -363,12 +366,22 @@ def explain_space_access(db, target: User, space: KnowledgeSpace) -> list[dict]:
         elif target.is_admin:
             reason = "TAKT-Administration (plattformweite Ausnahme)."
         elif matching_denies:
-            reason = "Explizite Sperre hat Vorrang vor Vererbung und Freigabe."
-        elif capability != "read" and not _raw_allowed(db, target, space, "read"):
+            reason = ("Explizite Sperre hat Vorrang (am Artikel)."
+                      if any(g.resource_kind == "article" for g in matching_denies)
+                      else "Explizite Sperre hat Vorrang (im Wissensraum).")
+        elif capability != "read" and not allowed(db, target, space, "read", article):
             reason = "Das notwendige Leserecht fehlt."
+        elif not permit and capability == "read" and article is not None and article.status != "published" and _raw_allowed(db, target, space, "read", article):
+            reason = "Der unveröffentlichte Artikel erfordert zusätzlich ein Redaktionsrecht."
+        elif any(g.resource_kind == "article" for g in matching_allows):
+            reason = "Ausdrückliche Freigabe am Artikel."
+        elif owns_article:
+            reason = "Eigentümer des Wissensartikels."
+        elif restricted:
+            reason = "Der Artikel erfordert eine eigene Freigabe."
         elif matching_allows:
             reason = "Ausdrückliche Freigabe im Wissensraum."
-        elif own:
+        elif space.owner_id == target.id:
             reason = "Eigentümer des Wissensraums."
         elif org_member and capability in {"read", "edit", "publish"}:
             reason = "Aktive Organisationszuordnung bzw. vererbte Organisationsrolle."

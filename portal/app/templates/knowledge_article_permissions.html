@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Artikelrechte · {{ item.title }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/knowledge.css">{% endblock %}
+{% block content %}
+<div class="knowledge-ui">
+  <nav class="knowledge-breadcrumb" aria-label="Pfad">
+    <a href="/wissen">Wissen</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+    <a href="/wissen/raum/{{ space.id }}">{{ space.title }}</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+    <a href="/wissen/artikel/{{ item.id }}">{{ item.title }}</a>
+  </nav>
+  <header class="knowledge-head"><div><h1>Artikelrechte prüfen</h1><p>{{ item.title }}</p></div></header>
+  {% include "_knowledge_rights_preview.html" %}
+</div>
+{% endblock %}

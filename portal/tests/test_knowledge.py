@@ -687,3 +687,38 @@ def test_review_confirmation_rejects_current_amendment_contributor(sample):
     assert admin.post(path + "/pruefung", data={
         "csrf": admin_csrf, "version": 4, "authority": "verified",
     }).status_code == 303
+
+
+def test_article_rights_preview_reflects_restrictions_and_draft_read_gate(sample):
+    from app import knowledge
+
+    _, space_id, article_id, _, outsider_id, reviewer_id = sample
+    admin = login(*ADMIN)
+    reviewer = login("wissen-checker@example.org", "knowledge-test-123")
+    path = f"/wissen/artikel/{article_id}/rechtevorschau"
+    assert reviewer.get(path).status_code == 403
+    assert admin.get(path + f"?person={reviewer_id}").status_code == 200
+    assert "Aktive Organisationszuordnung" in admin.get(path + f"?person={reviewer_id}").text
+    with SessionLocal() as db:
+        article = db.get(KnowledgeArticle, article_id)
+        article.scope = "restricted"
+        db.get(User, outsider_id).permissions = "knowledge_read,knowledge_ai"
+        for capability in ("read", "ai"):
+            db.add(KnowledgeGrant(resource_kind="article", resource_id=article_id,
+                                  principal_kind="user", principal_id=outsider_id,
+                                  capability=capability, effect="allow"))
+        db.commit()
+        outsider = db.get(User, outsider_id)
+        space = db.get(KnowledgeSpace, space_id)
+        assert not knowledge.allowed(db, outsider, space, "ai", article)
+    assert "Der Artikel erfordert eine eigene Freigabe" in admin.get(path + f"?person={reviewer_id}").text
+    assert "Der unveröffentlichte Artikel erfordert zusätzlich ein Redaktionsrecht" in admin.get(path + f"?person={outsider_id}").text
+    with SessionLocal() as db:
+        grant = db.scalar(select(KnowledgeGrant).where(
+            KnowledgeGrant.resource_kind == "article",
+            KnowledgeGrant.resource_id == article_id, KnowledgeGrant.capability == "read"))
+        grant.effect = "deny"
+        db.commit()
+    assert "Explizite Sperre hat Vorrang (am Artikel)" in admin.get(path + f"?person={outsider_id}").text
+    settings(module_knowledge="0")
+    assert admin.get(path).status_code == 404
