@@ -64,9 +64,9 @@
               </select></label>
             <label>Termindetails<select class="form-select" name="data_level">
               <option value="busy" {% if screen.data_level == 'busy' %}selected{% endif %}>Nur Frei / Belegt (empfohlen)</option>
-              <option value="title" {% if screen.data_level == 'title' %}selected{% endif %}>Termintitel bei internem/geschütztem Zugriff</option>
+              <option value="title" {% if screen.data_level == 'title' %}selected{% endif %}>Termintitel nur in berechtigter interner Vorschau</option>
             </select></label>
-            <div class="sg-info-box"><i class="fa-solid fa-lock"></i> Öffentliche Anzeigen zeigen aus Buchungen grundsätzlich nur die Belegung. Kontaktdaten werden nie ausgespielt.</div>
+            <div class="sg-info-box"><i class="fa-solid fa-lock"></i> Öffentliche und per Link geteilte Anzeigen zeigen ausschließlich Frei/Belegt. Termintitel sind nur bei internem Zugriff mit Ressourcenberechtigung sichtbar. Kontaktdaten werden nie ausgespielt.</div>
             <label class="sg-check"><input type="checkbox" name="enabled" value="1" {% if screen.enabled %}checked{% endif %}> Anzeige eingeschaltet</label>
           </div>
         </details>
