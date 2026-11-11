@@ -58,7 +58,19 @@ def _int(value):
     return int(value) if str(value or "").isdigit() and int(value) > 0 else None
 
 
+def _assert_screen_scope(db, screen):
+    """A scoped screen cannot project rooms belonging to another employer."""
+    if not screen.org_id or not screen.room_id:
+        return
+    room = db.get(SignageRoom, screen.room_id)
+    floor = db.get(SignageFloor, room.floor_id) if room else None
+    building = db.get(SignageBuilding, floor.building_id) if floor else None
+    if not building or not building.active or building.org_id != screen.org_id:
+        raise HTTPException(403, "Raum und Organisationsumfang stimmen nicht überein.")
+
+
 def _render_display(request, db, screen, *, public, viewer=None):
+    _assert_screen_scope(db, screen)
     if not screen.enabled:
         raise HTTPException(404)
     data = signage.context(db, screen, public=public, viewer=viewer)
@@ -159,6 +171,7 @@ async def signage_save(sid: int, request: Request, user: User = Depends(manage_u
     if rid and not db.get(Resource, rid) or room_id and not db.get(SignageRoom, room_id) or org_id and not db.get(Organization, org_id):
         raise HTTPException(422, "Verknüpfung nicht vorhanden.")
     screen.resource_id, screen.room_id, screen.org_id = rid, room_id, org_id
+    _assert_screen_scope(db, screen)
     screen.version += 1
     screen.updated_at = utcnow()
     db.add(SignageRevision(screen_id=sid, version=screen.version,
