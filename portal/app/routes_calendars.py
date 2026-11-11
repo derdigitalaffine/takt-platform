@@ -409,19 +409,40 @@ def calendar_booking_overview(
     not ORM booking objects containing secret citizen access tokens.
     """
     from datetime import timedelta
+    from sqlalchemy import or_, and_
     from . import bookings as bk, booking_integration as integration, shares
-    from .db import Booking, utcnow
+    from .db import Booking, BookingPage, utcnow
 
     if not calendar_sources.enabled(db, "bookings"):
         raise HTTPException(404)
     scope = scope if scope in ("mine", "team") else "mine"
     status = status if status in ("open", "requested", "booked", "past") else "open"
-    q = " ".join((q or "").strip().split())[:80].casefold()
+    query_text = " ".join((q or "").strip().split())[:80]
+    needle = query_text.casefold()
     now = utcnow()
     start = now - timedelta(days=30) if status == "past" else now - timedelta(days=1)
     end = now if status == "past" else now + timedelta(days=180)
+    # Restrict at the SQL layer before applying a bounded result limit.
+    # Otherwise other departments' appointments could exhaust the limit
+    # and crowd an authorized person's own terms out of the overview.
+    all_pages = list(db.scalars(select(BookingPage)))
+    view_ids = {
+        item.id for item in all_pages
+        if shares.access_level(db, "booking", item, user) >= shares.VIEW
+    }
+    owned_simple_ids = {
+        item.id for item in all_pages if item.owner_id == user.id
+    }
+    allowed = (
+        or_(Booking.provider_id == user.id,
+            and_(Booking.provider_id.is_(None),
+                 Booking.page_id.in_(owned_simple_ids)))
+        if scope == "mine" else
+        or_(Booking.provider_id == user.id, Booking.page_id.in_(view_ids))
+    )
     query = (
         select(Booking).where(
+            allowed,
             Booking.status.in_(("requested", "booked")),
             Booking.starts_at < end,
             Booking.ends_at > start,
@@ -450,7 +471,7 @@ def calendar_booking_overview(
         detail = visibility == "detail"
         subject = (booking.type.name if booking.type else unit.title) if detail else "Bürgertermin (belegt)"
         title = (booking.name if detail else "Details geschützt")
-        if q and q not in (subject + " " + title + " " + unit.title).casefold():
+        if needle and needle not in (subject + " " + title + " " + unit.title).casefold():
             continue
         cards.append({
             "id": booking.id,
@@ -469,7 +490,7 @@ def calendar_booking_overview(
     return render(
         request, "calendar_bookings.html", user,
         entries=cards, scope=scope, status=status,
-        chosen_page=page, query_text=q,
+        chosen_page=page, query_text=query_text,
         page_options=sorted(page_options.items(), key=lambda item: item[1].casefold()),
         is_truncated=len(cards) >= 500,
     )
