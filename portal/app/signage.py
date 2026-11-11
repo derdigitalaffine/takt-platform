@@ -6,6 +6,7 @@ import re
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 from sqlalchemy import select
+from fastapi import HTTPException
 from .db import LOCAL_TZ, Resource, ResourceBooking, User, utcnow
 from .signage_models import (SignageBuilding, SignageFloor, SignageOffice, SignageRoom, SignageScreen,
                              SignageWayNode, SignageWayEdge, SignageDisplayAnchor)
@@ -124,7 +125,7 @@ def events(db, screen: SignageScreen, *, public=True, now=None, viewer=None) -> 
                 try:
                     occurrences = calendar_recurrence.occurrences(
                         row, begin.astimezone(timezone.utc), end.astimezone(timezone.utc))
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, HTTPException):
                     # A corrupt legacy event must not break every room display.
                     continue
                 for event in occurrences:
