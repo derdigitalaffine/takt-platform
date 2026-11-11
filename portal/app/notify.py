@@ -334,6 +334,24 @@ def process_queue() -> int:
             n.attempts += 1
             try:
                 attachments = json.loads(n.attachments_json) if n.attachments_json else None
+                # AU attachments for organizational supervisors must remain
+                # authorized when the queued email is actually sent. Drop the
+                # entire medical email if a supervisor/HR permission was revoked.
+                if n.kind == "krank" and attachments and isinstance(attachments[0], dict):
+                    guard = attachments[0].get("_krank_supervisor_guard")
+                    if guard is not None:
+                        from . import krank
+                        if not krank.supervisor_attachment_authorized(db, n.to_addr, guard):
+                            n.status = "failed"
+                            n.error = "AU-Zugriff vor dem Versand entzogen; Nachricht verworfen."
+                            krank.purge_sent(n)
+                            db.commit()
+                            continue
+                        attachments = [
+                            {key: value for key, value in item.items()
+                             if key != "_krank_supervisor_guard"}
+                            for item in attachments
+                        ]
                 # Vertretungsnotiz / geändertes Branding können die endgültige Größe erhöhen.
                 if attachments and attachments[0].get("form_response_id"):
                     from . import form_mail
