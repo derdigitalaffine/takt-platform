@@ -77,6 +77,9 @@
     if (!form) throw new Error('Die Fachmaske ist nicht verfügbar. Bitte den Vorschlag neu planen.');
     const fields = {...data.fields};
     const liveTask = tool === 'create_task' && fields.live_task === true;
+    if (liveTask && form.elements.namedItem('task_revision')?.value !== String(data.task_revision)) {
+      throw new Error('Der Aufgabenentwurf hat sich geändert. Bitte lade die Seite neu.');
+    }
     if (tool === 'set_krank_status') {
       const chosen = form.querySelector(`button[name="status"][value="${data.fields.status}"]`);
       if (!chosen || chosen.disabled) throw new Error('Dieser Statuswechsel ist nicht mehr verfügbar.');
@@ -132,7 +135,8 @@
       const editor = document.querySelector('#event-editor');
       if (editor) { editor.hidden = false; editor.open = true; }
     }
-    for (const [name, value] of Object.entries(fields)) {
+    // The live task was filled by the server. Keep any edits made while this request was in flight.
+    for (const [name, value] of liveTask ? [] : Object.entries(fields)) {
       const control = form.elements.namedItem(name);
       if (tool === 'create_survey' && ['access','secrecy'].includes(name)) {
         for (const input of form.querySelectorAll(`[name="${name}"]`)) {
@@ -221,9 +225,12 @@
     } else {
       banner.append(preview, back, discard);
     }
-    banner.scrollIntoView({block: 'start'});
-    const first = form.querySelector('input:not([type="hidden"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)');
-    first?.focus({preventScroll: true});
+    if (!liveTask || !form.contains(document.activeElement)) {
+      if (liveTask) banner.style.scrollMarginTop = '4rem';
+      banner.scrollIntoView({block: 'start'});
+      const first = form.querySelector('input:not([type="hidden"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)');
+      first?.focus({preventScroll: true});
+    }
   } catch (error) {
     banner.className = 'alert alert-warning'; banner.textContent = error.message;
   }

@@ -18,11 +18,18 @@ OUTPUT.mkdir(exist_ok=True)
 def exercise_live_task(page, chat_url):
     page.goto(chat_url)
     page.locator('#ai-prompt').fill('/takt Erstelle eine Aufgabe Inventur planen')
-    page.get_by_role('button', name='Nachricht senden', exact=True).click()
+    draft_request = re.compile(r'/agent/draft\?plan_id=')
+    pending = []
+    page.route(draft_request, lambda route: pending.append(route))
+    with page.expect_request(draft_request):
+        page.get_by_role('button', name='Nachricht senden', exact=True).click()
     expect(page).to_have_url(re.compile(r'/aufgaben/neu\?agent_plan='))
     editor = page.locator('form[data-task-create]')
     expect(editor.locator('[name="title"]')).to_have_value('Inventur planen')
     editor.locator('[name="description"]').fill('Manuell ergänzt')
+    assert len(pending) == 1
+    pending[0].continue_()
+    page.unroute(draft_request)
     page.get_by_label('Aufgabe ergänzen').fill('Fällig am 12.12.2030 mit hoher Priorität')
     page.get_by_role('button', name='Entwurf ergänzen').click()
     expect(editor.locator('[name="due_date"]')).to_have_value('2030-12-12')
