@@ -1,29 +1,33 @@
 {% extends "base.html" %}
 {% block title %}Termine buchen{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/booking-public.css">{% endblock %}
 {% block content %}
-<div style="max-width: 60rem">
-  <h1 class="h3 mb-1"><i class="fa-solid fa-calendar-plus me-2 text-primary"></i>Termine buchen</h1>
-  <p class="text-secondary mb-4">Wählen Sie ein Angebot und buchen Sie einen freien Termin selbst – ohne Anmeldung. Die Bestätigung kommt per E-Mail.</p>
-  {% if rows %}
-  <div class="row g-3">
-    {% for r in rows %}{% set p = r.page %}
-    <div class="col-md-6"><a class="card h-100 text-reset text-decoration-none pub-tile" href="/b/{{ p.public_token }}">
-      <div class="card-body">
-        <h2 class="h5 mb-1">{{ p.title }}</h2>
-        {% if p.owner %}<div class="small text-secondary mb-2">bei {{ p.owner.name }}</div>{% endif %}
-        {% if p.description %}<p class="small mb-2">{{ p.description | truncate(180) }}</p>{% endif %}
-        <div class="small text-secondary d-flex flex-wrap gap-3">
-          <span><i class="fa-regular fa-clock me-1"></i>{{ p.slot_minutes }} Minuten</span>
-          {% if p.online %}<span><i class="fa-solid fa-video me-1"></i>Videokonferenz</span>{% elif p.location %}<span><i class="fa-solid fa-location-dot me-1"></i>{{ p.location }}</span>{% endif %}
-        </div>
-      </div>
-      <div class="card-footer small {{ 'text-success' if r.next else 'text-secondary' }}">
-        {% if r.next %}<i class="fa-regular fa-calendar-check me-1"></i>Nächster freier Termin: {{ r.next }}{% else %}<i class="fa-regular fa-calendar-xmark me-1"></i>Zurzeit keine freien Termine{% endif %}
-      </div></a></div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="alert alert-light border"><i class="fa-regular fa-calendar me-1"></i>Zurzeit werden keine Termine öffentlich angeboten.</div>
-  {% endif %}
+<div class="bk-citizen bk-public-directory">
+  <header class="bk-public-hero">
+    <div class="bk-public-eyebrow"><span class="bk-public-icon"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i></span>Online-Terminbuchung</div>
+    <h1>Termine buchen</h1>
+    <p class="bk-public-intro">Finden Sie Ihr Anliegen und buchen Sie einen passenden Termin – ohne Anmeldung. Sie wählen erst Ihr Angebot, danach Datum und Uhrzeit. Die Bestätigung kommt per E-Mail.</p>
+  </header>
+  <section class="bk-public-panel" aria-labelledby="bk-directory-title">
+    <div class="bk-public-panel-heading"><div><span class="bk-public-kicker">Verfügbare Angebote</span><h2 id="bk-directory-title">Was möchten Sie erledigen?</h2>
+      <p>Wählen Sie das passende Angebot, um freie Termine anzusehen.</p></div></div>
+    {% if rows %}
+    <div class="bk-type-grid">{% for r in rows %}{% set p = r.page %}
+      <a class="bk-type-choice pub-tile" href="/b/{{ p.public_token }}">
+        <span class="bk-type-choice-main"><span class="bk-type-symbol"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span>
+          <span class="bk-type-title">{{ p.title }}</span></span>
+        {% if p.owner %}<span class="bk-type-meta"><i class="fa-regular fa-user" aria-hidden="true"></i>{{ p.owner.name }}</span>{% endif %}
+        {% if p.description %}<span class="bk-type-description">{{ p.description | truncate(165) }}</span>{% endif %}
+        <span class="bk-type-meta">{% if p.extended %}<i class="fa-solid fa-layer-group" aria-hidden="true"></i>Mehrere Terminarten
+          {% else %}<i class="fa-regular fa-clock" aria-hidden="true"></i>{{ p.slot_minutes }} Minuten{% endif %}
+          {% if p.online %} · Videokonferenz{% elif p.location %} · {{ p.location }}{% endif %}</span>
+        <span class="bk-type-action">
+          {% if r.next %}<i class="fa-regular fa-calendar-check" aria-hidden="true"></i>Nächster freier Termin: {{ r.next }}
+          {% else %}<i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i>Aktuell keine freien Termine{% endif %}
+        </span>
+      </a>
+    {% endfor %}</div>
+    {% else %}<div class="bk-no-results"><i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i>Zurzeit werden keine Termine öffentlich angeboten.</div>{% endif %}
+  </section>
 </div>
 {% endblock %}
