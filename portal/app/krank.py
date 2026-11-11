@@ -719,6 +719,57 @@ def forget_user(db, user: User) -> int:
 
 # --- Mails ---------------------------------------------------------------------------------------------
 
+def supervisor_recipients(db, employer: KrankEmployer | None) -> list[str]:
+    """Only active organizational leads within the employer's ancestry.
+
+    Requires explicit employer opt-in. Never grants access to the report or
+    assumes a leadership role alone is permission to receive AU files.
+    """
+    if employer is None or not employer.notify_supervisors or employer.org is None:
+        return []
+    from .org_models import OrgRoleGrant
+    from .orgs import path as org_path
+
+    lineage = org_path(employer.org)
+    org_ids = {node.id for node in lineage if node.active}
+    if employer.org.id not in org_ids:
+        return []
+    grants = db.scalars(select(OrgRoleGrant).where(
+        OrgRoleGrant.org_id.in_(org_ids),
+        OrgRoleGrant.role.in_(("lead", "deputy")),
+    )).all()
+    recipients = []
+    for grant in grants:
+        if grant.org_id != employer.org.id and not grant.include_children:
+            continue
+        if grant.user_id:
+            person = db.get(User, grant.user_id)
+            if person is not None and person.active and EMAIL_RE.match(person.email or ""):
+                recipients.append(person.email.lower())
+        if grant.group_id:
+            group_members = db.scalars(select(GroupMember).where(GroupMember.group_id == grant.group_id)).all()
+            for membership in group_members:
+                person = db.get(User, membership.user_id)
+                if person is not None and person.active and EMAIL_RE.match(person.email or ""):
+                    recipients.append(person.email.lower())
+    return list(dict.fromkeys(recipients))
+
+
+def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set[str]) -> None:
+    """Opt-in minimal absence notice; no medical details, portal link or attachments."""
+    for recipient in supervisor_recipients(db, report.employer):
+        if recipient in exclude:
+            continue
+        subject = f"Abwesenheitsmeldung: {report.employer_name}"[:255]
+        body = (f"Guten Tag,\\n\\nfür {full_name(report)} ist eine Abwesenheitsmeldung "
+                f"für {period(report)} eingegangen.\\n\\n"
+                "Ein ärztlicher Nachweis, Diagnosen und sonstige vertrauliche Angaben "
+                "werden nicht an Vorgesetzte versendet. Für Rückfragen wenden Sie "
+                "sich bitte an die zuständige Personalverwaltung.")
+        if notify.enqueue(db, recipient, subject, body, "krank", cfg):
+            add_event(report, "mail", f"Vorgesetztenhinweis an {recipient}", by="System")
+
+
 def staff_recipients(db, employer: KrankEmployer | None, cfg: dict[str, str]) -> list[str]:
     """Hinterlegte Adressen des Arbeitgebers, Portal-Zuständige (Personen und Gruppen), globale Kopie;
     ohne Empfänger die Adresse der Personalverwaltung aus den Einstellungen."""
@@ -768,10 +819,23 @@ def _mail_staff_new(db, report: KrankReport, cfg: dict[str, str]) -> None:
         try:
             attachments = [{"filename": f"{report.ref_no}.pdf", "mime": "application/pdf",
                             "content_b64": base64.b64encode(pdf(report)).decode()}]
+            if employer.attach_original_au and report.kind in {"au", "child"}:
+                for document in report.files:
+                    if document.source not in {"meldung", "nachgereicht", "import"}:
+                        continue
+                    attachments.append({
+                        "filename": file_name(document),
+                        "mime": document.mime,
+                        "content_b64": base64.b64encode(read_file(document)).decode(),
+                    })
         except Exception:  # noqa: BLE001  (Mail ohne PDF ist besser als keine Mail)
-            log.exception("PDF für %s nicht erzeugt", report.ref_no)
-    for to in staff_recipients(db, employer, cfg):
-        _mail(db, cfg, to, "krank_staff_full" if full else "krank_staff_notice", report, attachments=attachments)
+            log.exception("PDF/Originalnachweis für %s nicht erzeugt", report.ref_no)
+            attachments = None
+    recipients = staff_recipients(db, employer, cfg)
+    for to in recipients:
+        _mail(db, cfg, to, "krank_staff_full" if full and attachments else "krank_staff_notice",
+              report, attachments=attachments)
+    _mail_supervisors(db, report, cfg, set(recipients))
 
 
 def purge_sent(n) -> None:
