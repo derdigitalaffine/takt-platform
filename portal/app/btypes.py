@@ -102,7 +102,17 @@ def slots(db, page: BookingPage, bt: BookingType, provider_id: int | None = None
         if not hours:
             continue
         blocked = _blocked_days(db, page, p.id, first, last)
-        busy = _busy(db, p.id, _to_utc(datetime.combine(first, time())), _to_utc(datetime.combine(last + timedelta(days=1), time())), keep)
+        range_start = _to_utc(datetime.combine(first, time()))
+        range_end = _to_utc(datetime.combine(last + timedelta(days=1), time()))
+        busy = _busy(db, p.id, range_start, range_end, keep)
+        from . import booking_integration as integration
+        if integration.configured(page, "calendar_conflicts"):
+            sources = integration.options(page).get("conflict_sources", ["personal", "meetings"])
+            if not isinstance(sources, list):
+                sources = ["personal", "meetings"]
+            busy += integration.internal_busy(
+                db, p.id, range_start, range_end, scopes=sources,
+                exclude_meeting_id=keep.meeting_id if keep else None)
         d = first
         while d <= last:
             if d not in blocked and d not in specials:
@@ -124,18 +134,25 @@ def slots(db, page: BookingPage, bt: BookingType, provider_id: int | None = None
 
 
 def pick_provider(db, candidates: list[int], start: datetime) -> int:
-    """Gleichmäßig verteilen: die Person mit den wenigsten Terminen in derselben Woche (bei Gleichstand die erste)."""
+    """Weighted fair scheduling: lowest booked minutes in the current local week.
+
+    The provider allowlist remains the skill/eligibility filter. In equal
+    workloads, the configured provider order is a deterministic tie breaker.
+    """
     if len(candidates) == 1:
         return candidates[0]
     local = to_local(start).date()
     week0 = local - timedelta(days=local.weekday())
     a, b = _to_utc(datetime.combine(week0, time())), _to_utc(datetime.combine(week0 + timedelta(days=7), time()))
+    minutes = {c: 0 for c in candidates}
     counts = {c: 0 for c in candidates}
-    for pid in db.scalars(select(Booking.provider_id).where(Booking.provider_id.in_(candidates),
-                                                            Booking.status.in_(ACTIVE), Booking.starts_at >= a,
-                                                            Booking.starts_at < b)):
-        counts[pid] = counts.get(pid, 0) + 1
-    return min(candidates, key=lambda c: (counts[c], candidates.index(c)))
+    for booked in db.scalars(select(Booking).where(Booking.provider_id.in_(candidates),
+                                                  Booking.status.in_(ACTIVE), Booking.starts_at >= a,
+                                                  Booking.starts_at < b)):
+        pid = booked.provider_id
+        minutes[pid] += max(1, int((booked.ends_at - booked.starts_at).total_seconds() / 60))
+        counts[pid] += 1
+    return min(candidates, key=lambda c: (minutes[c], counts[c], candidates.index(c)))
 
 
 def check(db, page: BookingPage, bt: BookingType, start: datetime, provider_id: int | None = None,

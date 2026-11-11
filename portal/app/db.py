@@ -2173,6 +2173,7 @@ class BookingPage(Base):
     notify_owner: Mapped[bool] = mapped_column(Boolean, default=True)
     reminder_hours: Mapped[int] = mapped_column(Integer, default=24)     # 0 = keine Erinnerung
     confirm_text: Mapped[str] = mapped_column(Text, default="")
+    integration_json: Mapped[str] = mapped_column(Text, default="{}")  # Kalender/Benachrichtigungen, je Buchungsseite
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     public_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     # Geheimer Link zum Abonnieren der Buchungen im eigenen Kalender (None = aus)
@@ -2259,7 +2260,8 @@ class BookingType(Base):
     location: Mapped[str] = mapped_column(String(255), default="")
     online: Mapped[bool] = mapped_column(Boolean, default=False)          # Videokonferenz
     approval: Mapped[bool] = mapped_column(Boolean, default=False)        # Bestätigung durch Mitarbeitende
-    phone_mode: Mapped[str] = mapped_column(String(10), default="optional")   # none | optional | required
+    phone_mode: Mapped[str] = mapped_column(String(10), default="optional")
+    privacy_mode: Mapped[str] = mapped_column(String(12), default="inherit")  # inherit | restricted | busy   # none | optional | required
     choose_provider: Mapped[bool] = mapped_column(Boolean, default=False)     # Bürger:innen wählen die Person
     fields_json: Mapped[str] = mapped_column(Text, default="[]")          # eigene Felder (Teil 2)
     color: Mapped[str] = mapped_column(String(9), default="")
@@ -3024,7 +3026,9 @@ _NEW_COLUMNS = {
     "groups": {"lead_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL"},
     "booking_pages": {"listed": "BOOLEAN NOT NULL DEFAULT 0", "extended": "BOOLEAN NOT NULL DEFAULT 0",
                       "days_ahead": "INTEGER NOT NULL DEFAULT 60", "step_minutes": "INTEGER NOT NULL DEFAULT 15",
-                      "holidays_closed": "BOOLEAN NOT NULL DEFAULT 1"},
+                      "holidays_closed": "BOOLEAN NOT NULL DEFAULT 1",
+                      "integration_json": "TEXT NOT NULL DEFAULT '{}'"},
+    "booking_types": {"privacy_mode": "VARCHAR(12) NOT NULL DEFAULT 'inherit'"},
     "bookings": {"type_id": "INTEGER REFERENCES booking_types(id) ON DELETE SET NULL",
                  "provider_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL", "answers_json": "TEXT NOT NULL DEFAULT ''"},
     "votes": {"chart": "VARCHAR(8) NOT NULL DEFAULT 'bar'", "archived_at": "DATETIME", "used_at": "DATETIME"},

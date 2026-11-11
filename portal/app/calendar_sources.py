@@ -91,6 +91,16 @@ def project(db, user, kind, start, end, *, channel="web"):
 
             if seminar_hybrid.is_seminar_room(db, row):
                 continue
+            # Avoid duplicate booking and meeting entries only when this
+            # actor can actually see the corresponding booking projection.
+            # Invited portal users without booking permissions must retain
+            # their meeting entry rather than losing it altogether.
+            related = db.scalar(select(Booking).where(Booking.meeting_id == row.id).limit(1))
+            if related is not None:
+                from . import shares
+                if (shares.access_level(db, "booking", related.page, user) >= shares.VIEW
+                        or related.provider_id == user.id):
+                    continue
             add(
                 row.id,
                 row.title,
@@ -201,19 +211,43 @@ def project(db, user, kind, start, end, *, channel="web"):
                 )
                 out.append(event)
     elif kind == "bookings":
-        from . import shares, bookings
+        from . import shares, bookings, booking_integration
 
         for page in db.scalars(select(BookingPage)):
-            if shares.access_level(db, "booking", page, user) < shares.VIEW:
-                continue
-            for row in bookings.active_bookings(page):
+            level = shares.access_level(db, "booking", page, user)
+            # A personally assigned appointment belongs in the employee's
+            # calendar even when their role grants no access to the whole page.
+            rows = [row for row in bookings.active_bookings(page)
+                    if level >= shares.VIEW or row.provider_id == user.id]
+            for row in rows:
+                responsible = row.provider_id == user.id or (
+                    row.provider_id is None and page.owner_id == user.id)
+                visibility = booking_integration.calendar_visibility(
+                    row, channel=channel, can_edit=level >= shares.EDIT,
+                    responsible=responsible)
+                description = ""
+                if visibility == "detail":
+                    title = page.title + ": " + row.name
+                    if row.type is not None:
+                        title = row.type.name + ": " + row.name
+                elif visibility == "type" and row.type is not None:
+                    title = "Bürgertermin: " + row.type.name
+                else:
+                    title = "Bürgertermin (belegt)"
                 add(
                     row.id,
-                    page.title + ": " + row.name,
+                    ("Anfrage: " if row.status == "requested" and channel == "web" else "") + title,
                     row.starts_at,
                     row.ends_at,
-                    "/bookings/" + str(page.id),
+                    "/kalender/buchungen/" + str(row.id) if channel == "web" else "",
+                    description=description,
+                    status="requested" if row.status == "requested" else "booked",
                 )
+                if channel == "web" and out:
+                    out[-1]["classNames"] = [
+                        "takt-booking-event",
+                        "takt-booking-requested" if row.status == "requested" else "takt-booking-confirmed",
+                    ]
     elif kind == "tasks":
         from . import tasks
         from .task_models import Task
@@ -337,6 +371,7 @@ def to_ics(events, name):
                 if props.get("source") in ("closures", "tasks")
                 else "OPAQUE"
             ),
+            "status": "TENTATIVE" if props.get("status") == "requested" else "CONFIRMED",
         }
         for key, prop in [("start", "dtstart"), ("end", "dtend")]:
             event[prop] = (

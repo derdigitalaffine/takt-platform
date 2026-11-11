@@ -60,3 +60,25 @@
 [data-density="compact"] .calendar-workspace .card-body { padding:.85rem; }
 [data-density="compact"] .calendar-workspace .form-check { padding-top:.12rem; padding-bottom:.12rem; }
 [data-density="compact"] .fc .fc-button { min-height:2.15rem; padding:.2rem .5rem; }
+
+/* Canonical citizen appointments: visually distinct requests and confirmed slots. */
+.fc .takt-booking-event {
+  border-radius: .45rem;
+  border-width: 1px;
+  font-weight: 650;
+}
+.fc .takt-booking-requested {
+  background: var(--bs-warning-bg-subtle, #fff3cd);
+  color: var(--bs-warning-text-emphasis, #664d03);
+  border-color: var(--bs-warning-border-subtle, #ffda6a);
+  border-style: dashed;
+}
+.fc .takt-booking-confirmed {
+  background: var(--bs-primary-bg-subtle, #cfe2ff);
+  color: var(--bs-primary-text-emphasis, #084298);
+  border-color: var(--bs-primary-border-subtle, #9ec5fe);
+}
+.fc .takt-booking-event .fc-event-title,
+.fc .takt-booking-event .fc-event-time {
+  color: inherit;
+}

@@ -101,7 +101,7 @@ def _imap_connect(cfg: dict[str, str]) -> imaplib.IMAP4:
 # --- Senden ------------------------------------------------------------------
 
 def _build(cfg: dict[str, str], to_addr: str, subject: str, body: str,
-           attachments: list[dict] | None = None, reply_to: str | None = None) -> EmailMessage:
+           attachments: list[dict] | None = None, reply_to: str | None = None, *, kind: str = "") -> EmailMessage:
     msg = EmailMessage()
     msg["From"] = _sender(cfg)
     msg["To"] = to_addr
@@ -112,7 +112,7 @@ def _build(cfg: dict[str, str], to_addr: str, subject: str, body: str,
     msg["Message-ID"] = make_msgid(domain=cfg["mail_from"].rsplit("@", 1)[-1] or None)
     msg.set_content(body)
     frame = mail_frame(cfg)
-    msg.add_alternative(text_to_html(body, frame), subtype="html")
+    msg.add_alternative(text_to_html(body, frame, kind=kind), subtype="html")
     if frame and frame.get("logo"):
         # Logo als eingebettetes Bild (cid:) – wird ohne Nachladen aus dem Netz angezeigt
         html_part = msg.get_payload()[-1]
@@ -171,7 +171,7 @@ def mail_frame(cfg: dict[str, str]) -> dict | None:
     return frame
 
 
-def text_to_html(text: str, frame: dict | None = None) -> str:
+def text_to_html(text: str, frame: dict | None = None, *, kind: str = "") -> str:
     """HTML-Fassung des Mailtexts: Absätze, anklickbare Links; mit frame im Rahmen der Organisation
     (Kopfzeile mit Logo und Name in der Hauptfarbe, Fußzeile mit Impressum/Datenschutz). Tabellenlayout mit
     Inline-Stilen, weil viele Mailprogramme kein CSS kennen."""
@@ -179,16 +179,65 @@ def text_to_html(text: str, frame: dict | None = None) -> str:
     def links(raw):
         return _URL.sub(lambda m: f'<a href="{m.group(1)}" style="color:{color}">{m.group(1)}</a>', html.escape(raw)).replace(chr(10), '<br>')
     paragraphs = []
+    booking = kind.startswith("booking_")
+    booking_titles = {
+        "booking_confirm": ("Termin bestätigt", "#166534", "#f0fdf4"),
+        "booking_requested": ("Anfrage eingegangen · Bestätigung ausstehend", "#854d0e", "#fffbeb"),
+        "booking_update": ("Termin wurde verschoben", "#075985", "#eff6ff"),
+        "booking_cancelled": ("Termin abgesagt", "#991b1b", "#fef2f2"),
+        "booking_declined": ("Anfrage nicht bestätigt", "#991b1b", "#fef2f2"),
+        "booking_reminder": ("Erinnerung an Ihren Termin", "#075985", "#eff6ff"),
+        "booking_invite": ("Einladung zur Terminbuchung", "#075985", "#eff6ff"),
+        "booking_invite_reminder": ("Erinnerung an Ihre Terminwahl", "#075985", "#eff6ff"),
+        "booking_owner": ("Neuigkeiten zur Terminbuchung", "#075985", "#eff6ff"),
+    }
+    if booking and kind in booking_titles:
+        title, foreground, background = booking_titles[kind]
+        paragraphs.append(
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+            f'style="margin:0 0 20px;border-radius:8px;background:{background};'
+            f'border:1px solid #e5e7eb"><tr><td style="padding:13px 16px;'
+            f'font-size:16px;font-weight:700;color:{foreground}">{html.escape(title)}</td></tr></table>'
+        )
     labels = ('Umlauf öffnen und entscheiden', 'Umlauf öffnen und Kenntnisnahme bestätigen', 'Information öffnen')
     for part in text.split('\n\n'):
         if not part.strip(): continue
         lines = part.splitlines()
         label = lines[0].removesuffix(':')
-        if len(lines) >= 2 and label in labels and re.fullmatch(r'https?://[^\s<>"\']+/umlaeufe/[^\s<>"\']+', lines[1]):
+        if booking and label == "TERMINÜBERSICHT":
+            rows = []
+            for line in lines[1:]:
+                if ":" in line and not line.startswith(("https://", "http://")):
+                    key, value = line.split(":", 1)
+                    rows.append(
+                        f'<tr><td style="padding:7px 12px 7px 0;color:#596579;'
+                        f'width:30%;vertical-align:top">{html.escape(key.strip())}</td>'
+                        f'<td style="padding:7px 0;font-weight:650;vertical-align:top">'
+                        f'{links(value.strip())}</td></tr>')
+                elif line.strip():
+                    rows.append(f'<tr><td colspan="2" style="padding:6px 0">{links(line.strip())}</td></tr>')
+            content = (
+                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+                'style="margin:0 0 14px;padding:12px 16px;border:1px solid #dce4ee;'
+                'border-radius:8px;background:#f8fafc"><tr><td>'
+                '<strong style="display:block;color:#27364b;margin-bottom:5px">Ihr Termin</strong>'
+                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+                + ''.join(rows) + '</table></td></tr></table>'
+            )
+        elif booking and len(lines) >= 2 and lines[0].strip().endswith(":") and lines[1].strip().startswith("https://") and not any(ch.isspace() for ch in lines[1].strip()):
+            href = html.escape(lines[1].strip(), quote=True)
+            caption = html.escape(lines[0].strip().rstrip(":"))
+            content = (
+                f'<a href="{href}" style="display:inline-block;background:{color};color:white;'
+                f'font-weight:700;padding:13px 19px;border-radius:7px;text-decoration:none">'
+                f'{caption}</a>'
+            ) + ('<br>' + links('\n'.join(lines[2:])) if len(lines) > 2 else '')
+        elif len(lines) >= 2 and label in labels and re.fullmatch(r'https?://[^\s<>"\']+/umlaeufe/[^\s<>"\']+', lines[1]):
             button = f'<a href="{html.escape(lines[1], quote=True)}" style="display:inline-block;padding:12px 18px;border-radius:6px;background:{color};color:#ffffff;font-weight:600;text-decoration:none">{html.escape(label)}</a>'
             content = button + ('<br>' + links('\n'.join(lines[2:])) if len(lines)>2 else '')
         else: content = links(part)
-        paragraphs.append(f'<p style="margin:0 0 14px">{content}</p>')
+        paragraphs.append(content if booking and label == "TERMINÜBERSICHT"
+                          else f'<p style="margin:0 0 14px">{content}</p>')
     paragraphs = ''.join(paragraphs)
     font = "font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1f2328"
     if not frame:
@@ -230,10 +279,10 @@ def _save_to_sent(cfg: dict[str, str], msg: EmailMessage) -> None:
 
 
 def deliver(cfg: dict[str, str], to_addr: str, subject: str, body: str,
-            attachments: list[dict] | None = None, reply_to: str | None = None) -> None:
+            attachments: list[dict] | None = None, reply_to: str | None = None, *, kind: str = "") -> None:
     if not mail_configured(cfg):
         raise MailError("E-Mail-Versand ist nicht eingerichtet.")
-    msg = _build(cfg, to_addr, subject, body, attachments, reply_to)
+    msg = _build(cfg, to_addr, subject, body, attachments, reply_to, kind=kind)
     server = _smtp_connect(cfg)
     try:
         server.send_message(msg)
@@ -363,7 +412,14 @@ def process_queue() -> int:
                                                        attachments, cfg, applicant=attachments[0].get("applicant", False),
                                                        reply_to=n.reply_to)
                     n.attachments_json = json.dumps(attachments, ensure_ascii=False) if attachments else None
-                deliver(cfg, n.to_addr, n.subject, n.body, attachments=attachments, reply_to=n.reply_to)
+                if n.kind.startswith("booking_"):
+                    deliver(cfg, n.to_addr, n.subject, n.body, attachments=attachments,
+                            reply_to=n.reply_to, kind=n.kind)
+                else:
+                    # Preserve the established delivery contract for all other
+                    # modules and their explicit message-size/privacy guards.
+                    deliver(cfg, n.to_addr, n.subject, n.body, attachments=attachments,
+                            reply_to=n.reply_to)
             except MailError as exc:
                 n.error = str(exc)[:1000]
                 if n.attempts >= MAX_ATTEMPTS or not mail_configured(cfg):

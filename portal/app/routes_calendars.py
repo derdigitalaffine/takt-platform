@@ -66,7 +66,7 @@ def calendar_page(
         dict(key=kind, label=meta[0],
              suggested=(kind in (
                  {"holidays", "closures", "seminars", "leave", "birthdays"} if year_mode
-                 else {"meetings", "seminars", "tasks", "leave", "holidays", "closures", "birthdays"}
+                 else {"meetings", "seminars", "bookings", "tasks", "leave", "holidays", "closures", "birthdays"}
              )))
         for kind, meta in calendar_sources.SOURCES.items()
         if calendar_sources.enabled(db, kind) and kind not in attached
@@ -90,7 +90,7 @@ def calendar_page(
         source_choices=source_choices,
         recommended_sources=(
             {"holidays", "closures", "seminars", "leave"} if year_mode
-            else {"meetings", "seminars", "tasks", "leave", "holidays", "closures"}
+            else {"meetings", "seminars", "bookings", "tasks", "leave", "holidays", "closures"}
         ),
         has_closure_source=any(c.source == "closures" for c in rows),
         sources={
@@ -394,6 +394,61 @@ async def create_closure(
     org.audit(db, user, unit, "leave_closure", closure=closed.id)
     db.commit()
     return dict(id=closed.id)
+
+
+@app.get("/kalender/buchungen/{bid:int}")
+def calendar_booking_detail(
+    request: Request, bid: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Restricted details for a single appointment visible via the calendar.
+
+    An assigned provider can see their own appointment without being granted
+    blanket access to the rest of a booking page.
+    """
+    from .db import Booking
+    from . import shares, booking_integration
+    booking = db.get(Booking, bid)
+    if not booking or booking.status not in ("booked", "requested"):
+        raise HTTPException(404)
+    page = booking.page
+    level = shares.access_level(db, "booking", page, user)
+    responsible = booking.provider_id == user.id or (
+        booking.provider_id is None and page.owner_id == user.id)
+    if level < shares.VIEW and not responsible:
+        raise HTTPException(404)
+    show_details = booking_integration.calendar_visibility(
+        booking, can_edit=level >= shares.EDIT, responsible=responsible) == "detail"
+    from . import bookings as bk
+    return render(
+        request, "calendar_booking_detail.html", user,
+        booking=booking, page=page, show_details=show_details,
+        can_open=level >= shares.VIEW, can_manage=level >= shares.EDIT,
+        can_confirm=booking.status == "requested" and (level >= shares.EDIT or booking.provider_id == user.id),
+        when=bk.label(booking.starts_at, booking.ends_at),
+    )
+
+
+@app.post("/kalender/buchungen/{bid:int}/bestaetigen", dependencies=[Depends(check_csrf)])
+def calendar_booking_confirm(
+    bid: int, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    """Confirm a pending citizen appointment from its calendar event card."""
+    from .db import Booking
+    from . import shares, bookings as bk, worker
+    from .leave import lock
+    lock(db)
+    booking = db.get(Booking, bid)
+    if not booking:
+        raise HTTPException(404)
+    if booking.status != "requested":
+        raise HTTPException(409, "Diese Anfrage ist bereits bearbeitet.")
+    if (shares.access_level(db, "booking", booking.page, user) < shares.EDIT
+            and booking.provider_id != user.id):
+        raise HTTPException(403)
+    bk.confirm(db, booking)
+    db.commit()
+    worker.wake()
+    return redirect(f"/kalender/buchungen/{booking.id}")
 
 
 @app.get("/kalender/quellen/{kind}/data")

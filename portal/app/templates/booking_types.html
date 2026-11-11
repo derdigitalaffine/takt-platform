@@ -24,6 +24,12 @@
     <input class="form-control" id="{{ fid }}-l" name="location" maxlength="255" value="{{ t.location if t else page.location }}" placeholder="z. B. Rathaus, Zimmer 12"></div>
   <div class="col-md-4 d-flex align-items-end"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="{{ fid }}-o" name="online" value="1" {% if t and t.online %}checked{% endif %} {% if not can_video %}disabled{% endif %}>
     <label class="form-check-label" for="{{ fid }}-o">Als Videokonferenz</label></div></div>
+  <div class="col-12 col-md-6"><label class="form-label" for="{{ fid }}-privacy">Sichtbarkeit im TAKT-Kalender</label>
+    <select class="form-select" id="{{ fid }}-privacy" name="privacy_mode">
+      <option value="inherit" {% if not t or t.privacy_mode == 'inherit' %}selected{% endif %}>Standard: Berechtigte sehen Details</option>
+      <option value="restricted" {% if t and t.privacy_mode == 'restricted' %}selected{% endif %}>Vertraulich: nur direkt Zuständige sehen Details</option>
+      <option value="busy" {% if t and t.privacy_mode == 'busy' %}selected{% endif %}>Nur als Belegt anzeigen (keine Bürgerdaten)</option>
+    </select><div class="form-text">Externe Kalender-Abos erhalten unabhängig davon nur einen belegten Zeitraum.</div></div>
   <div class="col-12"><label class="form-label" for="{{ fid }}-p">Zuständige Mitarbeitende</label>
     <select class="form-select js-select" id="{{ fid }}-p" name="providers" multiple data-search="1">{% for u in users %}<option value="{{ u.id }}" {% if t and u in t.providers %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select>
     <div class="form-text">Jede Person bietet Termine in ihren Sprechzeiten an (unten). Sind mehrere frei, verteilt das Portal gleichmäßig.</div></div>
