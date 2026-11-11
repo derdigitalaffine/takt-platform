@@ -41,7 +41,8 @@ def _dt(value: datetime) -> str:
 
 def build(*, method: str, uid: str, sequence: int, start: datetime, minutes: int, title: str,
           description: str, location: str, url: str, organizer: tuple[str, str] | None,
-          attendees: list[tuple[str, str]], cancelled: bool = False, alarm_minutes: int = 15) -> str:
+          attendees: list[tuple[str, str]], cancelled: bool = False, alarm_minutes: int = 15,
+          rsvp: bool = True) -> str:
     """Erzeugt eine VCALENDAR-Datei. start: naive UTC. method: REQUEST | CANCEL | PUBLISH."""
     end = start + timedelta(minutes=minutes)
     lines = [
@@ -70,7 +71,7 @@ def build(*, method: str, uid: str, sequence: int, start: datetime, minutes: int
         lines.append(f"ORGANIZER;CN={_param(organizer[0])}:mailto:{organizer[1]}")
     for name, email in attendees:
         lines.append(f"ATTENDEE;CN={_param(name or email)};CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;"
-                     f"PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:{email}")
+                     f"PARTSTAT={'NEEDS-ACTION' if rsvp else 'ACCEPTED'};RSVP={'TRUE' if rsvp else 'FALSE'}:mailto:{email}")
     if not cancelled and alarm_minutes:
         lines += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_esc(title)}",
                   f"TRIGGER:-PT{alarm_minutes}M", "END:VALARM"]
