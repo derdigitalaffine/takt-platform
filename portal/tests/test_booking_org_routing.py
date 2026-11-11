@@ -64,15 +64,8 @@ def test_assignment_resolves_organization_tree_and_respects_staff_capacity(db, t
         assert [u.id for u in btypes.providers_for(db, bt)] == [first.id]
         assert btypes.provider_capacity(db, bt) == {}
     finally:
+        # All test rows are uncommitted; rollback safely removes the entire tree.
         db.rollback()
-        for entry in entries:
-            db.delete(entry)
-        db.delete(bt)
-        db.delete(page)
-        db.flush()
-        db.delete(child)
-        db.delete(root)
-        db.commit()
 
 
 def test_weighted_fair_routing_prefers_normalized_capacity(db, task_people):
@@ -101,5 +94,3 @@ def test_weighted_fair_routing_prefers_normalized_capacity(db, task_people):
         assert btypes.pick_provider(db, [half.id, full.id], start + timedelta(hours=1)) == half.id
     finally:
         db.rollback()
-        db.delete(page)
-        db.commit()
