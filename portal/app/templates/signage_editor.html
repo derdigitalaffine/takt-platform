@@ -72,6 +72,22 @@
           </div>
         </details>
       </form>
+      <div class="sg-panel">
+        <div class="sg-panel-head"><div><span class="sg-eyebrow">WEGEFÜHRUNG</span><h2>Startposition dieses Displays</h2>
+          <p>Die Route beginnt am tatsächlichen Standort des Bildschirms. Wegpunkte werden zentral in der Gebäudeverwaltung gepflegt.</p></div>
+        </div>
+        <form class="sg-form-stack sg-anchor-form" action="/signage/{{ screen.id }}/anchor" method="post">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Wegepunkt
+            <select class="form-select" name="node_id">
+              <option value="">Noch keine Startposition</option>
+              {% for node in route_nodes %}<option value="{{ node.id }}" {% if anchor and anchor.node_id == node.id %}selected{% endif %}>{{ node.label }}</option>{% endfor %}
+            </select>
+          </label>
+          <button class="btn btn-outline-primary" type="submit">Displayposition speichern</button>
+          {% if not route_nodes %}<a class="sg-back" href="/signage#routing">Zuerst Wegepunkte anlegen</a>{% endif %}
+        </form>
+      </div>
     </div>
     <div class="sg-preview-column">
       <div class="sg-preview-heading"><div><span class="sg-eyebrow">LIVE-VORSCHAU</span><h2>Dein Bildschirm</h2></div>
