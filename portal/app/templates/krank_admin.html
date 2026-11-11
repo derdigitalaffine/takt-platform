@@ -32,9 +32,11 @@
     <ul class="list-group list-group-flush">{% for e in employers %}
       <li class="list-group-item d-flex align-items-center gap-2">
         <span class="d-inline-block rounded-circle" style="width:.8rem;height:.8rem;background:{{ e.color }}"></span>
-        <a class="flex-grow-1" href="/krankmelder/arbeitgeber/{{ e.id }}">{{ e.name }}</a>
+        <a class="flex-grow-1" href="/krankmelder/arbeitgeber/{{ e.id }}">{{ e.org.name if e.org else e.name }}</a>
         {% if not e.active %}<span class="badge text-bg-secondary">inaktiv</span>{% endif %}
-        {% if e.attach_files %}<span class="badge text-bg-warning" title="Mails mit Angaben und PDF">Anhänge</span>{% endif %}
+        {% if e.attach_files %}<span class="badge text-bg-warning" title="Angaben und PDF per Mail">{{ 'PDF + Original-AU' if e.attach_original_au else 'PDF' }}</span>{% endif %}
+        {% if e.notify_supervisors %}<span class="badge text-bg-info" title="Leitungsrollen der Organisation erhalten einen Minimalhinweis">Leitung informiert</span>{% endif %}
+        {% if not e.org_id %}<span class="badge text-bg-danger">Kein Organisationsknoten</span>{% endif %}
         {% if e.dms_enabled %}<span class="badge text-bg-info" title="Ablage im DMS">DMS</span>{% endif %}
         {% if not e.responsible %}<span class="badge text-bg-light border" title="Nur Admins und „Krankmelder verwalten“ sehen die Meldungen">keine Zuständigen</span>{% endif %}
         <span class="small text-secondary">{{ counts.get(e.id, 0) }}</span>
@@ -43,10 +45,10 @@
           <button class="btn btn-sm btn-link px-1" name="dir" value="down" title="nach unten" {% if loop.last %}disabled{% endif %}><i class="fa-solid fa-arrow-down"></i></button></form>
       </li>{% else %}<li class="list-group-item text-secondary">Noch keine Arbeitgeber – bitte anlegen (oder aus dem Krankmelder importieren).</li>{% endfor %}</ul>
     <div class="card-footer"><form method="post" action="/krankmelder/arbeitgeber/neu" class="d-flex flex-wrap gap-2"><input type="hidden" name="csrf" value="{{ csrf }}">
-      <select class="form-select form-select-sm" name="org_id" aria-label="Körperschaft oder Einrichtung" style="flex: 1 1 14rem"><option value="">Aus den Körperschaften wählen …</option>{% for i, n in org_options %}<option value="{{ i }}">{{ n }}</option>{% endfor %}</select>
-      <input class="form-control form-control-sm" name="name" placeholder="oder Name eingeben" maxlength="200" style="flex: 1 1 12rem" aria-label="Name des Arbeitgebers">
+      <select class="form-select form-select-sm" name="org_id" aria-label="Körperschaft oder Einrichtung" style="flex: 1 1 14rem"><option value="">Neue Arbeitgeber-Einheit auf oberster Ebene …</option>{% for i, n in org_options %}<option value="{{ i }}">{{ n }}</option>{% endfor %}</select>
+      <input class="form-control form-control-sm" name="name" placeholder="Optional: neuen Arbeitgeber-Knoten unter Auswahl anlegen" maxlength="200" style="flex: 1 1 12rem" aria-label="Name des Arbeitgebers">
       <button class="btn btn-sm btn-primary text-nowrap" type="submit"><i class="fa-solid fa-plus me-1"></i>Anlegen</button></form>
-      <div class="form-text mb-1">Körperschaften und Einrichtungen (z. B. Kitas, Abteilungen) pflegen Sie zentral unter <a href="/admin/organization">Verwaltung › Organisation</a>.</div>
+      <div class="form-text mb-1">Ohne eigenen Namen wird die gewählte Organisationseinheit direkt als Arbeitgeber verwendet. Mit Namen wird ein neuer untergeordneter Arbeitgeber-Knoten angelegt. Organisation, Fachbereiche und Leitungsrollen pflegen Sie zentral unter <a href="/admin/organization">Verwaltung › Organisation</a>.</div>
       <a class="small" href="/krankmelder/verwaltung/vorschau.txt" target="_blank">Empfänger aller Arbeitgeber anzeigen</a></div></div>
 </div>
 
