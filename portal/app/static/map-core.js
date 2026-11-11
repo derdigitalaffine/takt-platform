@@ -83,7 +83,7 @@
       var order = state.layers.map(function (s) { return s.id; });
       overlays.sort(function (a, b) { var ia = order.indexOf(a.id), ib = order.indexOf(b.id); return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib); });
     }
-    var baseId = (state.base && bases.some(function (b) { return b.id === state.base; })) ? state.base
+    var baseId = state.noBase === true ? '' : (state.base && bases.some(function (b) { return b.id === state.base; })) ? state.base
       : opts.base || ((bases.find(function (b) { return b.visible; }) || bases[0] || {}).id);
     var parcelStyle={boundaries:true,numbers:true};
     function isParcel(l){return /flurst|ave:flurstueck/i.test((l.layers||'')+' '+(l.name||''));}
@@ -195,10 +195,10 @@
       on: function (fn) { listeners.push(fn); },
       setBase: function (id) {
         var prev = baseCfg(), next = bases.find(function (b) { return b.id === id; });
-        if (!next) { return; }
+        if (!next && id !== '') { return; }
         baseId = id;
-        if ((prev && prev.kind === 'style') || next.kind === 'style') {
-          map.setStyle(next.kind === 'style' ? next.style : blankStyle());   // style.load baut alles neu auf
+        if (prev?.kind === 'style' || next?.kind === 'style') {
+          map.setStyle(next?.kind === 'style' ? next.style : blankStyle());   // style.load baut alles neu auf
         } else {
           bases.forEach(function (b) { setVis(b, b.id === id); });
         }
@@ -262,7 +262,7 @@
       state: function () {
         var c = map.getCenter();
         return {
-          center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch(), base: baseId,
+          center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch(), base: baseId, noBase: baseId === '',
           layers: overlays.filter(function (l) { return !l.custom; }).map(function (l) { return { id: l.id, visible: l.visible, opacity: l.opacity, time: l.time || '' }; }),
           custom: overlays.filter(function (l) { return l.custom; }).map(function (l) { return { def: Object.assign({}, l.custom, { time: l.time || '' }), opacity: l.opacity }; })
         };

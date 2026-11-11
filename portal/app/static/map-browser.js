@@ -11,8 +11,11 @@
   var params = new URLSearchParams(location.search);
 
   // Ebenen und Grundkarte aus dem Link (?base=s1&layers=s3,s4)
-  if (params.get('base')) { bundle.state.base = params.get('base'); }
-  if (params.get('layers')) {
+  if (params.has('base')) {
+    bundle.state.base = params.get('base');
+    bundle.state.noBase = bundle.state.base === '';
+  }
+  if (params.has('layers')) {
     var wanted = params.get('layers').split(',');
     bundle.state.layers = bundle.layers.filter(function (l) { return l.role !== 'base'; }).map(function (l) {
       return { id: l.id, visible: wanted.indexOf(l.id) >= 0, opacity: l.opacity };
@@ -54,7 +57,9 @@
       if (!byCat[c]) { byCat[c] = []; cats.push(c); }
       byCat[c].push(l);
     });
-    document.getElementById('overlay-empty').hidden = kit.overlays.length > 0;
+    var empty = document.getElementById('overlay-empty');
+    empty.hidden = cats.length > 0;
+    empty.textContent = filterText ? 'Keine passenden Ebenen. Ändern Sie den Suchbegriff.' : 'Keine Ebenen verfügbar.';
     box.innerHTML = cats.map(function (c) {
       return '<div class="layer-cat">' + esc(c) + '</div><div class="layer-group" data-cat="' + esc(c) + '">' + byCat[c].map(rowHtml).join('') + '</div>';
     }).join('');
@@ -175,16 +180,20 @@
     return [lon * 180 / Math.PI, lat * 180 / Math.PI];
   }
 
-  var parcelKit=MapParcels.create(map,document.getElementById('parcel-browser'),{browserMode:true,infoHost:parcelInfo,initial:bundle.state.parcels||[],isDrawing:function(){return draw&&draw.mode();},show:showInfo,onActive:function(f){if(f)showInfo();},onMode:function(enabled){if(!enabled)parcelInfo.replaceChildren();},onStyle:function(style){kit.setParcelStyle(style);},onPreset:function(){
+  var parcelKit=MapParcels.create(map,document.getElementById('parcel-browser'),{browserMode:true,onChange:function(){publishWorkspace();},infoHost:parcelInfo,initial:bundle.state.parcels||[],isDrawing:function(){return draw&&draw.mode();},show:showInfo,onActive:function(f){if(f)showInfo();},onMode:function(enabled){if(!enabled)parcelInfo.replaceChildren();},onStyle:function(style){kit.setParcelStyle(style);},onPreset:function(){
     if(!meta.canEdit){toast('Eigene Ebenen können angemeldete Portalnutzer ergänzen.',true);return;}
     document.getElementById('map-catalog').value='parcels';bootstrap.Modal.getOrCreateInstance(document.getElementById('add-layer')).show();document.getElementById('map-catalog-load').click();
   }});
-  var advanced=document.getElementById('map-advanced');
-  try{advanced.checked=localStorage.getItem('map-advanced')==='1';}catch(e){}
-  function advancedMode(){shell.classList.toggle('is-advanced',advanced.checked);try{localStorage.setItem('map-advanced',advanced.checked?'1':'0');}catch(e){}}
-  advanced.addEventListener('change',advancedMode);advancedMode();
+  var advanced = document.getElementById('map-advanced');
+  try { advanced.checked = localStorage.getItem('map-advanced') === '1'; } catch (_) {}
+  function updateLayerOptions() {
+    shell.classList.toggle('is-advanced', advanced.checked);
+    try { localStorage.setItem('map-advanced', advanced.checked ? '1' : '0'); } catch (_) {}
+  }
+  advanced.addEventListener('change', updateLayerOptions);
+  updateLayerOptions();
   map.on('map-service-error',function(e){document.getElementById('map-service-status').textContent=e.message;});
-  map.on('error',function(e){if(e.sourceId)document.getElementById('map-service-status').textContent='Ein Kartendienst konnte nicht geladen werden. Quelle und Layerauswahl im erweiterten Modus prüfen.';});
+  map.on('error',function(e){if(e.sourceId)document.getElementById('map-service-status').textContent='Ein Kartendienst konnte nicht geladen werden. Quelle und Layerauswahl prüfen.';});
   /* --- Klick: Sachinformation (WMS) und Objekte (WFS/GeoJSON) ----------------------- */
   map.on('click', function (ev) {
     if (draw.mode()) { return; }
@@ -202,27 +211,31 @@
       rows.forEach(function(r){var section=document.createElement('details'),head=document.createElement('summary');head.textContent=r.layer.name+(r.error?' · nicht verfügbar':'');section.append(head);
         var frame=document.createElement('iframe');frame.setAttribute('sandbox','');frame.title='Sachinformation '+r.layer.name;frame.srcdoc='<base target="_blank"><style>body{font:14px system-ui;margin:6px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px}img{max-width:100%}</style>'+r.html;section.append(frame);otherInfo.append(section);
       });
-      if(!rows.length&&!feats.length){var empty=document.createElement('p');empty.className='small text-secondary mt-2';empty.textContent=parcelKit.activeMode()?'Keine weiteren Ebeneninformationen an dieser Stelle.':'Keine Objektinformationen an dieser Stelle. Flurstücksauskunft unter Kartenwerkzeuge öffnen.';otherInfo.append(empty);}
+      if(!rows.length&&!feats.length){var empty=document.createElement('p');empty.className='small text-secondary mt-2';empty.textContent=parcelKit.activeMode()?'Keine weiteren Ebeneninformationen an dieser Stelle.':'Keine Objektinformationen an dieser Stelle. Zum Prüfen eines Flurstücks den Bereich „Flurstücke“ öffnen.';otherInfo.append(empty);}
     });
 
   });
 
   /* --- Zeichnen und Messen ------------------------------------------------------------- */
-  var measureBox = document.getElementById('map-measure'), drawList = document.getElementById('draw-list');
-  var KIND = { point: ['Punkt', 'fa-location-dot'], line: ['Linie', 'fa-route'], polygon: ['Fläche', 'fa-draw-polygon'] };
-  var kindOf = function (f) { return f.properties.kind || { Point: 'point', LineString: 'line', Polygon: 'polygon' }[f.geometry.type]; };
+  var measureBox = document.getElementById('map-measure');
+  var sketchInfo=null;
+  var KIND = { point: ['Punkt', 'fa-location-dot'], text:['Text','fa-font'], rectangle:['Rechteck','fa-vector-square'],circle:['Kreis','fa-circle'],line: ['Linie', 'fa-route'], polygon: ['Fläche', 'fa-draw-polygon'] };
   var draw = MapDraw.create(map, {
-    onChange: renderDrawings,
+    labels:true,
+    snapFeatures:function(){return parcelKit.features().concat(bundle.plan?.geometry?[{geometry:bundle.plan.geometry}]:[]);},
+    onChange: publishWorkspace,
     onSelect: function (id) {
-      drawList.querySelectorAll('[data-fid]').forEach(function (r) { r.classList.toggle('active', r.dataset.fid === id); });
-      var row = id && drawList.querySelector('[data-fid="' + id + '"]');
-      if (row) { shell.classList.remove('panel-hidden'); row.scrollIntoView({ block: 'nearest' }); }
+      publishWorkspace();
+      if (!id) return;
+      shell.classList.remove('panel-hidden');
+      map.resize();
+      window.dispatchEvent(new CustomEvent('map-workbench-selection'));
     },
     onSketch: function (info) {
-      document.querySelectorAll('[data-draw]').forEach(function (b) { b.classList.toggle('active', !!info && b.dataset.draw === info.mode); });
+      sketchInfo=info;publishWorkspace();
       if (!info) { measureBox.hidden = true; return; }
       measureBox.hidden = false;
-      var hint = info.mode === 'point' ? 'In die Karte klicken' :
+      var hint = (info.mode === 'point'||info.mode==='text') ? 'In die Karte klicken' : (info.mode==='rectangle'||info.mode==='circle') ? (info.count?'Zweiten Punkt für Größe setzen':'Ersten Punkt setzen') :
         info.count < info.min ? (info.mode === 'polygon' ? 'Eckpunkte setzen (mind. 3)' : 'Punkte setzen (mind. 2)') :
         (info.mode === 'polygon' ? 'Ersten Punkt oder doppelt klicken zum Schließen' : 'Doppelklick oder „Fertig“ beendet');
       measureBox.innerHTML = '<i class="fa-solid ' + KIND[info.mode][1] + ' me-1"></i>' + (info.text ? '<strong>' + esc(info.text) + '</strong> · ' : '') + esc(hint) +
@@ -235,62 +248,28 @@
     var b = ev.target.closest('[data-sk]');
     if (b) { draw[b.dataset.sk](); }
   });
-  document.querySelectorAll('[data-draw]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      if (draw.mode() === btn.dataset.draw) { draw.cancel(); return; }
-      draw.start(btn.dataset.draw);
-      if (window.innerWidth < 768) { shell.classList.add('panel-hidden'); setTimeout(function () { map.resize(); }, 50); }
-    });
-  });
-  function renderDrawings(list) {
-    if (typing) { return; }
-    list = list || draw.features();
-    document.getElementById('draw-actions').hidden = !list.length;
-    drawList.innerHTML = list.length ? list.map(function (f, i) {
-      var k = kindOf(f);
-      return '<div class="draw-row" data-fid="' + esc(f.id) + '">' +
-        '<input type="color" class="form-control form-control-color form-control-sm flex-none" value="' + esc(f.properties.color || '#d62828') + '" data-dc title="Farbe" aria-label="Farbe">' +
-        '<div class="flex-grow-1 min-w-0"><input class="form-control form-control-sm" value="' + esc(f.properties.name || '') + '" placeholder="' + KIND[k][0] + ' ' + (i + 1) + '" data-dn aria-label="Bezeichnung">' +
-        '<div class="small text-secondary text-truncate mt-1"><i class="fa-solid ' + KIND[k][1] + ' me-1"></i>' + esc(MapDraw.describe(f)) + '</div></div>' +
-        '<div class="btn-group-vertical btn-group-sm flex-none"><button class="btn btn-link py-0" type="button" data-dz title="Hinzoomen" aria-label="Hinzoomen"><i class="fa-solid fa-magnifying-glass-location"></i></button>' +
-        '<button class="btn btn-link text-danger py-0" type="button" data-dd title="Löschen" aria-label="Löschen"><i class="fa-regular fa-trash-can"></i></button></div></div>';
-    }).join('') : '<div class="small text-secondary">Noch nichts gezeichnet. Wählen Sie oben Punkt, Linie oder Fläche – Länge und Fläche werden dabei gemessen.</div>';
-    var sel = draw.selected();
-    if (sel) { var r = drawList.querySelector('[data-fid="' + sel + '"]'); if (r) { r.classList.add('active'); } }
-  }
-  var typing = false;
-  drawList.addEventListener('input', function (ev) {
-    var row = ev.target.closest('[data-fid]');
-    if (!row) { return; }
-    typing = true;   // Liste beim Tippen nicht neu aufbauen (Fokus bleibt im Feld)
-    draw.update(row.dataset.fid, ev.target.hasAttribute('data-dc') ? { color: ev.target.value } : { name: ev.target.value.slice(0, 200) });
-    typing = false;
-  });
-  drawList.addEventListener('click', function (ev) {
-    var row = ev.target.closest('[data-fid]');
-    if (!row) { return; }
-    if (ev.target.closest('[data-dd]')) { draw.remove(row.dataset.fid); return; }
-    if (ev.target.closest('[data-dz]')) { draw.zoomTo(row.dataset.fid); draw.select(row.dataset.fid); return; }
-    if (!ev.target.closest('input')) { draw.select(row.dataset.fid); }
-  });
-  document.getElementById('draw-export').addEventListener('click', function () {
+  function exportDrawings() {
     var data = { type: 'FeatureCollection', features: draw.features().map(function (f) {
       var m = MapDraw.measure(f);
-      return { type: 'Feature', geometry: f.geometry, properties: { name: f.properties.name || '', farbe: f.properties.color, laenge_m: Math.round(m.length * 10) / 10, flaeche_m2: Math.round(m.area) } };
+      return { type: 'Feature', geometry: f.geometry, properties: { shape:f.properties.shape||'',radius_m:f.properties.radius_m||0, name: f.properties.name || '', farbe: f.properties.color, laenge_m: Math.round(m.length * 10) / 10, flaeche_m2: Math.round(m.area) } };
     }) };
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/geo+json' }));
     a.download = 'zeichnungen.geojson';
     a.click();
-  });
+    setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+  }
   document.getElementById('draw-import').addEventListener('change', function (ev) {
     var file = ev.target.files[0];
     if (!file) { return; }
+    if(file.size>5000000){toast('Die Datei darf höchstens 5 MB groß sein.',true);ev.target.value='';return;}
     file.text().then(function (text) {
+      if(text.length>5000000)throw new Error('Datei zu groß');
       var data = JSON.parse(text), list = data.type === 'FeatureCollection' ? data.features : [data];
-      var ok = list.filter(function (f) { return f && f.geometry && /^(Point|LineString|Polygon)$/.test(f.geometry.type); }).slice(0, 500).map(function (f, i) {
+      if(!Array.isArray(list))throw new Error('Keine Objektliste');
+      var ok = list.filter(function (f) { return MapDraw.validFeature(f); }).slice(0, Math.max(0,500-draw.features().length)).map(function (f, i) {
         var p = f.properties || {};
-        return { type: 'Feature', geometry: f.geometry, properties: { name: String(p.name || p.bezeichnung || '').slice(0, 200), color: /^#[0-9a-f]{6}$/i.test(p.farbe || p.color || '') ? (p.farbe || p.color) : MapDraw.COLORS[i % MapDraw.COLORS.length] } };
+        return { type: 'Feature', geometry: f.geometry, properties: { shape: /^(circle|rectangle|text)$/.test(p.shape||'')?p.shape:'', radius_m: Number.isFinite(p.radius_m)?p.radius_m:0, name: String(p.name || p.bezeichnung || '').slice(0, 200), color: /^#[0-9a-f]{6}$/i.test(p.farbe || p.color || '') ? (p.farbe || p.color) : MapDraw.COLORS[i % MapDraw.COLORS.length] } };
       });
       draw.setFeatures(draw.features().concat(ok));
       if (ok.length) { draw.zoomTo(draw.features()[draw.features().length - 1].id); }
@@ -298,13 +277,8 @@
     }).catch(function () { toast('Die Datei ist kein gültiges GeoJSON.', true); });
     ev.target.value = '';
   });
-  document.getElementById('draw-clear').addEventListener('click', function () {
-    var go = function () { draw.clear(); };
-    if (window.Swal) { Swal.fire({ title: 'Alle Zeichnungen löschen?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Löschen', cancelButtonText: 'Abbrechen' }).then(function (r) { if (r.isConfirmed) { go(); } }); }
-    else if (confirm('Alle Zeichnungen löschen?')) { go(); }
-  });
   draw.setFeatures((bundle.state && bundle.state.drawings) || []);
-  renderDrawings();
+  draw.resetHistory();
 
   /* --- Export und Link ------------------------------------------------------------------ */
   function toast(text, error) {
@@ -315,7 +289,7 @@
       try {
         var a = document.createElement('a');
         a.download = 'karte.png';
-        a.href = map.getCanvas().toDataURL('image/png');
+        a.href = window.MapPrint.capture(window.MapWorkspace);
         a.click();
       } catch (e) { toast('Bild nicht möglich: Ein direkt geladener Dienst erlaubt keinen Export.', true); }
     });
@@ -323,11 +297,34 @@
   });
   document.getElementById('btn-link').addEventListener('click', function () {
     var on = kit.overlays.filter(function (l) { return l.visible && !l.custom; }).map(function (l) { return l.id; });
-    var url = location.origin + location.pathname + '?base=' + encodeURIComponent(kit.baseId || '') + '&layers=' + on.join(',') + location.hash;
+    var link = new URL(location.href);
+    link.searchParams.set('base', kit.baseId || '');
+    link.searchParams.set('layers', on.join(','));
+    var url = link.href;
     (navigator.clipboard && window.isSecureContext ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link kopiert'); })
       .catch(function () { window.prompt('Link zu diesem Ausschnitt:', url); });
   });
 
+  function fingerprint(){var state=kit.state();return JSON.stringify({drawings:draw.features(),base:state.base,layers:state.layers,custom:state.custom,parcels:parcelKit.features()});}
+  var baseline=fingerprint();
+  kit.on(publishWorkspace);
+  function publishWorkspace(){if(!draw)return;window.dispatchEvent(new CustomEvent('map-workbench-change'));}
+  function getWorkspace(){return {features:draw.features(),selected:draw.selected(),sketch:sketchInfo,canUndo:draw.canUndo(),canRedo:draw.canRedo(),canSave:meta.canEdit,plan:bundle.plan||null,dirty:fingerprint()!==baseline};}
+  window.MapWorkspace={snapshot:getWorkspace,draw:draw,map:map,kit:kit,click:function(id){var el=document.getElementById(id);if(el)el.click();},
+    start:function(mode){parcelKit.cancelInspect();draw.start(mode);if(innerWidth<768){shell.classList.add('panel-hidden');map.resize();}},
+    download:exportDrawings};
+  window.addEventListener('beforeunload',function(ev){if(getWorkspace().dirty){ev.preventDefault();ev.returnValue='';}});
+  window.dispatchEvent(new CustomEvent('map-workbench-ready'));
+  document.addEventListener('keydown',function(ev){if(/INPUT|TEXTAREA|SELECT/.test((ev.target||{}).tagName||'')||ev.target.isContentEditable)return;if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='z'){ev.preventDefault();if(ev.shiftKey)draw.redo();else draw.undo();}});
+  if(bundle.plan){
+    var plan=bundle.plan;
+    function showPlan(){
+      if(!plan.geometry)return;
+      if(!map.getSource('law-boundary')){map.addSource('law-boundary',{type:'geojson',data:{type:'Feature',geometry:plan.geometry,properties:{}}});map.addLayer({id:'law-boundary-fill',type:'fill',source:'law-boundary',paint:{'fill-color':'#7950f2','fill-opacity':0.13}});map.addLayer({id:'law-boundary-line',type:'line',source:'law-boundary',paint:{'line-color':'#7950f2','line-width':3,'line-dasharray':[3,2]}});}
+    }
+    map.on('load',function(){showPlan();if(plan.geometry&&!/^#\d+(?:\.\d+)?\/-?\d+(?:\.\d+)?\/-?\d/.test(location.hash)){var bounds=new maplibregl.LngLatBounds();plan.geometry.coordinates[0].forEach(function(p){bounds.extend(p);});map.fitBounds(bounds,{padding:50,maxZoom:17});}});
+    map.on('style.load',showPlan);
+  }
   if (!meta.canEdit) { return; }
 
   /* --- Eigene Layer hinzufügen ---------------------------------------------------------- */
@@ -392,20 +389,24 @@
   });
 
   /* --- Speichern -------------------------------------------------------------------------- */
+  var saving=false;
   function save(asNew) {
+    if(saving)return;
     var title = document.getElementById('sm-title').value.trim();
     var out = document.getElementById('sm-result');
     if (!title) { out.innerHTML = '<div class="text-danger small">Bitte einen Titel angeben.</div>'; return; }
+    saving=true;out.textContent='Karte wird gespeichert …';
+    var savedFingerprint=fingerprint();
     post('/maps/save', { id: asNew ? '' : (meta.mapId || ''), title: title, description: document.getElementById('sm-desc').value,
       public: document.getElementById('sm-public').checked ? '1' : '0', state: JSON.stringify(Object.assign(kit.state(), { drawings: draw.features(), parcels:parcelKit.features() })) }).then(function (d) {
       if (!d.ok) { out.innerHTML = '<div class="text-danger small">' + esc(d.error) + '</div>'; return; }
-      meta.mapId = d.id;
+      meta.mapId = d.id; baseline=savedFingerprint;publishWorkspace();
       var pub = d.public ? location.origin + d.public : '';
       out.innerHTML = '<div class="alert alert-success small mb-0"><i class="fa-solid fa-check me-1"></i>Gespeichert. <a href="' + esc(d.link) + '">Karte öffnen</a>' +
         (pub ? '<div class="mt-2">Öffentlicher Link:<input class="form-control form-control-sm mt-1" readonly value="' + esc(pub) + '"></div>' +
           '<div class="mt-2">Einbetten:<textarea class="form-control form-control-sm font-monospace mt-1" rows="3" readonly>' +
           esc('<iframe src="' + location.origin + d.public.replace('/karte/', '/karte-embed/') + '" title="Karte" style="width:100%;height:600px;border:0" allow="geolocation; fullscreen" loading="lazy"></iframe>') + '</textarea></div>' : '') + '</div>';
-    });
+    }).catch(function(){out.textContent='Karte konnte nicht gespeichert werden. Bitte erneut versuchen.';}).finally(function(){saving=false;});
   }
   document.getElementById('sm-save').addEventListener('click', function () { save(false); });
   var copyBtn = document.getElementById('sm-copy');

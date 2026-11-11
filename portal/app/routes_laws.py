@@ -189,7 +189,16 @@ def _law_page(request: Request, db: Session, embed: bool, slug: str, anchor: str
     anchors = {v.section.anchor for v in flat}
     idx = flat.index(current) if current else -1
     versions = lx.public_versions(law, include_internal=user is not None)
+    from . import law_maps
+    from .main import enabled_modules
+    map_data = law_maps.state(version or law)
+    map_link = ''
+    if {'maps', 'laws'}.issubset(enabled_modules()) and (map_data.get('geometry') or law_maps.available_map(db, map_data, user)):
+        map_link = f'/karte/recht/{law.id}'
+        if version is not None:
+            map_link += f'?version={version.id}'
     return _cookieless(request, render(request, "recht_law.html", user, law=law, roots=roots, flat=flat, current=current,
+                  map_link=map_link,
                   prev=flat[idx - 1] if current and idx > 0 else None,
                   next=flat[idx + 1] if current and idx + 1 < len(flat) else None,
                   path=lx.level_path(law.level), q=request.query_params.get("q", ""), version=version,
@@ -345,6 +354,41 @@ def _form_page(request: Request, db: Session, user: User, law: LawText | None, v
     return render(request, "law_edit.html", user, law=law, v=values or {}, return_to=law_return((values or {}).get("return_to",request.query_params.get("return_to"))), topic_options=catalog.TOPICS,
                   selected_topics=selected, other_topics=values.get("other_topics", "") if values and "topics_present" in values else ", ".join(t for t in selected if t not in catalog.TOPICS.values()), level_options=lx.level_options(db),
                   outline_modes=lx.OUTLINE_MODES, **_common(db, user))
+
+
+def _map_form(request, db, user, law, values=None, error=''):
+    from . import law_maps
+    from .db import UserMap
+    from .routes_maps import can_open_map, map_bundle
+    data = law_maps.state(law)
+    values = values if values is not None else dict(data, geometry=json.dumps(data.get('geometry')) if data.get('geometry') else '')
+    return render(request, 'law_map.html', user, law=law, v=values, error=error,
+                  maps=[row for row in db.scalars(select(UserMap).order_by(UserMap.title)) if can_open_map(row, user)],
+                  bundle=map_bundle(db, request, user), attachments=law.attachments)
+
+
+@app.get('/laws/{law_id}/map')
+def law_map_edit(request: Request, law_id: int, user: User = Depends(law_user), db: Session = Depends(get_db)):
+    return _map_form(request, db, user, _law(db, law_id))
+
+
+@app.post('/laws/{law_id}/map', dependencies=[Depends(check_csrf)])
+async def law_map_save(request: Request, law_id: int, user: User = Depends(law_user), db: Session = Depends(get_db)):
+    from . import law_maps
+    law = _law(db, law_id)
+    data = await request.form()
+    try:
+        value = law_maps.clean(db, law, user, data)
+    except ValueError as exc:
+        return _map_form(request, db, user, law, dict(data), str(exc))
+    encoded = json.dumps(value, ensure_ascii=False)
+    if encoded != law.map_json:
+        lx.snapshot(db, law, public=False, saved_by=user.name)
+        law.map_json = encoded
+        law.updated_by = user.id
+        db.commit()
+    flash(request, 'Kartenbezug gespeichert. Karten- und Anlagenfreigaben gelten weiterhin unabhängig.')
+    return redirect(f'/laws/{law.id}/map?saved=1')
 
 
 @app.get("/laws/new")
@@ -593,8 +637,12 @@ def law_version_restore(request: Request, law_id: int, version_id: int, user: Us
         raise HTTPException(404, "Fassung nicht gefunden.")
     data = {"title": law.title, "short_title": law.short_title, "slug": law.slug, "level_id": str(law.level_id or ""),
             "doc_type": law.doc_type, "version_note": version.version_note, "issued_on": law.issued_on,
-            "valid_from": law.valid_from, "valid_until": law.valid_until, "published": "1" if law.published else ""}
+            "valid_from": law.valid_from, "valid_until": law.valid_until, "published": "1" if law.published else "",
+            "internal": "1" if law.internal else ""}
+    if law.body_md == version.body_md and law.map_json != version.map_json:
+        lx.snapshot(db, law, public=False, saved_by=user.name)
     _apply(db, law, data, version.body_md, user)
+    law.map_json = version.map_json
     lx.store(db, law)
     db.commit()
     flash(request, f"Die Fassung vom {version.saved_at:%d.%m.%Y} wurde wiederhergestellt; der bisherige Stand liegt "

@@ -202,11 +202,12 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: portal/ui/package-lock.json
-      - name: Verify bundled Mantine board UI
+      - name: Verify bundled Mantine workspaces
         run: |
           npm ci --prefix ui
           npm run build --prefix ui
-          git diff --exit-code -- app/static/board-ui.js app/static/board-ui.css app/static/board-ui.js.LEGAL.txt app/static/vendor/mantine
+          git diff --exit-code -- app/static/board-ui.js app/static/board-ui.css app/static/board-ui.js.LEGAL.txt app/static/map-ui.js app/static/map-ui.css app/static/map-ui.js.LEGAL.txt app/static/vendor/mantine
+          node tests/test_map_draw_client.js
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

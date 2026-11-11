@@ -1,0 +1,25 @@
+<section class="card mb-4" id="library" aria-labelledby="library-title">
+  <div class="card-header"><h2 class="h5 mb-1" id="library-title">Kartenbibliothek Deutschland</h2><p class="small text-secondary mb-0">{{library_total}} kuratierte Quellen für Grundkarten, Luftbilder und Fachdaten. Quelle öffnen, gewünschte Ebenen auswählen und anschließend aktivieren.</p></div>
+  <div class="card-body">
+    <form action="/admin/maps#library" method="get" class="row g-3 align-items-end mb-3" role="search" aria-label="Kartenquellen suchen">
+      <div class="col-12 col-lg-4"><label class="form-label" for="library-q">Suche</label><input type="search" class="form-control" name="q" id="library-q" value="{{request.query_params.get('q','')}}" placeholder="z. B. Luftbilder, Kataster, DWD"></div>
+      <div class="col-12 col-sm-6 col-lg-3"><label class="form-label" for="library-region">Gebiet</label><select class="form-select" name="region" id="library-region"><option value="">Alle Gebiete</option>{% for region in library_regions %}<option {{'selected' if region==request.query_params.get('region')}}>{{region}}</option>{% endfor %}</select></div>
+      <div class="col-12 col-sm-6 col-lg-3"><label class="form-label" for="library-topic">Thema</label><select class="form-select" name="topic" id="library-topic"><option value="">Alle Themen</option>{% for topic in library_topics %}<option {{'selected' if topic==request.query_params.get('topic')}}>{{topic}}</option>{% endfor %}</select></div>
+      <div class="col-12 col-lg-2"><button class="btn btn-outline-primary w-100">Suchen</button></div>
+    </form>
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3"><p class="small text-secondary mb-0" role="status">{{library|length}} von {{library_total}} Quellen</p>{% if request.query_params.get('q') or request.query_params.get('region') or request.query_params.get('topic') %}<a class="small" href="/admin/maps#library">Filter zurücksetzen</a>{% endif %}</div>
+    <div class="map-library-grid">
+    {% for key,source in library.items() %}
+      <article class="map-library-source">
+        <div class="small text-secondary">{{source.region}} · {{source.topic}}</div>
+        <h3 class="h6 my-2">{{source.name}}</h3>
+        <p class="small text-secondary">{{source.provider}}</p>
+        {% if source.note %}<p class="small">{{source.note}}</p>{% endif %}
+        <div class="small mb-3"><a href="{{source.source_url}}" target="_blank" rel="noopener">Anbieter und Metadaten ↗</a><br><a href="{{source.license_url}}" target="_blank" rel="noopener">{{source.license}} ↗</a></div>
+        <form method="post" action="/admin/maps/library/{{key}}" class="mt-auto"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-outline-primary w-100" aria-label="Ebenen auswählen: {{source.name}}">Ebenen auswählen</button></form>
+      </article>
+    {% else %}<p>Keine passende Quelle gefunden. Ändern Sie die Suche oder setzen Sie die Filter zurück.</p>{% endfor %}
+    </div>
+    <p class="small text-secondary mt-3 mb-0">Bundesweite Dienste decken Deutschland ab; Landesdienste nur ihr jeweiliges Gebiet. Weitere Dienste können über „Neuer Layer“ ergänzt werden. Verfügbarkeit, Datenstand und Nutzungsbedingungen liegen beim Anbieter. Die unterstützten Ebenen werden beim Öffnen aktuell abgefragt.</p>
+  </div>
+</section>

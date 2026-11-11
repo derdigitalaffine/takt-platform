@@ -615,7 +615,7 @@ def snapshot(db, law: LawText, *, public: bool, valid_until: str = "", saved_by:
         return
     db.add(LawVersion(law_id=law.id, saved_by=saved_by or (law.editor.name if law.editor else ""), body_md=law.body_md,
                       version_note=law.version_note, saved_at=law.updated_at, public=public, internal=law.internal, title=law.title,
-                      valid_from=law.valid_from, valid_until=valid_until if public else ""))
+                      valid_from=law.valid_from, valid_until=valid_until if public else "", map_json=law.map_json))
 
 
 def public_versions(law: LawText, include_internal=False) -> list:

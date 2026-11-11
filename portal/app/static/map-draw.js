@@ -26,21 +26,79 @@
     if (!g) { return ''; }
     if (g.type === 'Point') { return g.coordinates[1].toFixed(6) + ', ' + g.coordinates[0].toFixed(6); }
     if (g.type === 'LineString') { return 'Länge ' + MapKit.fmtLen(m.length) + ' · ' + m.points + ' Punkte'; }
-    return 'Fläche ' + MapKit.fmtArea(m.area) + ' · Umfang ' + MapKit.fmtLen(m.length);
+    return (f.properties && f.properties.shape === 'circle' ? 'Radius ' + MapKit.fmtLen(f.properties.radius_m) + ' · ' : '') + 'Fläche ' + MapKit.fmtArea(m.area) + ' · Umfang ' + MapKit.fmtLen(m.length);
   }
   function verticesOf(g) {
     return g.type === 'Polygon' ? g.coordinates[0].slice(0, -1) : g.type === 'LineString' ? g.coordinates : [g.coordinates];
   }
   function geometry(mode, pts) {
-    if (mode === 'point') { return { type: 'Point', coordinates: pts[0] }; }
+    if (mode === 'point' || mode === 'text') { return { type: 'Point', coordinates: pts[0] }; }
     if (mode === 'line') { return { type: 'LineString', coordinates: pts.slice() }; }
+    if (mode === 'rectangle') {
+      var a=pts[0], b=pts[pts.length-1];
+      return {type:'Polygon',coordinates:[[a,[b[0],a[1]],b,[a[0],b[1]],a]]};
+    }
+    if (mode === 'circle') return circleGeometry(pts[0], MapKit.haversine(pts[0],pts[pts.length-1]));
     return { type: 'Polygon', coordinates: [pts.concat([pts[0]])] };
   }
-  var MIN = { point: 1, line: 2, polygon: 3 };
+  function circleGeometry(center, meters) {
+    var radius=meters/6371008.8, ring=[];
+    var lat=center[1]*Math.PI/180, lon=center[0]*Math.PI/180;
+    for(var i=0;i<96;i++){
+      var bearing=i/96*2*Math.PI;
+      var phi=Math.asin(Math.sin(lat)*Math.cos(radius)+Math.cos(lat)*Math.sin(radius)*Math.cos(bearing));
+      var lam=lon+Math.atan2(Math.sin(bearing)*Math.sin(radius)*Math.cos(lat),Math.cos(radius)-Math.sin(lat)*Math.sin(phi));
+      ring.push([((lam*180/Math.PI+540)%360)-180,phi*180/Math.PI]);
+    }
+    ring.push(ring[0].slice());
+    return {type:'Polygon',coordinates:[ring]};
+  }
+  function linesOf(g) {
+    if (g.type==='Point') return [[g.coordinates]];
+    if (g.type==='LineString') return [g.coordinates];
+    if (g.type==='Polygon') return g.coordinates;
+    if (g.type==='MultiPolygon') return g.coordinates.flat();
+    return [];
+  }
+  var MIN = { point: 1, text:1, line: 2, polygon: 3, rectangle:2, circle:2 };
 
   function create(map, opts) {
     opts = opts || {};
     var feats = [], mode = null, pts = [], hover = null, selected = null, drag = null, lastClick = 0, lastPt = null;
+    var history=['[]'], future=[], restoring=false, snapping=false, labelMarkers=[];
+    function snap(p, screen) {
+      if (!snapping) return p;
+      var best=12, result=p, budget=8000;
+      var candidates=feats.filter(function(f){return !drag || f.id!==selected;});
+      if(opts.snapFeatures)candidates=candidates.concat(opts.snapFeatures());
+      function check(point, coordinates) {
+        var distance=Math.hypot(point.x-screen.x,point.y-screen.y);
+        if(distance>=best)return;
+        best=distance;
+        result=coordinates ? coordinates.slice() : map.unproject([point.x,point.y]).toArray();
+      }
+      candidates.some(function(feature){
+        if (!feature.geometry) return false;
+        return linesOf(feature.geometry).some(function(line){
+          var previous;
+          return line.some(function(coordinates){
+            if(budget--<=0)return true;
+            var point=map.project(coordinates);
+            check(point, coordinates);
+            if(previous){
+              var dx=point.x-previous.x, dy=point.y-previous.y, length2=dx*dx+dy*dy;
+              if(length2){
+                var t=Math.max(0,Math.min(1,((screen.x-previous.x)*dx+(screen.y-previous.y)*dy)/length2));
+                check({x:previous.x+t*dx,y:previous.y+t*dy});
+              }
+            }
+            previous=point;
+            return false;
+          });
+        });
+      });
+      return result;
+    }
     var src = 'draw-' + uid();
     var L = { fill: src + '-fill', line: src + '-line', pt: src + '-pt', vx: src + '-vx', sk: src + '-sk', skpt: src + '-skpt' };
 
@@ -53,11 +111,11 @@
     function sketchData() {
       var list = [], all = hover ? pts.concat([hover]) : pts;
       if (mode && all.length > 1) {
-        list.push({ type: 'Feature', geometry: mode === 'polygon' && all.length > 2 ? geometry('polygon', all) : { type: 'LineString', coordinates: all }, properties: {} });
+        list.push({ type: 'Feature', geometry: ((mode === 'polygon' && all.length > 2) || mode==='circle' || mode==='rectangle') ? geometry(mode, all) : { type: 'LineString', coordinates: all }, properties: {} });
       }
       pts.forEach(function (p, i) { list.push({ type: 'Feature', geometry: { type: 'Point', coordinates: p }, properties: { first: i === 0 ? 1 : 0 } }); });
       var f = selected && byId(selected);
-      if (f && !mode) {
+      if (f && !mode && !(f.properties && f.properties.shape==='circle')) {
         verticesOf(f.geometry).forEach(function (p, i) { list.push({ type: 'Feature', geometry: { type: 'Point', coordinates: p }, properties: { vx: i, color: f.properties.color } }); });
       }
       return fc(list);
@@ -85,15 +143,23 @@
       ensure();
       map.getSource(src).setData(data());
       map.getSource(src + '-s').setData(sketchData());
+      labelMarkers.forEach(function(m){m.remove();});labelMarkers=[];
+      if(opts.labels)feats.filter(function(f){return f.properties.name;}).slice(0,150).forEach(function(f){
+        var el=document.createElement('span');el.className='map-drawing-label';el.textContent=f.properties.name;
+        labelMarkers.push(new maplibregl.Marker({element:el,anchor:'bottom',offset:[0,-10]}).setLngLat(verticesOf(f.geometry)[0]).addTo(map));
+      });
     }
-    function changed() { refresh(); if (opts.onChange) { opts.onChange(api.features()); } }
+    function changed() {
+      if(!restoring){var snapshot=JSON.stringify(feats);if(snapshot!==history[history.length-1]){history.push(snapshot);if(history.length>60)history.shift();future=[];}}
+      refresh(); if (opts.onChange) { opts.onChange(api.features()); }
+    }
     function sketch() {
       refresh();
       if (!opts.onSketch) { return; }
       if (!mode) { opts.onSketch(null); return; }
       var all = hover ? pts.concat([hover]) : pts;
       var info = { mode: mode, count: pts.length, min: MIN[mode], text: '' };
-      if (all.length >= 2 && mode !== 'point') { info.text = describe({ geometry: mode === 'polygon' && all.length > 2 ? geometry('polygon', all) : { type: 'LineString', coordinates: all } }); }
+      if (all.length >= 2 && mode !== 'point') { info.text = describe({ geometry: ((mode === 'polygon' && all.length > 2)||mode==='circle'||mode==='rectangle') ? geometry(mode, all) : { type: 'LineString', coordinates: all }, properties:mode==='circle'?{shape:'circle',radius_m:MapKit.haversine(all[0],all[all.length-1])}:{} }); }
       opts.onSketch(info);
     }
 
@@ -104,9 +170,10 @@
     function finish() {
       if (!mode) { return null; }
       var m = mode, done = null;
-      if (pts.length >= MIN[m]) {
+      if (pts.length >= MIN[m] && (opts.single||feats.length<500)) {
         if (opts.single) { feats = []; }
-        done = { id: uid(), type: 'Feature', geometry: geometry(m, pts), properties: { name: '', color: opts.color || COLORS[feats.length % COLORS.length], kind: m } };
+        done = { id: uid(), type: 'Feature', geometry: geometry(m, pts), properties: { name: m==='text'?'Beschriftung':'', color: opts.color || COLORS[feats.length % COLORS.length], kind: m==='text'?'point':(m==='circle'||m==='rectangle')?'polygon':m, shape:m } };
+        if(m==='circle')done.properties.radius_m=MapKit.haversine(pts[0],pts[1]);
         feats.push(done);
         selected = done.id;
       }
@@ -121,7 +188,7 @@
     map.on('click', function (ev) {
       if (drag && drag.moved) { return; }
       if (mode) {
-        var now = Date.now(), p = [ev.lngLat.lng, ev.lngLat.lat];
+        var now = Date.now(), p = snap([ev.lngLat.lng, ev.lngLat.lat],ev.point);
         var near = lastPt && Math.hypot(lastPt.x - ev.point.x, lastPt.y - ev.point.y) < 8;
         if (now - lastClick < 400 && near && pts.length >= MIN[mode]) { lastClick = 0; finish(); return; }   // Doppelklick beendet
         lastClick = now; lastPt = ev.point;
@@ -131,7 +198,7 @@
           if (Math.hypot(first.x - ev.point.x, first.y - ev.point.y) < 12) { finish(); return; }
         }
         pts.push(p);
-        if (mode === 'point') { finish(); return; }
+        if (mode === 'point' || mode==='text' || ((mode==='rectangle'||mode==='circle')&&pts.length===2)) { finish(); return; }
         sketch();
         return;
       }
@@ -141,7 +208,7 @@
     });
     map.on('mousemove', function (ev) {
       if (drag) { return; }
-      if (mode) { hover = [ev.lngLat.lng, ev.lngLat.lat]; sketch(); return; }
+      if (mode) { hover = snap([ev.lngLat.lng, ev.lngLat.lat],ev.point); sketch(); return; }
       if (selected && map.getLayer(L.vx)) {
         var over = map.queryRenderedFeatures(ev.point, { layers: [L.vx] }).length;
         map.getCanvas().style.cursor = over ? 'move' : '';
@@ -157,7 +224,8 @@
     }
     function moveDrag(ev) {
       if (!drag) { return; }
-      var f = byId(selected), p = [ev.lngLat.lng, ev.lngLat.lat], g = f.geometry;
+      var f = byId(selected), p = snap([ev.lngLat.lng, ev.lngLat.lat],ev.point), g = f.geometry;
+      if (f.properties.shape==='rectangle') delete f.properties.shape;
       drag.moved = true;
       if (g.type === 'Point') { g.coordinates = p; }
       else if (g.type === 'LineString') { g.coordinates[drag.index] = p; }
@@ -189,6 +257,7 @@
 
     var api = {
       start: function (m) {
+        if(!MIN[m])return;
         api.cancel();
         mode = m; pts = []; hover = null; selected = null;
         map.getCanvas().style.cursor = 'crosshair';
@@ -204,11 +273,24 @@
         map.doubleClickZoom.enable();
         sketch();
       },
-      undo: function () { if (mode && pts.length) { pts.pop(); sketch(); } },
+      undo: function () { if(mode){if(pts.length)pts.pop();sketch();return;}if(history.length<2)return;future.push(history.pop());feats=JSON.parse(history[history.length-1]);selected=byId(selected)?selected:null;restoring=true;changed();restoring=false;sketch(); },
+      redo: function () { if(mode||!future.length)return;var next=future.pop();history.push(next);feats=JSON.parse(next);selected=byId(selected)?selected:null;restoring=true;changed();restoring=false;sketch(); },
+      canUndo: function(){return mode?pts.length>0:history.length>1;},
+      canRedo: function(){return !mode&&future.length>0;},
+      resetHistory:function(){history=[JSON.stringify(feats)];future=[];},
+      setSnapping:function(value){snapping=!!value;},
+      bufferPoint: function(id, meters) {
+        var point=byId(id);
+        if(!point || point.geometry.type!=='Point' || !Number.isFinite(meters) || meters<1 || meters>1000000 || feats.length>=500) return null;
+        var zone={id:uid(),type:'Feature',geometry:circleGeometry(point.geometry.coordinates,meters),
+          properties:{name:('Umkreis · '+(point.properties.name||'Punkt')).slice(0,200),color:point.properties.color||COLORS[0],kind:'polygon',shape:'circle',radius_m:meters}};
+        feats.push(zone);selected=zone.id;changed();return zone.id;
+      },
+      duplicate:function(id){var f=byId(id);if(!f||feats.length>=500)return;var copy=JSON.parse(JSON.stringify(f));copy.id=uid();copy.properties.name=(copy.properties.name||'Zeichnung')+' (Kopie)';feats.push(copy);selected=copy.id;changed();return copy.id;},
       addPoint: function (lngLat) {   // z. B. aktueller GPS-Standort als nächster Stützpunkt
         if (!mode) { return; }
         pts.push(lngLat);
-        if (mode === 'point') { finish(); } else { sketch(); }
+        if (mode === 'point'||mode==='text'||((mode==='rectangle'||mode==='circle')&&pts.length===2)) { finish(); } else { sketch(); }
       },
       features: function () { return feats.map(function (f) { return JSON.parse(JSON.stringify(f)); }); },
       setFeatures: function (list) {
@@ -245,5 +327,12 @@
     return api;
   }
 
-  window.MapDraw = { create: create, measure: measure, describe: describe, COLORS: COLORS };
+  function validFeature(f){
+    if(!f||!f.geometry)return false;
+    var g=f.geometry,c=g.coordinates,count=0;
+    function point(p){return Array.isArray(p)&&p.length>=2&&typeof p[0]==='number'&&typeof p[1]==='number'&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<=180&&Math.abs(p[1])<=85.051129;}
+    function line(list,min){if(!Array.isArray(list)||list.length<min)return false;count+=list.length;return count<=5000&&list.every(point);}
+    return g.type==='Point'?point(c):g.type==='LineString'?line(c,2):g.type==='Polygon'&&Array.isArray(c)&&c.length>0&&c.every(function(r){return line(r,4)&&r[0][0]===r[r.length-1][0]&&r[0][1]===r[r.length-1][1];});
+  }
+  window.MapDraw = { create: create, measure: measure, describe: describe, COLORS: COLORS, validFeature:validFeature };
 })();

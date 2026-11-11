@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% import '_macros.html' as m with context %}
+{% block title %}{{source.name}} · Kartenbibliothek{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/map.css">{% endblock %}
+{% block content %}
+<p><a href="/admin/maps#library">← Zur Kartenbibliothek</a></p>
+{{m.page_header(source.name, source.region ~ ' · ' ~ source.topic ~ ' · ' ~ source.provider)}}
+<p><a href="{{source.source_url}}" target="_blank" rel="noopener">Anbieter und Metadaten ↗</a> · <a href="{{source.license_url}}" target="_blank" rel="noopener">{{source.license}} ↗</a></p>
+{% if source.note %}<p>{{source.note}}</p>{% endif %}
+{% if error %}<p class="alert alert-danger" role="alert">{{error}}</p>{% endif %}
+{% if choices %}
+<form method="post" action="/admin/maps/library/{{key}}/import">
+  <input type="hidden" name="csrf" value="{{csrf}}">
+  <fieldset><legend class="h5">{{choices|length}} unterstützte Ebenen</legend>
+    <p class="text-secondary">Wählen Sie bis zu 100 Ebenen. Neue Einträge werden als {{'Grundkarte' if source.role=='base' else 'Überlagerung'}} angelegt, zunächst deaktiviert und intern. Vorhandene Einträge werden übersprungen.</p>
+    <label class="form-label" for="library-layer-search">Ebenen suchen</label><input type="search" class="form-control mb-2" id="library-layer-search" placeholder="Name oder Kennung eingeben">
+    <p class="small text-secondary" id="library-selection-status" role="status">Noch keine Ebene ausgewählt.</p>
+    <div class="map-library-choices mb-3">
+    {% for layer in choices %}<div class="map-library-choice">
+      <div class="form-check"><input class="form-check-input" type="checkbox" name="layers" id="library-layer-{{loop.index}}" value="{{layer.name}}" {{'checked' if layer.name in selected_names}}><label class="form-check-label fw-semibold" for="library-layer-{{loop.index}}">{{layer.title}}</label></div>
+      <div class="small text-secondary ms-4">{{layer.name}}{% if layer.queryable %} · Sachauskunft{% endif %}{% if layer.times %} · Zeitreihe{% endif %}</div>
+      {% if layer.abstract %}<p class="small mb-0 mt-1 ms-4">{{layer.abstract}}</p>{% endif %}
+    </div>{% endfor %}
+    </div>
+  </fieldset>
+  <button class="btn btn-primary">Ausgewählte Ebenen ergänzen</button>
+  <a class="btn btn-outline-secondary" href="/admin/maps#library">Abbrechen</a>
+</form>
+{% else %}
+{% if error %}<form method="post" action="/admin/maps/library/{{key}}"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-primary">Quelle erneut abfragen</button></form>{% else %}
+{{m.empty_state('Keine unterstützten Ebenen', 'Der Dienst bietet derzeit keine für diesen Eintrag unterstützten Ebenen. Sie können eine andere Quelle wählen oder den Dienst manuell prüfen.', '/admin/maps#library', 'Andere Quelle wählen')}}
+{% endif %}
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="/static/map-library.js"></script>{% endblock %}
