@@ -144,7 +144,7 @@ templates.env.globals["geo_position"] = lambda v, raw="": _forms_mod().geo_posit
 templates.env.globals["form_constraints"] = lambda item: _forms_mod().validation_constraints(item)
 templates.env.globals["form_rule_hint"] = lambda item: _forms_mod().validation_hint(item)
 templates.env.globals["perm_modules"] = {"processes": "applications", "app_create": "applications", "formblocks": "forms",
-                                         "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources",
+                                         "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources", "signage_manage": "signage",
                                          "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai", "ai_web": "ai", "anliegen_submit": "anliegen", "anliegen_manage": "anliegen",
                                          "knowledge_read": "knowledge", "knowledge_edit": "knowledge",
                                          "knowledge_publish": "knowledge", "knowledge_manage": "knowledge",
@@ -204,6 +204,7 @@ MODULES = {
     "circulations": ("Umläufe & Aushänge", "module_circulations", ("/umlaeufe",)),
     "dms": ("Ablage (DMS)", "module_dms", ("/dms",)),
     "resources": ("Ressourcenbuchung", "module_resources", ("/resources", "/r/", "/r", "/r-embed")),
+    "signage": ("Digital Signage", "module_signage", ("/signage",)),
     "krank": ("BlueOtter Krankmelder", "module_krank", ("/krank", "/krankmelder")),
 }
 _module_cache: dict = {"at": 0.0, "enabled": set(MODULES)}
@@ -289,6 +290,10 @@ async def _security_headers(request: Request, call_next):
     prefix = embed_prefix(request.url.path)
     frame_ancestors = "'none'"
     if request.url.path in {"/agent", "/ki"}:
+        frame_ancestors = "'self'"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    elif re.fullmatch(r"/signage/\d+/preview", request.url.path):
+        # Only authenticated design-studio previews may be framed by TAKT itself.
         frame_ancestors = "'self'"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
     elif prefix:
@@ -1808,7 +1813,22 @@ def recording_fetch(request: Request, rec_id: int, user: User = Depends(video_us
 def _profile_page(request, user, db, details=None, profile_error=""):
     from . import profiles
     cfg = get_settings(db)
+    signage_offices = []
+    if "signage" in enabled_modules():
+        from .signage_models import SignageOffice, SignageRoom, SignageFloor, SignageBuilding
+        rows = db.execute(select(SignageOffice, SignageRoom, SignageFloor, SignageBuilding)
+            .join(SignageRoom, SignageOffice.room_id == SignageRoom.id)
+            .join(SignageFloor, SignageRoom.floor_id == SignageFloor.id)
+            .join(SignageBuilding, SignageFloor.building_id == SignageBuilding.id)
+            .where(SignageOffice.user_id == user.id, SignageBuilding.active.is_(True))
+            .order_by(SignageOffice.is_primary.desc(), SignageRoom.number)).all()
+        signage_offices = [dict(id=office.id, room=room.number, room_name=room.name,
+                                 floor=floor.name, building=building.name, public=office.public,
+                                 is_primary=office.is_primary)
+                           for office, room, floor, building in rows]
     return render(request, "profile.html", user,
+                  signage_enabled="signage" in enabled_modules(),
+                  signage_offices=signage_offices,
                   allow_user_keys=cfg.get("allow_user_keys") == "1",
                   own_key_mask=mask_secret(decrypt(user.sm_api_key_enc)),
                   profile_groups=profiles.GROUPS,
@@ -2468,6 +2488,7 @@ def admin_modules(request: Request, user: User = Depends(admin_user), db: Sessio
     from .db import (BookingPage, DmsRecord, Form as FormModel, FormResponse, KrankReport, LawText, Poll,
                      Resource as ResourceModel, ShortLink, UserMap)
     from .db import Circulation, Seminar
+    from .signage_models import SignageScreen
     stats = {"seminars": db.scalar(select(func.count(Seminar.id))),"circulations": db.scalar(select(func.count(Circulation.id))), "bookings": db.scalar(select(func.count(BookingPage.id))),
              "dms": db.scalar(select(func.count(DmsRecord.id))),
              "maps": db.scalar(select(func.count(UserMap.id))),
@@ -2477,7 +2498,8 @@ def admin_modules(request: Request, user: User = Depends(admin_user), db: Sessio
              "forms": db.scalar(select(func.count(FormModel.id))),
              "polls": db.scalar(select(func.count(Poll.id))),
              "krank": db.scalar(select(func.count(KrankReport.id))),
-             "resources": db.scalar(select(func.count(ResourceModel.id)))}
+             "resources": db.scalar(select(func.count(ResourceModel.id))),
+             "signage": db.scalar(select(func.count(SignageScreen.id)))}
     return render(request, "admin_modules.html", user, all_modules=MODULES, stats=stats)
 
 
@@ -3041,6 +3063,7 @@ from . import routes_payments  # noqa: E402,F401
 from . import routes_votes  # noqa: E402,F401
 from . import routes_resources  # noqa: E402,F401
 from . import routes_resources_public  # noqa: E402,F401
+from . import routes_signage  # noqa: E402,F401
 from . import routes_caretakers  # noqa: E402,F401
 from . import routes_qr  # noqa: E402,F401
 from . import routes_trash  # noqa: E402,F401

@@ -142,6 +142,7 @@ PERMISSIONS = {
     "maps": ("Karten", "fa-map-location-dot", "Im Kartenbrowser eigene WMS/WFS-Layer hinzufügen, Karten speichern und teilen"),
     "payments": ("Zahlungen", "fa-euro-sign", "Zahlungsübersicht und Export, Zahlungen als bezahlt markieren, erstatten und stornieren"),
     "resources": ("Ressourcen", "fa-building", "Bürgerhäuser, Räume, Grillplätze, Geräte anlegen, Buchungen bearbeiten, Belegungskalender teilen"),
+    "signage_manage": ("Digital Signage gestalten", "fa-display", "Gebäude, Räume, Displays, Freigaben und Geräte verwalten"),
     "krank": ("Krankmeldungen", "fa-notes-medical", "Krankmeldungen der Arbeitgeber bearbeiten, für die man (oder die eigene Gruppe) zuständig ist"),
     "krank_admin": ("Krankmelder verwalten", "fa-user-nurse", "Alle Krankmeldungen sehen; Arbeitgeber, Empfänger, Zuständige, Zugang, Texte, Löschfrist und Import verwalten"),
     "org_members": ("Organisationszuordnungen verwalten", "fa-users-gear", "Haupt- und zusätzliche Organisationseinheiten aller Personen zuordnen; keine Konten oder Rollen ändern"),
@@ -2785,6 +2786,7 @@ DEFAULT_SETTINGS = {
     "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
     "module_knowledge": "0",  # Organizational knowledge: disabled until explicitly activated.
+    "module_signage": "0",  # Digital signage disabled until explicitly activated.
     "ai_knowledge_enabled": "0",
     "ai_laws_include_all": "0",
     "ai_laws_excluded_ids": "[]",
@@ -3159,6 +3161,7 @@ def init_db() -> None:
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
     from . import knowledge_models  # noqa: F401 – register additive knowledge tables
+    from . import signage_models  # noqa: F401 – additive signage models
     from . import anliegen_models  # noqa: F401 – register additive internal request tables
     from . import anliegen_process_models  # noqa: F401 – register opt-in process binding tables
     Base.metadata.create_all(engine)

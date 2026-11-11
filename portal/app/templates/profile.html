@@ -76,6 +76,45 @@
     <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger" data-confirm-title="Freiwillige Angaben löschen?" data-confirm="Alle freiwilligen Angaben und die Zustimmung zur Vorbelegung werden entfernt. Bereits eingereichte Formulare bleiben erhalten." data-confirm-button="Angaben löschen">Alle freiwilligen Angaben löschen</button>
   </form>
 </section>
+{% if signage_enabled %}
+<section id="signage-offices" class="mb-5" aria-labelledby="signage-offices-title">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <h2 class="h4 mb-0" id="signage-offices-title"><i class="fa-solid fa-building-user me-2"></i>Dienstliche Bürozuordnungen</h2>
+    {% if user.can('signage_manage') %}<a class="btn btn-sm btn-outline-secondary" href="/signage#offices">Standorte und Büros verwalten</a>{% endif %}
+  </div>
+  <p class="text-secondary small">Diese strukturierten Angaben werden in TAKT zentral als Gebäude, Geschoss und Zimmer gepflegt. Sie sind unabhängig von den verschlüsselten freiwilligen Profilangaben. Die öffentliche Anzeige deines Namens und Büros ist standardmäßig ausgeschaltet.</p>
+  {% if signage_offices %}
+  <div class="row g-3">
+    {% for office in signage_offices %}
+    <div class="col-12 col-lg-6"><div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-start gap-2">
+        <div><strong>{{ office.building }} · {{ office.floor }}</strong>
+          <div class="text-secondary small">Zimmer {{ office.room }}{% if office.room_name %} · {{ office.room_name }}{% endif %}</div>
+        </div>
+        {% if office.is_primary %}<span class="badge text-bg-secondary">Hauptbüro</span>{% endif %}
+      </div>
+      <div class="mt-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="small">
+          {% if office.public %}<span class="badge text-bg-success">Im Besucherwegweiser sichtbar</span>
+          {% else %}<span class="badge text-bg-secondary">Nicht öffentlich</span>{% endif %}
+        </div>
+        <form method="post" action="/profile/signage/office/{{ office.id }}/visibility">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if office.public %}
+            <button class="btn btn-sm btn-outline-danger" type="submit" name="public" value="0"><i class="fa-solid fa-eye-slash me-1"></i>Öffentliche Anzeige widerrufen</button>
+          {% else %}
+            <button class="btn btn-sm btn-outline-primary" type="submit" name="public" value="1"><i class="fa-solid fa-eye me-1"></i>Im Besucherwegweiser anzeigen</button>
+          {% endif %}
+        </form>
+      </div>
+    </div></div></div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-light border small">Dir ist noch kein strukturiertes Büro zugeordnet. Zuständige mit Digital-Signage-Berechtigung können dies in der zentralen Gebäudeverwaltung einrichten.</div>
+  {% endif %}
+</section>
+{% endif %}
 <h2 class="h4">Konto und Zugang</h2>
 <form method="post" action="/profile" class="row g-4">
   <input type="hidden" name="csrf" value="{{ csrf }}">
