@@ -74,3 +74,29 @@ def test_admin_domains_page():
         assert get_settings(db)["domain_krank"] == "krank.example.org"
     admin.post("/admin/domains", data={"csrf": token, "krank": ""})
     reset()
+
+
+def test_all_registered_modules_have_explicit_domain_policy():
+    """Mandatory CI gate: adding a module requires a domain exposure decision."""
+    modhosts.assert_module_coverage(main.MODULES)
+    assert set(modhosts.MODULE_PUBLIC).isdisjoint(modhosts.PORTAL_ONLY)
+    assert set(main.MODULES) == set(modhosts.MODULE_PUBLIC) | set(modhosts.PORTAL_ONLY)
+
+
+def test_domain_policy_rejects_unclassified_and_stale_modules():
+    import pytest
+
+    with pytest.raises(ValueError, match="future_public_module"):
+        modhosts.assert_module_coverage({**main.MODULES, "future_public_module": ("Neu", "module_new", ())})
+    with pytest.raises(ValueError, match="unbekannt"):
+        modhosts.assert_module_coverage({})
+
+
+def test_admin_domains_shows_portal_only_module_policy():
+    admin = login("admin@example.org", "admin-passwort-123")
+    page = admin.get("/admin/domains")
+    assert page.status_code == 200
+    for key in modhosts.PORTAL_ONLY:
+        assert main.MODULES[key][0] in page.text
+    assert "Module ohne eigene öffentliche Domain" in page.text
+    assert "Interne Verwaltungsseiten" in page.text
