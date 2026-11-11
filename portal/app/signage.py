@@ -1,12 +1,14 @@
 """Read-only, allowlisted projections for kiosk pages (privacy by default)."""
 import hashlib
+import heapq
 import json
 import re
 import secrets
 from datetime import date, datetime, time, timedelta, timezone
 from sqlalchemy import select
 from .db import LOCAL_TZ, Resource, ResourceBooking, User, utcnow
-from .signage_models import SignageBuilding, SignageFloor, SignageOffice, SignageRoom, SignageScreen
+from .signage_models import (SignageBuilding, SignageFloor, SignageOffice, SignageRoom, SignageScreen,
+                             SignageWayNode, SignageWayEdge, SignageDisplayAnchor)
 from .calendar_models import Calendar, CalendarEvent
 
 KINDS = {"agenda": "Terminübersicht", "room": "Digitales Türschild",
@@ -161,16 +163,87 @@ def staff_directory(db, screen: SignageScreen) -> list[dict]:
     ]
 
 
+def shortest_paths(nodes, edges, start_id: int, *, barrier_free=False) -> dict[int, dict]:
+    """Bounded Dijkstra with explicit one-way and accessibility rules.
+
+    Works with SQLAlchemy node objects or simple test fixtures. Never route
+    wheelchair users through stairs, regardless of edge configuration.
+    """
+    by_id = {node.id: node for node in nodes}
+    if start_id not in by_id:
+        return {}
+    allowed = {node.id for node in nodes
+               if not barrier_free or (node.accessible and node.kind != "stairs")}
+    if start_id not in allowed:
+        return {}
+    adjacent = {nid: [] for nid in allowed}
+    for edge in edges:
+        if (edge.from_node_id not in allowed or edge.to_node_id not in allowed
+                or barrier_free and not edge.accessible or not 1 <= edge.distance_m <= 5000):
+            continue
+        adjacent[edge.from_node_id].append((edge.to_node_id, edge.distance_m))
+        if edge.bidirectional:
+            adjacent[edge.to_node_id].append((edge.from_node_id, edge.distance_m))
+    heap = [(0, start_id)]
+    best = {start_id: 0}
+    previous = {}
+    while heap:
+        distance, node_id = heapq.heappop(heap)
+        if distance != best.get(node_id):
+            continue
+        for target, step in adjacent[node_id]:
+            new_distance = distance + step
+            if new_distance < best.get(target, 10**15):
+                best[target] = new_distance
+                previous[target] = node_id
+                heapq.heappush(heap, (new_distance, target))
+    result = {}
+    for target, distance in best.items():
+        sequence = [target]
+        while sequence[-1] != start_id:
+            sequence.append(previous[sequence[-1]])
+        result[target] = {"distance_m": distance, "nodes": list(reversed(sequence))}
+    return result
+
+
 def waypoints(db, screen: SignageScreen) -> list[dict]:
     rows = db.execute(select(SignageRoom, SignageFloor, SignageBuilding)
         .join(SignageFloor, SignageRoom.floor_id == SignageFloor.id)
         .join(SignageBuilding, SignageFloor.building_id == SignageBuilding.id)
         .where(SignageBuilding.active.is_(True))
         .order_by(SignageBuilding.name, SignageFloor.level, SignageRoom.number).limit(150)).all()
-    return [dict(number=room.number, label=room.name or "Raum", building=building.name,
-                 floor=floor.name, accessible=room.accessible)
-            for room, floor, building in rows
-            if screen.org_id is None or building.org_id == screen.org_id]
+    origin = db.get(SignageDisplayAnchor, screen.id)
+    nodes = db.scalars(select(SignageWayNode).join(
+        SignageFloor, SignageWayNode.floor_id == SignageFloor.id).join(
+        SignageBuilding, SignageFloor.building_id == SignageBuilding.id).where(
+        SignageBuilding.active.is_(True)).limit(3000)).all() if origin else []
+    edge_rows = db.scalars(select(SignageWayEdge).limit(7000)).all() if nodes else []
+    nodes_by_id = {node.id: node for node in nodes}
+    simple_paths = shortest_paths(nodes, edge_rows, origin.node_id) if origin else {}
+    accessible_paths = shortest_paths(nodes, edge_rows, origin.node_id,
+                                      barrier_free=True) if origin else {}
+    room_node = {}
+    for node in nodes:
+        if node.room_id:
+            room_node.setdefault(node.room_id, node.id)
+
+    def describe(info):
+        if not info:
+            return None
+        sequence = [nodes_by_id[nid] for nid in info["nodes"]]
+        return {
+            "distance_m": info["distance_m"],
+            "steps": [n.label for n in sequence[1:]] or ["Sie befinden sich bereits am Ziel"],
+        }
+
+    return [
+        dict(number=room.number, label=room.name or "Raum", building=building.name,
+             floor=floor.name, accessible=room.accessible,
+             route=describe(simple_paths.get(room_node.get(room.id))),
+             accessible_route=describe(accessible_paths.get(room_node.get(room.id))))
+        for room, floor, building in rows
+        if screen.org_id is None or building.org_id == screen.org_id
+    ]
 
 
 def context(db, screen: SignageScreen, public=True, viewer=None) -> dict:
