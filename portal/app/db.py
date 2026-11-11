@@ -2615,6 +2615,7 @@ class KrankEmployer(Base):
     attach_files: Mapped[bool] = mapped_column(Boolean, default=False)  # Mail mit PDF/Nachweis statt nur Hinweis + Link
     attach_original_au: Mapped[bool] = mapped_column(Boolean, default=False)  # Originalbeleg zusätzlich zur Sammel-PDF
     notify_supervisors: Mapped[bool] = mapped_column(Boolean, default=False)  # Leitung der verknüpften Orga nur mit Minimalhinweis
+    supervisor_attachment_mode: Mapped[str] = mapped_column(String(12), default="notice")  # notice | pdf | original
     dms_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     dms_area_id: Mapped[int | None] = mapped_column(ForeignKey("dms_areas.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -3098,7 +3099,8 @@ _NEW_COLUMNS = {
     "law_levels": {"org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
     "krank_employers": {"org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
                         "attach_original_au": "BOOLEAN NOT NULL DEFAULT 0",
-                        "notify_supervisors": "BOOLEAN NOT NULL DEFAULT 0"},
+                        "notify_supervisors": "BOOLEAN NOT NULL DEFAULT 0",
+                        "supervisor_attachment_mode": "VARCHAR(12) NOT NULL DEFAULT 'notice'"},
     "law_texts": {"internal": "BOOLEAN NOT NULL DEFAULT 0", "planned_md": "TEXT NOT NULL DEFAULT ''", "planned_valid_from": "VARCHAR(10) NOT NULL DEFAULT ''",
                   "planned_note": "VARCHAR(255) NOT NULL DEFAULT ''", "outline": "VARCHAR(20) NOT NULL DEFAULT ''",
                   "topics_json": "TEXT NOT NULL DEFAULT ''", "map_json": "TEXT NOT NULL DEFAULT '{}'"},
