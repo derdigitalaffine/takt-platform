@@ -8,13 +8,14 @@ from itertools import islice
 from fastapi import HTTPException
 from sqlalchemy import select, or_
 
-from . import ai_dms, calendars, dms, forms as fm, agent_anliegen, agent_forms
+from . import ai_dms, calendars, dms, forms as fm, agent_anliegen, agent_applications, agent_forms
 from .ai_models import AIDmsSource
 from .calendar_models import Calendar, CalendarEvent
 from .anliegen_models import AnliegenCategory
 from .db import DmsArea, DmsRecord, Form, Process, get_settings
 
 READ = {
+    "search_applications": "applications",
     "search_surveys": "surveys",
     "search_anliegen_categories": "anliegen",
     "search_calendars": "calendars", "search_events": "calendars",
@@ -23,6 +24,7 @@ READ = {
     "search_my_leave": "leave", "search_leave_requests": "leave",
 }
 WRITE = {
+    "application_command": "applications", "application_step": "applications",
     "create_survey": "surveys", "survey_state": "surveys", "finalize_poll": "surveys",
     "set_krank_status": "krank", "add_krank_note": "krank", "send_krank_message": "krank",
     "create_leave": "leave", "edit_leave": "leave", "leave_command": "leave",
@@ -31,6 +33,7 @@ WRITE = {
     "update_event": "calendars", "delete_event": "calendars", "create_event": "calendars", "copy_form": "forms", "move_dms": "dms",
 }
 LABELS = {
+    "search_applications": "berechtigten Online-Anträgen",
     "search_surveys": "Umfragen und Abstimmungen",
     "search_anliegen_categories": "Anliegen-Kategorien",
     "search_calendars": "Kalendern", "search_events": "Terminen",
@@ -38,13 +41,15 @@ LABELS = {
     "search_dms": "freigegebenen DMS-Wissensakten", "search_dms_areas": "DMS-Zielbereichen",
     "search_my_leave": "deinen eigenen Urlaubsanträgen", "search_leave_requests": "berechtigten Urlaubsanträgen",
 }
-KINDS = {"configure_anliegen_category": "anliegen_category", "create_event": "calendar", "copy_form": "form", "edit_form": "form", "move_dms": "dms"}
+KINDS = {"application_command": "application", "application_step": "application", "configure_anliegen_category": "anliegen_category", "create_event": "calendar", "copy_form": "form", "edit_form": "form", "move_dms": "dms"}
 MODELS = {"configure_anliegen_category": AnliegenCategory, "create_event": Calendar, "copy_form": Form, "move_dms": DmsRecord}
 
 
 def enabled(user, module):
     from .main import enabled_modules
     mods = enabled_modules()
+    if module == "applications":
+        return "applications" in mods and user.active
     if module == "processes":
         return "applications" in mods and user.can("processes")
     if module == "forms":
@@ -69,6 +74,8 @@ def search(db, user, spec):
     require(user, READ[tool])
     phrase = _term(spec.get("query"))
     pattern = _like(phrase)
+    if tool == "search_applications":
+        return agent_applications.search(db, user, spec, phrase, pattern)
     if tool == "search_surveys":
         from .agent_surveys import search as search_surveys
         return search_surveys(db,user,spec)
@@ -143,6 +150,8 @@ def target(db, user, action):
 
 
 def normalize(db, user, raw, findings):
+    if raw["tool"] in agent_applications.TOOLS:
+        return agent_applications.normalize(db, user, raw, findings)
     from . import agent_surveys
     if raw["tool"] in agent_surveys.TOOLS:
         return agent_surveys.normalize(db, user, raw, findings)
@@ -180,6 +189,8 @@ def normalize(db, user, raw, findings):
 
 
 def preview(db, action):
+    if action["tool"] in agent_applications.TOOLS:
+        return agent_applications.preview(db, action)
     from . import agent_surveys
     if action["tool"] in agent_surveys.TOOLS:
         return agent_surveys.preview(db, action)
@@ -204,6 +215,8 @@ def preview(db, action):
 
 
 def execute(db, user, action):
+    if action["tool"] in agent_applications.TOOLS:
+        return agent_applications.execute(db, user, action)
     from . import agent_surveys
     if action["tool"] in agent_surveys.TOOLS:
         return agent_surveys.execute(db, user, action)
