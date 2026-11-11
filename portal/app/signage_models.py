@@ -92,3 +92,15 @@ class SignageDevice(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SignageRevision(Base):
+    """Immutable design history; publication/credentials are deliberately excluded."""
+    __tablename__ = "signage_revisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    snapshot_json: Mapped[str] = mapped_column(Text)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    __table_args__ = (UniqueConstraint("screen_id", "version"),)
