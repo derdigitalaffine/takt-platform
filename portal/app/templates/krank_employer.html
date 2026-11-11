@@ -31,7 +31,13 @@
       <div class="form-check form-switch mt-2"><input class="form-check-input" type="checkbox" role="switch" id="ke-original" name="attach_original_au" value="1" {% if emp.attach_original_au %}checked{% endif %}><label class="form-check-label" for="ke-original">Original-AU zusätzlich als separate Datei versenden</label></div>
       <div class="form-text">Standard: Nur Hinweis und geschützter Portal-Link. Wenn PDF-Versand aktiv ist, enthält das PDF den eingebetteten Nachweis; mit der Zusatzoption werden Original-PDFs/Fotos außerdem unverändert angehängt. Nur bei expliziter Freigabe verwenden.</div>
       <div class="form-check form-switch mt-3"><input class="form-check-input" type="checkbox" role="switch" id="ke-supervisors" name="notify_supervisors" value="1" {% if emp.notify_supervisors %}checked{% endif %}><label class="form-check-label" for="ke-supervisors">Vorgesetzte aus der Organisationsstruktur informieren</label></div>
-      <div class="form-text">Leitung und stellvertretende Leitung des zugeordneten Organisationsknotens (inklusive übergeordneter Bereiche mit Zuständigkeit für Untereinheiten) erhalten nur Name und Abwesenheitszeitraum, keine AU, keine weiteren Gesundheitsangaben und keinen vertraulichen Bearbeitungslink. Standardmäßig deaktiviert.</div></div>
+      <label class="form-label mt-2" for="ke-supervisor-mode">Anhänge für Vorgesetzte</label>
+      <select class="form-select" id="ke-supervisor-mode" name="supervisor_attachment_mode">
+        <option value="notice" {% if emp.supervisor_attachment_mode == 'notice' %}selected{% endif %}>Nur Hinweis (empfohlen)</option>
+        <option value="pdf" {% if emp.supervisor_attachment_mode == 'pdf' %}selected{% endif %}>Zusammengefasstes PDF einschließlich AU</option>
+        <option value="original" {% if emp.supervisor_attachment_mode == 'original' %}selected{% endif %}>Original-AU als separate Datei statt PDF</option>
+      </select>
+      <div class="form-text">Leitung und stellvertretende Leitung werden aus der Organisationsstruktur ermittelt, einschließlich berechtigter übergeordneter Bereiche. Gesundheitsnachweise gehen <strong>nur</strong> an Personen, die bereits Zugriff auf die betreffende Krankmeldung besitzen (Krankmelder-Admin oder explizit zuständige Person/Gruppe mit Krankmelder-Recht). Ohne Berechtigung wird ausschließlich Name und Zeitraum mitgeteilt. Beide Optionen sind standardmäßig aus; vor Freigabe von AU-Anhängen ist die datenschutzrechtliche Erforderlichkeit zu prüfen.</div></div>
     <div class="col-12 small text-secondary">Derzeitige Empfänger: {{ recipients | join(', ') or '– niemand (bitte Personen, Gruppen, Adressen oder die Adresse der Personalverwaltung hinterlegen) –' }}</div>
 
     <div class="col-12"><h2 class="h6 mt-2">Ablage (DMS)</h2></div>
