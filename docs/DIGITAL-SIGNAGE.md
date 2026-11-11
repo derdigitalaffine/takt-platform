@@ -61,7 +61,9 @@ Stand: 11.11.2026. Verbindliche Interviewentscheidungen **1–7 = D**; weitere E
 3. Unter **Digital Signage** eine Anzeige aus Vorlage erzeugen; im Studio Farben, Widgets, Raum-/Ressourcenverknüpfung und Sichtbarkeit pflegen. Die Live-Vorschau testet ungespeicherte Anpassungen; spätere Änderungen können über Designversionen wiederhergestellt werden.
 4. Ein öffentliches Display unter `/signage/view/<ID>` oder ein geschütztes Display über einen per Mail/Einmalausgabe erzeugten Link öffnen. Geteilte Links lassen sich im Studio einzeln widerrufen.
 5. Standorte über zentrale TAKT-Orte, Gebäude/Geschosse/Räume über Signage verknüpfen; Raumkalender nur bei vorhandener Quellfreigabe zuordnen. Mitarbeiter können ihre freigegebenen Bürozuordnungen im eigenen Profil sehen und deren öffentliche Anzeige aktivieren/widerrufen.
-6. Für Wegweiser unter Digital Signage ein Wegenetz (Eingänge, Flure, Treppen, Aufzüge, Zielflächen) erfassen; je Wegweiser eine Startposition wählen. Das System berechnet Wege und verfügbare barrierefreie Alternativen.\n7. Optional eigenes Signage-Domain-Mapping unter Admin → Domains; nur freigegebene öffentliche Displaypfade werden unter der Domain zugänglich.\n8. Gekoppelte Player rufen mit Bearer-Token den schreibgeschützten `/signage/api/device/<ID>/manifest` ab, geben Heartbeats an `/signage/api/device/<ID>/heartbeat` ab und müssen bei Verlust sofort widerrufen werden.
+6. Für Wegweiser unter Digital Signage ein Wegenetz (Eingänge, Flure, Treppen, Aufzüge, Zielflächen) erfassen; je Wegweiser eine Startposition wählen. Das System berechnet Wege und verfügbare barrierefreie Alternativen.
+7. Optional eigenes Signage-Domain-Mapping unter Admin → Domains; nur freigegebene öffentliche Displaypfade werden unter der Domain zugänglich.
+8. Gekoppelte Player rufen mit Bearer-Token den schreibgeschützten `/signage/api/device/<ID>/manifest` ab, geben Heartbeats an `/signage/api/device/<ID>/heartbeat` ab und müssen bei Verlust sofort widerrufen werden.
 
 ### Erweiterungskontrakt für zukünftige Module
 
