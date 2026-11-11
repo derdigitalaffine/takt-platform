@@ -80,13 +80,13 @@
     <div class="bk-public-panel-heading"><div><span class="bk-public-kicker">Nächster Schritt</span><h2 id="bk-time-title">Wann passt es Ihnen?</h2>
       <p>Wählen Sie zuerst einen Tag und dann eine verfügbare Uhrzeit.</p></div></div>
     {% if invalid_slot %}<div class="alert alert-warning">Der ausgewählte Termin ist nicht mehr verfügbar. Bitte wählen Sie eine andere Uhrzeit.</div>{% endif %}
-    {% if bt and bt.choose_provider and bt.providers | length > 1 %}
+    {% if bt and bt.choose_provider and assignable | length > 1 %}
       <form method="get" class="bk-person-filter">
         <input type="hidden" name="step" value="times"><input type="hidden" name="art" value="{{ bt.id }}">
         {% if invite %}<input type="hidden" name="i" value="{{ invite.token }}">{% endif %}
         <label for="bk-person">Ansprechperson</label>
         <div><select class="form-select" id="bk-person" name="person">
-          <option value="">Egal – erster freier Termin</option>{% for p in bt.providers if p.active %}<option value="{{ p.id }}" {% if person == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
+          <option value="">Egal – erster freier Termin</option>{% for p in assignable %}<option value="{{ p.id }}" {% if person == p.id %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
         </select><button type="submit" class="btn btn-outline-primary">Anzeigen</button></div>
       </form>
     {% endif %}

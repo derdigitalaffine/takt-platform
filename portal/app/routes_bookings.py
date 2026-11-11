@@ -626,6 +626,7 @@ def _booking_public_steps(request: Request, db: Session, page: BookingPage, invi
     return _public(
         request, db, page, mode="book", step="details" if is_details else "times",
         invite=invite, member=member, bt=bt, person=person, types=types,
+        assignable=btypes.providers_for(db, bt) if bt is not None else [],
         fields=btypes.fields(bt) if bt is not None else [],
         days=days, day_nav=chunk, active_day=day, day_offset=offset,
         prev_days=link(step="times", offset=max(0, offset - 7)) if offset > 0 else "",
@@ -656,12 +657,12 @@ def booking_public(request: Request, token: str, i: str = "", db: Session = Depe
     member = session_user(request, db)
     if page.extended:
         from . import btypes
-        types = btypes.active_types(page)
+        types = btypes.active_types(page, db)
         art = request.query_params.get("art", "")
         bt = next((t for t in types if str(t.id) == art), None) if art else (types[0] if len(types) == 1 else None)
         person = request.query_params.get("person", "")
         pid = int(person) if person.isdigit() and bt and bt.choose_provider and any(
-            p.id == int(person) and p.active for p in bt.providers) else None
+            p.id == int(person) for p in btypes.providers_for(db, bt)) else None
         return _booking_public_steps(request, db, page, inv, member, types, bt, pid)
     return _booking_public_steps(request, db, page, inv, member, [], None)
 
@@ -687,7 +688,7 @@ async def booking_public_book(request: Request, token: str, db: Session = Depend
     bt, pid = None, None
     if page.extended:
         from . import btypes
-        bt = next((t for t in btypes.active_types(page) if str(t.id) == str(data.get("art", ""))), None)
+        bt = next((t for t in btypes.active_types(page, db) if str(t.id) == str(data.get("art", ""))), None)
         person = str(data.get("person", ""))
         pid = int(person) if bt and bt.choose_provider and person.isdigit() else None
         back += ("&" if "?" in back else "?") + f"art={bt.id if bt else ''}" + (f"&person={pid}" if pid else "")

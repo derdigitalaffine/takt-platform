@@ -2261,7 +2261,8 @@ class BookingType(Base):
     online: Mapped[bool] = mapped_column(Boolean, default=False)          # Videokonferenz
     approval: Mapped[bool] = mapped_column(Boolean, default=False)        # Bestätigung durch Mitarbeitende
     phone_mode: Mapped[str] = mapped_column(String(10), default="optional")
-    privacy_mode: Mapped[str] = mapped_column(String(12), default="inherit")  # inherit | restricted | busy   # none | optional | required
+    privacy_mode: Mapped[str] = mapped_column(String(12), default="inherit")  # inherit | restricted | busy
+    routing_json: Mapped[str] = mapped_column(Text, default="{}")  # opt-in organization routing   # none | optional | required
     choose_provider: Mapped[bool] = mapped_column(Boolean, default=False)     # Bürger:innen wählen die Person
     fields_json: Mapped[str] = mapped_column(Text, default="[]")          # eigene Felder (Teil 2)
     color: Mapped[str] = mapped_column(String(9), default="")
@@ -3028,7 +3029,8 @@ _NEW_COLUMNS = {
                       "days_ahead": "INTEGER NOT NULL DEFAULT 60", "step_minutes": "INTEGER NOT NULL DEFAULT 15",
                       "holidays_closed": "BOOLEAN NOT NULL DEFAULT 1",
                       "integration_json": "TEXT NOT NULL DEFAULT '{}'"},
-    "booking_types": {"privacy_mode": "VARCHAR(12) NOT NULL DEFAULT 'inherit'"},
+    "booking_types": {"privacy_mode": "VARCHAR(12) NOT NULL DEFAULT 'inherit'",
+                      "routing_json": "TEXT NOT NULL DEFAULT '{}'"},
     "bookings": {"type_id": "INTEGER REFERENCES booking_types(id) ON DELETE SET NULL",
                  "provider_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL", "answers_json": "TEXT NOT NULL DEFAULT ''"},
     "votes": {"chart": "VARCHAR(8) NOT NULL DEFAULT 'bar'", "archived_at": "DATETIME", "used_at": "DATETIME"},

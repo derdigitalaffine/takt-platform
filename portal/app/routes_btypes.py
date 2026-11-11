@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import bookings as bk, btypes, shares as sh
-from .db import BookingClosure, BookingHours, BookingType, User
+from .db import BookingClosure, BookingHours, BookingType, Organization, User
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
 from .routes_bookings import _bpage, _int
 
@@ -20,8 +20,11 @@ def _users(db: Session) -> list[User]:
 @app.get("/bookings/{page_id}/arten")
 def btypes_page(request: Request, page_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     page, level = _bpage(db, page_id, user, sh.EDIT)
-    providers = btypes.all_providers(page)
-    return render(request, "booking_types.html", user, page=page, users=_users(db), providers=providers,
+    providers = btypes.all_providers(page, db)
+    organizations = list(db.scalars(select(Organization).where(
+        Organization.active.is_(True)).order_by(Organization.name)))
+    return render(request, "booking_types.html", user, page=page, users=_users(db),
+                  providers=providers, organizations=organizations, routing=btypes.routing,
                   plan=btypes.weekly_plan(page), weekdays=btypes.WEEKDAYS, durations=btypes.DURATIONS,
                   phone_modes=btypes.PHONE_MODES, summary=btypes.summary, field_kinds=btypes.FIELD_KINDS,
                   fields=btypes.fields, max_fields=btypes.MAX_FIELDS, can_video=user.can("video"),
@@ -61,11 +64,29 @@ async def btypes_save(request: Request, page_id: int, user: User = Depends(curre
                                          set(data.getlist("f_required")), data.getlist("f_help"))
     ids = {int(x) for x in data.getlist("providers") if str(x).isdigit()}
     bt.providers = list(db.scalars(select(User).where(User.id.in_(ids), User.active.is_(True)))) if ids else []
+    mode = str(data.get("routing_mode", "manual"))
+    if mode not in ("manual", "organization", "mixed"):
+        mode = "manual"
+    org_id = int(data.get("routing_org_id")) if str(data.get("routing_org_id", "")).isdigit() else None
+    if mode in ("organization", "mixed"):
+        org = db.get(Organization, org_id) if org_id else None
+        if not org or not org.active:
+            db.rollback()
+            flash(request, "Bitte eine aktive Organisationseinheit für die Terminverteilung auswählen.", "error")
+            return redirect(f"/bookings/{page.id}/arten")
+    else:
+        org_id = None
+    import json
+    bt.routing_json = json.dumps({"mode": mode, "org_id": org_id,
+                                  "include_children": data.get("routing_children") == "1"},
+                                 ensure_ascii=False)
+    db.flush()
+    eligible = btypes.providers_for(db, bt)
     db.commit()
-    missing = [p.name for p in bt.providers if not any(h.user_id == p.id for h in page.hours)]
+    missing = [p.name for p in eligible if not any(h.user_id == p.id for h in page.hours)]
     flash(request, f"Terminart „{bt.name}“ gespeichert." + (
         f" Noch ohne Sprechzeiten: {', '.join(missing)} – bitte unten eintragen." if missing else "")
-        + ("" if bt.providers else " Ohne zuständige Person wird sie nicht angeboten."))
+        + ("" if eligible else " Ohne geeignete zuständige Person wird sie nicht angeboten."))
     return redirect(f"/bookings/{page.id}/arten#art-{bt.id}")
 
 
