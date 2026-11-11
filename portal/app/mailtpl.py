@@ -782,6 +782,8 @@ SAMPLE = {
     "videolink": "Teilnahme per Videokonferenz:\nhttps://portal.example.org/join/beispiel",
     "verwalten": "https://portal.example.org/b/m/beispiel", "absagefrist": "24 Stunden",
     "hinweis": "Bitte bringen Sie Ihre Zeugnisse mit.", "anbieter": "Max Muster", "wer": "Sie haben",
+    "terminart": "Bauberatung", "vorher": "Dienstag, 13.10.2026, 09:00–09:45 Uhr",
+    "unterlagen": "Bitte Lageplan und Ausweis mitbringen.",
     "abwesend": "Max Muster", "vertretung": "Erika Mustermann",
     "eingetragen_von": "Max Muster", "notiz": "Notiz: Akten liegen im Schrank links.",
     "grund": "", "ereignis": "Neue Buchung", "gast": "Erika Mustermann <erika@example.org>", "nachricht": "",
