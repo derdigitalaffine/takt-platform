@@ -661,3 +661,29 @@ def test_in_app_review_reminders_are_opt_in_and_follow_current_rights(sample):
     settings(module_knowledge="0")
     assert reviewer.post(preference, data={"csrf": csrf, "enabled": "false"}).status_code == 404
     assert notice not in reviewer.get("/tasks").text
+
+
+def test_review_confirmation_rejects_current_amendment_contributor(sample):
+    _, _, article_id, _, _, reviewer_id = sample
+    _, reviewer = _publish_sample(sample)
+    admin = login(*ADMIN)
+    path = f"/wissen/artikel/{article_id}"
+    with SessionLocal() as db:
+        db.get(User, reviewer_id).permissions = "knowledge_read,knowledge_edit,knowledge_publish"
+        db.commit()
+    reviewer_csrf = csrf_of(reviewer.get(path).text)
+    assert reviewer.post(path + "/entwurf/start", data={"csrf": reviewer_csrf, "version": 3}).status_code == 303
+    assert reviewer.post(path + "/entwurf/status", data={
+        "csrf": reviewer_csrf, "status": "review", "version": 1,
+    }).status_code == 303
+    admin_csrf = csrf_of(admin.get(path + "/entwurf").text)
+    assert admin.post(path + "/entwurf/status", data={
+        "csrf": admin_csrf, "status": "published", "version": 2,
+    }).status_code == 303
+    assert reviewer.post(path + "/pruefung", data={
+        "csrf": reviewer_csrf, "version": 4, "authority": "verified",
+    }).status_code == 403
+    assert "Prüfung bestätigen und Termin speichern" not in reviewer.get(path).text
+    assert admin.post(path + "/pruefung", data={
+        "csrf": admin_csrf, "version": 4, "authority": "verified",
+    }).status_code == 303

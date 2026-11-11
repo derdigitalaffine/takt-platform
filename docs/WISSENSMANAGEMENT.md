@@ -73,10 +73,9 @@ Zugriffsentscheidungen dürfen niemals über bloße Navigationsausblendung erfol
 - **Prozessnotationen:** BPMN/CMMN/DMN/EPK und Prozessrekonstruktion sind
   geplante Ausbaustufen (#300, #301), noch keine Editoren.
 - **Governance:** P2 enthält voneinander getrennte Änderungsentwürfe,
-  revisionsbezogene Historie, einen Prüftermin und eingeschränkte fachliche
-  Qualitätsstufen. Delegierte Rollen, konfigurierbare mehrstufige Freigaben,
-  Erinnerungs-Worker, verknüpfte Dienstanweisungen/Umläufe und Wissenstransfer
-  bleiben Aufgaben von #298 / #302.
+  revisionsbezogene Historie, Wiedervorlagen, delegierte Raumverwaltung,
+  konfigurierbare Prüfpersonen und Fachquellverweise. Zeitgesteuerte
+  Versandkanäle und Wissenstransfer bleiben Aufgaben von #298 / #302.
 - **Suche:** Der Einstieg verwendet berechtigungsgefiltertes SQL-Textmatching
   mit begrenzter Kandidatenanzahl. Später folgen FTS/Hybrid-Vektor und
   indizierte Zugriffsfilter für große Datenbestände.
@@ -148,8 +147,6 @@ sein, bevor ein PR gemergt wird.
 - **Abgrenzung:** Der visuelle Blockeditor ist ein blockbasierter,
   Markdown-kompatibler Editor, aber kein freies HTML-/Layout-Canvas und
   keine Rich-Text-WYSIWYG-Oberfläche für alle möglichen Plugins.
-  Automatisierte Erinnerungen, mehrstufige fachliche Freigaben und
-  Quellverknüpfungen bleiben spätere Aufgaben von #298.
 
 
 ## P2 – delegierte Fachredaktion und Prüfungsübersicht
@@ -167,8 +164,8 @@ sein, bevor ein PR gemergt wird.
   innerhalb von 30 Tagen anstehende Reviews. Beiträge, die die
   prüfende Person selbst fachlich verfasst hat, werden nicht als
   freigebbar angeboten.
-- Keine automatischen E-Mails oder Intervieweinladungen; Reminder-
-  Automatisierung ist ein **separater späterer Schritt**. Keine
+- Persönliche Prüfhinweise können im Portal aktiviert werden.
+  Es gibt keine automatischen E-Mails, Intervieweinladungen oder
   personenbezogenen Leistungskennzahlen.
 - **Tests:** Organisationsisolierung, Rechteentzugswirkung, verbotene
   delegierte Rechteausweitung, CSRF, Review-Filter und Modulabschaltung.
@@ -261,3 +258,8 @@ wenn mindestens eine für die Person prüfbare Wiedervorlage heute fällig
 oder überfällig ist. Beim Seitenaufruf prüft TAKT die aktuellen Rechte.
 Der Hinweis enthält keine Artikeldaten und legt keine Aufgabe an.
 Die Voreinstellung ist aus. Es werden keine Nachrichten versandt.
+
+Die Wiedervorlage einer veröffentlichten Fassung darf nur eine unabhängige
+Person bestätigen. Wer an der aktuell veröffentlichten Fassung
+mitgewirkt hat, erhält für diese Fassung
+keinen Prüfhinweis und kann die Bestätigung nicht ausführen.
