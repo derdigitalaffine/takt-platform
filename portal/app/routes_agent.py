@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import agent, agent_intent, ai_provider, agent_mode
+from . import agent, agent_intent, ai_provider, agent_mode, agent_task_draft
 from .ai_models import AIProvider, AIConversation, AIMessage
 from .db import User
 from .main import app, check_csrf, current_user, get_db, rate_limit, stash_get, stash_put
@@ -138,6 +138,33 @@ def _navigation_response(db, user, convo, provider, prompt, target):
     }
 
 
+def _open_task_draft(request, db, user, convo, provider, prompt, task_text):
+    from . import agent_drafts
+    from .db import utcnow
+    from .routes_ai import _ai_markdown
+
+    action, message = agent_task_draft.initial(db, user, task_text)
+    if convo:
+        if not convo.messages:
+            convo.title = prompt[:100]
+        db.add_all([
+            AIMessage(conversation_id=convo.id, role="user", content="/takt " + prompt),
+            AIMessage(conversation_id=convo.id, role="assistant", content=message,
+                      model_id=provider.model_id if provider else ""),
+        ])
+        convo.updated_at = utcnow()
+        db.commit()
+    nonce = secrets.token_urlsafe(24)
+    plan = dict(nonce=nonce, user_id=user.id, actions=[action], delivery="forms",
+                task_revision=0, task_provider_id=provider.id if provider else None)
+    stash_put(request, "takt-agent-plan", plan)
+    return _response(dict(
+        mode="operate", open_url=agent_drafts.url(plan), open_task_draft=True, message=message,
+        html=_ai_markdown(message), proposals=agent.preview(db, [action]),
+        results=[], sources=[], steps=[], plan_id=nonce,
+    ))
+
+
 @app.post("/agent/plan", dependencies=[Depends(check_csrf)])
 async def takt_agent_plan(request: Request, prompt: str = Form(...),
                           chat_id: int = Form(0), use_knowledge: str = Form(""), use_web: str = Form(""),
@@ -186,6 +213,11 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
                               proposals=[], results=[], steps=[], plan_id=""))
     rate_limit(request, "takt-agent-plan", limit=24, window=60, key=str(user.id))
     provider = db.get(AIProvider, convo.provider_id) if convo else db.scalar(select(AIProvider).where(AIProvider.active.is_(True)).order_by(AIProvider.id))
+    if intent == "operate" and use_web != "1" and agent.allowed(user, "tasks"):
+        task_text = agent_task_draft.match(prompt)
+        if task_text is not None:
+            return _open_task_draft(request, db, user, convo, provider if provider and provider.active else None,
+                                    prompt, task_text)
     if not provider or not provider.active:
         raise HTTPException(503, "Für TAKT Agent ist noch kein aktiver KI-Provider eingerichtet.")
 
@@ -372,6 +404,56 @@ def takt_agent_draft(request: Request, plan_id: str, step: int = 0,
     return _response(data)
 
 
+@app.post("/agent/draft/task", dependencies=[Depends(check_csrf)])
+async def takt_agent_task_draft(request: Request, plan_id: str = Form(...),
+                               revision: int = Form(...), prompt: str = Form(...),
+                               user: User = Depends(current_user), db: Session = Depends(get_db)):
+    import asyncio
+    from . import agent_drafts
+
+    _access(user)
+    agent_task_draft.authorize(user)
+    plan, action = agent_drafts.load(request, user, plan_id, 0)
+    if not action.get("live_task") or revision != plan.get("task_revision"):
+        raise HTTPException(409, "Der Aufgabenentwurf hat sich geändert. Bitte die Seite neu laden.")
+    prompt = prompt.strip()
+    if not 1 <= len(prompt) <= 2000:
+        raise HTTPException(422, "Bitte eine Ergänzung mit 1 bis 2.000 Zeichen eingeben.")
+    rate_limit(request, "takt-agent-task-draft", limit=20, window=60, key=str(user.id))
+    provider = db.get(AIProvider, plan["task_provider_id"]) if plan.get("task_provider_id") else None
+    if not provider or not provider.active:
+        raise HTTPException(503, "Das Textmodell ist nicht verfügbar. Du kannst den Entwurf direkt bearbeiten.")
+    data = await request.form()
+    current = agent_task_draft.values({**action, **data})
+    from . import agent_krank
+    if any(agent.sensitive_request(value) or agent_krank.SIGNAL.search(value)
+           for value in (prompt, *current.values())):
+        raise HTTPException(422, "Bitte trage diese Angabe direkt in die Fachmaske ein.")
+    try:
+        async with asyncio.timeout(15):
+            reply = await ai_provider.complete(provider, agent_task_draft.messages(prompt, current), max_tokens=700)
+        db.expire_all()
+        _access(user)
+        agent_task_draft.authorize(user)
+        changes, notices = agent_task_draft.patch(db, user, reply, current)
+    except (ValueError, ai_provider.AIProviderError, TimeoutError) as exc:
+        raise HTTPException(422, "Die Ergänzung konnte nicht übernommen werden. Der Entwurf bleibt geöffnet.") from exc
+
+    latest, _ = agent_drafts.load(request, user, plan_id, 0)
+    if latest is not plan:
+        raise HTTPException(409, "Der Aufgabenentwurf hat sich geändert. Bitte die Seite neu laden.")
+    if not changes:
+        return _response(dict(fields={}, revision=revision, message=" ".join(notices) or "Keine passenden Änderungen gefunden."))
+    updated = dict(action, **current)
+    updated.update(changes)
+    revision += 1
+    next_plan = dict(plan, actions=[updated], task_revision=revision)
+    next_plan.pop("review", None)
+    stash_put(request, "takt-agent-plan", next_plan)
+    message = "Entwurf ergänzt. " + " ".join(notices)
+    return _response(dict(fields=changes, revision=revision, message=message.strip()))
+
+
 @app.post("/agent/draft/review", dependencies=[Depends(check_csrf)])
 async def takt_agent_draft_review(request: Request, user: User = Depends(current_user),
                                   db: Session = Depends(get_db)):
@@ -384,11 +466,12 @@ async def takt_agent_draft_review(request: Request, user: User = Depends(current
     except (TypeError, ValueError):
         raise HTTPException(422, "Ungültiger Schritt.")
     plan, action = agent_drafts.load(request, user, str(data.get("agent_plan", "")), step)
+    if action.get("live_task") and data.get("task_revision") != str(plan["task_revision"]):
+        raise HTTPException(409, "Der Aufgabenentwurf hat sich geändert. Bitte die Seite neu laden.")
     updated = agent_drafts.edited(db, user, action, data)
     review_id = secrets.token_urlsafe(24)
-    plan["review"] = dict(nonce=review_id, step=step, action=updated)
-    plan["delivery"] = "forms"
-    stash_put(request, "takt-agent-plan", plan)
+    review = dict(nonce=review_id, step=step, action=updated)
+    stash_put(request, "takt-agent-plan", dict(plan, review=review, delivery="forms"))
     response = render(request, "agent_draft_review.html", user, plan_id=plan["nonce"],
                       review_id=review_id, step=step, total=len(plan["actions"]),
                       proposal=agent.preview(db, [updated])[0], back=agent_drafts.url(plan, step))

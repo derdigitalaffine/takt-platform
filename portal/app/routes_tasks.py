@@ -31,10 +31,10 @@ def groups(db, user):
     return list(db.scalars(q))
 
 
-def editor(request, db, user, data, error='', notices=(), *, row=None, back='/tasks', original=''):
+def editor(request, db, user, data, error='', notices=(), *, row=None, back='/tasks', original='', live_agent=None):
     response = render(request, 'task_editor.html', user, data=data, error=error, notices=notices, task=row,
                   people=ts.users(db), groups=groups(db, user), statuses=ts.STATUSES, priorities=ts.PRIORITIES,
-                  back=back_path(back), original=original)
+                  back=back_path(back), original=original, live_agent=live_agent)
     response.status_code = 422 if error else 200
     return response
 
@@ -44,7 +44,18 @@ def new_task(request: Request, user: User = Depends(current_user), db: Session =
     module_on()
     if not ts.may_create(user):
         raise HTTPException(403)
-    return editor(request, db, user, dict(assignee_id=str(user.id), priority='normal'), back=request.query_params.get('back'))
+    back = request.query_params.get("back")
+    nonce = request.query_params.get("agent_plan")
+    if nonce and request.query_params.get("agent_step", "0") == "0":
+        from . import agent_drafts, agent_task_draft
+
+        plan, action = agent_drafts.load(request, user, nonce, 0)
+        if action.get("live_task"):
+            agent_task_draft.authorize(user)
+            response = editor(request, db, user, action, back=back, live_agent=plan)
+            response.headers["Cache-Control"] = "no-store"
+            return response
+    return editor(request, db, user, dict(assignee_id=str(user.id), priority="normal"), back=back)
 
 
 @app.post('/aufgaben/vorschau', dependencies=[Depends(check_csrf)])

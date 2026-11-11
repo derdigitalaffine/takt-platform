@@ -55,8 +55,7 @@ def test_explicit_command_keeps_checked_preview_and_persists_mode(monkeypatch):
 def test_no_js_command_has_safe_native_handoff_and_stream_route_never_executes(monkeypatch):
     c=login(*ADMIN);csrf=csrf_of(c.get('/').text)
     new=c.post('/agent/new',data=dict(csrf=csrf));cid=int(new.headers['location'].split('chat=')[1])
-    fake(monkeypatch,[],[dict(tool='create_task',title='Ohne JavaScript',description='Native Übergabe')])
-    r=c.post(f'/agent/{cid}/message',data=dict(csrf=csrf,message='/takt Erstelle eine Aufgabe'))
+    r=c.post(f'/agent/{cid}/message',data=dict(csrf=csrf,message='/takt Erstelle eine Aufgabe Ohne JavaScript'))
     assert r.status_code==200 and 'Vorschlag im Fachbereich prüfen' in r.text and 'Ohne JavaScript' in r.text
     assert c.post(f'/agent/{cid}/message/updates',data=dict(csrf=csrf,message='/takt Erstelle eine Aufgabe')).status_code==409
     with SessionLocal() as db:pid=db.scalar(select(AIProvider.id).where(AIProvider.active.is_(True)))

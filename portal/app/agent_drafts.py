@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 
 from fastapi import HTTPException
 
-from . import agent, agent_applications, agent_forms, tasks, anliegen
+from . import agent, agent_applications, agent_forms, agent_task_draft, tasks, anliegen
 from .db import DmsArea, LOCAL_TZ
 
 
@@ -67,6 +67,9 @@ def load(request, user, nonce, step):
 
 
 def validate(db, user, action):
+    if action.get("live_task"):
+        agent_task_draft.authorize(user)
+        return
     if action["tool"] in agent_applications.TOOLS:
         agent_applications.validate(db, user, action)
         return
@@ -148,7 +151,7 @@ def view(db, user, plan, step):
     return dict(tool=tool, fields=fields, id=action.get("id"), step=step,
                 total=len(plan["actions"]), preview=agent.preview(db, [action])[0],
                 path=destination(action).split("?")[0],
-                event_times=event_times)
+                event_times=event_times, task_revision=plan.get("task_revision"))
 
 
 def edited(db, user, original, data):
@@ -191,6 +194,9 @@ def edited(db, user, original, data):
                 except ValueError:
                     raise HTTPException(422, "Bitte ein gültiges Ziel auswählen.")
             raw[key] = value
+    if original.get("live_task") and isinstance(raw["assignee_id"], str):
+        assignee = raw["assignee_id"]
+        raw["assignee_id"] = int(assignee) if assignee.isascii() and assignee.isdigit() else 0
     if tool=="create_survey":
         import json
         for key in ("options","questions"):

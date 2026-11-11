@@ -76,6 +76,7 @@
     }
     if (!form) throw new Error('Die Fachmaske ist nicht verfügbar. Bitte den Vorschlag neu planen.');
     const fields = {...data.fields};
+    const liveTask = tool === 'create_task' && fields.live_task === true;
     if (tool === 'set_krank_status') {
       const chosen = form.querySelector(`button[name="status"][value="${data.fields.status}"]`);
       if (!chosen || chosen.disabled) throw new Error('Dieser Statuswechsel ist nicht mehr verfügbar.');
@@ -186,6 +187,7 @@
     if (submit) { submit.className = 'btn btn-primary'; submit.textContent = 'Vorschlag prüfen'; }
     hidden('csrf', document.querySelector('meta[name="csrf"]')?.content || '');
     hidden('agent_plan', nonce); hidden('agent_step', String(data.step));
+    if (liveTask) hidden('task_revision', String(data.task_revision));
     form.action = '/agent/draft/review'; form.method = 'post';
     // Capture before calendar/task progressive-enhancement handlers.
     form.addEventListener('submit', event => {
@@ -197,8 +199,11 @@
     if (formBuilder && submit) submit.disabled = false;
     banner.replaceChildren();
     const heading = document.createElement('h2'); heading.className = 'h5';
-    heading.textContent = `TAKT-Agent-Vorschlag · ${data.total} Schritt${data.total === 1 ? '' : 'e'} offen`;
-    const text = document.createElement('p'); text.textContent = 'Die Fachmaske ist ausgefüllt. Prüfen und bearbeiten Sie die freigeschalteten Angaben. Es wurde noch nichts gespeichert.';
+    heading.textContent = liveTask ? 'Aufgabenentwurf' :
+      `TAKT-Agent-Vorschlag · ${data.total} Schritt${data.total === 1 ? '' : 'e'} offen`;
+    const text = document.createElement('p');
+    text.textContent = liveTask ? 'Ergänze die Aufgabe per Nachricht oder direkt in der Maske. Gespeichert wird erst nach deiner Bestätigung.' :
+      'Die Fachmaske ist ausgefüllt. Prüfen und bearbeiten Sie die freigeschalteten Angaben. Es wurde noch nichts gespeichert.';
     const preview = document.createElement('p'); preview.style.whiteSpace = 'pre-wrap'; preview.className = 'small text-break'; preview.textContent = data.preview;
     const back = document.createElement('a'); back.href = '/agent'; back.textContent = 'Zurück zum TAKT-Agenten';
     const discard = document.createElement('form'); discard.method = 'post'; discard.action = '/agent/draft/cancel';
@@ -206,11 +211,88 @@
       const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; discard.appendChild(input);
     }
     const discardButton = document.createElement('button'); discardButton.type = 'submit'; discardButton.className = 'btn btn-sm btn-outline-secondary'; discardButton.textContent = 'Vorschlag verwerfen'; discard.appendChild(discardButton);
-    banner.append(heading, text, preview, back, discard);
+    banner.append(heading, text);
+    if (liveTask) {
+      addTaskPrompt(banner, form, allowed, fields, nonce, data.task_revision);
+      const footer = document.createElement('div');
+      footer.className = 'd-flex flex-wrap align-items-center gap-3 mt-3 small';
+      footer.append(back, discard);
+      banner.append(footer);
+    } else {
+      banner.append(preview, back, discard);
+    }
     banner.scrollIntoView({block: 'start'});
     const first = form.querySelector('input:not([type="hidden"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)');
     first?.focus({preventScroll: true});
   } catch (error) {
     banner.className = 'alert alert-warning'; banner.textContent = error.message;
+  }
+
+  function addTaskPrompt(banner, editor, fields, initial, nonce, revision) {
+    const promptForm = document.createElement('form');
+    promptForm.className = 'd-flex flex-wrap align-items-end gap-2';
+    const field = document.createElement('div');
+    field.className = 'flex-grow-1';
+    const label = document.createElement('label');
+    label.htmlFor = 'agent-task-prompt';
+    label.className = 'form-label small fw-semibold';
+    label.textContent = 'Aufgabe ergänzen';
+    const prompt = document.createElement('textarea');
+    prompt.id = label.htmlFor;
+    prompt.className = 'form-control';
+    prompt.rows = 2;
+    prompt.maxLength = 2000;
+    prompt.required = true;
+    prompt.placeholder = 'Zum Beispiel: Bis Freitag um 14 Uhr, hohe Priorität';
+    field.append(label, prompt);
+    const send = document.createElement('button');
+    send.className = 'btn btn-primary';
+    send.type = 'submit';
+    send.textContent = 'Entwurf ergänzen';
+    const status = document.createElement('p');
+    status.className = 'small mb-0 mt-2';
+    status.setAttribute('role', 'status');
+    promptForm.append(field, send);
+    banner.append(promptForm, status);
+    const allowed = fields.filter(name => Object.hasOwn(initial, name));
+    promptForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (send.disabled || !prompt.value.trim()) return;
+      const current = Object.fromEntries(allowed.map(name => [name, editor.elements.namedItem(name).value]));
+      const body = new URLSearchParams({
+        ...current, plan_id: nonce, revision: String(revision), prompt: prompt.value,
+        csrf: editor.elements.namedItem('csrf').value
+      });
+      send.disabled = true;
+      status.textContent = 'Ergänzung wird vorbereitet …';
+      try {
+        const response = await fetch('/agent/draft/task', {
+          method: 'POST', body, credentials: 'same-origin', cache: 'no-store',
+          headers: {'Accept': 'application/json'}
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Ergänzung konnte nicht übernommen werden.');
+        let skipped = false;
+        for (const [name, value] of Object.entries(result.fields)) {
+          if (!allowed.includes(name)) continue;
+          const control = editor.elements.namedItem(name);
+          if (control.value !== current[name]) { skipped = true; continue; }
+          if (control.tomselect) control.tomselect.setValue(value, true);
+          else control.value = value;
+          control.dispatchEvent(new Event('change', {bubbles: true}));
+          const details = control.closest('details');
+          if (details) details.open = true;
+        }
+        revision = result.revision;
+        editor.elements.namedItem('task_revision').value = String(revision);
+        prompt.value = '';
+        status.textContent = result.message + (skipped ? ' Deine parallelen Eingaben bleiben erhalten.' : '');
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        send.disabled = false;
+        prompt.focus();
+      }
+    });
   }
 })();

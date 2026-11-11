@@ -310,6 +310,13 @@
         assistantBubble.content.innerHTML = data.html;
       }
       addAnswerMetadata(assistantBubble.bubble, data);
+      // The server can open an explicitly requested new task at this one native route.
+      if (data.open_task_draft === true &&
+          /^\/aufgaben\/neu\?agent_plan=[A-Za-z0-9_-]{32}&agent_step=0$/.test(data.open_url)) {
+        status.textContent = 'Aufgabenentwurf wird geöffnet …';
+        window.top.location.assign(data.open_url);
+        return;
+      }
       const list = document.createElement('ul');
       for (const result of data.results || []) {
         if (!/^\/(?:(?:aufgaben|anliegen|forms|processes)\/\d+|dms\/r\/\d+|urlaub\/vorgang\/\d+|kalender\?ansicht=termine)$/.test(result.url || '')) continue;
