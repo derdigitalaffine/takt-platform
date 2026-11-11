@@ -224,6 +224,8 @@ def project(db, user, kind, start, end, *, channel="web"):
                     title = page.title + ": " + row.name
                     if row.type is not None:
                         title = row.type.name + ": " + row.name
+                elif visibility == "type" and row.type is not None:
+                    title = "Bürgertermin: " + row.type.name
                 else:
                     title = "Bürgertermin (belegt)"
                 add(
