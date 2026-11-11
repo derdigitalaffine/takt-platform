@@ -70,6 +70,9 @@ def _apply(page: BookingPage, data) -> None:
                                  if flag("conflict_" + key)],
             "staff_calendar_attachment": flag("staff_calendar_attachment"),
             "mail_digest": flag("mail_digest"),
+            "owner_mail_events": [key for key in booking_integration.OWNER_MAIL_EVENTS
+                                  if key in data.getlist("owner_mail_events")],
+            "request_escalation_hours": _int(data.get("request_escalation_hours"), 0, 168, 0),
             "calendar_privacy": data.get("calendar_privacy") if data.get("calendar_privacy")
                                 in ("staff", "assigned", "busy") else "staff",
             "external_calendar": data.get("external_calendar") if data.get("external_calendar")
@@ -85,7 +88,8 @@ def _settings_ctx(page: BookingPage | None, user: User) -> dict:
         "calendar_conflicts": True, "conflict_sources": ["personal", "meetings"],
         "staff_calendar_attachment": False, "mail_digest": False}
     return {"page": page, "slot_choices": SLOT_CHOICES, "pause_choices": PAUSE_CHOICES, "durations": DURATIONS,
-            "can_video": user.can("video"), "integration": integration}
+            "can_video": user.can("video"), "integration": integration,
+            "owner_mail_choices": booking_integration.OWNER_MAIL_EVENTS}
 
 
 # --- Verwaltung --------------------------------------------------------------------------
