@@ -269,21 +269,57 @@ def signage_revoke_device(sid: int, device_id: int, request: Request, user: User
     return redirect(f"/signage/{sid}/edit")
 
 
-@app.post("/signage/api/device/{device_id:int}/heartbeat")
-def signage_heartbeat(device_id: int, request: Request, db: Session = Depends(get_db)):
+def _device_access(request: Request, db, device_id: int):
+    """Dedicated player bearer: no portal session, no access to CRUD."""
     _enabled()
-    rate_limit(request, "signage-device", limit=90, window=60)
-    secret = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    secret = request.headers.get("Authorization", "")
+    secret = secret[len("Bearer "):].strip() if secret.startswith("Bearer ") else ""
     device = db.get(SignageDevice, device_id)
-    if not device or device.revoked or len(secret) < 32 or not compare_digest(signage.digest(secret), device.secret_hash):
+    if not device or device.revoked or len(secret) < 32 or len(secret) > 128:
+        raise HTTPException(403)
+    if not compare_digest(signage.digest(secret), device.secret_hash):
         raise HTTPException(403)
     screen = db.get(SignageScreen, device.screen_id)
     if not screen or not screen.enabled:
         raise HTTPException(404)
+    return device, screen
+
+
+@app.post("/signage/api/device/{device_id:int}/heartbeat")
+def signage_heartbeat(device_id: int, request: Request, db: Session = Depends(get_db)):
+    rate_limit(request, "signage-device", limit=90, window=60)
+    device, screen = _device_access(request, db, device_id)
     device.last_seen_at = utcnow()
     db.commit()
     return JSONResponse({"ok": True, "screen_id": screen.id, "version": screen.version,
                          "kind": screen.kind}, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/signage/api/device/{device_id:int}/manifest")
+def signage_device_manifest(device_id: int, request: Request, db: Session = Depends(get_db)):
+    """Machine-readable player feed, limited to the same safe kiosk projection."""
+    rate_limit(request, "signage-manifest", limit=120, window=60)
+    _, screen = _device_access(request, db, device_id)
+    projected = signage.context(db, screen, public=True)
+    events = [{
+        "start": ev["start"].isoformat(), "end": ev["end"].isoformat(),
+        "busy": True, "ongoing": ev["ongoing"], "label": "Belegt",
+    } for ev in projected["events"]]
+    org = db.get(Organization, screen.org_id) if screen.org_id else None
+    return JSONResponse({
+        "screen": {"id": screen.id, "version": screen.version, "name": screen.name,
+                   "kind": screen.kind, "subtitle": screen.subtitle,
+                   "direction": screen.direction},
+        "theme": projected["theme"], "widgets": projected["widgets"],
+        "brand": {"name": branding.load()["name"],
+                  "logo": f"/org/{org.id}/logo" if org and org.logo else None},
+        "room": {"number": projected["room"].number,
+                 "name": projected["room"].name} if projected["room"] else None,
+        "status": {"busy": bool(projected["busy"]), "updated_at": projected["now"].isoformat()},
+        "events": events,
+        "directory": projected["staff"],
+        "waypoints": projected["waypoints"],
+    }, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 @app.post("/signage/structure", dependencies=[Depends(check_csrf)])
