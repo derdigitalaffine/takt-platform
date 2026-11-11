@@ -103,7 +103,7 @@ def internal_busy(db, user_id: int, start: datetime, end: datetime, *, scopes=No
                 if event.ical_data:
                     from icalendar import Calendar as ICalendar
                     parsed = ICalendar.from_ical(event.ical_data)
-                    master = next(parsed.walk("VEVENT"), None)
+                    master = next(iter(parsed.walk("VEVENT")), None)
                     if master and (str(master.get("TRANSP", "OPAQUE")).upper() == "TRANSPARENT"
                                    or str(master.get("STATUS", "")).upper() == "CANCELLED"):
                         continue
