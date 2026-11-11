@@ -59,7 +59,25 @@
         <section class="sd-tile sd-wayfinder" aria-label="Raumwegweiser"><h2><i class="fa-solid fa-signs-post" aria-hidden="true"></i> Wegweiser</h2>
           <label class="sd-search-label">Raum oder Ziel suchen<input type="search" class="sd-search" data-sg-search="rooms" placeholder="Raum, Gebäude oder Geschoss eingeben" autocomplete="off" aria-label="Raum oder Ziel suchen"></label>
           {% if screen.direction %}<div class="sd-direction"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><strong>{{ screen.direction }}</strong></div>{% endif %}
-          {% if waypoints %}<div class="sd-directory-grid">{% for point in waypoints[:24] %}<article class="sd-person" data-sg-entry><strong>{{ point.label }} · {{ point.number }}</strong><span>{{ point.building }} · {{ point.floor }}{% if point.accessible %} · barrierefrei{% endif %}</span></article>{% endfor %}</div>
+          {% if waypoints %}<div class="sd-directory-grid">{% for point in waypoints %}
+            <article class="sd-person" data-sg-entry>
+              <strong>{{ point.label }} · {{ point.number }}</strong>
+              <span>{{ point.building }} · {{ point.floor }}{% if point.accessible %} · barrierefrei{% endif %}</span>
+              {% if point.route %}
+              <details class="sd-route-details">
+                <summary><i class="fa-solid fa-route" aria-hidden="true"></i> Weg anzeigen · ca. {{ point.route.distance_m }} m</summary>
+                <ol>{% for step in point.route.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+              </details>
+              {% else %}<span class="sd-route-unavailable">Noch keine Route hinterlegt</span>{% endif %}
+              {% if point.accessible_route and (not point.route or point.accessible_route.steps != point.route.steps) %}
+              <details class="sd-route-details">
+                <summary><i class="fa-solid fa-wheelchair-move" aria-hidden="true"></i> Barrierefreier Weg · ca. {{ point.accessible_route.distance_m }} m</summary>
+                <ol>{% for step in point.accessible_route.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+              </details>
+              {% elif point.accessible_route and point.route %}
+              <span class="sd-route-accessible"><i class="fa-solid fa-wheelchair-move" aria-hidden="true"></i> Weg ist barrierefrei</span>
+              {% endif %}
+            </article>{% endfor %}</div>
           {% else %}<div class="sd-empty">Noch keine Räume hinterlegt.</div>{% endif %}
         </section>
         {% elif widget == 'message' %}
