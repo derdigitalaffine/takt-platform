@@ -791,6 +791,12 @@ def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set
                                 "content_b64": base64.b64encode(read_file(f)).decode()} for f in files] or None
             except Exception:  # noqa: BLE001
                 log.exception("Vorgesetzten-AU für %s nicht geladen", report.ref_no)
+        # Revalidate at actual SMTP delivery, because permissions can change
+        # while an AU message waits in the queue.
+        if attachments and user is not None:
+            attachments[0]["_krank_supervisor_guard"] = {
+                "report_id": report.id, "user_id": user.id, "mode": mode,
+            }
         # Already notified as an HR recipient: do not send duplicate notices.
         if recipient in exclude and not attachments:
             continue
@@ -803,6 +809,31 @@ def _mail_supervisors(db, report: KrankReport, cfg: dict[str, str], exclude: set
                  "Ärztliche Nachweise und weitere vertrauliche Angaben sind nicht beigefügt."))
         if notify.enqueue(db, recipient, subject, body, "krank", cfg, attachments=attachments):
             add_event(report, "mail", f"Vorgesetztenhinweis an {recipient}", by="System")
+
+
+def supervisor_attachment_authorized(db, recipient: str, guard: dict) -> bool:
+    """Recheck AU delivery against live organizational roles and case access."""
+    if not isinstance(guard, dict):
+        return False
+    report_id, user_id, mode = (
+        guard.get("report_id"), guard.get("user_id"), guard.get("mode")
+    )
+    if (type(report_id) is not int or type(user_id) is not int
+            or mode not in {"pdf", "original"}):
+        return False
+    report = db.get(KrankReport, report_id)
+    user = db.get(User, user_id)
+    if not report or not user or not user.active:
+        return False
+    employer = report.employer
+    if (employer is None or not employer.active
+            or not employer.notify_supervisors
+            or employer.supervisor_attachment_mode != mode):
+        return False
+    if (user.email or "").strip().lower() != recipient.strip().lower():
+        return False
+    return (user.email.lower() in supervisor_recipients(db, employer)
+            and can_see(db, user, report))
 
 
 def staff_recipients(db, employer: KrankEmployer | None, cfg: dict[str, str]) -> list[str]:
