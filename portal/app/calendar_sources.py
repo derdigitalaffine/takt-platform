@@ -91,10 +91,16 @@ def project(db, user, kind, start, end, *, channel="web"):
 
             if seminar_hybrid.is_seminar_room(db, row):
                 continue
-            # Videokonferenzen, die aus Bürgerbuchungen entstanden sind, sind
-            # über die Buchungsquelle bereits sichtbar: keine Doppelanzeige.
-            if db.scalar(select(Booking.id).where(Booking.meeting_id == row.id).limit(1)) is not None:
-                continue
+            # Avoid duplicate booking and meeting entries only when this
+            # actor can actually see the corresponding booking projection.
+            # Invited portal users without booking permissions must retain
+            # their meeting entry rather than losing it altogether.
+            related = db.scalar(select(Booking).where(Booking.meeting_id == row.id).limit(1))
+            if related is not None:
+                from . import shares
+                if (shares.access_level(db, "booking", related.page, user) >= shares.VIEW
+                        or related.provider_id == user.id):
+                    continue
             add(
                 row.id,
                 row.title,
