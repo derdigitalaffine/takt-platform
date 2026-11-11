@@ -224,11 +224,12 @@ def test_studio_revision_restore_leaves_publication_and_links_unchanged():
             SignageRevision.screen_id == sid, SignageRevision.version == 1))
         assert created
         revision_id = created.id
+        starting_version = db.get(SignageScreen, sid).version
     editor = c.get(f"/signage/{sid}/edit")
     assert "Designverlauf" in editor.text
     csrf = csrf_of(editor.text)
     changed = c.post(f"/signage/{sid}/save", data={
-        "csrf": csrf, "version": "1", "name": "Neues Design",
+        "csrf": csrf, "version": str(starting_version), "name": "Neues Design",
         "kind": "info", "visibility": "public", "enabled": "1",
         "background": "#000000", "foreground": "#ffffff", "accent": "#42d4ad",
         "layout_json": '["clock","message"]',
@@ -236,22 +237,22 @@ def test_studio_revision_restore_leaves_publication_and_links_unchanged():
     assert changed.status_code == 303
     with SessionLocal() as db:
         row = db.get(SignageScreen, sid)
-        assert row.version == 2 and row.visibility == "public"
+        assert row.version == starting_version + 1 and row.visibility == "public"
         assert db.scalar(select(SignageRevision).where(SignageRevision.screen_id == sid,
-                                                       SignageRevision.version == 2))
+                                                       SignageRevision.version == starting_version + 1))
     stale = c.post(f"/signage/{sid}/save", data={"csrf": csrf, "version": "1",
              "name": "Old tab", "kind": "agenda", "visibility": "link"})
     assert stale.status_code == 409
     restored = c.post(f"/signage/{sid}/revision/{revision_id}/restore",
-                      data={"csrf": csrf, "version": "2"})
+                      data={"csrf": csrf, "version": str(starting_version + 1)})
     assert restored.status_code == 303
     with SessionLocal() as db:
         row = db.get(SignageScreen, sid)
         assert row.name == "Original" and row.kind == "room"
-        assert row.version == 3
+        assert row.version == starting_version + 2
         assert row.visibility == "public"  # Never restore publication state.
         assert db.scalar(select(SignageRevision).where(SignageRevision.screen_id == sid,
-                                                       SignageRevision.version == 3))
+                                                       SignageRevision.version == starting_version + 2))
 
 
 def test_live_preview_changes_are_not_persisted():
