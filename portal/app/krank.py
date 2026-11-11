@@ -687,8 +687,20 @@ def employee_reply(db, report: KrankReport, text: str, upload: tuple[str, bytes]
         raise ValueError("Bitte eine Datei auswählen oder eine Nachricht schreiben.")
     audit(db, None, report, "nachgereicht", ", ".join(parts))
     cfg = get_settings(db)
+    attachments = None
+    if upload and report.employer and report.employer.attach_files:
+        try:
+            attachments = [{"filename": f"{report.ref_no}.pdf", "mime": "application/pdf",
+                            "content_b64": base64.b64encode(pdf(report)).decode()}]
+            if report.employer.attach_original_au and report.kind in {"au", "child"}:
+                attachments.append({"filename": file_name(f), "mime": f.mime,
+                                    "content_b64": base64.b64encode(read_file(f)).decode()})
+        except Exception:  # noqa: BLE001
+            log.exception("Nachgereichten Nachweis für %s nicht als Mailanhang erzeugt", report.ref_no)
+            attachments = None
     for to in staff_recipients(db, report.employer, cfg):
-        _mail(db, cfg, to, "krank_staff_update", report, ereignis=" und ".join(parts))
+        _mail(db, cfg, to, "krank_staff_update", report, attachments=attachments,
+              ereignis=" und ".join(parts))
     sync_dms(db, report)
 
 
