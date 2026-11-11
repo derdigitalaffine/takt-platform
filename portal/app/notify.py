@@ -236,7 +236,8 @@ def text_to_html(text: str, frame: dict | None = None, *, kind: str = "") -> str
             button = f'<a href="{html.escape(lines[1], quote=True)}" style="display:inline-block;padding:12px 18px;border-radius:6px;background:{color};color:#ffffff;font-weight:600;text-decoration:none">{html.escape(label)}</a>'
             content = button + ('<br>' + links('\n'.join(lines[2:])) if len(lines)>2 else '')
         else: content = links(part)
-        paragraphs.append(f'<p style="margin:0 0 14px">{content}</p>')
+        paragraphs.append(content if booking and label == "TERMINÜBERSICHT"
+                          else f'<p style="margin:0 0 14px">{content}</p>')
     paragraphs = ''.join(paragraphs)
     font = "font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.5;color:#1f2328"
     if not frame:
