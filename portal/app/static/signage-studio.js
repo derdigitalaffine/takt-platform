@@ -43,56 +43,60 @@
   }
   form.addEventListener('input', queueLivePreview);
   form.addEventListener('change', queueLivePreview);
-    const list = document.getElementById('sg-widget-list');
-  const hidden = document.getElementById('sg-layout-json');
-  let initial = [];
-  try { initial = JSON.parse(hidden.value); } catch (_) { /* defaults remain */ }
-  if (Array.isArray(initial)) {
-    const ordered = initial.map(key => [...list.children].find(item => item.dataset.widget === key)).filter(Boolean);
-    ordered.forEach(item => list.appendChild(item));
-  }
-  function sync() {
-    hidden.value = JSON.stringify([...list.querySelectorAll('.sg-widget-choice')]
-      .filter(item => item.querySelector('input').checked).map(item => item.dataset.widget));
-    queueLivePreview();
-  }
-  list.addEventListener('change', sync);
-  list.addEventListener('click', event => {
-    const btn = event.target.closest('.sg-widget-up,.sg-widget-down');
-    if (!btn) return;
-    const item = btn.closest('.sg-widget-choice');
-    if (btn.classList.contains('sg-widget-up') && item.previousElementSibling) {
-      list.insertBefore(item, item.previousElementSibling);
-    } else if (btn.classList.contains('sg-widget-down') && item.nextElementSibling) {
-      list.insertBefore(item.nextElementSibling, item);
+  const list = document.getElementById('sg-widget-list');
+  if (list) {
+    const hidden = document.getElementById('sg-layout-json');
+    let initial = [];
+    try { initial = JSON.parse(hidden.value); } catch (_) { /* defaults remain */ }
+    if (Array.isArray(initial)) {
+      const ordered = initial.map(key => [...list.children].find(item => item.dataset.widget === key)).filter(Boolean);
+      ordered.forEach(item => list.appendChild(item));
     }
-    sync();
-    btn.focus();
-  });
-  let dragging = null;
-  list.addEventListener('dragstart', event => {
-    const item = event.target.closest('.sg-widget-choice');
-    if (!item) return;
-    dragging = item;
-    item.classList.add('is-dragging');
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', item.dataset.widget);
-  });
-  list.addEventListener('dragover', event => {
-    if (!dragging) return;
-    event.preventDefault();
-    const over = event.target.closest('.sg-widget-choice');
-    if (over && over !== dragging) {
-      const top = over.getBoundingClientRect().top + over.offsetHeight / 2;
-      list.insertBefore(dragging, event.clientY > top ? over.nextSibling : over);
+    function sync() {
+      hidden.value = JSON.stringify([...list.querySelectorAll('.sg-widget-choice')]
+        .filter(item => item.querySelector('input').checked).map(item => item.dataset.widget));
+      queueLivePreview();
     }
-  });
-  list.addEventListener('drop', event => { event.preventDefault(); sync(); });
-  list.addEventListener('dragend', () => {
-    if (dragging) dragging.classList.remove('is-dragging');
-    dragging = null;
+    list.addEventListener('change', sync);
+    list.addEventListener('click', event => {
+      const btn = event.target.closest('.sg-widget-up,.sg-widget-down');
+      if (!btn) return;
+      const item = btn.closest('.sg-widget-choice');
+      if (btn.classList.contains('sg-widget-up') && item.previousElementSibling) {
+        list.insertBefore(item, item.previousElementSibling);
+      } else if (btn.classList.contains('sg-widget-down') && item.nextElementSibling) {
+        list.insertBefore(item.nextElementSibling, item);
+      }
+      sync();
+      btn.focus();
+    });
+    let dragging = null;
+    list.addEventListener('dragstart', event => {
+      const item = event.target.closest('.sg-widget-choice');
+      if (!item) return;
+      dragging = item;
+      item.classList.add('is-dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', item.dataset.widget);
+    });
+    list.addEventListener('dragover', event => {
+      if (!dragging) return;
+      event.preventDefault();
+      const over = event.target.closest('.sg-widget-choice');
+      if (over && over !== dragging) {
+        const top = over.getBoundingClientRect().top + over.offsetHeight / 2;
+        list.insertBefore(dragging, event.clientY > top ? over.nextSibling : over);
+      }
+    });
+    list.addEventListener('drop', event => { event.preventDefault(); sync(); });
+    list.addEventListener('dragend', () => {
+      if (dragging) dragging.classList.remove('is-dragging');
+      dragging = null;
+      sync();
+    });
+    form.addEventListener('submit', sync);
     sync();
-  });
+  }
   const shell = document.getElementById('sg-preview-shell');
   document.querySelectorAll('[data-aspect]').forEach(btn => btn.addEventListener('click', () => {
     const portrait = btn.dataset.aspect === 'portrait';
@@ -111,7 +115,7 @@
   }
   function applyColors() {
     const selected = Object.fromEntries(colors.map(color => [color.name, color.value]));
-    if (frame.contentDocument) {
+    if (frame?.contentDocument?.body) {
       const style = frame.contentDocument.body.style;
       style.setProperty('--sg-bg', selected.background);
       style.setProperty('--sg-fg', selected.foreground);
@@ -126,6 +130,4 @@
   colors.forEach(color => color.addEventListener('input', applyColors));
   frame?.addEventListener('load', applyColors);
   applyColors();
-  form.addEventListener('submit', sync);
-  sync();
 })();

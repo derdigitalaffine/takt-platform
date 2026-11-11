@@ -78,3 +78,28 @@ body {overflow-x:hidden}
 .sd-route-details li {padding:5px 0}
 .sd-route-unavailable {opacity:.5;font-size:clamp(.78rem,1vw,1.1rem)}
 .sd-route-accessible {color:#77edc1;font-size:clamp(.78rem,1vw,1.1rem);font-weight:640}
+
+.sd-passive {gap: clamp(14px, 2.2vh, 32px)}
+.sd-passive .sd-title-row {margin-bottom: clamp(12px, 2vh, 30px)}
+.sd-passive h1, .sd-special {overflow-wrap:anywhere}
+.sd-passive .sd-title-row h1 {font-size:clamp(1.7rem, min(5vw, 8vh), 5.5rem)}
+.sd-target-pages {display:grid;gap:8px}
+.sd-targets {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(8px,1vw,20px);list-style:none;margin:0;padding:0}
+.sd-targets[hidden] {display:none}
+.sd-target {display:flex;align-items:center;gap:clamp(10px,1.5vw,28px);padding:clamp(10px,1.5vh,25px);border:1px solid color-mix(in srgb,var(--sg-fg) 25%,transparent);border-radius:14px;background:color-mix(in srgb,var(--sg-fg) 7%,transparent)}
+.sd-target-arrow,.sd-target-info {display:grid;gap:.2em;min-width:0}
+.sd-target-arrow {text-align:center;min-width:4em;align-content:center}
+.sd-target-arrow:empty {display:none}
+.sd-target-arrow strong {font-size:clamp(2.1rem, min(4vw, 6vh), 5rem);line-height:1}
+.sd-target-info strong {font-size:clamp(1.06rem,min(2.6vw,4.5vh),3rem);line-height:1.15}
+.sd-target-info span,.sd-target-arrow span {font-size:clamp(.82rem,min(1.35vw,2.8vh),1.45rem)}
+.sd-target-info {overflow-wrap:anywhere}
+.sd-page-count {text-align:end}
+.sd-special {padding:clamp(12px,2vh,28px);margin-bottom:clamp(12px,2vh,28px);border:2px solid currentColor;border-radius:16px}
+.sd-special h2 {font-size:clamp(1.25rem,min(3.6vw,5vh),4rem);margin:0 0 .35em}
+.sd-special p {font-size:clamp(1rem,2vw,1.75rem);margin:.25em 0 .6em}
+.sd-special .sd-targets {grid-template-columns:1fr}
+@media (orientation:portrait), (max-width:600px) {.sd-targets{grid-template-columns:1fr}}
+.sd-floor-heading {font-size:clamp(1rem,2.4vw,2rem);margin:0 0 .4em}
+.sd-manual {grid-template-columns:1fr;margin-bottom:12px}
+.sd-empty[hidden], .sd-special[hidden], [data-sg-target-page][hidden] {display:none}

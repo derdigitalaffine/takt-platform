@@ -1,0 +1,56 @@
+<section class="sg-panel" id="special">
+  <div class="sg-panel-head"><div><h2>Sonderbetrieb</h2><p>Je Display gewinnt die höchste aktive Priorität. Bei Gleichstand zählt der frühere Beginn, danach der zuerst angelegte Eintrag.</p></div></div>
+  {% if specials %}
+  <div class="sg-table-wrap"><table class="table table-hover align-middle">
+    <thead><tr><th>Anzeige</th><th>Priorität</th><th>Freigabe</th><th>Aktionen</th></tr></thead>
+    <tbody>{% for item in specials %}<tr>
+      <td><strong>{{ item.title }}</strong><br><small>{{ presets[item.preset][0] }} · {{ 'TAKT-Termin' if item.event_id else format_local(item.starts_at, '%d.%m.%Y %H:%M') ~ ' – ' ~ format_local(item.ends_at, '%d.%m.%Y %H:%M') }}</small></td>
+      <td>{{ item.priority }}</td><td>{{ 'Freigegeben' if item.published else 'Entwurf' }}</td>
+      <td><form method="post" action="/signage/{{ screen.id }}/special" class="d-flex flex-wrap gap-2">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="special_id" value="{{ item.id }}">
+        <a class="btn btn-sm btn-outline-secondary" href="?special={{ item.id }}{% if item.event_id and special_calendars.get(item.event_id) %}&amp;calendar={{ special_calendars[item.event_id] }}{% endif %}#special-form">Bearbeiten</a>
+        {% if item.published %}<button class="btn btn-sm btn-outline-secondary" type="submit" name="action" value="withdraw">Freigabe widerrufen</button>{% else %}
+        <button class="btn btn-sm btn-outline-danger" type="submit" name="action" value="remove">Löschen</button>{% endif %}
+      </form></td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% endif %}
+  {% if destinations %}
+  <details class="sg-form-stack" {% if source_id or editing_special %}open{% endif %}>
+    <summary id="special-form">{{ 'Sonderanzeige bearbeiten' if editing_special else 'Sonderanzeige einrichten' }}</summary>
+    <form method="get" action="/signage/{{ screen.id }}/edit#special-form" class="sg-form-stack">
+      {% if editing_special %}<input type="hidden" name="special" value="{{ editing_special.id }}">{% endif %}
+      <label>TAKT-Kalender für die Terminauswahl <select class="form-select" name="calendar">
+        <option value="">Eigener Zeitraum</option>
+        {% for cal in source_calendars %}<option value="{{ cal.id }}" {% if source_id == cal.id %}selected{% endif %}>{{ cal.title }}</option>{% endfor %}
+      </select></label>
+      <label>Termintitel filtern <input class="form-control" name="event_search" value="{{ request.query_params.get('event_search', '')[:120] }}" maxlength="120" type="search"></label>
+      <button type="submit" class="btn btn-outline-secondary">Terminauswahl laden</button>
+    </form>
+    <form method="post" action="/signage/{{ screen.id }}/special" class="sg-form-stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {% if editing_special %}<input type="hidden" name="special_id" value="{{ editing_special.id }}">{% endif %}
+      <label>Vorlage<select class="form-select" name="preset">{% for value, preset in presets.items() %}<option value="{{ value }}" {% if editing_special and editing_special.preset == value %}selected{% endif %}>{{ preset[0] }} · Priorität {{ preset[1] }}</option>{% endfor %}</select></label>
+      <label>Öffentlicher Titel<input class="form-control" name="title" maxlength="120" value="{{ editing_special.title if editing_special else '' }}" placeholder="Leer lassen für Titel der Vorlage"></label>
+      <label>Öffentlicher Hinweis<textarea class="form-control" name="message" maxlength="250" rows="2">{{ editing_special.message if editing_special else '' }}</textarea></label>
+      <label>Zielraum<select class="form-select" name="room_id" required>
+        <option value="">Zielraum wählen</option>
+        {% for room, floor, building, release in destinations %}<option value="{{ room.id }}" {% if editing_special and editing_special.room_id == room.id %}selected{% endif %}>{{ room.number }} · {{ release.label or room.name }} · {{ floor.name }} · {{ building.name }}</option>{% endfor %}
+      </select></label>
+      {% if source_id or (editing_special and editing_special.event_id) %}
+      <label>Freizugebender Termin<select class="form-select" name="event_id" required>
+        <option value="">Termin wählen</option>
+        {% for event in source_events %}<option value="{{ event.id }}" {% if editing_special and editing_special.event_id == event.id %}selected{% endif %}>{{ event.starts_at }} · {{ event.title }}</option>{% endfor %}
+      </select></label>
+      <p class="sg-muted">Es wird der Zeitraum des Termins übernommen. Bei Serien gilt die Freigabe für alle Vorkommen. Kalendertexte bleiben intern.</p>
+      {% else %}
+      <label>Beginn (Ortszeit)<input class="form-control" type="datetime-local" name="starts_at" value="{{ format_local(editing_special.starts_at, '%Y-%m-%dT%H:%M') if editing_special else '' }}" required></label>
+      <label>Ende (Ortszeit)<input class="form-control" type="datetime-local" name="ends_at" value="{{ format_local(editing_special.ends_at, '%Y-%m-%dT%H:%M') if editing_special else '' }}" required></label>
+      {% endif %}
+      <label>Priorität (0–100)<input class="form-control" type="number" name="priority" min="0" max="100" value="{{ editing_special.priority if editing_special else '' }}" placeholder="Standard der Vorlage"></label>
+      <label>Normalanzeige<select class="form-select" name="mode"><option value="overlay">Unter dem Sonderhinweis weiter anzeigen</option><option value="replace" {% if editing_special and editing_special.mode == 'replace' %}selected{% endif %}>Während des Sonderbetriebs ausblenden</option></select></label>
+      <label class="sg-check"><input type="checkbox" name="published" value="1" {% if editing_special and editing_special.published %}checked{% endif %}> Für die Ausspielung auf diesem Display freigeben</label>
+      <button class="btn btn-primary" type="submit">Sonderanzeige speichern</button>
+    </form>
+  </details>
+  {% else %}<div class="sg-form-stack"><p>Für Sonderanzeigen wird ein freigegebener Zielraum benötigt.</p><a href="/signage#buildings">Raumfreigaben bearbeiten</a></div>{% endif %}
+</section>

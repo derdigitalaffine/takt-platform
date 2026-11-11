@@ -29,4 +29,27 @@
   });
   updateClock();
   setInterval(updateClock, 15000);
+  const pages = Array.from(document.querySelectorAll('[data-sg-target-page]'));
+  const pageCount = document.querySelector('[data-sg-page-count]');
+  if (pages.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    function showPage() {
+      const index = Math.floor(Date.now() / 15000) % pages.length;
+      pages.forEach((page, i) => { page.hidden = i !== index; });
+      pageCount.textContent = (index + 1) + ' / ' + pages.length;
+    }
+    showPage();
+    setInterval(showPage, 1000);
+  }
+  const special = document.querySelector('[data-sg-special-until]');
+  if (special) {
+    const expiresAt = Date.parse(special.dataset.sgSpecialUntil);
+    const fallback = document.querySelector('[data-sg-expired]');
+    function hideExpired() {
+      if (Date.now() < expiresAt) return;
+      special.hidden = true;
+      if (fallback) fallback.hidden = false;
+    }
+    hideExpired();
+    setInterval(hideExpired, 1000);
+  }
 })();

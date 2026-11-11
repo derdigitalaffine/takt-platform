@@ -1,0 +1,11 @@
+{% macro target(point) %}
+<li class="sd-target">
+  <div class="sd-target-arrow">
+    {% if point.arrow %}<strong aria-hidden="true">{{ point.arrow[0] }}</strong><span>{{ point.arrow[1] }}</span>{% endif %}
+  </div>
+  <div class="sd-target-info">
+    <strong>{{ point.label }}</strong>
+    {% if point.number %}<span>{{ point.building }} · {{ point.floor }} · Raum {{ point.number }}{% if point.accessible %} · Stufenfreier Weg{% endif %}</span>{% endif %}
+  </div>
+</li>
+{% endmacro %}

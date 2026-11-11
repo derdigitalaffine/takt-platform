@@ -1,9 +1,10 @@
+{% from "_signage_target.html" import target %}
 <!doctype html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta http-equiv="refresh" content="60">
+  {% if refresh %}<meta http-equiv="refresh" content="{{ 30 if passive or special else 60 }}">{% endif %}
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
   <title>{{ screen.name }} · TAKT Signage</title>
@@ -11,7 +12,7 @@
   <link rel="stylesheet" href="/static/signage-display.css">
 </head>
 <body style="--sg-bg:{{ theme.background }};--sg-fg:{{ theme.foreground }};--sg-accent:{{ theme.accent }}">
-  <main class="sd-stage" aria-label="Digitale Anzeige {{ screen.name }}">
+  <main class="sd-stage{{ ' sd-passive' if passive else '' }}" aria-label="Digitale Anzeige {{ screen.name }}">
     <header class="sd-header">
       <div class="sd-brand">
         {% if org_logo %}<img src="{{ org_logo }}" alt="Organisationswappen" class="sd-logo">
@@ -22,11 +23,40 @@
     </header>
     <section class="sd-content">
       <div class="sd-title-row">
-        <div><span class="sd-overline">TAKT · {{ {'room':'RAUMÜBERSICHT','agenda':'TERMINE HEUTE','directory':'MITARBEITERVERZEICHNIS','wayfinder':'WEGWEISER','info':'INFORMATIONEN'}[screen.kind] }}</span>
+        <div><span class="sd-overline">TAKT · {{ kind_label }}</span>
         <h1>{{ (room.number ~ ' · ' if room else '') ~ screen.name }}</h1>
         {% if screen.subtitle %}<p class="sd-subtitle">{{ screen.subtitle }}</p>{% endif %}</div>
         <div class="sd-time-wrap"><strong data-sg-time>{{ now.strftime('%H:%M') }}</strong><span data-sg-date>{{ now.strftime('%d.%m.%Y') }}</span></div>
       </div>
+      {% if special %}
+      <section class="sd-special" data-sg-special-until="{{ special.valid_until }}" aria-labelledby="sd-special-title">
+        <h2 id="sd-special-title">{{ special.title }}</h2>
+        {% if special.message %}<p>{{ special.message }}</p>{% endif %}
+        <ul class="sd-targets">{{ target(special.target) }}</ul>
+      </section>
+      {% endif %}
+      {% if special and special.mode == 'replace' %}
+      <p class="sd-empty" data-sg-expired hidden>Anzeige wird aktualisiert.</p>
+      {% endif %}
+      {% if not special or special.mode == 'overlay' %}
+      {% if passive %}
+        {% if manual_direction %}<ul class="sd-targets sd-manual">{{ target(manual_direction) }}</ul>{% endif %}
+        {% if destinations %}
+        <div class="sd-target-pages">
+          {% for heading, points in destination_groups.items() %}
+          {% for page in points|batch(4 if special or manual_direction else 6) %}
+            <section data-sg-target-page>
+              {% if heading %}<h2 class="sd-floor-heading">{{ heading }}</h2>{% endif %}
+              <ul class="sd-targets">{% for point in page %}{{ target(point) }}{% endfor %}</ul>
+            </section>
+          {% endfor %}
+          {% endfor %}
+          <span class="sd-page-count" data-sg-page-count></span>
+        </div>
+        {% elif not manual_direction %}
+        <p class="sd-empty">Für diesen Bereich sind derzeit keine Ziele verfügbar.</p>
+        {% endif %}
+      {% else %}
       <div class="sd-widgets">
       {% for widget in widgets %}
         {% if widget == 'clock' %}
@@ -85,6 +115,8 @@
         {% endif %}
       {% endfor %}
       </div>
+      {% endif %}
+      {% endif %}
     </section>
     <footer class="sd-footer"><span>{{ ui.product }} · Digitale Informationen</span><span>Anzeige wird automatisch aktualisiert</span></footer>
   </main>

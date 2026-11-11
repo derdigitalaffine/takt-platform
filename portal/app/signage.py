@@ -11,10 +11,11 @@ from .db import LOCAL_TZ, Resource, ResourceBooking, User, utcnow
 from .signage_models import (SignageBuilding, SignageFloor, SignageOffice, SignageRoom, SignageScreen,
                              SignageWayNode, SignageWayEdge, SignageDisplayAnchor)
 from .calendar_models import Calendar, CalendarEvent
+from . import signage_passive
 
 KINDS = {"agenda": "Terminübersicht", "room": "Digitales Türschild",
          "directory": "Personen und Büros", "wayfinder": "Wegweiser",
-         "info": "Informationen"}
+         "info": "Informationen", **signage_passive.KINDS}
 WIDGETS = {"clock": "Uhrzeit & Datum", "status": "Raumstatus",
            "agenda": "Termine", "directory": "Personenverzeichnis",
            "wayfinder": "Wegweiser", "message": "Hinweistext"}
@@ -24,6 +25,7 @@ TEMPLATES = {
     "directory": ["clock", "directory"],
     "wayfinder": ["clock", "wayfinder"],
     "info": ["clock", "message"],
+    **{kind: [] for kind in signage_passive.KINDS},
 }
 THEME_DEFAULTS = {"background": "#111e30", "foreground": "#f8fafc", "accent": "#42d4ad"}
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -253,16 +255,23 @@ def waypoints(db, screen: SignageScreen) -> list[dict]:
 
 def context(db, screen: SignageScreen, public=True, viewer=None) -> dict:
     now = datetime.now(LOCAL_TZ)
-    day = events(db, screen, public=public, now=now, viewer=viewer)
+    passive = screen.kind in signage_passive.KINDS
+    day = [] if passive else events(db, screen, public=public, now=now, viewer=viewer)
+    destinations, special, manual = signage_passive.project(db, screen, now)
+    groups = {}
+    for point in destinations:
+        heading = point["floor"] if screen.kind == "sign_building" else ""
+        groups.setdefault(heading, []).append(point)
     busy = next((ev for ev in day if ev["ongoing"]), None)
     later = [ev for ev in day if ev["start"] > now]
     room = db.get(SignageRoom, screen.room_id) if screen.room_id else None
     return dict(screen=screen, theme=theme(screen.theme_json),
-                widgets=widgets(screen.layout_json, screen.kind),
+                widgets=[] if passive else widgets(screen.layout_json, screen.kind),
                 now=now, events=day, busy=busy, next_event=later[0] if later else None,
                 room=room, staff=staff_directory(db, screen) if screen.kind == "directory" else [],
                 waypoints=waypoints(db, screen) if screen.kind == "wayfinder" else [],
-                public=public)
+                public=public, passive=passive, kind_label=KINDS[screen.kind],
+                destinations=destinations, destination_groups=groups, special=special, manual_direction=manual)
 
 
 def design_snapshot(screen: SignageScreen) -> str:

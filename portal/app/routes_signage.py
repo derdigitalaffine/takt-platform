@@ -2,21 +2,23 @@
 import json
 import logging
 import re
-from datetime import timedelta
+from datetime import timedelta, timezone
 from hmac import compare_digest
 from types import SimpleNamespace
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import branding, links, notify, signage, calendars
-from .db import Organization, PortalLocation, Resource, User, get_settings, utcnow
+from . import branding, links, notify, signage, calendars, signage_passive
+from .db import LOCAL_TZ, Organization, PortalLocation, Resource, User, get_settings, utcnow
 from .main import app, check_csrf, current_user, enabled_modules, flash, get_db, rate_limit, redirect, render, require, templates
-from .calendar_models import Calendar
+from .calendar_models import Calendar, CalendarEvent
 from .signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
                              SignageOffice, SignageRoom, SignageScreen, SignageRevision,
-                             SignageWayNode, SignageWayEdge, SignageDisplayAnchor)
+                             SignageWayNode, SignageWayEdge, SignageDisplayAnchor, SignagePassiveConfig,
+                             SignagePublicDestination, SignageDestinationOverride, SignageSpecial)
 
 class _RedactSignageLinks(logging.Filter):
     """Avoid logging bearer URLs in Uvicorn access logs.
@@ -76,7 +78,7 @@ def _render_display(request, db, screen, *, public, viewer=None):
     data = signage.context(db, screen, public=public, viewer=viewer)
     org = db.get(Organization, screen.org_id) if screen.org_id else None
     response = templates.TemplateResponse(request, "signage_display.html", {
-        **data, "ui": branding.load(), "org_logo": f"/org/{org.id}/logo" if org and org.logo else None,
+        **data, "refresh": request.method == "GET", "ui": branding.load(), "org_logo": f"/org/{org.id}/logo" if org and org.logo else None,
     })
     response.headers.update({"Cache-Control": "no-store, max-age=0",
                              "Referrer-Policy": "no-referrer",
@@ -99,7 +101,8 @@ def signage_home(request: Request, user: User = Depends(manage_user), db: Sessio
         staff=list(db.scalars(select(User).where(User.active.is_(True)).order_by(User.name))),
         locations=list(db.scalars(select(PortalLocation).where(PortalLocation.active.is_(True), PortalLocation.owner_id.is_(None)).order_by(PortalLocation.name))),
         organizations=list(db.scalars(select(Organization).order_by(Organization.name))),
-        kinds=signage.KINDS,
+        kinds=signage.KINDS, passive_kinds=signage_passive.KINDS, facings=signage_passive.FACINGS,
+        published_rooms={row.room_id: row.label for row in db.scalars(select(SignagePublicDestination))},
         calendars=[cal for cal in db.scalars(select(Calendar).where(Calendar.source == "free").order_by(Calendar.title))
                    if calendars.access(db, user, cal)],
         resources=list(db.scalars(select(Resource).where(Resource.active.is_(True)).order_by(Resource.name))))
@@ -116,8 +119,16 @@ async def signage_new(request: Request, user: User = Depends(manage_user), db: S
         raise HTTPException(422, "Bitte eine Bezeichnung eingeben.")
     screen = SignageScreen(name=name, kind=kind, visibility="private", owner_id=user.id,
                            layout_json=json.dumps(signage.TEMPLATES[kind]))
+    if kind in signage_passive.KINDS:
+        building, floor, node, facing, radius = _passive_fields(db, kind, data)
+        screen.org_id = building.org_id
     db.add(screen)
     db.flush()
+    if kind in signage_passive.KINDS:
+        db.add(SignagePassiveConfig(screen_id=screen.id, building_id=building.id,
+                                    floor_id=floor.id if floor else None, facing=facing, radius_m=radius))
+        if node:
+            db.add(SignageDisplayAnchor(screen_id=screen.id, node_id=node.id))
     db.add(SignageRevision(screen_id=screen.id, version=1,
                            snapshot_json=signage.design_snapshot(screen), actor_id=user.id))
     db.commit()
@@ -129,7 +140,44 @@ def signage_edit(sid: int, request: Request, user: User = Depends(manage_user), 
     screen = _screen(db, sid)
     devices = list(db.scalars(select(SignageDevice).where(SignageDevice.screen_id == sid).order_by(SignageDevice.id)))
     keys = list(db.scalars(select(SignageLink).where(SignageLink.screen_id == sid).order_by(SignageLink.id.desc())))
+    passive_config = db.get(SignagePassiveConfig, sid)
+    candidate_building = passive_config.building_id if passive_config and screen.kind in signage_passive.KINDS else None
+    destinations = db.execute(signage_passive.destination_rows(db, screen, candidate_building).order_by(
+        SignageBuilding.name, SignageFloor.level, SignageRoom.number)).all()
+    source_calendars = [cal for cal in db.scalars(select(Calendar).where(
+        Calendar.source == "free").order_by(Calendar.title)) if calendars.access(db, user, cal)]
+    specials = list(db.scalars(select(SignageSpecial).where(SignageSpecial.screen_id == sid)
+                               .order_by(SignageSpecial.published.desc(), SignageSpecial.priority.desc(), SignageSpecial.id)))
+    editing_special = next((item for item in specials
+                            if item.id == _int(request.query_params.get("special"))), None)
+    linked_ids = {item.event_id for item in specials if item.event_id is not None}
+    special_calendars = {
+        event.id: event.calendar_id for event in db.scalars(select(CalendarEvent).where(CalendarEvent.id.in_(linked_ids)))
+        if signage_passive.source_access(db, user, event, screen)
+    } if linked_ids else {}
+    source_id = _int(request.query_params.get("calendar"))
+    source_events = []
+    if any(cal.id == source_id for cal in source_calendars):
+        event_query = select(CalendarEvent).where(CalendarEvent.calendar_id == source_id)
+        search = request.query_params.get("event_search", "").strip()[:120]
+        if search:
+            event_query = event_query.where(CalendarEvent.title.icontains(search, autoescape=True))
+        source_events = [event for event in db.scalars(event_query.order_by(
+            CalendarEvent.starts_at.desc(), CalendarEvent.id.desc()).limit(200))
+            if signage_passive.source_access(db, user, event, screen)]
+        if editing_special and special_calendars.get(editing_special.event_id) == source_id:
+            linked = db.get(CalendarEvent, editing_special.event_id)
+            if linked and linked not in source_events:
+                source_events.insert(0, linked)
     return render(request, "signage_editor.html", user, screen=screen, widgets=signage.WIDGETS,
+        passive_config=passive_config, passive_kinds=signage_passive.KINDS, facings=signage_passive.FACINGS,
+        arrows=signage_passive.ARROWS, destinations=destinations, presets=signage_passive.PRESETS,
+        buildings=list(db.scalars(select(SignageBuilding).where(SignageBuilding.active.is_(True)).order_by(SignageBuilding.name))),
+        floors=list(db.scalars(select(SignageFloor).order_by(SignageFloor.level))),
+        overrides=list(db.scalars(select(SignageDestinationOverride).where(SignageDestinationOverride.screen_id == sid))),
+        specials=specials, editing_special=editing_special, special_calendars=special_calendars,
+        format_local=_format_local,
+        source_calendars=source_calendars, source_id=source_id, source_events=source_events,
         kinds=signage.KINDS, theme=signage.theme(screen.theme_json),
         selected_widgets=signage.widgets(screen.layout_json, screen.kind),
         resources=list(db.scalars(select(Resource).where(Resource.active.is_(True)).order_by(Resource.name))),
@@ -149,8 +197,8 @@ async def signage_save(sid: int, request: Request, user: User = Depends(manage_u
     if str(form.get("version") or "").isdigit() and int(form["version"]) != screen.version:
         raise HTTPException(409, "Die Anzeige wurde zwischenzeitlich geändert. Bitte neu laden.")
     kind = str(form.get("kind") or screen.kind)
-    if kind not in signage.KINDS:
-        raise HTTPException(422)
+    if kind not in signage.KINDS or (kind in signage_passive.KINDS and kind != screen.kind):
+        raise HTTPException(422, "Passive Vorlagen werden über den Schnellstart eingerichtet.")
     visibility = str(form.get("visibility") or "private")
     if visibility not in VISIBLE:
         raise HTTPException(422)
@@ -170,6 +218,8 @@ async def signage_save(sid: int, request: Request, user: User = Depends(manage_u
     org_id = _int(form.get("org_id"))
     if rid and not db.get(Resource, rid) or room_id and not db.get(SignageRoom, room_id) or org_id and not db.get(Organization, org_id):
         raise HTTPException(422, "Verknüpfung nicht vorhanden.")
+    if kind in signage_passive.KINDS:
+        rid, room_id, org_id = None, None, screen.org_id
     screen.resource_id, screen.room_id, screen.org_id = rid, room_id, org_id
     _assert_screen_scope(db, screen)
     screen.version += 1
@@ -226,14 +276,17 @@ async def signage_live_preview(sid: int, request: Request,
     original = _screen(db, sid)
     form = await request.form()
     kind = str(form.get("kind") or original.kind)
-    if kind not in signage.KINDS:
+    if kind not in signage.KINDS or (kind in signage_passive.KINDS and kind != original.kind):
         raise HTTPException(422, "Unbekannte Vorlage.")
+
     rid, room_id, org_id = (_int(form.get(k)) for k in
                              ("resource_id", "room_id", "org_id"))
     if (rid and not db.get(Resource, rid)
             or room_id and not db.get(SignageRoom, room_id)
             or org_id and not db.get(Organization, org_id)):
         raise HTTPException(422, "Datenquelle nicht gefunden.")
+    if kind in signage_passive.KINDS:
+        rid, room_id, org_id = None, None, original.org_id
     draft = SimpleNamespace(
         id=original.id, owner_id=original.owner_id,
         name=(str(form.get("name") or original.name).strip()[:180] or original.name),
@@ -424,6 +477,9 @@ def signage_device_manifest(device_id: int, request: Request, db: Session = Depe
         "events": events,
         "directory": projected["staff"],
         "waypoints": projected["waypoints"],
+        "destinations": projected["destinations"],
+        "manual_direction": projected["manual_direction"],
+        "special": projected["special"],
     }, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
@@ -470,6 +526,36 @@ async def signage_structure(request: Request, user: User = Depends(manage_user),
         raise HTTPException(409, "Eintrag bereits vorhanden oder Datenkonflikt.")
     flash(request, "Gebäudestammdaten gespeichert.")
     return redirect("/signage#buildings")
+
+
+@app.post("/signage/structure/{kind}/{item_id:int}", dependencies=[Depends(check_csrf)])
+async def signage_edit_structure(kind: str, item_id: int, request: Request,
+                                 user: User = Depends(manage_user), db: Session = Depends(get_db)):
+    _enabled()
+    model = {"building": SignageBuilding, "floor": SignageFloor, "room": SignageRoom}.get(kind)
+    item = db.get(model, item_id) if model else None
+    if not item:
+        raise HTTPException(404)
+    form = await request.form()
+    name = str(form.get("name") or "").strip()
+    if not name:
+        raise HTTPException(422, "Bitte eine Bezeichnung eingeben.")
+    if kind == "room":
+        item.number = name[:40]
+        item.name = str(form.get("label") or "").strip()[:180]
+        item.accessible = form.get("accessible") == "1"
+    elif kind == "floor":
+        item.name = name[:100]
+        item.level = _bounded(form, "level", -20, 200, item.level)
+    else:
+        item.name = name[:180]
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Diese Zimmer- oder Geschossnummer ist bereits vergeben.")
+    flash(request, "Stammdaten aktualisiert.")
+    return redirect(f"/signage#sg-{kind}-{item_id}")
 
 
 @app.post("/signage/room/{room_id:int}/calendar", dependencies=[Depends(check_csrf)])
@@ -646,3 +732,178 @@ async def signage_own_directory_visibility(
     db.commit()
     flash(request, "Sichtbarkeit deiner dienstlichen Bürozuordnung aktualisiert.")
     return redirect("/profile#signage-offices")
+
+
+def _format_local(value, fmt):
+    return value.replace(tzinfo=timezone.utc).astimezone(LOCAL_TZ).strftime(fmt) if value else ""
+
+
+def _passive_fields(db, kind, form):
+    building_id = _int(form.get("building_id"))
+    floor_id = _int(form.get("floor_id"))
+    node_id = _int(form.get("node_id"))
+    building = db.get(SignageBuilding, building_id) if building_id else None
+    floor = db.get(SignageFloor, floor_id) if floor_id else None
+    node = db.get(SignageWayNode, node_id) if node_id else None
+    node_floor = db.get(SignageFloor, node.floor_id) if node else None
+    facing = str(form.get("facing") or "")
+    if not building or not building.active:
+        raise HTTPException(422, "Bitte ein aktives Gebäude auswählen.")
+    if (floor_id or kind in ("sign_floor", "sign_corridor")) and (
+            not floor or floor.building_id != building.id):
+        raise HTTPException(422, "Bitte ein Geschoss des gewählten Gebäudes auswählen.")
+    if (node_id or kind == "sign_corridor") and (
+            not node_floor or node_floor.building_id != building.id
+            or (kind == "sign_corridor" and node.floor_id != floor.id)):
+        raise HTTPException(422, "Bitte einen passenden Displaystandort im gewählten Bereich auswählen.")
+    if facing and facing not in signage_passive.FACINGS:
+        raise HTTPException(422, "Ungültige Blickrichtung.")
+    return building, floor, node, facing, _bounded(form, "radius_m", 1, 250, 25)
+
+
+def _bounded(form, field, minimum, maximum, default):
+    try:
+        value = int(form.get(field) or default)
+    except (TypeError, ValueError):
+        raise HTTPException(422, "Ungültige Zahl.")
+    if not minimum <= value <= maximum:
+        raise HTTPException(422, f"Zahl zwischen {minimum} und {maximum} erforderlich.")
+    return value
+
+
+def _destination(db, screen, room_id):
+    config = db.get(SignagePassiveConfig, screen.id) if screen.kind in signage_passive.KINDS else None
+    if not room_id or (screen.kind in signage_passive.KINDS and not config):
+        raise HTTPException(422, "Bitte einen freigegebenen Zielraum wählen.")
+    if not db.execute(signage_passive.destination_rows(db, screen, config.building_id if config else None)
+                      .where(SignageRoom.id == room_id)).first():
+        raise HTTPException(422, "Der Zielraum ist für diese Anzeige nicht freigegeben.")
+
+
+@app.post("/signage/{sid:int}/passive", dependencies=[Depends(check_csrf)])
+async def signage_passive_config(sid: int, request: Request, user: User = Depends(manage_user),
+                                 db: Session = Depends(get_db)):
+    screen = _screen(db, sid)
+    if screen.kind not in signage_passive.KINDS:
+        raise HTTPException(404)
+    form = await request.form()
+    building, floor, node, facing, radius = _passive_fields(db, screen.kind, form)
+    config = db.get(SignagePassiveConfig, sid) or SignagePassiveConfig(screen_id=sid)
+    config.building_id, config.floor_id = building.id, floor.id if floor else None
+    config.facing, config.radius_m = facing, radius
+    manual_arrow = str(form.get("manual_arrow") or "")
+    if manual_arrow and manual_arrow not in signage_passive.ARROWS:
+        raise HTTPException(422, "Ungültiger Pfeil.")
+    config.manual_arrow = manual_arrow
+    config.manual_label = str(form.get("manual_label") or "").strip()[:120]
+    config.manual_only = form.get("manual_only") == "1" and bool(config.manual_label)
+    config.barrier_free = form.get("barrier_free") == "1"
+    db.add(config)
+    anchor = db.get(SignageDisplayAnchor, sid)
+    if node:
+        anchor = anchor or SignageDisplayAnchor(screen_id=sid)
+        anchor.node_id = node.id
+        db.add(anchor)
+    elif anchor:
+        db.delete(anchor)
+    screen.org_id = building.org_id
+    db.commit()
+    flash(request, "Anzeigebereich gespeichert.")
+    return redirect(f"/signage/{sid}/edit#passive")
+
+
+@app.post("/signage/room/{room_id:int}/destination", dependencies=[Depends(check_csrf)])
+async def signage_publish_destination(room_id: int, request: Request, user: User = Depends(manage_user),
+                                      db: Session = Depends(get_db)):
+    _enabled()
+    if not db.get(SignageRoom, room_id):
+        raise HTTPException(404)
+    form = await request.form()
+    entry = db.get(SignagePublicDestination, room_id)
+    if form.get("listed") == "1":
+        entry = entry or SignagePublicDestination(room_id=room_id)
+        entry.label = str(form.get("label") or "").strip()[:120]
+        db.add(entry)
+    elif entry:
+        db.delete(entry)
+    db.commit()
+    flash(request, "Raumfreigabe gespeichert.")
+    return redirect("/signage#buildings")
+
+
+@app.post("/signage/{sid:int}/destination", dependencies=[Depends(check_csrf)])
+async def signage_destination_override(sid: int, request: Request, user: User = Depends(manage_user),
+                                       db: Session = Depends(get_db)):
+    screen = _screen(db, sid)
+    form = await request.form()
+    room_id = _int(form.get("room_id"))
+    entry = db.get(SignageDestinationOverride, (sid, room_id)) if room_id else None
+    if form.get("action") == "reset":
+        if entry:
+            db.delete(entry)
+    else:
+        _destination(db, screen, room_id)
+        arrow = str(form.get("arrow") or "")
+        if arrow and arrow not in (*signage_passive.ARROWS, "none"):
+            raise HTTPException(422, "Ungültiger Pfeil.")
+        entry = entry or SignageDestinationOverride(screen_id=sid, room_id=room_id)
+        entry.arrow = arrow
+        entry.label = str(form.get("label") or "").strip()[:120]
+        entry.rank = _bounded(form, "rank", -100, 100, 0)
+        entry.hidden = form.get("hidden") == "1"
+        db.add(entry)
+    db.commit()
+    flash(request, "Zielausnahme gespeichert.")
+    return redirect(f"/signage/{sid}/edit#destinations")
+
+
+@app.post("/signage/{sid:int}/special", dependencies=[Depends(check_csrf)])
+async def signage_special_save(sid: int, request: Request, user: User = Depends(manage_user),
+                               db: Session = Depends(get_db)):
+    screen = _screen(db, sid)
+    form = await request.form()
+    special_id = _int(form.get("special_id"))
+    entry = db.get(SignageSpecial, special_id) if special_id else None
+    if special_id and (not entry or entry.screen_id != sid):
+        raise HTTPException(404)
+    action = form.get("action")
+    if action in ("remove", "withdraw"):
+        if not entry:
+            raise HTTPException(404)
+        if action == "remove":
+            db.delete(entry)
+        else:
+            entry.published = False
+    else:
+        room_id = _int(form.get("room_id"))
+        _destination(db, screen, room_id)
+        preset, mode = str(form.get("preset") or ""), str(form.get("mode") or "overlay")
+        if preset not in signage_passive.PRESETS or mode not in ("overlay", "replace"):
+            raise HTTPException(422, "Ungültige Sonderanzeige.")
+        default_title, default_priority = signage_passive.PRESETS[preset]
+        event_id = _int(form.get("event_id"))
+        starts_at = ends_at = None
+        if form.get("event_id"):
+            event = db.get(CalendarEvent, event_id) if event_id else None
+            if not signage_passive.source_access(db, user, event, screen):
+                raise HTTPException(403, "Dieser Termin kann nicht freigegeben werden.")
+        else:
+            try:
+                starts_at = signage_passive.schedule_time(str(form.get("starts_at") or ""))
+                ends_at = signage_passive.schedule_time(str(form.get("ends_at") or ""))
+            except (ValueError, OverflowError):
+                raise HTTPException(422, "Bitte gültige und eindeutige Start- und Endzeiten eingeben.")
+            if ends_at <= starts_at:
+                raise HTTPException(422, "Das Ende muss nach dem Beginn liegen.")
+        entry = entry or SignageSpecial(screen_id=sid)
+        entry.room_id, entry.event_id, entry.actor_id = room_id, event_id, user.id
+        entry.preset, entry.mode = preset, mode
+        entry.title = str(form.get("title") or "").strip()[:120] or default_title
+        entry.message = str(form.get("message") or "").strip()[:250]
+        entry.priority = _bounded(form, "priority", 0, 100, default_priority)
+        entry.starts_at, entry.ends_at = starts_at, ends_at
+        entry.published = form.get("published") == "1"
+        db.add(entry)
+    db.commit()
+    flash(request, "Sonderanzeige gespeichert.")
+    return redirect(f"/signage/{sid}/edit#special")

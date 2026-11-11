@@ -1,0 +1,43 @@
+<section class="sg-panel" id="passive">
+  <div class="sg-panel-head"><div><h2>Anzeigebereich und Pfeile</h2>
+    <p>Der Wegegraph liefert die erste Richtung vom Display zum Ziel. Lege die Blickrichtung im selben Plan fest, in dem die Wegepunkte eingetragen sind.</p></div></div>
+  <form method="post" action="/signage/{{ screen.id }}/passive" class="sg-form-stack" data-sg-scope>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% include "_signage_scope.html" %}
+    {% if screen.kind == 'sign_corridor' %}
+    <label>Maximaler Fußweg im Geschoss (m)<input class="form-control" type="number" name="radius_m" min="1" max="250" value="{{ passive_config.radius_m if passive_config else 25 }}" required></label>
+    {% endif %}
+    <label class="sg-check"><input type="checkbox" name="barrier_free" value="1" {% if passive_config and passive_config.barrier_free %}checked{% endif %}> Pfeile nur bei hinterlegtem stufenfreiem Weg</label>
+    {% if screen.kind == 'sign_direction' %}
+    <label>Statischer Hinweis<input class="form-control" name="manual_label" maxlength="120" value="{{ passive_config.manual_label if passive_config else '' }}" placeholder="z. B. Haupteingang"></label>
+    <label>Pfeil für den statischen Hinweis<select class="form-select" name="manual_arrow">
+      <option value="">Ohne Pfeil</option>
+      {% for value, arrow in arrows.items() %}<option value="{{ value }}" {% if passive_config and passive_config.manual_arrow == value %}selected{% endif %}>{{ arrow[0] }} {{ arrow[1] }}</option>{% endfor %}
+    </select></label>
+    <label class="sg-check"><input type="checkbox" name="manual_only" value="1" {% if passive_config and passive_config.manual_only %}checked{% endif %}> Nur den statischen Hinweis anzeigen</label>
+    {% endif %}
+    <button class="btn btn-outline-primary" type="submit">Anzeigebereich speichern</button>
+  </form>
+</section>
+<section class="sg-panel" id="destinations">
+  <div class="sg-panel-head"><div><h2>Ausnahmen pro Ziel</h2><p>Eine höhere Sortierpriorität zieht ein Ziel vor. Ausblenden gilt für den Normalbetrieb.</p></div></div>
+  {% if destinations %}
+  <form method="post" action="/signage/{{ screen.id }}/destination" class="sg-form-stack" data-sg-overrides>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Zielraum<select class="form-select" name="room_id" required>
+      <option value="">Zielraum wählen</option>
+      {% for room, floor, building, release in destinations %}
+        {% set rule = overrides|selectattr('room_id','equalto',room.id)|first %}
+        <option value="{{ room.id }}" data-label="{{ rule.label if rule else '' }}" data-arrow="{{ rule.arrow if rule else '' }}" data-rank="{{ rule.rank if rule else 0 }}" data-hidden="{{ '1' if rule and rule.hidden else '' }}">{{ room.number }} · {{ release.label or room.name }} · {{ floor.name }}{% if rule %} (angepasst){% endif %}</option>
+      {% endfor %}
+    </select></label>
+    <label>Abweichender Anzeigename<input class="form-control" name="label" maxlength="120"></label>
+    <label>Pfeil<select class="form-select" name="arrow"><option value="">Automatisch</option><option value="none">Ohne Pfeil</option>
+      {% for value, arrow in arrows.items() %}<option value="{{ value }}">{{ arrow[0] }} {{ arrow[1] }}</option>{% endfor %}
+    </select></label>
+    <label>Sortierpriorität<input class="form-control" type="number" name="rank" min="-100" max="100" value="0"></label>
+    <label class="sg-check"><input type="checkbox" name="hidden" value="1"> Im Normalbetrieb ausblenden</label>
+    <div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-primary" type="submit">Ausnahme speichern</button><button class="btn btn-outline-secondary" type="submit" name="action" value="reset">Zurücksetzen</button></div>
+  </form>
+  {% else %}<div class="sg-form-stack"><p>Für diesen Bereich sind noch keine Räume freigegeben.</p><a href="/signage#buildings">Raumfreigaben bearbeiten</a></div>{% endif %}
+</section>

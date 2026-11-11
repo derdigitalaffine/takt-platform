@@ -21,7 +21,7 @@
   {% for screen in screens %}
     <a class="sg-screen-card" href="/signage/{{ screen.id }}/edit">
       <div class="sg-screen-preview" style="--sg-bg:{{ (screen.theme_json|default('')) and '#17283d' or '#17283d' }}">
-        <div class="sg-screen-preview-top"><i class="fa-solid {{ {'agenda':'fa-calendar-days','room':'fa-door-open','directory':'fa-address-book','wayfinder':'fa-signs-post','info':'fa-bullhorn'}[screen.kind] }}"></i><span>TAKT Signage</span></div>
+        <div class="sg-screen-preview-top"><i class="fa-solid {{ {'agenda':'fa-calendar-days','room':'fa-door-open','directory':'fa-address-book','info':'fa-bullhorn'}.get(screen.kind, 'fa-signs-post') }}"></i><span>TAKT Signage</span></div>
         <strong>{{ screen.name }}</strong><small>{{ kinds[screen.kind] }}</small>
       </div>
       <div class="sg-screen-card-foot"><div><strong>{{ screen.name }}</strong><span>{{ kinds[screen.kind] }}</span></div>
@@ -34,10 +34,15 @@
   {% endif %}
   <section class="sg-panel" aria-labelledby="sg-new">
     <div class="sg-panel-head"><div><span class="sg-eyebrow">SCHNELLSTART</span><h2 id="sg-new">Neue Anzeige erstellen</h2></div></div>
-    <form class="sg-create-form" action="/signage/new" method="post">
+    <form class="sg-form-stack" data-sg-scope action="/signage/new" method="post">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label>Name <input class="form-control" name="name" maxlength="180" required placeholder="z. B. Eingang Rathaus oder Raum 1.14"></label>
-      <label>Vorlage <select class="form-select" name="kind">{% for key,label in kinds.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+      <label>1. Vorlage <select class="form-select" name="kind" data-sg-template>{% for key,label in kinds.items() %}<option value="{{ key }}" {% if key in passive_kinds %}data-passive{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <fieldset data-sg-passive class="sg-form-stack">
+        <legend class="h6">2. Anzeigebereich wählen</legend>
+        {% include "_signage_scope.html" %}
+        {% if not buildings %}<p>Lege zuerst ein <a href="#buildings">Gebäude</a> an.</p>{% endif %}
+      </fieldset>
       <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus me-1"></i>Anzeige gestalten</button>
     </form>
   </section>
@@ -73,12 +78,48 @@
         <button class="btn btn-outline-primary" type="submit" {% if not floors %}disabled{% endif %}>Raum hinzufügen</button>
       </form>
     </div>
+    {% if buildings %}
+    <div class="sg-form-stack">
+      <h3>Gebäude und Geschosse bearbeiten</h3>
+      {% for building in buildings %}
+      <details id="sg-building-{{ building.id }}" class="sg-mini-form">
+        <summary>{{ building.name }}</summary>
+        <form method="post" action="/signage/structure/building/{{ building.id }}" class="sg-inline-calendar">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Gebäudename<input class="form-control form-control-sm" name="name" required maxlength="180" value="{{ building.name }}"></label>
+          <button class="btn btn-sm btn-outline-primary" type="submit">Gebäude speichern</button>
+        </form>
+        {% for floor in floors if floor.building_id == building.id %}
+        <form id="sg-floor-{{ floor.id }}" method="post" action="/signage/structure/floor/{{ floor.id }}" class="sg-inline-calendar">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Geschossname<input class="form-control form-control-sm" name="name" required maxlength="100" value="{{ floor.name }}"></label>
+          <label>Ebene<input class="form-control form-control-sm" type="number" name="level" min="-20" max="200" required value="{{ floor.level }}"></label>
+          <button class="btn btn-sm btn-outline-primary" type="submit">Geschoss speichern</button>
+        </form>
+        {% endfor %}
+      </details>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% if rooms %}
     <div class="sg-table-wrap"><table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Raum</th><th>Bezeichnung</th><th>Geschoss</th><th>Ressource</th><th>TAKT-Kalender</th></tr></thead><tbody>
+      <thead><tr><th>Raum</th><th>Bezeichnung</th><th>Geschoss</th><th>Ressource</th><th>TAKT-Kalender</th><th>Passive Anzeigen</th></tr></thead><tbody>
       {% for room in rooms %}
-      <tr><td><strong>{{ room.number }}</strong></td><td>{{ room.name or '—' }}</td>
-      <td>{{ (floors|selectattr('id','equalto',room.floor_id)|first).name }}</td>
+      {% set floor = floors|selectattr('id','equalto',room.floor_id)|first %}
+      {% set building = buildings|selectattr('id','equalto',floor.building_id)|first %}
+      <tr id="sg-room-{{ room.id }}"><td><strong>{{ room.number }}</strong></td><td>
+        <details>
+          <summary>{{ room.name or 'Raum bearbeiten' }}</summary>
+          <form method="post" action="/signage/structure/room/{{ room.id }}" class="sg-form-stack">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label>Zimmernummer<input class="form-control form-control-sm" name="name" value="{{ room.number }}" required maxlength="40"></label>
+            <label>Raumbezeichnung<input class="form-control form-control-sm" name="label" value="{{ room.name }}" maxlength="180"></label>
+            <label class="sg-check"><input type="checkbox" name="accessible" value="1" {% if room.accessible %}checked{% endif %}> Barrierefrei erreichbar</label>
+            <button type="submit" class="btn btn-sm btn-outline-primary">Raum speichern</button>
+          </form>
+        </details>
+      </td>
+      <td>{{ building.name }} · {{ floor.name }}</td>
       <td>{{ (resources|selectattr('id','equalto',room.resource_id)|first).name if room.resource_id else '—' }}</td>
       <td><form class="sg-inline-calendar" action="/signage/room/{{ room.id }}/calendar" method="post">
         <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -87,7 +128,13 @@
           {% for cal in calendars %}<option value="{{ cal.id }}" {% if cal.id == room.calendar_id %}selected{% endif %}>{{ cal.title }}</option>{% endfor %}
         </select>
         <button class="btn btn-sm btn-outline-primary" type="submit">Übernehmen</button>
-      </form></td></tr>
+      </form></td><td>
+        <form method="post" action="/signage/room/{{ room.id }}/destination" class="sg-form-stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="sg-check"><input type="checkbox" name="listed" value="1" {% if room.id in published_rooms %}checked{% endif %}> Raum {{ room.number }} freigeben</label>
+          <label>Öffentlicher Name<input class="form-control form-control-sm" name="label" maxlength="120" value="{{ published_rooms.get(room.id, '') }}" placeholder="Raumbezeichnung übernehmen"></label>
+          <button type="submit" class="btn btn-sm btn-outline-primary">Freigabe speichern</button>
+        </form></td></tr>
       {% endfor %}</tbody></table></div>
     {% endif %}
   </section>
@@ -181,4 +228,5 @@
     {% if offices %}<p class="sg-muted">Bestehende Zuordnungen: {{ offices|length }}. Die öffentliche Sichtbarkeit kann durch erneutes Speichern der Zuordnung geändert werden.</p>{% endif %}
   </section>
 </div>
+<script src="/static/signage-passive-admin.js" defer></script>
 {% endblock %}

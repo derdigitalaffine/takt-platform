@@ -23,12 +23,14 @@
         <details class="sg-panel" open><summary><i class="fa-solid fa-sliders me-2"></i>Anzeige & Inhalt</summary>
           <div class="sg-form-stack">
             <label>Name<input class="form-control" name="name" value="{{ screen.name }}" maxlength="180" required></label>
-            <label>Anzeigetyp<select class="form-select" name="kind">{% for key,label in kinds.items() %}<option value="{{ key }}" {% if screen.kind == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <label>Anzeigetyp<select class="form-select" name="kind">{% for key,label in kinds.items() if (screen.kind in passive_kinds and key == screen.kind) or (screen.kind not in passive_kinds and key not in passive_kinds) %}<option value="{{ key }}" {% if screen.kind == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
             <label>Untertitel oder Hinweismeldung<textarea class="form-control" rows="2" name="subtitle" maxlength="250">{{ screen.subtitle }}</textarea></label>
+            {% if screen.kind not in passive_kinds %}
             <label>Richtungsinformation (Wegweiser)<input class="form-control" name="direction" value="{{ screen.direction }}" maxlength="100" placeholder="z. B. links zum Bürgerbüro"></label>
             <label>Verknüpfte Ressource<select class="form-select" name="resource_id"><option value="">Keine Ressource</option>{% for item in resources %}<option value="{{ item.id }}" {% if screen.resource_id == item.id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
             <label>Raum<select class="form-select" name="room_id"><option value="">Kein Raum</option>{% for room in rooms %}<option value="{{ room.id }}" {% if screen.room_id == room.id %}selected{% endif %}>{{ room.number }} · {{ room.name }}</option>{% endfor %}</select></label>
             <label>Organisation<select class="form-select" name="org_id"><option value="">Globales TAKT-Design</option>{% for org in organizations %}<option value="{{ org.id }}" {% if screen.org_id == org.id %}selected{% endif %}>{{ org.name }}</option>{% endfor %}</select></label>
+            {% endif %}
           </div>
         </details>
         <details class="sg-panel" open><summary><i class="fa-solid fa-palette me-2"></i>Designsystem</summary>
@@ -42,6 +44,7 @@
             <p class="sg-muted" id="sg-contrast-alert" role="status"></p>
           </div>
         </details>
+        {% if screen.kind not in passive_kinds %}
         <details class="sg-panel" open><summary><i class="fa-solid fa-grip me-2"></i>Widgets & Reihenfolge</summary>
           <div class="sg-form-stack">
             <p class="sg-muted">Widgets aktivieren und anschließend mit der Maus oder den Pfeiltasten verschieben.</p>
@@ -56,6 +59,7 @@
             </div>
           </div>
         </details>
+        {% endif %}
         <details class="sg-panel" open><summary><i class="fa-solid fa-shield-halved me-2"></i>Veröffentlichung & Datenschutz</summary>
           <div class="sg-form-stack">
             <label>Zugriffsart<select class="form-select" name="visibility">
@@ -63,15 +67,20 @@
                 <option value="public" {% if screen.visibility == 'public' %}selected{% endif %}>Öffentlich, ohne Anmeldung</option>
                 <option value="link" {% if screen.visibility == 'link' %}selected{% endif %}>Nur mit sicherem Freigabelink</option>
               </select></label>
+            {% if screen.kind not in passive_kinds %}
             <label>Termindetails<select class="form-select" name="data_level">
               <option value="busy" {% if screen.data_level == 'busy' %}selected{% endif %}>Nur Frei / Belegt (empfohlen)</option>
               <option value="title" {% if screen.data_level == 'title' %}selected{% endif %}>Termintitel nur in berechtigter interner Vorschau</option>
             </select></label>
             <div class="sg-info-box"><i class="fa-solid fa-lock"></i> Öffentliche und per Link geteilte Anzeigen zeigen ausschließlich Frei/Belegt. Termintitel sind nur bei internem Zugriff mit Ressourcenberechtigung sichtbar. Kontaktdaten werden nie ausgespielt.</div>
+            {% endif %}
             <label class="sg-check"><input type="checkbox" name="enabled" value="1" {% if screen.enabled %}checked{% endif %}> Anzeige eingeschaltet</label>
           </div>
         </details>
       </form>
+      {% if screen.kind in passive_kinds %}
+      {% include "_signage_passive_editor.html" %}
+      {% else %}
       <div class="sg-panel">
         <div class="sg-panel-head"><div><span class="sg-eyebrow">WEGEFÜHRUNG</span><h2>Startposition dieses Displays</h2>
           <p>Die Route beginnt am tatsächlichen Standort des Bildschirms. Wegpunkte werden zentral in der Gebäudeverwaltung gepflegt.</p></div>
@@ -88,6 +97,8 @@
           {% if not route_nodes %}<a class="sg-back" href="/signage#routing">Zuerst Wegepunkte anlegen</a>{% endif %}
         </form>
       </div>
+      {% endif %}
+      {% include "_signage_special_editor.html" %}
     </div>
     <div class="sg-preview-column">
       <div class="sg-preview-heading"><div><span class="sg-eyebrow">LIVE-VORSCHAU</span><h2>Dein Bildschirm</h2></div>
@@ -139,4 +150,5 @@
   </div>
 </div>
 {% endblock %}
-{% block scripts %}<script src="/static/signage-studio.js" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/signage-studio.js" defer></script><script src="/static/signage-passive-admin.js" defer></script>
+{% endblock %}

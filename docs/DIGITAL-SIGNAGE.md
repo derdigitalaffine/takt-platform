@@ -68,3 +68,27 @@ Stand: 11.11.2026. Verbindliche Interviewentscheidungen **1–7 = D**; weitere E
 ### Erweiterungskontrakt für zukünftige Module
 
 Jeder neue Fachbereich benötigt einen expliziten Eintrag in `main.MODULES`, eine Entscheidung in `modhosts.MODULE_PUBLIC` oder `PORTAL_ONLY`, passende Moduldefault-Settings, Benutzerrechte, Navigation und Modulkarte. `test_domains.py` muss diese Zuordnung CI-seitig erzwingen. Zugang über Proxy-Hosts darf niemals interne `/signage/*/edit`-Pfade freigeben. Eine zentrale Register-Lösung bleibt nach Issue #328 weiterzuentwickeln.
+
+## Passive Wegweiser und Sonderbetrieb
+
+### In Betrieb nehmen
+
+1. In **Standorte, Gebäude und Räume** die Ziele pflegen. Gebäudenamen, Geschossnamen, Ebenen, Zimmernummern, Raumbezeichnungen und die Zugänglichkeit lassen sich an vorhandenen Einträgen korrigieren. Verknüpfte Kalender, Ressourcen und Wegpunkte bleiben dabei erhalten.
+2. Für jedes Besucherziel **Raum freigeben** aktivieren. Ein öffentlicher Anzeigename ist optional. Bleibt er leer, folgt der Wegweiser der aktuellen Raumbezeichnung. Die Freigabe gilt für passive Übersichten und Sonderanzeigen. Ein Widerruf entfernt den Raum aus beiden Projektionen.
+3. Im Schnellstart **Gebäudeübersicht**, **Geschossübersicht**, **Flurübersicht** oder **Passive Richtungsanzeige** wählen und den Standort einstellen. Die Gebäudeübersicht gruppiert Ziele nach Geschoss. Die Geschossübersicht zeigt Ziele auf dem gewählten Geschoss. Die Flurübersicht zeigt Ziele, die vom Display über Wege im selben Geschoss innerhalb der eingestellten Gehstrecke erreichbar sind. Die Richtungsanzeige kann einen statischen Hinweis mit Pfeil allein oder zusammen mit automatisch gefundenen Zielen zeigen.
+4. Für automatische Pfeile den Startpunkt und die Blickrichtung der Besucher vor dem Display im Plan einstellen. Die erste Kante des kürzesten zulässigen Wegs bestimmt die Richtung. Ohne eindeutige erste Richtung erscheint die Ortsangabe allein. Für einzelne Ziele lassen sich Anzeigename, Pfeil, Sortierpriorität und Ausblendung im Normalbetrieb einstellen. Die Option für stufenfreie Wege berücksichtigt die Angaben an Raum, Wegpunkten und Kanten. Eine manuelle Pfeilkorrektur erhält keine automatische Aussage zur Stufenfreiheit.
+5. Vorschau am tatsächlichen Bildschirm kontrollieren. Bei vielen Zielen wechselt die Browseranzeige die Seiten ohne Übergangsanimation. Bei reduzierter Bewegung erscheinen alle Zielseiten untereinander. Sichtbarkeit erst nach der Kontrolle auf **Öffentlich** oder **Sicherer Link** setzen.
+
+### Sonderanzeigen einrichten
+
+- Im Editor des betroffenen Displays **Sonderbetrieb** öffnen. Die Vorlagen **Ratssitzung**, **Wahlraum**, **Briefwahlstelle** und **Veranstaltung** liefern einen öffentlichen Standardtitel und eine Vorgabe für die Priorität. Eigene Titel, Hinweise und Zielräume sind frei konfigurierbar. Über den Freigabehaken geht der Eintrag für dieses Display in Betrieb.
+- Zeitfenster gelten ab Beginn bis unmittelbar vor Ende. Manuelle Termine werden in Berliner Ortszeit eingegeben. Mehrdeutige oder übersprungene Uhrzeiten bei der Sommerzeitumstellung werden abgewiesen. Die Formularschnittstelle akzeptiert zur eindeutigen Angabe auch ISO-Zeitstempel mit UTC-Offset.
+- Alternativ einen berechtigten freien TAKT-Kalender und einen konkreten Termin auswählen. TAKT übernimmt ausschließlich dessen Zeitfenster. Verschiebungen, Serienausnahmen und Löschungen wirken bei der nächsten Abfrage. Eine Serienfreigabe gilt für alle Vorkommen. Beim Abruf werden das Signage-Recht und die Quellberechtigung des freigebenden Kontos erneut geprüft. Kalendertitel, Beschreibungen und Teilnehmende werden aus dieser Quelle nicht veröffentlicht.
+- Pro Display gewinnt der gültige Eintrag mit der höchsten Priorität, dann mit dem früheren Beginn, dann der zuerst angelegte Eintrag. Je nach Einstellung ergänzt oder ersetzt er die normale Anzeige. Nach dem Zeitfenster oder Widerruf übernimmt der nächste gültige Eintrag oder der Normalbetrieb.
+- Browser fragen bei aktivem Sonderbetrieb und auf passiven Displays alle 30 Sekunden neu ab. Ein Sonderhinweis hat zusätzlich eine kurze Gültigkeit im Browser. Bei abgelaufenem Ersatzbetrieb erscheint bis zur nächsten Antwort ein neutraler Aktualisierungshinweis. Externe Player müssen die Prioritätsentscheidung aus `special` und dessen `valid_until` beachten. Das Manifest liefert zusätzlich `destinations` und `manual_direction`.
+
+### Grenzen und weitere Ausbaustufen
+
+- Die Stammdaten bleiben an die vorhandenen TAKT-Orte, Organisationen, Ressourcen und Kalender angebunden. Ein umfassender zentraler Organisations- und Grundrisseditor, Verschieben und Zusammenführen von Gebäudeteilen, Fachbereichs- und Dienstleistungszuordnungen sowie Importe bleiben in #322 und #325. Die bestehende interaktive Wegweiser-Vorlage behält ihre eigenen Freigaberegeln.
+- Sonderanzeigen werden pro Display gepflegt. Displaygruppen, automatische Vorschläge aus separaten Gremien-/Buchungsmodulen, eine Freigabe einzelner Serienvorkommen und ein revisionssicheres Freigabeprotokoll bleiben Ausbaustufen. Die Designhistorie erfasst Gestaltung. Stammdaten, Zielausnahmen und Sonderfreigaben werden separat gepflegt.
+- Die Wegweisung setzt vor Ort geprüfte Plankoordinaten, Blickrichtung und korrekt gepflegte Zugänglichkeit voraus. Sie ist für Besucherinformation ausgelegt. Evakuierung, vorgeschriebene Beschilderung und ausfallsicherer Offline-Betrieb gehören zu #327. Für große Installationen, sehr kleine Displays und formale Barrierefreiheitsprüfungen gilt #328.
