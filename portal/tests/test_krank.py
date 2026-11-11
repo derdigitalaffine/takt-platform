@@ -599,3 +599,159 @@ def test_supervisor_original_or_pdf_requires_existing_report_access():
         assert files[0]["filename"].startswith("KM-")
         assert files[0]["filename"].endswith(".pdf")
         assert base64.b64decode(files[0]["content_b64"]).startswith(b"%PDF")
+
+
+def test_supervisor_scope_respects_inheritance_groups_and_inactive_users():
+    from app.db import Organization
+    from app.org_models import OrgRoleGrant
+
+    _staff_user("noninherited-lead@example.org", "krank")
+    _staff_user("inherited-deputy@example.org", "krank")
+    _staff_user("group-lead-krank@example.org", "krank")
+    _staff_user("inactive-lead-krank@example.org", "krank")
+    with SessionLocal() as db:
+        root = Organization(name="Supervisor Scope Root", kind="verwaltung")
+        department = Organization(name="Supervisor Scope Department", kind="fachbereich", parent=root)
+        db.add_all([root, department])
+        db.flush()
+        by_email = {
+            user.email: user for user in db.scalars(select(User).where(
+                User.email.in_((
+                    "noninherited-lead@example.org", "inherited-deputy@example.org",
+                    "group-lead-krank@example.org", "inactive-lead-krank@example.org",
+                ))))
+        }
+        team = Group(name="Krank Supervisor Testgruppe")
+        team.members.append(by_email["group-lead-krank@example.org"])
+        db.add(team)
+        db.flush()
+        by_email["inactive-lead-krank@example.org"].active = False
+        db.add_all([
+            OrgRoleGrant(org_id=root.id, user_id=by_email["noninherited-lead@example.org"].id,
+                         role="lead", include_children=False),
+            OrgRoleGrant(org_id=root.id, user_id=by_email["inherited-deputy@example.org"].id,
+                         role="deputy", include_children=True),
+            OrgRoleGrant(org_id=department.id, group_id=team.id,
+                         role="lead", include_children=False),
+            OrgRoleGrant(org_id=department.id, user_id=by_email["inactive-lead-krank@example.org"].id,
+                         role="lead", include_children=True),
+        ])
+        emp = KrankEmployer(name="Supervisor Scope Employer", org_id=department.id,
+                            notify_supervisors=True)
+        db.add(emp)
+        db.commit()
+        recipients = krank.supervisor_recipients(db, emp)
+        assert set(recipients) == {
+            "inherited-deputy@example.org", "group-lead-krank@example.org"
+        }
+        emp.notify_supervisors = False
+        assert krank.supervisor_recipients(db, emp) == []
+
+
+@pytest.mark.parametrize("mode", ["pdf", "original"])
+def test_supervisor_role_and_global_krank_right_do_not_grant_au_access(mode):
+    from app.db import Organization
+    from app.org_models import OrgRoleGrant
+
+    email = f"unassigned-supervisor-{mode}@example.org"
+    _staff_user(email, "krank")  # Module access without report-specific assignment.
+    with SessionLocal() as db:
+        node = Organization(name=f"Restricted Supervisor {mode}", kind="arbeitgeber")
+        db.add(node)
+        db.flush()
+        supervisor = db.scalar(select(User).where(User.email == email))
+        db.add(OrgRoleGrant(org_id=node.id, user_id=supervisor.id,
+                            role="lead", include_children=True))
+        emp = KrankEmployer(name=f"Restricted Report Employer {mode}", org_id=node.id,
+                            notify_supervisors=True, supervisor_attachment_mode=mode,
+                            attach_files=True, attach_original_au=True)
+        db.add(emp)
+        db.commit()
+        employer_id = emp.id
+    c = public_client()
+    result = submit(c, "au", first_name="Geheim", last_name="Patient",
+                    employer=str(employer_id),
+                    **{"from": "2026-10-05", "to": "2026-10-06", "first": "1"},
+                    files={"file": ("private-au.pdf", PDF, "application/pdf")})
+    assert result.status_code == 303
+    with SessionLocal() as db:
+        notices = db.scalars(select(Notification).where(
+            Notification.to_addr == email)).all()
+        assert len(notices) == 1
+        assert notices[0].attachments_json is None
+        assert "Geheim Patient" in notices[0].body
+        assert "private-au.pdf" not in notices[0].body
+
+
+def test_admin_mail_preferences_are_validated_and_saved():
+    from app.db import Organization
+
+    with SessionLocal() as db:
+        node = Organization(name="Mail Policy Administration Org", kind="arbeitgeber")
+        db.add(node)
+        db.flush()
+        emp = KrankEmployer(name=node.name, org_id=node.id)
+        db.add(emp)
+        db.commit()
+        eid = emp.id
+    admin = login("admin@example.org", "admin-passwort-123")
+    edit = admin.get(f"/krankmelder/arbeitgeber/{eid}")
+    assert edit.status_code == 200
+    assert "Original-AU" in edit.text
+    assert "Vorgesetzte aus der Organisationsstruktur" in edit.text
+    csrf = csrf_of(edit.text)
+    org_id = node.id
+    r = admin.post(f"/krankmelder/arbeitgeber/{eid}", data={
+        "csrf": csrf, "org_id": str(org_id), "active": "1",
+        "attach_files": "1", "attach_original_au": "1",
+        "notify_supervisors": "1", "supervisor_attachment_mode": "original",
+    })
+    assert r.status_code == 303
+    with SessionLocal() as db:
+        saved = db.get(KrankEmployer, eid)
+        assert saved.attach_files is True
+        assert saved.attach_original_au is True
+        assert saved.notify_supervisors is True
+        assert saved.supervisor_attachment_mode == "original"
+    # A forged invalid mode must fail closed; no original without PDF enablement.
+    admin.post(f"/krankmelder/arbeitgeber/{eid}", data={
+        "csrf": csrf, "org_id": str(org_id), "active": "1",
+        "attach_original_au": "1", "notify_supervisors": "1",
+        "supervisor_attachment_mode": "bogus",
+    })
+    with SessionLocal() as db:
+        saved = db.get(KrankEmployer, eid)
+        assert saved.attach_original_au is False
+        assert saved.supervisor_attachment_mode == "notice"
+
+
+def test_existing_organization_can_be_employer_or_parent_of_new_employer():
+    from app.db import Organization
+
+    with SessionLocal() as db:
+        parent = Organization(name="Krankmeldungen Test Fachbereich", kind="fachbereich")
+        db.add(parent)
+        db.commit()
+        parent_id = parent.id
+    admin = login("admin@example.org", "admin-passwort-123")
+    csrf = csrf_of(admin.get("/krankmelder/verwaltung").text)
+    existing = admin.post("/krankmelder/arbeitgeber/neu", data={
+        "csrf": csrf, "org_id": str(parent_id),
+    })
+    assert existing.status_code == 303
+    with SessionLocal() as db:
+        linked = db.scalar(select(KrankEmployer).where(
+            KrankEmployer.org_id == parent_id))
+        assert linked is not None
+        assert linked.name == "Krankmeldungen Test Fachbereich"
+    new = admin.post("/krankmelder/arbeitgeber/neu", data={
+        "csrf": csrf, "org_id": str(parent_id),
+        "name": "Untergeordneter Arbeitgeber Test",
+    })
+    assert new.status_code == 303
+    with SessionLocal() as db:
+        linked = db.scalar(select(KrankEmployer).where(
+            KrankEmployer.name == "Untergeordneter Arbeitgeber Test"))
+        assert linked is not None
+        assert linked.org.parent_id == parent_id
+        assert linked.org.kind == "arbeitgeber"
