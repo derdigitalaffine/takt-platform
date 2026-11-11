@@ -70,6 +70,10 @@ def _apply(page: BookingPage, data) -> None:
                                  if flag("conflict_" + key)],
             "staff_calendar_attachment": flag("staff_calendar_attachment"),
             "mail_digest": flag("mail_digest"),
+            "calendar_privacy": data.get("calendar_privacy") if data.get("calendar_privacy")
+                                in ("staff", "assigned", "busy") else "staff",
+            "external_calendar": data.get("external_calendar") if data.get("external_calendar")
+                                 in ("busy", "type") else "busy",
         })
         page.integration_json = json.dumps(opts, ensure_ascii=False)
 
