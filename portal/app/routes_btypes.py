@@ -56,6 +56,7 @@ async def btypes_save(request: Request, page_id: int, user: User = Depends(curre
     bt.choose_provider = data.get("choose_provider") == "1"
     bt.active = data.get("active", "1") == "1"
     bt.phone_mode = data.get("phone_mode") if data.get("phone_mode") in btypes.PHONE_MODES else "optional"
+    bt.privacy_mode = data.get("privacy_mode") if data.get("privacy_mode") in ("inherit", "restricted", "busy") else "inherit"
     bt.fields_json = btypes.clean_fields(data.getlist("f_label"), data.getlist("f_kind"), data.getlist("f_options"),
                                          set(data.getlist("f_required")), data.getlist("f_help"))
     ids = {int(x) for x in data.getlist("providers") if str(x).isdigit()}
