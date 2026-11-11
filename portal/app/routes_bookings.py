@@ -171,7 +171,7 @@ def booking_events(page_id: int, user: User = Depends(current_user), db: Session
 
 def _window_change_payload(page: BookingPage, message: str) -> dict:
     """Aktuelle Kalenderdaten und kleine Vorschau ohne erneutes Laden der gesamten Seite."""
-    free = bk.bookable(page)
+    free = bk.bookable(page, db=db)
     days = bk.group_by_day(free)
     return {
         "ok": True, "message": message, "events": bk.calendar_events(page),
@@ -585,7 +585,7 @@ def _booking_public_steps(request: Request, db: Session, page: BookingPage, invi
                        summary=btypes.summary, invite=invite, start_url=link())
 
     from . import btypes
-    available = (btypes.slots(db, page, bt, person) if bt is not None else bk.bookable(page))
+    available = (btypes.slots(db, page, bt, person) if bt is not None else bk.bookable(page, db=db))
     days = bk.group_by_day(available)
     slot_value = q.get("slot", "")[:100]
     chosen = next(((day, slot) for day in days for slot in day["slots"]
