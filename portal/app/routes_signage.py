@@ -3,7 +3,7 @@ import json
 from datetime import timedelta
 from hmac import compare_digest
 from fastapi import Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -152,16 +152,41 @@ def signage_public(sid: int, request: Request, db: Session = Depends(get_db)):
     return _render_display(request, db, screen, public=True)
 
 
+def _authorized_link(db, sid, raw):
+    screen = _screen(db, sid)
+    if screen.visibility != "link" or not screen.enabled or len(raw) < 32 or len(raw) > 128:
+        raise HTTPException(404)
+    row = db.scalar(select(SignageLink).where(
+        SignageLink.screen_id == sid, SignageLink.token_hash == signage.digest(raw)))
+    if row is None or row.revoked or row.expires_at <= utcnow():
+        raise HTTPException(404)
+    return screen, row
+
+
 @app.get("/signage/l/{sid:int}/{token}")
 def signage_linked(sid: int, token: str, request: Request, db: Session = Depends(get_db)):
-    screen = _screen(db, sid)
-    if screen.visibility != "link" or len(token) < 32 or len(token) > 128:
-        raise HTTPException(404)
-    row = db.scalar(select(SignageLink).where(SignageLink.screen_id == sid,
-                                              SignageLink.token_hash == signage.digest(token)))
-    if not row or row.revoked or row.expires_at <= utcnow():
-        raise HTTPException(404)
-    return _render_display(request, db, screen, public=False)
+    """Exchange a one-time URL visit for an HttpOnly scoped cookie.
+
+    The initial email URL is necessarily a bearer secret; redirect removes it
+    from the browser address bar, subsequent reloads and history entries.
+    Access proxy logs must additionally redact incoming /signage/l/* paths.
+    """
+    _, row = _authorized_link(db, sid, token)
+    age = min(7 * 86400, max(1, int((row.expires_at - utcnow()).total_seconds())))
+    response = RedirectResponse(f"/signage/access/{sid}", status_code=303)
+    response.set_cookie(key=f"sg_access_{sid}", value=token, max_age=age,
+                        path=f"/signage/access/{sid}", secure=True,
+                        httponly=True, samesite="lax")
+    response.headers.update({"Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+                             "X-Robots-Tag": "noindex, nofollow"})
+    return response
+
+
+@app.get("/signage/access/{sid:int}")
+def signage_link_session(sid: int, request: Request, db: Session = Depends(get_db)):
+    raw = request.cookies.get(f"sg_access_{sid}", "")
+    screen, _ = _authorized_link(db, sid, raw)
+    return _render_display(request, db, screen, public=True)
 
 
 @app.post("/signage/{sid:int}/share", dependencies=[Depends(check_csrf)])
