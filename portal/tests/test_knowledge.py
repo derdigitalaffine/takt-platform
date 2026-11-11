@@ -553,3 +553,78 @@ def test_source_references_enforce_current_dms_and_article_access(sample):
             db.flush()
             db.delete(db.get(DmsArea, area_id))
             db.commit()
+
+
+def test_room_approval_policy_snapshots_independent_reviewers(sample):
+    _, space_id, article_id, _, _, reviewer_id = sample
+    admin = login(*ADMIN)
+    author = login("wissen-reader@example.org", "knowledge-test-123")
+    reviewer = login("wissen-checker@example.org", "knowledge-test-123")
+    management = f"/wissen/raum/{space_id}/verwaltung"
+    policy = f"/wissen/raum/{space_id}/freigaben"
+    path = f"/wissen/artikel/{article_id}"
+    admin_csrf = csrf_of(admin.get(management).text)
+    author_csrf = csrf_of(author.get(path).text)
+    reviewer_csrf = csrf_of(reviewer.get(path).text)
+    assert admin.post(policy, data={"required": 2}).status_code == 400
+    assert author.post(policy, data={"csrf": author_csrf, "required": 2}).status_code == 403
+    assert admin.post(policy, data={"csrf": admin_csrf, "required": 2}).status_code == 303
+    assert author.post(path + "/status", data={
+        "csrf": author_csrf, "status": "review", "version": 1,
+    }).status_code == 303
+    assert admin.post(policy, data={"csrf": admin_csrf, "required": 1}).status_code == 303
+    decision = {"status": "published", "version": 2}
+    assert author.post(path + "/status", data={**decision, "csrf": author_csrf}).status_code == 403
+    assert reviewer.post(path + "/status", data={**decision, "csrf": reviewer_csrf}).status_code == 303
+    assert "1 von 2 unabhängigen Freigaben" in reviewer.get(path).text
+    assert reviewer.post(path + "/status", data={**decision, "csrf": reviewer_csrf}).status_code == 409
+    assert "Beschaffung Dienstmaterial" not in reviewer.get("/wissen/pruefungen").text
+
+    # A revoked approval does not count when a second reviewer votes.
+    with SessionLocal() as db:
+        db.get(User, reviewer_id).permissions = "knowledge_read"
+        db.commit()
+    assert admin.post(path + "/status", data={**decision, "csrf": admin_csrf}).status_code == 303
+    assert "1 von 2 unabhängigen Freigaben" in admin.get(path).text
+    with SessionLocal() as db:
+        db.get(User, reviewer_id).permissions = "knowledge_read,knowledge_publish"
+        db.commit()
+    # Return and resubmission supersede both decisions and pick up the new rule.
+    assert author.post(path + "/status", data={
+        "csrf": author_csrf, "status": "draft", "version": 2,
+    }).status_code == 303
+    assert author.post(path + "/status", data={
+        "csrf": author_csrf, "status": "review", "version": 3,
+    }).status_code == 303
+    assert reviewer.post(path + "/status", data={
+        **decision, "csrf": reviewer_csrf, "version": 4,
+    }).status_code == 303
+    with SessionLocal() as db:
+        assert db.get(KnowledgeArticle, article_id).status == "published"
+
+
+def test_two_reviewers_publish_amendment_only_after_both_approve(sample):
+    _, space_id, article_id, *_ = sample
+    author, reviewer = _publish_sample(sample)
+    admin = login(*ADMIN)
+    admin_csrf = csrf_of(admin.get(f"/wissen/raum/{space_id}/verwaltung").text)
+    assert admin.post(f"/wissen/raum/{space_id}/freigaben", data={
+        "csrf": admin_csrf, "required": 2,
+    }).status_code == 303
+    article = f"/wissen/artikel/{article_id}"
+    proposal = article + "/entwurf"
+    author_csrf = csrf_of(author.get(article).text)
+    assert author.post(proposal + "/start", data={"csrf": author_csrf, "version": 3}).status_code == 303
+    assert author.post(proposal + "/save", data={
+        "csrf": author_csrf, "version": 1, "title": "Überarbeitete Wissensfassung",
+    }).status_code == 303
+    assert author.post(proposal + "/status", data={
+        "csrf": author_csrf, "version": 2, "status": "review",
+    }).status_code == 303
+    vote = {"version": 3, "status": "published"}
+    reviewer_csrf = csrf_of(reviewer.get(proposal).text)
+    assert reviewer.post(proposal + "/status", data={**vote, "csrf": reviewer_csrf}).status_code == 303
+    assert "1 von 2 unabhängigen Freigaben" in reviewer.get(proposal).text
+    assert "Überarbeitete Wissensfassung" not in reviewer.get(article).text
+    assert admin.post(proposal + "/status", data={**vote, "csrf": admin_csrf}).status_code == 303
+    assert "Überarbeitete Wissensfassung" in reviewer.get(article).text

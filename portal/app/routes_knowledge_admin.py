@@ -6,17 +6,17 @@ access for delegated room administrators.
 from datetime import timedelta
 from itertools import islice
 
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import Depends, Form, HTTPException, Query, Request
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from . import knowledge as km
+from . import knowledge as km, knowledge_approvals as approvals
 from .db import Group, Organization, User
 from .knowledge_models import (
     KnowledgeAmendment, KnowledgeArticle, KnowledgeGrant, KnowledgeSpace,
 )
 from .org_models import OrgMembership
-from .main import app, current_user, get_db, render
+from .main import app, check_csrf, current_user, flash, get_db, redirect, render
 from .routes_knowledge import _reader, _space
 
 
@@ -94,6 +94,25 @@ def knowledge_management(request: Request, space_id: int, q: str = "",
                   capabilities=km.CAP_PERMS, delegated=not user.is_admin)
 
 
+@app.post("/wissen/raum/{space_id:int}/freigaben", dependencies=[Depends(check_csrf)])
+def knowledge_approval_policy(request: Request, space_id: int,
+                              required: int = Form(...),
+                              user: User = Depends(current_user),
+                              db: Session = Depends(get_db)):
+    _reader(user, db)
+    if not user.is_admin:
+        raise HTTPException(403)
+    space = _space(db, user, space_id, "manage")
+    if required not in {1, 2}:
+        raise HTTPException(422, "Bitte eine oder zwei unabhängige Freigaben wählen.")
+    if space.required_approvals != required:
+        space.required_approvals = required
+        km.audit(db, user, space.id, None, "approval_policy", str(required))
+        db.commit()
+    flash(request, "Freigaberegel für neue Einreichungen gespeichert.")
+    return redirect(f"/wissen/raum/{space.id}/verwaltung")
+
+
 @app.get("/wissen/pruefungen")
 def knowledge_review_queue(request: Request,
                            due_page: int = Query(1, ge=1, le=1_000_000),
@@ -111,7 +130,8 @@ def knowledge_review_queue(request: Request,
     pending = with_space.where(KnowledgeArticle.status == "review").order_by(*recent_first)
     articles = list(islice(
         ((item, space) for item, space in db.execute(pending.execution_options(yield_per=100))
-         if km.can_approve_article(db, user, space, item)),
+         if km.can_approve_article(db, user, space, item)
+         and approvals.can_record(user, item, approvals.current_reviewers(db, space, item))),
         100,
     ))
 
@@ -122,7 +142,8 @@ def knowledge_review_queue(request: Request,
         .order_by(KnowledgeAmendment.updated_at.desc(), KnowledgeArticle.id.desc()))
     amendments = list(islice(
         ((item, space) for item, space, proposal in db.execute(proposed.execution_options(yield_per=100))
-         if km.can_approve_amendment(db, user, space, item, proposal)),
+         if km.can_approve_amendment(db, user, space, item, proposal)
+         and approvals.can_record(user, proposal, approvals.current_reviewers(db, space, item, proposal))),
         100,
     ))
 

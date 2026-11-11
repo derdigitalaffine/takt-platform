@@ -14,6 +14,23 @@
   {% else %}
   <div class="knowledge-info-note"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Zentrale Administration. Gruppen- und Organisationsfreigaben kannst du unten ebenfalls konfigurieren. Direkte Sperren übersteuern geerbte Rechte.</div>
   {% endif %}
+  {% if not delegated %}
+  <section class="knowledge-form-card mb-4" aria-labelledby="k-approval-title">
+    <h2 id="k-approval-title" class="h5">Fachliche Freigaben</h2>
+    <form action="/wissen/raum/{{ space.id }}/freigaben" method="post" class="d-flex flex-wrap align-items-end gap-2">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div>
+        <label for="k-required-approvals" class="form-label">Unabhängige Prüfpersonen</label>
+        <select class="form-select" name="required" id="k-required-approvals">
+          <option value="1" {{ 'selected' if space.required_approvals == 1 }}>Eine Prüfperson</option>
+          <option value="2" {{ 'selected' if space.required_approvals == 2 }}>Zwei Prüfpersonen</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Freigaberegel speichern</button>
+    </form>
+    <p class="form-text">Gilt für neue Einreichungen und erneut eingereichte Überarbeitungen in diesem Raum.</p>
+  </section>
+  {% endif %}
   <section class="knowledge-form-card" aria-labelledby="k-people-title">
     <div class="knowledge-section-title mt-0"><h2 id="k-people-title">Person auswählen</h2><span class="small text-secondary">Maximal 120 Treffer je Suche</span></div>
     <form method="get" action="/wissen/raum/{{space.id}}/verwaltung" class="knowledge-people-search">

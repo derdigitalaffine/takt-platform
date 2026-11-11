@@ -2969,7 +2969,10 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    "knowledge_spaces": {"required_approvals": "INTEGER NOT NULL DEFAULT 1"},
+    "knowledge_amendments": {"required_approvals": "INTEGER NOT NULL DEFAULT 1"},
     "knowledge_articles": {
+        "required_approvals": "INTEGER NOT NULL DEFAULT 1",
         "authority": "VARCHAR(20) NOT NULL DEFAULT 'unconfirmed'",
         "review_due_on": "DATE",
         "last_reviewed_at": "DATETIME",
