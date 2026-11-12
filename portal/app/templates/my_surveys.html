@@ -4,9 +4,13 @@
 {% block content %}
 <div class="survey-workspace">
   {% call m.page_header('Meine Umfragen', 'Offene Einladungen, erledigte Teilnahmen und Änderungen – unabhängig davon, wo du den Link geöffnet hast.') %}
-    {% if polls_enabled and (user.can('polls') or user.can('votes')) %}<a href="/umfragen" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-square-poll-vertical me-1" aria-hidden="true"></i>Umfragen verwalten</a>{% endif %}
   {% endcall %}
-
+  {% if polls_enabled %}
+  <nav class="ds-nav nav nav-pills gap-2 mb-3" aria-label="Bereiche der Umfragen und Abstimmungen">
+    <a class="nav-link active" href="/meine-umfragen" aria-current="page"><i class="fa-solid fa-clipboard-check me-2" aria-hidden="true"></i>Meine Umfragen</a>
+    {% if can_manage %}<a class="nav-link" href="/umfragen"><i class="fa-solid fa-chart-column me-2" aria-hidden="true"></i>Umfragen verwalten</a>{% endif %}
+  </nav>
+  {% endif %}
   <div class="row g-3 mb-4" aria-label="Persönlicher Teilnahmestand">
     {% for key, label, icon, tone in [('open','Offen','fa-clock','warning'),('done','Abgeschlossen','fa-circle-check','success'),('closed','Beendet','fa-lock','secondary')] %}
     <div class="col-4"><div class="card h-100"><div class="card-body py-3 text-center">
