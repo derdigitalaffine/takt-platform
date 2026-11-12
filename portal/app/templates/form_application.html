@@ -31,8 +31,9 @@
       <div class="card h-100"><div class="card-header"><i class="fa-solid fa-user-tie me-2"></i>Zuständig (Vorgabe)</div><div class="card-body"><div class="row g-3">
         <div class="col-md-6"><label class="form-label" for="a-user">Person</label>
           <select class="form-select" id="a-user" name="app_assignee_id"><option value="">–</option>{% for u in users %}<option value="{{ u.id }}" {% if form.app_assignee_id == u.id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select></div>
-        <div class="col-md-6"><label class="form-label" for="a-group">Gruppe (alle Mitglieder)</label>
-          <select class="form-select" id="a-group" name="app_group_id"><option value="">–</option>{% for g in groups %}<option value="{{ g.id }}" {% if form.app_group_id == g.id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}</select></div>
+        <div class="col-md-6"><label class="form-label" for="a-group">Zuständige Organisationseinheit / Gruppe</label>
+          <select class="form-select" id="a-group" name="app_org_id"><option value="">– keine Organisationseinheit –</option>{% for id, label in responsible_options %}<option value="{{ id }}" {% if selected_default_org == id %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <p class="form-text">Aus dem Organisationsbaum. Ein Gruppenknoten erreicht seine Gruppenmitglieder; andere Einheiten erreichen die direkt zugeordneten Personen. Nur aktive Einheiten sind auswählbar.</p></div>
         <div class="col-12"><label class="form-label" for="a-mailbox">Funktionspostfach (optional)</label>
           <input class="form-control" id="a-mailbox" name="app_mailbox" type="email" value="{{ form.app_mailbox }}" placeholder="z. B. ordnungsamt@vg-beispiel.de">
           <div class="form-text">Bekommt jeden neuen Antrag samt PDF – z. B. für die Ablage in der E-Akte. Ohne Zuständige geht der Hinweis an Sie als Besitzer:in.</div></div>
@@ -62,14 +63,14 @@
       <div class="card-body">
         {% if questions %}
         <div class="table-responsive"><table class="table table-sm align-middle mb-2">
-          <thead class="small"><tr><th>Wenn die Antwort auf …</th><th>… lautet (bzw. enthält)</th><th>dann zuständig: Person</th><th>Gruppe</th><th>Postfach</th></tr></thead>
+          <thead class="small"><tr><th>Wenn die Antwort auf …</th><th>… lautet (bzw. enthält)</th><th>dann zuständig: Person</th><th>Organisationseinheit / Gruppe</th><th>Postfach</th></tr></thead>
           <tbody>
           {% for r in rules + [{}, {}, {}] %}
           <tr>
             <td><select class="form-select form-select-sm" name="rule_question"><option value="">–</option>{% for q in questions if q.type in ('radio', 'dropdown', 'checkbox', 'short') %}<option value="{{ q.id }}" {% if r.question == q.id %}selected{% endif %}>{{ q.title or types[q.type][0] }}</option>{% endfor %}</select></td>
             <td><input class="form-control form-control-sm" name="rule_value" value="{{ r.value or '' }}" placeholder="z. B. Otterberg"></td>
             <td><select class="form-select form-select-sm" name="rule_user"><option value="">–</option>{% for u in users %}<option value="{{ u.id }}" {% if r.user_id == u.id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select></td>
-            <td><select class="form-select form-select-sm" name="rule_group"><option value="">–</option>{% for g in groups %}<option value="{{ g.id }}" {% if r.group_id == g.id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}</select></td>
+            <td><select class="form-select form-select-sm" name="rule_org" aria-label="Zuständige Organisationseinheit"><option value="">–</option>{% for id, label in responsible_options %}<option value="{{ id }}" {% if r.org_id == id %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
             <td><input class="form-control form-control-sm" name="rule_email" value="{{ r.email or '' }}" placeholder="optional"></td>
           </tr>
           {% endfor %}
