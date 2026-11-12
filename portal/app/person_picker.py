@@ -8,7 +8,7 @@ import re
 from collections.abc import Mapping
 from sqlalchemy import select
 
-from .db import Organization, SessionLocal, User
+from .db import Group, GroupMember, Organization, SessionLocal, User
 from .org_models import OrgMembership
 
 PERSON_KEYS = frozenset({
@@ -65,9 +65,16 @@ def prepare_context(ctx):
         return {"people": {}, "organizations": []}
 
     with SessionLocal() as db:
-        memberships = db.execute(select(
+        memberships = list(db.execute(select(
             OrgMembership.user_id, OrgMembership.org_id
-        ).where(OrgMembership.user_id.in_(list(ids)))).all()
+        ).where(OrgMembership.user_id.in_(list(ids)))).all())
+        # Real TAKT groups are organizational nodes; annotate their users in
+        # the existing smart picker without copying them into HR memberships.
+        memberships.extend(db.execute(select(
+            GroupMember.user_id, Group.org_id
+        ).join(Group, GroupMember.group_id == Group.id).where(
+            GroupMember.user_id.in_(list(ids)), Group.org_id.is_not(None)
+        )).all())
         membership_map = {uid: [] for uid in ids}
         required = set()
         for uid, org_id in memberships:
