@@ -156,10 +156,12 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         for g in role_rows
         if g.org_id == unit
     ]
-    org_people_count = {}
-    for group_node in db.scalars(select(Group).where(Group.org_id.is_not(None))):
-        org_people_count[group_node.org_id] = db.scalar(
-            select(func.count(GroupMember.user_id)).where(GroupMember.group_id == group_node.id)) or 0
+    org_people_count = dict(db.execute(
+        select(Group.org_id, func.count(GroupMember.user_id))
+        .join(GroupMember, GroupMember.group_id == Group.id)
+        .where(Group.org_id.is_not(None))
+        .group_by(Group.org_id)
+    ).all())
     for membership in memberships:
         if membership.org_id not in org_people_count:
             org_people_count[membership.org_id] = 0
