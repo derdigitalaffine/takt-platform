@@ -207,3 +207,26 @@ Für die Freigabe verwenden Prüfungsübersicht, Artikelseite und Statuswechsel
 dieselben Regeln zu Zugriffsrechten und Mitwirkung an der Fassung.
 Parallele Änderungen an derselben Version führen zu einem Konflikt mit
 Aufforderung zum Neuladen. Die Übersicht arbeitet ohne Versand oder KI.
+
+## Quellverweise aus den Fachmodulen
+
+Auf aktuellen Rechtstexten, Umläufen, Ablageeinträgen und
+Bearbeitungsprozessen öffnet **Wissensverweise** die berechtigten,
+veröffentlichten Wissensartikel zum jeweiligen Objekt. Die Fachredaktion
+kann dort den Markdown-Verweis kopieren und in einen Wissensentwurf einfügen.
+Der Verweis durchläuft dieselbe Versionierung und Freigabe wie der übrige
+Artikeltext. Er lässt sich im visuellen Editor als gewöhnlicher Link
+bearbeiten.
+
+TAKT speichert im Wissensartikel die Referenz. Bezeichnung und Ziel werden
+erst beim Anzeigen oder Öffnen mit der aktuellen Berechtigung im Fachmodul
+aufgelöst. Ablageverweise verwenden eine allgemeine Linkbezeichnung.
+Deaktivierte Module, gelöschte Quellen und Rechteentzüge führen zu „Quelle
+nicht verfügbar“. Der Erstellungszeitpunkt der Quelle schützt den Verweis
+vor der Wiederverwendung einer numerischen ID. Rückverweise zeigen nur
+veröffentlichte, aktuell lesbare Artikel. Gast- und Einbettungsansichten
+bieten keinen Einstieg zu diesen Verweisen.
+
+Die Fachmodule bleiben für ihre Fassungen und Regeln zuständig. Ein Verweis
+folgt dem aktuellen Objektstand. Er erzeugt weder eine Kopie noch eine
+Kenntnisnahme oder eine KI-Indizierung.

@@ -95,6 +95,17 @@ try:
         page.get_by_role('button', name='Visuelle Ansicht', exact=True).click()
         assert textarea.input_value() == before
 
+        # Source references pasted as Markdown survive the visual editor and form submission.
+        reference = '/wissen/quelle/ablage/17/0123456789abcdef01234567'
+        snippet = f'[Ablageeintrag]({reference})'
+        page.get_by_role('button', name='Markdown-Quelltext', exact=True).click()
+        textarea.fill(before + '\n\n' + snippet)
+        page.get_by_role('button', name='Visuelle Ansicht', exact=True).click()
+        source_link = page.locator('.knowledge-visual-link').last
+        expect(source_link.get_by_role('textbox', name='Linkadresse')).to_have_value(reference)
+        page.get_by_role('button', name='Speichern', exact=True).click()
+        assert snippet in page.evaluate('window.testSubmissions[1]')
+
         # Mobile viewport, no unwanted global horizontal scroll.
         page.set_viewport_size({'width': 390, 'height': 844})
         page.emulate_media(color_scheme='dark', reduced_motion='reduce')

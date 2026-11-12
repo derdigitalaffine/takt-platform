@@ -48,6 +48,7 @@
 {%- endmacro %}
 
 {% block content %}
+{% include "_knowledge_source_link.html" %}
 {% if law.internal %}<div class="alert alert-info"><i class="fa-solid fa-lock me-2"></i>Interner Text – nur für angemeldete Portal-Benutzer.</div>{% endif %}
 
 <nav aria-label="Pfad" class="ds-breadcrumb small mb-2 lex-noprint">

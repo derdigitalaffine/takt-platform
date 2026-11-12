@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import circulations as cl, csvsafe, dms, circulation_reports as reports, bundle_lifecycle as bl
+from .knowledge_sources import contextual_link
 from .db import (Circulation, CirculationBundle, CirculationDistributor, CirculationEvent, CirculationReceipt,
                  CirculationRecipient, CirculationVersion, DmsFile, Form, Group, LawText, User, to_local, utcnow)
 from .main import app, check_csrf, current_user, enabled_modules, flash, get_db, redirect, render, session_user
@@ -315,6 +316,7 @@ def view(request, db, row, ver, user=None, guest=None, token=None):
     base = f'/umlaeufe/g/{token}' if token else f'/umlaeufe/{row.id}'
     items = [{**i, 'accessible': cl.item_access(db, user, i)} for i in c['items']]
     return protect(render(request, 'circulation_detail.html', user, row=row, ver=ver, c=c, items=items,
+        knowledge_source=contextual_link(db, user, "umlauf", row) if guest is None and ver.number == row.current_version else None,
         recipient=rec, recipient_choices=choices, proxy=bool(rec and user and rec.user_id and rec.user_id != user.id), manager=manager, base=base, guest=guest, markdown=cl.markdown,
         personal_progress=len(set(cl.requirement_keys(c)) & {r.item_key for r in cl.receipts(db, rec)}),
         required_count=len(cl.requirement_keys(c)), next_key=next((k for k in cl.requirement_keys(c) if k not in {r.item_key for r in cl.receipts(db, rec)}), None),

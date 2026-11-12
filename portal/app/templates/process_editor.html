@@ -2,6 +2,7 @@
 {% import "_macros.html" as m with context %}
 {% block title %}{{ process.name }} · Prozesse{% endblock %}
 {% block content %}
+{% include "_knowledge_source_link.html" %}
 <nav aria-label="Pfad" class="ds-breadcrumb small mb-2"><a href="/processes">Prozesse</a> › {{ process.name }}</nav>
 <div class="d-flex flex-wrap align-items-start gap-2 mb-3">
   <div class="flex-grow-1" style="min-width: 18rem">

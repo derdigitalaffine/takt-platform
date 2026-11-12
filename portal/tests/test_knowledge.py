@@ -480,3 +480,76 @@ def test_review_confirmation_keeps_submitted_amendment_publishable(sample):
         "csrf": reviewer_csrf, "version": 3, "status": "published",
     }).status_code == 303
     assert "Neue Fassung" in reviewer.get(article).text
+
+
+def test_source_references_enforce_current_dms_and_article_access(sample):
+    import re
+    from app.db import DmsAccess, DmsArea, DmsRecord
+
+    _, _, article_id, _, outsider_id, reviewer_id = sample
+    _, reviewer = _publish_sample(sample)
+    settings(module_dms="1")
+    with SessionLocal() as db:
+        area = DmsArea(name="Vertraulicher Fachordner")
+        db.add(area)
+        db.flush()
+        record = DmsRecord(area_id=area.id, title="Geschützter DMS-Titel", kind="manuell")
+        db.add(record)
+        db.add(DmsAccess(area_id=area.id, user_id=reviewer_id, level=1))
+        db.add(DmsAccess(area_id=area.id, user_id=outsider_id, level=1))
+        db.commit()
+        area_id, record_id = area.id, record.id
+    try:
+        outsider = login("wissen-outsider@example.org", "knowledge-test-123")
+        dms_page = reviewer.get(f"/dms/r/{record_id}")
+        assert dms_page.status_code == 200
+        contextual = re.search(r'href="(/wissen/quelle/ablage/[^"]+/wissen)"', dms_page.text)[1]
+        reference = contextual.removesuffix("/wissen")
+        assert reviewer.get(reference, follow_redirects=False).headers["location"] == f"/dms/r/{record_id}"
+        with SessionLocal() as db:
+            article = db.get(KnowledgeArticle, article_id)
+            article.body_md = f'`{reference}`'
+            db.commit()
+        assert "Beschaffung Dienstmaterial" not in reviewer.get(contextual).text
+
+        with SessionLocal() as db:
+            article = db.get(KnowledgeArticle, article_id)
+            article.body_md = f'[Manuell angegebener Titel]({reference} "Privater Hinweis")'
+            db.commit()
+
+        assert "Beschaffung Dienstmaterial" in reviewer.get(contextual).text
+        assert "Beschaffung Dienstmaterial" not in outsider.get(contextual).text
+        article_path = f"/wissen/artikel/{article_id}"
+        html = reviewer.get(article_path).text
+        assert f'href="{reference}"' in html and "Ablageeintrag öffnen" in html
+        assert "Geschützter DMS-Titel" not in html
+        assert "Privater Hinweis" not in html
+
+        with SessionLocal() as db:
+            access = db.scalar(select(DmsAccess).where(
+                DmsAccess.area_id == area_id, DmsAccess.user_id == reviewer_id))
+            db.delete(access)
+            db.commit()
+
+        html = reviewer.get(article_path).text
+        assert "Quelle nicht verfügbar" in html
+        assert "Manuell angegebener Titel" not in html
+        assert f'href="{reference}"' not in html
+        assert reviewer.get(contextual).status_code == 404
+        assert reviewer.get(reference).status_code == 404
+
+        with SessionLocal() as db:
+            from datetime import timedelta
+            db.get(DmsRecord, record_id).created_at += timedelta(seconds=1)
+            db.add(DmsAccess(area_id=area_id, user_id=reviewer_id, level=1))
+            db.commit()
+        assert reviewer.get(f"/dms/r/{record_id}").status_code == 200
+        assert reviewer.get(reference).status_code == 404
+    finally:
+        with SessionLocal() as db:
+            for access in db.scalars(select(DmsAccess).where(DmsAccess.area_id == area_id)):
+                db.delete(access)
+            db.delete(db.get(DmsRecord, record_id))
+            db.flush()
+            db.delete(db.get(DmsArea, area_id))
+            db.commit()

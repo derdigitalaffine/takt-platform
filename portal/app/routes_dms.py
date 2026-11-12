@@ -11,6 +11,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from . import dms_lifecycle as lifecycle, trash, csvsafe, applications as apps, dms, forms as fm
+from .knowledge_sources import contextual_link
 from .db import (
     LOCAL_TZ, DmsAccess, DmsArea, DmsLog, DmsRecord, DmsSearch, Group, Person, User, utcnow,
 )
@@ -171,6 +172,7 @@ def dms_record(request: Request, record_id: int, user: User = Depends(current_us
         candidates = db.scalars(q.order_by(Person.name).limit(15)).all()
     ctx.update(person_q=person_q, candidates=candidates)
     return render(request, "dms_record.html", user, record=record, level=level, by_id=by_id, label=dms.label,
+                  knowledge_source=contextual_link(db, user, "ablage", record),
                   may_remove=may_remove, protection=lifecycle.protection(db, record),
                   area_path=dms.path(record.area, by_id), statuses=apps.STATUSES, write_areas=[(a, d) for a, d in dms.tree(db) if lv.get(a.id, 0) >= dms.WRITE],
                   **ctx)
