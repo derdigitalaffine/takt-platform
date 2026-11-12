@@ -56,3 +56,15 @@ Verknüpfte Dokumente, laufende Vorgänge, noch geltende Aufbewahrungsfristen un
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du willst ein Dokument ablegen oder wiederfinden?
+
+1. **Ablage (DMS)** öffnen.
+2. Passenden Vorgang oder Ablageort suchen.
+3. Dokument hochladen beziehungsweise auswählen, wenn du dazu berechtigt bist.
+4. Titel und Zuordnung prüfen, damit andere es später finden.
+5. Zugriffsrechte beachten und die richtige Fassung verwenden.
+
+**Merksatz:** Eine Datei irgendwo hochladen ist noch keine ordentliche Ablage.
