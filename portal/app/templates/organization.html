@@ -55,13 +55,48 @@
     <div>
         {% if selected %}
             <section class="card card-body mb-3 org-unit-header"><div class="d-flex flex-wrap gap-3 align-items-start">{% if selected.logo %}<img class="org-current-logo" src="{{org_logo_url(selected)}}" alt="Wappen {{selected.name}}">{% endif %}<div class="flex-grow-1"><h2 class="h4">{{selected.name}}</h2><p class="small text-secondary mb-2">{{org_kinds.get(selected.kind,(selected.kind,))[0]}}{% if not selected.active %} · inaktiv{% endif %}{% if selected.short_name %} · {{selected.short_name}}{% endif %}</p><p class="small mb-0">{{selected.contact}}{% if selected.city %} · {{selected.street}}, {{selected.zip}} {{selected.city}}{% endif %}{% if selected.email %} · {{selected.email}}{% endif %}</p>
-  <div class="org-unit-summary"><span><i class="fa-solid fa-users" aria-hidden="true"></i>{{memberships|length}} Zuordnungen</span><span><i class="fa-solid fa-key" aria-hidden="true"></i>{{role_groups|length}} Rollenträger</span><span><i class="fa-solid fa-circle-{{'check' if selected.active else 'pause'}}" aria-hidden="true"></i>{{'Aktiv' if selected.active else 'Inaktiv'}}</span></div></div>{% if caps.settings %}<a class="btn btn-outline-secondary" href="#org-settings" data-org-open>Stammdaten & Wappen</a>{% endif %}</div></section>
+  <div class="org-unit-summary"><span><i class="fa-solid fa-users" aria-hidden="true"></i>{{group_members|length if linked_group else memberships|length}} {{'Gruppenmitglieder' if linked_group else 'Zuordnungen'}}</span><span><i class="fa-solid fa-key" aria-hidden="true"></i>{{role_groups|length}} Rollenträger</span><span><i class="fa-solid fa-circle-{{'check' if selected.active else 'pause'}}" aria-hidden="true"></i>{{'Aktiv' if selected.active else 'Inaktiv'}}</span></div></div>{% if caps.settings %}<a class="btn btn-outline-secondary" href="#org-settings" data-org-open>Stammdaten & Wappen</a>{% endif %}</div></section>
             <nav class="org-detail-nav" aria-label="Einstellungen dieser Organisationseinheit">
               <a href="#org-members"><i class="fa-solid fa-users" aria-hidden="true"></i>Personen</a>
               <a href="#org-roles"><i class="fa-solid fa-key" aria-hidden="true"></i>Rollen &amp; Rechte</a>
               {% if caps.settings %}<a href="#org-settings" data-org-open><i class="fa-solid fa-address-card" aria-hidden="true"></i>Stammdaten</a>{% endif %}
             </nav>
             {% if person_filter or group_filter %}<p class="small">Gefilterte Ansicht · <a href="/admin/organization?unit={{selected.id}}">Alle Zuordnungen anzeigen</a></p>{% endif %}
+            {% if linked_group %}
+            <section class="card mb-4" id="org-members"><div class="card-body">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div><h3 class="h5 mb-1">Mitglieder der Gruppe</h3><p class="small text-secondary mb-0">Echte TAKT-Benutzergruppe: Mitgliedschaften gelten unverändert für Einladungen und Berechtigungen, ohne eine zusätzliche Personal-Hauptzuordnung zu erzeugen.</p></div>
+                <span class="badge text-bg-light border">{{group_members|length}} Personen</span>
+              </div>
+              <div class="org-membership-tools mt-3">
+                <label for="org-member-search" class="form-label">Mitglieder dieser Gruppe durchsuchen</label>
+                <input id="org-member-search" type="search" class="form-control"
+                       placeholder="Name oder E-Mail …" data-org-member-search>
+                <span class="org-membership-footer" data-org-member-count
+                      aria-live="polite">{{group_members|length}} Mitglieder</span>
+              </div>
+              <div class="list-group list-group-flush mt-3" data-org-member-list>
+                {% for entry in group_members if entry.user_id in people %}
+                <div class="list-group-item px-0 d-flex justify-content-between align-items-center gap-3"
+                     data-org-member-row data-name="{{people[entry.user_id].name|lower}} {{people[entry.user_id].email|lower}}">
+                  <div><strong>{{people[entry.user_id].name}}</strong><small class="d-block text-secondary">{{people[entry.user_id].email}}</small></div>
+                  <span class="badge {{'text-bg-secondary' if entry.manual else 'text-bg-info'}}">{{'Manuell' if entry.manual else 'Externe Synchronisation'}}</span>
+                </div>
+                {% else %}<p class="small text-secondary mt-3">Noch keine Mitglieder.</p>{% endfor %}
+              </div>
+              {% if caps.members %}
+              <details class="mt-3" id="org-assignment" {{'open' if form_data.get('action')=='group_members_save'}}><summary>Gruppenmitglieder bearbeiten</summary>
+                <form action="/admin/organization" method="post" class="mt-3">
+                  {{fields('group_members_save',selected.id)}}
+                  {{sp.picker('org-group-members','members',member_choices,group_member_ids)}}
+                  <p class="form-text mt-2">Extern synchronisierte Mitgliedschaften bleiben geschützt. Die Auswahl ändert keine Personal-Hauptzuordnungen und keine Stellenbesetzung.</p>
+                  <button class="btn btn-primary" data-selection-submit>Gruppenmitglieder speichern</button>
+                </form>
+              </details>
+              {% endif %}
+              <a class="small d-inline-block mt-3" href="/admin/users#gruppen">Gruppenleitung und weitere Gruppendaten</a>
+            </div></section>
+            {% else %}
             <section class="card mb-4" id="org-members"><div class="card-body"><h3 class="h5">Personenzuordnungen</h3><p class="small text-secondary">Eine Hauptzuordnung und zusätzliche Mitarbeit in weiteren Einheiten. Bereichsrollen werden getrennt vergeben.</p>
                 <div class="org-membership-tools">
   <div><label for="org-member-search" class="form-label">Personen dieser Einheit durchsuchen</label><input id="org-member-search" class="form-control" type="search" placeholder="Name oder E-Mail …" data-org-member-search></div>
@@ -73,6 +108,7 @@
                     <div class="col-md-7"><label for="org-staff-mode" class="form-label">Besetzungswirkung</label><select id="org-staff-mode" name="staff_mode" class="form-select">{% set staff=form_data.get('staff_mode','yes' if membership_edit and membership_edit.counts_staff else 'no' if membership_edit else 'default') %}{% for key,title in [('default','Standard: Hauptzuordnung zählt, zusätzliche zählt nicht'),('yes','Für die Besetzung mitzählen'),('no','Nicht für die Besetzung mitzählen')] %}<option value="{{key}}" {{'selected' if staff==key}}>{{title}}</option>{% endfor %}</select></div><div class="col-md-5"><label for="org-capacity" class="form-label">Einsatzanteil (%)</label><input id="org-capacity" class="form-control" name="capacity_percent" type="number" min="0" max="100" value="{{form_data.get('capacity_percent',membership_edit.capacity_percent if membership_edit else 100)}}"><p class="form-text">Für die erweiterte Kapazitätsprüfung.</p></div><div><button class="btn btn-primary" data-selection-submit>Auswahl zuordnen</button></div></div>
                 </form></details>{% if member_remove_choices %}<details class="mt-3" {{'open' if form_data.get('action')=='membership_remove_many'}}><summary>Mehrere Zuordnungen entfernen</summary><form method="post" action="/admin/organization" class="mt-3">{{fields('membership_remove_many',selected.id)}}{{sp.picker('org-remove-people','memberships',member_remove_choices,form_data.get('memberships',[]))}}<p class="small mt-2">Eine Hauptzuordnung mit weiteren Zuordnungen lässt sich erst nach Wahl einer neuen Hauptzuordnung entfernen.</p><button class="btn btn-outline-danger" data-selection-submit>Ausgewählte Zuordnungen entfernen</button></form></details>{% endif %}{% endif %}
             </div></section>
+            {% endif %}
             <section class="card mb-4" id="org-roles"><div class="card-body">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2"><div><h3 class="h5 mb-1">Bereichsrollen</h3><p class="text-secondary small mb-0">Jede Person erscheint einmal; direkte und geerbte Rollen sind zusammengefasst.</p></div><span class="badge text-bg-light border">{{role_groups|length}} Personen / Gruppen</span></div>
   {% if role_groups|length > 4 %}<div class="org-membership-tools"><div><label class="form-label" for="org-role-search">Rollen suchen</label><input class="form-control" id="org-role-search" type="search" placeholder="Person oder Gruppe …" data-org-role-search></div><span class="org-membership-footer" data-org-role-count>{{role_groups|length}} Einträge</span></div>{% endif %}

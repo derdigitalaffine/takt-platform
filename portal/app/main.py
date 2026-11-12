@@ -2474,9 +2474,10 @@ async def admin_groups_create(request: Request, name: str = Form(...), descripti
     from .db import GroupMember
     from sqlalchemy import update
     db.execute(update(GroupMember).where(GroupMember.group_id==group.id,GroupMember.user_id.in_(ids)).values(manual=True))
-    db.add(group)
+    from .organization_groups import sync_from_group
+    node = sync_from_group(db, group)
     db.commit()
-    flash(request, f"Gruppe „{group.name}“ angelegt.")
+    flash(request, f"Gruppe „{group.name}“ angelegt und im Organisationsbaum eingeordnet.")
     return redirect("/admin/users#gruppen")
 
 
@@ -2490,7 +2491,19 @@ async def admin_groups_update(request: Request, gid: int, action: str = Form("sa
     if protected_group(db, group.id) and not (user.is_admin or user.can("org_roles")):
         raise HTTPException(403, "Gruppen mit Bereichsrollen dürfen nur mit Organisationsrollen-Rechten geändert werden.")
     if action == "delete":
-        db.delete(group)
+        from .organization_groups import node_of, removable
+        node = node_of(db, group)
+        if node:
+            if not user.is_admin and not user.can("orgs"):
+                raise HTTPException(403, "Zum Löschen eines Gruppenknotens werden Organisationsstrukturrechte benötigt.")
+            if removable(db, node):
+                raise HTTPException(422, "Gruppe ist in der Organisationshierarchie noch in Verwendung. "
+                                        "Verknüpfungen und Untereinheiten zuerst umordnen.")
+            db.delete(group)
+            db.flush()
+            db.delete(node)
+        else:
+            db.delete(group)
         db.commit()
         flash(request, f"Gruppe „{group.name}“ gelöscht. Die Mitglieder behalten ihre Konten.")
         return redirect("/admin/users#gruppen")
@@ -2502,12 +2515,11 @@ async def admin_groups_update(request: Request, gid: int, action: str = Form("sa
     group.description = " ".join(str(form.get("description", "")).split())[:255]
     group.lead_id = int(form["lead_id"]) if str(form.get("lead_id", "")).isdigit() and db.get(User, int(form["lead_id"])) else None
     ids = {int(u) for u in form.getlist("members") if str(u).isdigit()}
-    group.members = list(db.scalars(select(User).where(User.id.in_(ids)))) if ids else []
     db.add(group)
     db.flush()
-    from .db import GroupMember
-    from sqlalchemy import update
-    db.execute(update(GroupMember).where(GroupMember.group_id==group.id,GroupMember.user_id.in_(ids)).values(manual=True))
+    from .organization_groups import set_group_members, sync_from_group
+    set_group_members(db, group, ids)
+    sync_from_group(db, group)
     db.commit()
     flash(request, f"Gruppe „{group.name}“ gespeichert." + (" Der Name ist schon vergeben." if clash else ""))
     return redirect("/admin/users#gruppen")

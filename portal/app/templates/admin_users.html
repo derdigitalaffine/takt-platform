@@ -147,7 +147,7 @@
   <tbody>
   {% for g in groups %}
   <tr>
-    <td class="fw-semibold">{{ g.name }}<div class="small fw-normal"><a href="/admin/organization?group={{g.id}}#org-roles">Bereichsrollen{{' · geschützt' if g.id in org_group_roles}}</a></div></td>
+    <td class="fw-semibold">{{ g.name }}<div class="small fw-normal">{% if g.org_id %}<a href="/admin/organization?unit={{g.org_id}}"><i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Im Organisationsbaum bearbeiten</a> · {% endif %}<a href="/admin/organization?group={{g.id}}#org-roles">Bereichsrollen{{' · geschützt' if g.id in org_group_roles}}</a></div></td>
     <td class="small text-secondary">{{ g.description }}{% if g.lead %}<div><i class="fa-solid fa-user-tie me-1"></i>Leitung: {{ g.lead.name }}</div>{% endif %}</td>
     <td data-order="{{ g.members|length }}">{% for mbr in g.members[:6] %}<span class="avatar avatar-sm me-1" title="{{ mbr.name }}">{{ m.initials(mbr.name) }}</span>{% endfor %}{% if g.members|length > 6 %}<span class="small text-secondary">+{{ g.members|length - 6 }}</span>{% endif %}
       <span class="small text-secondary ms-1">({{ g.members|length }})</span></td>

@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from .db import Organization, User, Group, GroupMember
 from .org_models import OrgMembership, OrgRoleGrant, OrgAudit, OrgKind, OrgState
-from . import organization as os, orgs, people_choices
+from . import organization as os, organization_groups as og, orgs, people_choices
 from .main import app, current_user, get_db, check_csrf, render, redirect, flash
 
 
@@ -46,7 +46,8 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
             .order_by(OrgMembership.is_primary.desc())
         )
     if unit is None and group is not None:
-        unit = db.scalar(
+        linked = db.scalar(select(Group.org_id).where(Group.id == group))
+        unit = linked if linked in visible else db.scalar(
             select(OrgRoleGrant.org_id).where(
                 OrgRoleGrant.group_id == group, OrgRoleGrant.org_id.in_(visible)
             )
@@ -54,6 +55,10 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
     if unit is None and visible:
         unit = next(o.id for o, _ in rows if o.id in visible)
     selected = nodes.get(unit)
+    linked_group = og.group_of(db, selected)
+    group_members = list(db.scalars(select(GroupMember).where(
+        GroupMember.group_id == linked_group.id).order_by(GroupMember.user_id)
+    )) if linked_group else []
     caps = access.get(unit, {})
     memberships = list(
         db.scalars(
@@ -151,9 +156,16 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         for g in role_rows
         if g.org_id == unit
     ]
-    org_people_count = {}
+    org_people_count = dict(db.execute(
+        select(Group.org_id, func.count(GroupMember.user_id))
+        .join(GroupMember, GroupMember.group_id == Group.id)
+        .where(Group.org_id.is_not(None))
+        .group_by(Group.org_id)
+    ).all())
     for membership in memberships:
-        org_people_count[membership.org_id] = org_people_count.get(membership.org_id, 0) + 1
+        if membership.org_id not in org_people_count:
+            org_people_count[membership.org_id] = 0
+        org_people_count[membership.org_id] += 1
     org_role_count = {}
     for grant in all_grants:
         org_role_count[grant.org_id] = org_role_count.get(grant.org_id, 0) + 1
@@ -182,6 +194,9 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         org_logo_url=orgs.logo_url,
         org_usage=orgs.usage(db, selected) if selected and caps.get("settings") else {},
         memberships=shown,
+        linked_group=linked_group,
+        group_members=group_members,
+        group_member_ids={str(m.user_id) for m in group_members},
         own_memberships=own,
         people=people,
         org_groups=groups,
@@ -282,6 +297,13 @@ def _person_editor_entries(db, actor, person, focus=None):
             select(OrgMembership).where(OrgMembership.user_id == person.id)
         )
     }
+    group_nodes = {org_id: (gid, manual)
+                   for org_id, gid, manual in db.execute(
+                       select(Group.org_id, Group.id, GroupMember.manual)
+                       .join(GroupMember, GroupMember.group_id == Group.id)
+                       .where(GroupMember.user_id == person.id,
+                              Group.org_id.is_not(None))
+                   )}
     direct = {}
     for grant in db.scalars(
         select(OrgRoleGrant).where(OrgRoleGrant.user_id == person.id)
@@ -293,13 +315,16 @@ def _person_editor_entries(db, actor, person, focus=None):
             continue
         members = os.allows(db, actor, node.id, "members")
         roles = os.allows(db, actor, node.id, "roles")
-        if not (members or roles or node.id in assigned or node.id in direct):
+        if not (members or roles or node.id in assigned or node.id in direct or node.id in group_nodes):
             continue
         entries.append(dict(
             node=node, membership=assigned.get(node.id),
+            group_member=node.id in group_nodes,
+            group_managed=node.id in group_nodes and not group_nodes[node.id][1],
             grants=direct.get(node.id, {}),
             can_members=members, can_roles=roles,
-            focused=node.id == focus or (focus is None and node.id in assigned),
+            focused=node.id == focus or (focus is None and
+                     (node.id in assigned or node.id in group_nodes)),
         ))
     return entries
 
@@ -351,8 +376,9 @@ async def organization_person_save(
     primary_raw = form.get("primary_unit")
     primary_unit = os.number(primary_raw) if primary_raw else None
     if primary_unit and not any(
-        e["node"].id == primary_unit and e["can_members"]
-        and form.get(f"member_{primary_unit}") == "1" for e in entries
+        e["node"].id == primary_unit and e["node"].kind != og.KIND and
+        e["can_members"] and form.get(f"member_{primary_unit}") == "1"
+        for e in entries
     ):
         raise HTTPException(422, "Hauptzuordnung muss aktiv und bearbeitbar sein.")
     # Move the primary association first, then update other associations,
@@ -365,6 +391,12 @@ async def organization_person_save(
     for entry in member_entries:
         oid = entry["node"].id
         member = entry["membership"]
+        if entry["node"].kind == og.KIND:
+            if not entry["group_member"]:
+                os.set_membership(db, user, dict(
+                    org_id=oid, user_id=person_id, is_primary="0"
+                ))
+            continue
         want_primary = oid == primary_unit if primary_unit else bool(
             member and member.is_primary
         )
@@ -405,6 +437,20 @@ async def organization_person_save(
                     os.delete_role(db, user, dict(grant=grant.id))
     for entry in editable:
         if not entry["can_members"]:
+            continue
+        if entry["node"].kind == og.KIND:
+            if entry["group_member"] and not entry["group_managed"] and (
+                form.get(f'member_{entry["node"].id}') != "1"
+            ):
+                group = og.group_of(db, entry["node"])
+                if group and db.get(GroupMember, (group.id, person_id)):
+                    if os.protected_group(db, group.id) and not (
+                        user.is_admin or user.can("org_roles")
+                    ):
+                        raise HTTPException(403, "Geschützte Gruppe benötigt Organisationsrollen-Rechte.")
+                    db.delete(db.get(GroupMember, (group.id, person_id)))
+                    os.audit(db, user, entry["node"].id, "group_member_remove",
+                             group=group.id, user=person_id)
             continue
         old = entry["membership"]
         if old and form.get(f'member_{entry["node"].id}') != "1":
@@ -494,6 +540,21 @@ async def handle_action(request, user, db, data):
                         else os.delete_role
                     )(db, user, values)
             count = len(selected)
+        elif action == "group_members_save":
+            os.require(db, user, oid, "members")
+            node = db.get(Organization, oid)
+            group = og.group_of(db, node)
+            if group is None:
+                raise HTTPException(422, "Bitte einen bestehenden Gruppenknoten wählen.")
+            if os.protected_group(db, group.id) and not (
+                user.is_admin or user.can("org_roles")
+            ):
+                raise HTTPException(403, "Gruppen mit Bereichsrollen erfordern Organisationsrollen-Rechte.")
+            wanted = {os.number(v) for v in data.getlist("members")}
+            og.set_group_members(db, group, wanted)
+            os.audit(db, user, oid, "group_members", group=group.id,
+                     count=len(wanted))
+            count = len(wanted)
         elif action == "membership":
             os.set_membership(db, user, data)
         elif action == "membership_remove":
@@ -515,6 +576,13 @@ async def handle_action(request, user, db, data):
             values, errors = orgs.clean(data, existing, os.kinds(db))
             if errors:
                 raise HTTPException(422, " ".join(errors))
+            requested_kind = values["kind"]
+            if existing:
+                if (existing.kind == og.KIND) != (requested_kind == og.KIND):
+                    raise HTTPException(422, "Ein Gruppenknoten kann nicht in einen anderen Typ "
+                                            "umgewandelt werden. Bitte die Gruppe verschieben.")
+            elif requested_kind == og.KIND and not og.available_name(db, values["name"]):
+                raise HTTPException(422, "Gruppenname bereits vergeben oder länger als 120 Zeichen.")
             if str(data.get("kind", "")) not in os.kinds(db):
                 raise HTTPException(422, "Gültigen Ebenentyp wählen.")
             if existing and not user.can("orgs"):
@@ -577,6 +645,10 @@ async def handle_action(request, user, db, data):
             if existing is None:
                 db.add(row)
             db.flush()
+            if row.kind == og.KIND:
+                if len(row.note or "") > 255:
+                    raise HTTPException(422, "Gruppenbeschreibungen dürfen maximal 255 Zeichen enthalten.")
+                og.sync_from_node(db, row, allow_create=existing is None)
             oid = row.id
             os.audit(db, user, oid, "unit_save", name=row.name, parent=row.parent_id)
         elif action == "unit_delete":
@@ -585,7 +657,10 @@ async def handle_action(request, user, db, data):
             row = db.get(Organization, oid)
             if not row:
                 raise HTTPException(404)
+            linked_group = og.group_of(db, row)
             used = {k: v for k, v in orgs.usage(db, row).items() if v}
+            if linked_group and os.protected_group(db, linked_group.id):
+                raise HTTPException(422, "Gruppe hat noch Bereichsrollen. Diese zuerst entfernen.")
             if used:
                 raise HTTPException(
                     422,
@@ -595,6 +670,9 @@ async def handle_action(request, user, db, data):
                 )
             old_logo = row.logo
             os.audit(db, user, oid, "unit_delete", name=row.name)
+            if linked_group:
+                db.delete(linked_group)
+                db.flush()
             db.delete(row)
             oid = None
         elif action in {"kind", "kind_remove"}:

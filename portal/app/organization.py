@@ -96,14 +96,16 @@ def grants(db, user):
 
 
 def context(db, user):
+    own = set(db.scalars(
+        select(OrgMembership.org_id).where(OrgMembership.user_id == user.id)))
+    # Groups are native org nodes, but their canonical membership stays in
+    # group_members. This never confers primary HR/staffing status.
+    own.update(db.scalars(select(Group.org_id).join(
+        GroupMember, GroupMember.group_id == Group.id).where(
+        GroupMember.user_id == user.id, Group.org_id.is_not(None))))
     return dict(
         nodes={n.id: n for n in db.scalars(select(Organization))},
-        grants=grants(db, user),
-        own=set(
-            db.scalars(
-                select(OrgMembership.org_id).where(OrgMembership.user_id == user.id)
-            )
-        ),
+        grants=grants(db, user), own=own,
     )
 
 
@@ -167,6 +169,10 @@ def has_access(db, user):
         return True
     return bool(
         db.scalar(select(OrgMembership.id).where(OrgMembership.user_id == user.id))
+        or db.scalar(select(GroupMember.group_id).where(
+            GroupMember.user_id == user.id,
+            GroupMember.group_id.in_(
+                select(Group.id).where(Group.org_id.is_not(None)))))
         or any(active_path(db, g.org_id) for g in grants(db, user))
     )
 
@@ -223,6 +229,24 @@ def set_membership(db, actor, data):
     person = db.get(User, uid)
     if not person or not person.active:
         raise HTTPException(422, "Aktive Person wählen.")
+    node = db.get(Organization, oid)
+    if node.kind == "gruppe":
+        from .organization_groups import group_of
+        group = group_of(db, node)
+        if not group:
+            raise HTTPException(409, "Gruppe ist nicht verknüpft.")
+        if not active_path(db, oid):
+            raise HTTPException(422, "Mitglieder dürfen nur aktiven Gruppen zugeordnet werden.")
+        if protected_group(db, group.id) and not (
+            actor.is_admin or actor.can("org_roles")
+        ):
+            raise HTTPException(403, "Gruppen mit Bereichsrollen benötigen Organisationsrollen-Rechte.")
+        if data.get("is_primary") == "1":
+            raise HTTPException(422, "Gruppen sind zusätzliche Mitgliedschaften, keine Hauptzuordnung.")
+        if db.get(GroupMember, (group.id, uid)) is None:
+            db.add(GroupMember(group_id=group.id, user_id=uid, manual=True))
+        audit(db, actor, oid, "group_member", user=uid, group=group.id)
+        return
     if not active_path(db, oid):
         raise HTTPException(
             422,
@@ -391,8 +415,10 @@ def check_structure_change(db, actor, node, parent_id, active):
             403,
             "Für Strukturänderungen an Bereichen mit Rollen ist zusätzlich „Organisationsrollen vergeben“ erforderlich.",
         )
-    if db.scalar(
-        select(OrgMembership.id).where(OrgMembership.org_id.in_(ids))
+    populated_group_ids = select(Group.id).where(Group.org_id.in_(ids))
+    if (db.scalar(select(OrgMembership.id).where(OrgMembership.org_id.in_(ids)))
+        or db.scalar(select(GroupMember.group_id).where(
+            GroupMember.group_id.in_(populated_group_ids)))
     ) and not (actor.is_admin or actor.can("org_members")):
         raise HTTPException(
             403,
@@ -406,7 +432,12 @@ def scoped_people(db, user, cap, primary_only=False):
     q = select(OrgMembership.user_id).where(OrgMembership.org_id.in_(ids))
     if primary_only:
         q = q.where(OrgMembership.is_primary.is_(True))
-    return set(db.scalars(q))
+    members = set(db.scalars(q))
+    if not primary_only:
+        group_nodes = select(Group.id).where(Group.org_id.in_(ids))
+        members.update(db.scalars(select(GroupMember.user_id).where(
+            GroupMember.group_id.in_(group_nodes))))
+    return members
 
 
 def directory(db):
@@ -421,6 +452,15 @@ def directory(db):
         result.setdefault(m.user_id, []).append(
             dict(id=m.org_id, name=nodes[m.org_id].name, primary=m.is_primary)
         )
+    # Canonical group membership appears as an additional organizational
+    # assignment without affecting primary placement, leave or staffing.
+    node_groups = {g.id: g.org_id for g in db.scalars(select(Group)).all()
+                   if g.org_id in nodes}
+    for gid, uid in db.execute(select(GroupMember.group_id, GroupMember.user_id)):
+        oid = node_groups.get(gid)
+        if oid is not None and not any(m["id"] == oid for m in result.get(uid, [])):
+            result.setdefault(uid, []).append(
+                dict(id=oid, name=nodes[oid].name, primary=False, group=True))
     return result
 
 

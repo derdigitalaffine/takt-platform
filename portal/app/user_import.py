@@ -229,4 +229,8 @@ def apply(db, rows: list[dict], force_change: bool) -> tuple[list[User], list[Us
                     user.groups.append(g)
                     added += 1
     db.flush()
+    # Imported groups use the same canonical IDs and root-level organization
+    # nodes as groups created in the administration.
+    from .organization_groups import ensure_all
+    ensure_all(db)
     return without_password, created, added
