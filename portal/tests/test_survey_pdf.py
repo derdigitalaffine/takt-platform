@@ -234,4 +234,4 @@ def test_poll_color_matrix_has_web_yes_maybe_no_and_untruncated_csv(reports):
     stream = b" ".join(page.get_contents().get_data() for page in reader.pages)
     assert b".870588" in stream   # #DEF1E6 green fill
     assert b".945098" in stream   # green fill component
-    assert b".984314" in stream   # #FCE4E7 red fill
+    assert b".988235" in stream   # #FCE4E7 red fill
