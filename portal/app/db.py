@@ -3172,6 +3172,14 @@ def _migrate() -> None:
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_form_responses_track_token "
                           "ON form_responses (track_token)"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_groups_org_id ON groups (org_id)"))
+        # ALTER TABLE ADD COLUMN does not create SQLAlchemy's index=True
+        # indexes on existing SQLite/PostgreSQL deployments.
+        for index_name, table, column in (
+            ("ix_forms_app_org_id", "forms", "app_org_id"),
+            ("ix_form_responses_responsible_org_id", "form_responses", "responsible_org_id"),
+            ("ix_application_tasks_responsible_org_id", "application_tasks", "responsible_org_id"),
+        ):
+            conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table} ({column})"))
         # SQLite UNIQUE over nullable org_id does not deduplicate global rules.
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_anliegen_global_rule_revision "
                           "ON anliegen_process_rules (category_id, process_id, revision) WHERE org_id IS NULL"))
