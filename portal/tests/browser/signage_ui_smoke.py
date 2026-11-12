@@ -31,7 +31,21 @@ def exercise():
         page.locator('[name="email"]').fill("signage@example.org")
         page.locator('[name="password"]').fill("browser-test-password")
         page.locator('button[type="submit"]').click()
-        # Building publication lives in the dedicated hierarchy browser.
+        # Shared person picker: multiple selection, surname sort, org hierarchy.
+        page.goto(BASE + "/signage/rooms")
+        expect(page.get_by_role("heading", name="Alle Räume & Personen")).to_be_visible()
+        picker = page.locator(".sg-room-add .pp-person-control")
+        expect(picker).to_be_visible()
+        filter_select = page.locator(".sg-room-add .pp-org-filter select")
+        expect(filter_select).to_be_visible()
+        filter_select.select_option(label="Verwaltung / Service")
+        picker.locator("input").fill("Lars")
+        page.locator(".sg-room-add .ts-dropdown .option").filter(
+            has_text="Lars Berg").click()
+        page.get_by_role("button", name="Personen zuordnen").click()
+        expect(page.locator(".sg-occupant").get_by_text("Lars Berg")).to_be_visible()
+
+                # Building publication lives in the dedicated hierarchy browser.
         page.goto(BASE + "/signage/buildings")
         page.locator(".sg-tree-room").filter(has_text="Bürgerbüro").click()
         page.get_by_label("Raum für öffentliche Anzeigen freigeben").check()
