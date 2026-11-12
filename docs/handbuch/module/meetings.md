@@ -169,3 +169,15 @@ Auf der Aufnahme ganz unten **Löschen**. Je nach Stand bietet das Portal an: nu
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du willst eine Videobesprechung machen?
+
+1. **Meetings** öffnen und eine Besprechung anlegen.
+2. Zeitpunkt und Teilnehmende festlegen.
+3. Einladungen beziehungsweise den passenden Zugangslink verschicken.
+4. Vor Beginn Mikrofon, Kamera und gegebenenfalls Bildschirmfreigabe testen.
+5. Nur mit den nötigen Rechten und Hinweisen aufnehmen; danach freigegebene Ergebnisse teilen.
+
+**Merksatz:** Einen Meetinglink zu haben bedeutet nicht automatisch, dass alle vertraulichen Inhalte sehen dürfen.
