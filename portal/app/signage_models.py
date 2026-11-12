@@ -28,6 +28,30 @@ class SignageFloor(Base):
     __table_args__ = (UniqueConstraint("building_id", "level"),)
 
 
+class SignageBuildingPart(Base):
+    """Logical building wing/section without rewriting legacy floor foreign keys.
+
+    Parent parts must belong to the same building. Hierarchy validation occurs
+    in the management route; consumers can keep using canonical floor/room IDs.
+    """
+    __tablename__ = "signage_building_parts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    building_id: Mapped[int] = mapped_column(ForeignKey("signage_buildings.id", ondelete="CASCADE"), index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("signage_building_parts.id", ondelete="RESTRICT"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    code: Mapped[str] = mapped_column(String(32), default="")
+    kind: Mapped[str] = mapped_column(String(20), default="wing")
+    description: Mapped[str] = mapped_column(String(250), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SignagePartFloor(Base):
+    """Optional one-part-per-floor membership; existing floors remain valid."""
+    __tablename__ = "signage_part_floors"
+    floor_id: Mapped[int] = mapped_column(ForeignKey("signage_floors.id", ondelete="CASCADE"), primary_key=True)
+    part_id: Mapped[int] = mapped_column(ForeignKey("signage_building_parts.id", ondelete="CASCADE"), index=True)
+
+
 class SignageRoom(Base):
     __tablename__ = "signage_rooms"
     id: Mapped[int] = mapped_column(primary_key=True)
