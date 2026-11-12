@@ -291,6 +291,7 @@ async def signage_generate_for_building(request: Request,
         for floor in floors:
             nodes = db.scalars(select(SignageWayNode).where(
                 SignageWayNode.floor_id == floor.id,
+                SignageWayNode.room_id.is_(None),
                 SignageWayNode.kind.in_(("entrance", "corridor"))
             ).order_by(SignageWayNode.id).limit(30)).all()
             requests.extend((f"corridor:{node.id}", "sign_corridor",
