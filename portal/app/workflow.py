@@ -498,7 +498,9 @@ def can_work(db, user: User, task: ApplicationTask) -> bool:
         return False
     if (user.is_admin or task.assignee_id in _user_ids(db, user) or
         (task.group_id and task.group_id in _group_ids(db, user)) or
-        ao.can_handle(db, user, task.responsible_org_id)):
+        # An explicit takeover supersedes the Org-wide task audience. Keep
+        # case visibility separate from permission to act on this step.
+        (task.assignee_id is None and ao.can_handle(db, user, task.responsible_org_id))):
         return True
     if task.kind != "approval" and not task.assignee_id and not task.group_id and not task.responsible_org_id:
         return apps.access(db, user, task.response) >= 2
