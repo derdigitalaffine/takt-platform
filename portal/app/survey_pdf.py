@@ -265,6 +265,8 @@ def poll_report(db, poll) -> bytes:
                 reverse=True):
             count = counts[option.id]
             label = pl.option_parts(option)["label"]
+            if option.note:
+                label += " · " + str(option.note)[:120]
             if option.id == poll.final_option_id:
                 label += " (festgelegt)"
             rows.append([
