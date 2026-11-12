@@ -36,15 +36,50 @@ def exercise():
         expect(page.get_by_role("heading", name="Alle Räume & Personen")).to_be_visible()
         picker = page.locator(".sg-room-add .pp-person-control")
         expect(picker).to_be_visible()
-        filter_select = page.locator(".sg-room-add .pp-org-filter select")
-        expect(filter_select).to_be_visible()
-        filter_select.select_option(label="Verwaltung / Service")
+        # Exactly one accessible search/picker. The organizational browser
+        # belongs to its Tom Select dropdown, not a separate select widget.
+        expect(page.locator(".sg-room-add .pp-org-filter select")).to_have_count(0)
+        picker.locator("input").click()
+        toolbar = page.locator(".sg-room-add .pp-integrated-toolbar")
+        expect(toolbar).to_be_visible()
+        panel = toolbar.locator(".pp-org-panel")
+        picker.locator("input").press("Alt+ArrowDown")
+        expect(panel).to_be_visible()
+        expect(toolbar.locator(".pp-org-toggle")).to_be_focused()
+        toolbar.locator(".pp-org-toggle").press("Escape")
+        expect(panel).to_be_hidden()
+        toolbar.locator(".pp-org-toggle").click()
+        expect(panel).to_be_visible()
+        panel.locator(".pp-org-expand").first.click()
+        panel.locator(".pp-org-choice").filter(has_text="Service").click()
+        expect(toolbar.locator(".pp-org-toggle")).to_contain_text("Service")
+        # A blank search must still respect the organization filter.
+        picker.locator("input").fill("")
+        expect(page.locator(".sg-room-add .ts-dropdown .option").filter(
+            has_text="Tina Bereich")).to_have_count(0)
         picker.locator("input").fill("Lars")
         page.locator(".sg-room-add .ts-dropdown .option").filter(
             has_text="Lars Berg").click()
         expect(page.locator(".sg-room-add .pp-picker-count")).to_contain_text("1 Personen ausgewählt")
+        # Change the organization WITHOUT dropping the selected Service worker.
+        picker.locator("input").fill("")
+        picker.locator("input").click()
+        toolbar.locator(".pp-org-toggle").click()
+        panel.locator(".pp-org-choice").filter(has_text="Finanzen").click()
+        picker.locator("input").fill("")
+        expect(page.locator(".sg-room-add .ts-dropdown .option").filter(
+            has_text="Lars Berg")).to_have_count(0)
+        picker.locator("input").fill("Tina")
+        page.locator(".sg-room-add .ts-dropdown .option").filter(
+            has_text="Tina Bereich").click()
+        expect(page.locator(".sg-room-add .pp-picker-count")).to_contain_text("2 Personen ausgewählt")
+        selected = page.locator(".sg-room-add select[name=user_ids]").evaluate(
+            "(select) => [...select.selectedOptions].map(option => option.textContent)")
+        assert any("Lars Berg" in label for label in selected), selected
+        assert any("Tina Bereich" in label for label in selected), selected
         page.get_by_role("button", name="Personen zuordnen").click()
         expect(page.locator(".sg-occupant").get_by_text("Lars Berg")).to_be_visible()
+        expect(page.locator(".sg-occupant").get_by_text("Tina Bereich")).to_be_visible()
 
                 # Building publication lives in the dedicated hierarchy browser.
         page.goto(BASE + "/signage/buildings")
