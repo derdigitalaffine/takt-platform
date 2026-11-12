@@ -31,7 +31,7 @@ PART_KINDS = {"wing": "Gebäudeflügel", "annex": "Anbau / Nebengebäude",
 
 
 def _exists(db, model, *conditions):
-    return db.scalar(select(model.id).where(*conditions).limit(1)) is not None
+    return db.scalar(select(1).select_from(model).where(*conditions).limit(1)) is not None
 
 
 def _label(data, key, maximum, *, required=True):
