@@ -120,7 +120,7 @@ def test_org_editor_updates_same_group_and_preserves_members(db, legacy_group):
     assert page.status_code == 200
     assert "Mitglieder der Gruppe" in page.text
     assert db.get(User, uid).name in page.text
-    assert "Externe Synchronisation" in page.text
+    assert "Manuell" in page.text
     assert 'name="action" value="group_members_save"' in page.text
 
 
@@ -152,12 +152,14 @@ def test_group_member_editor_keeps_oidc_members_and_changes_manual_only(db, lega
     # Empty manual selection must remove manual members, not OIDC members.
     result = _post(c, db, "group_members_save", org_id=org_id)
     assert result.status_code == 303
+    db.expire_all()
     assert db.get(GroupMember, (gid, uid)) is None
     automatic = db.get(GroupMember, (gid, admin.id))
     assert automatic is not None and not automatic.manual
     # Can add a manual member to a group while leaving OIDC membership intact.
     result = _post(c, db, "group_members_save", org_id=org_id, members=str(uid))
     assert result.status_code == 303
+    db.expire_all()
     assert db.get(GroupMember, (gid, uid)) is not None
     assert db.get(GroupMember, (gid, admin.id)) is not None
 
