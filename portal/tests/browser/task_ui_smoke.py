@@ -72,7 +72,9 @@ def exercise(page):
     expect(page.locator('#task-title')).to_be_focused()
     page.keyboard.type(title)
     page.keyboard.press('Tab')
-    expect(page.locator('#task-person')).to_be_focused()
+    # The shared search picker is the keyboard focus target; the original
+    # select remains in the form as an accessible submission source.
+    expect(page.locator('.task-page .pp-person-control input')).to_be_focused()
     page.locator('#task-description').fill('Beschreibung und Unterlagen vor dem ersten Speichern prüfen.')
     page.locator('#task-date-display').fill((datetime.now(ZoneInfo('Europe/Berlin')).date()+timedelta(days=3)).strftime('%d.%m.%Y'))
     page.locator('#task-date-display').press('Tab')

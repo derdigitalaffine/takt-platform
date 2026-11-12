@@ -1,5 +1,6 @@
 """Isolated fixtures for the passive-signage browser smoke test."""
-from app.db import SessionLocal, User, init_db, set_setting
+from app.db import Organization, SessionLocal, User, init_db, set_setting
+from app.org_models import OrgMembership
 from app.main import app
 from app.security import hash_password
 from app.signage_models import SignageBuilding, SignageFloor, SignageRoom, SignageWayEdge, SignageWayNode
@@ -9,7 +10,16 @@ with SessionLocal() as db:
     set_setting(db, "module_signage", "1")
     db.add(User(name="Signage-Redaktion", email="signage@example.org",
                 password_hash=hash_password("browser-test-password"), permissions="signage_manage"))
-    building = SignageBuilding(name="Rathaus")
+    root = Organization(name="Verwaltung", kind="verwaltung")
+    db.add(root); db.flush()
+    team = Organization(name="Service", kind="team", parent_id=root.id)
+    db.add(team); db.flush()
+    for name, address in [("Anja Zander", "anja-sg@example.org"),
+                          ("Lars Berg", "lars-sg@example.org")]:
+        worker = User(name=name, email=address, password_hash=hash_password("browser-test-password"))
+        db.add(worker); db.flush()
+        db.add(OrgMembership(user_id=worker.id, org_id=team.id, is_primary=True))
+        building = SignageBuilding(name="Rathaus")
     db.add(building)
     db.flush()
     floor = SignageFloor(building_id=building.id, name="Erdgeschoss")

@@ -1,0 +1,36 @@
+/* Digital Signage: a room-centric, immediately usable staff directory. */
+.sg-room-layout{display:grid;grid-template-columns:minmax(290px,.8fr) minmax(0,1.25fr);gap:22px;align-items:start}
+.sg-room-list{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto}
+.sg-room-search{display:grid;grid-template-columns:1fr;gap:9px;margin:15px 0}
+.sg-room-search .btn{justify-self:start}
+.sg-room-items{display:grid;gap:7px}
+.sg-room-choice{display:flex;align-items:center;gap:12px;padding:13px 11px;border-radius:12px;text-decoration:none;color:var(--bs-body-color);border:1px solid var(--bs-border-color);background:var(--bs-body-bg)}
+.sg-room-choice>i:first-child{color:var(--bs-primary);font-size:1rem}
+.sg-room-choice>i:last-child{color:var(--bs-secondary-color);font-size:.73rem}
+.sg-room-choice span{display:grid;gap:3px;flex:1;min-width:0}
+.sg-room-choice strong{font-size:.85rem;line-height:1.35;overflow-wrap:anywhere}
+.sg-room-choice small{font-size:.76rem;color:var(--bs-secondary-color)}
+.sg-room-choice:hover,.sg-room-choice.is-active{border-color:var(--bs-primary);color:var(--bs-primary);background:var(--bs-primary-bg-subtle,var(--bs-tertiary-bg))}
+.sg-room-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.75rem;margin-top:16px}
+.sg-room-right>.sg-panel{margin-bottom:14px}
+.sg-room-add{padding:18px;background:var(--bs-tertiary-bg);border-radius:13px;margin:20px 0;border:1px solid var(--bs-border-color)}
+.sg-room-add h3,.sg-room-occupants h3{font-size:1rem;font-weight:750;margin-bottom:7px}
+.sg-room-add p{color:var(--bs-secondary-color);font-size:.79rem}
+.sg-room-add label{font-size:.83rem}
+.sg-room-add .sg-form-stack{margin-top:12px}
+.sg-occupant-list{display:grid;gap:8px;margin-top:15px}
+.sg-occupant{display:flex;align-items:center;gap:11px;border:1px solid var(--bs-border-color);padding:11px;border-radius:12px;flex-wrap:wrap}
+.sg-occupant-avatar{height:37px;width:37px;border-radius:50%;display:grid;place-items:center;background:var(--bs-tertiary-bg);color:var(--bs-primary);font-weight:800}
+.sg-occupant-info{display:grid;gap:4px;flex:1;min-width:150px}
+.sg-occupant-info strong{font-size:.85rem}
+.sg-occupant-info small{font-size:.73rem;color:var(--bs-secondary-color)}
+.sg-occupant-badges{display:flex;gap:6px;flex-wrap:wrap}
+.sg-occupant-actions{display:flex;gap:6px;flex-wrap:wrap}
+.sg-occupant-actions form{margin:0}
+.sg-room-privacy{display:flex;align-items:start;gap:9px;font-size:.79rem;color:var(--bs-secondary-color);line-height:1.65}
+.sg-room-privacy i{color:var(--bs-primary);margin-top:3px}
+.sg-room-unassigned{display:grid;place-items:center;text-align:center;padding:25px;gap:10px;border:1px dashed var(--bs-border-color);border-radius:12px}
+.sg-room-unassigned>i{font-size:1.5rem;color:var(--bs-primary)}
+.sg-room-unassigned p{font-size:.79rem;color:var(--bs-secondary-color);margin:0}
+@media(max-width:850px){.sg-room-layout{grid-template-columns:1fr}.sg-room-list{position:static;max-height:380px}.sg-occupant-actions{flex-basis:100%;justify-content:end}}
+@media(max-width:520px){.sg-room-layout{grid-template-columns:minmax(0,1fr)}.sg-occupant-info{min-width:0;flex-basis:calc(100% - 52px)}}

@@ -7,10 +7,53 @@ window.taktInitSelectionPicker = () => {
       .replace(/ß/g, "ss")
       .toLocaleLowerCase()
       .trim();
+  let pickerMeta = {people:{}, organizations:[]};
+  try {
+    const node = document.querySelector('#takt-person-picker-meta');
+    if (node) pickerMeta = JSON.parse(node.textContent);
+  } catch (_) {}
+  const personMap = pickerMeta.people || {};
+  const organizations = pickerMeta.organizations || [];
   for (const root of document.querySelectorAll("[data-selection-picker]")) {
     const search = root.querySelector("[data-selection-search]"),
       kind = root.querySelector("[data-selection-kind]");
     const rows = [...root.querySelectorAll("[data-selection-option]")];
+    const surnames = window.TaktPersonPicker?.sortKey;
+    if (surnames) {
+      const collator = new Intl.Collator('de', {sensitivity:'base', numeric:true});
+      const parent = root.querySelector('.selection-options');
+      const placeholder = root.querySelector('[data-selection-empty]');
+      rows.sort((a,b) => {
+        if (a.dataset.kind !== b.dataset.kind) return a.dataset.kind === 'person' ? -1 : 1;
+        if (a.dataset.kind !== 'person') return 0;
+        const nameA = surnames(a.querySelector('[data-selection-title]')?.textContent);
+        const nameB = surnames(b.querySelector('[data-selection-title]')?.textContent);
+        return collator.compare(nameA[0],nameB[0]) || collator.compare(nameA[1],nameB[1]);
+      }).forEach(row => parent.insertBefore(row, placeholder));
+    }
+    // This picker intentionally retains its checkbox and group semantics.
+    // Organizational filtering only applies to users the server already
+    // exposed on the current page; never retrieve an unrestricted directory.
+    let orgFilter = null;
+    const availableOrgs = new Set();
+    for (const row of rows) {
+      if (row.dataset.kind !== 'person') continue;
+      const id = row.querySelector('[data-selection-check]')?.value.replace(/^user:/, '');
+      for (const orgId of personMap[id]?.orgs || []) availableOrgs.add(orgId);
+    }
+    if (availableOrgs.size) {
+      const control = document.createElement('select');
+      control.className = 'form-select w-auto';
+      control.dataset.selectionOrg = '1';
+      control.setAttribute('aria-label', 'Organisationseinheit filtern');
+      control.add(new Option('Alle Organisationseinheiten', ''));
+      for (const org of organizations) {
+        if (availableOrgs.has(org.id)) control.add(new Option(org.path || org.name, String(org.id)));
+      }
+      const bar = search.closest('.d-flex');
+      bar?.append(control);
+      orgFilter = control;
+    }
     const checks = rows.map((row) =>
       row.querySelector("[data-selection-check]"),
     );
@@ -23,6 +66,9 @@ window.taktInitSelectionPicker = () => {
       for (const row of rows) {
         row.hidden =
           (!!kind?.value && row.dataset.kind !== kind.value) ||
+          (!!orgFilter?.value && (row.dataset.kind !== 'person' ||
+            !(personMap[row.querySelector('[data-selection-check]').value.replace(/^user:/, '')]?.orgs || [])
+              .includes(Number(orgFilter.value)))) ||
           !terms.every((term) => fold(row.dataset.search).includes(term));
         if (!row.hidden) visible++;
       }
@@ -64,6 +110,7 @@ window.taktInitSelectionPicker = () => {
     }
     search.addEventListener("input", render);
     kind?.addEventListener("change", render);
+    orgFilter?.addEventListener("change", render);
     search.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         search.value = "";

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Alle Räume · Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-workspace.css"><link rel="stylesheet" href="/static/signage-rooms.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace sg-room-directory">
+  <div class="sg-page-intro"><div>
+    <span class="sg-eyebrow">TAKT · DIGITAL SIGNAGE</span>
+    <h1>Alle Räume & Personen</h1>
+    <p>Wähle links ein Zimmer und ordne rechts mehrere Mitarbeitende in einem Schritt zu. Die öffentliche Sichtbarkeit entscheidet jede Person selbst in ihrem Profil.</p>
+  </div><div class="sg-intro-icon" aria-hidden="true"><i class="fa-solid fa-door-open"></i></div></div>
+  {% set section = 'rooms' %}{% include "_signage_nav.html" %}
+  <div class="sg-room-layout">
+    <section class="sg-panel sg-room-list" aria-labelledby="sg-rooms-title">
+      <div class="sg-panel-head"><div><span class="sg-eyebrow">STANDORTE</span><h2 id="sg-rooms-title">{{ room_count }} Räume</h2>
+        <p>Suche nach Raum, Nummer oder Gebäude.</p>
+      </div></div>
+      <form method="get" action="/signage/rooms" class="sg-room-search">
+        <label for="sg-room-q" class="visually-hidden">Raum suchen</label>
+        <input class="form-control" id="sg-room-q" name="q" value="{{ q }}" placeholder="Raum oder Zimmernummer …" maxlength="80">
+        <label for="sg-room-building" class="visually-hidden">Gebäude filtern</label>
+        <select id="sg-room-building" name="building" class="form-select">
+          <option value="">Alle Gebäude</option>
+          {% for b in buildings %}<option value="{{ b.id }}" {% if selected_building == b.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-outline-primary" type="submit"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Suchen</button>
+      </form>
+      {% if rooms %}
+      <nav aria-label="Raumliste" class="sg-room-items">
+        {% for room,floor,building in rooms %}
+        <a href="/signage/rooms?room={{ room.id }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}{% if selected_building %}&amp;building={{ selected_building }}{% endif %}{% if page > 1 %}&amp;page={{ page }}{% endif %}"
+           class="sg-room-choice {{ 'is-active' if selected and selected[0].id == room.id else '' }}"
+           {% if selected and selected[0].id == room.id %}aria-current="page"{% endif %}>
+          <i class="fa-solid fa-door-closed" aria-hidden="true"></i>
+          <span><strong>Zimmer {{ room.number }} · {{ room.name or 'Ohne Raumbezeichnung' }}</strong>
+            <small>{{ building.name }} / {{ floor.name }}</small></span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </a>
+        {% endfor %}
+      </nav>
+      {% if pages > 1 %}
+      <nav class="sg-room-pagination" aria-label="Seitennavigation">
+        {% if page > 1 %}<a class="btn btn-sm btn-outline-secondary" href="/signage/rooms?page={{ page-1 }}&amp;building={{ selected_building or '' }}&amp;q={{ q|urlencode }}">Vorherige</a>{% endif %}
+        <span>Seite {{ page }} von {{ pages }}</span>
+        {% if page < pages %}<a class="btn btn-sm btn-outline-secondary" href="/signage/rooms?page={{ page+1 }}&amp;building={{ selected_building or '' }}&amp;q={{ q|urlencode }}">Nächste</a>{% endif %}
+      </nav>
+      {% endif %}
+      {% else %}
+      <div class="sg-empty"><i class="fa-solid fa-door-closed"></i><h3>Keine Räume gefunden</h3><p>Prüfe deine Suchbegriffe oder erstelle einen neuen Raum im Gebäudebrowser.</p><a class="btn btn-outline-primary" href="/signage/buildings">Gebäude & Räume</a></div>
+      {% endif %}
+    </section>
+    <div class="sg-room-right">
+    {% if selected %}
+      {% set room=selected[0] %}{% set floor=selected[1] %}{% set building=selected[2] %}
+      <section class="sg-panel sg-room-assignment" aria-labelledby="sg-selected-room">
+        <div class="sg-panel-head"><div><span class="sg-eyebrow">{{ building.name }} · {{ floor.name }}</span>
+          <h2 id="sg-selected-room">{{ room.number }} · {{ room.name or 'Raum' }}</h2>
+          <p>{{ assigned|length }} Personen zugeordnet · öffentlicher Eintrag nur nach persönlicher Freigabe</p>
+        </div>
+          <a class="btn btn-sm btn-outline-secondary" href="/signage/buildings?select=room:{{ room.id }}">Raum bearbeiten</a>
+        </div>
+        <div class="sg-room-add">
+          <h3>Personen zuordnen</h3>
+          <p>Du kannst mehrere Personen gemeinsam auswählen. Bestehende Raumzuordnungen bleiben erhalten; Duplikate werden vermieden.</p>
+          <form method="post" action="/signage/rooms/{{ room.id }}/people" class="sg-form-stack">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="action" value="add">
+            <label for="sg-room-users">Mitarbeitende (Mehrfachauswahl)</label>
+            <select id="sg-room-users" class="form-select" name="user_ids" data-person-picker="1" multiple required>
+              {% for person in staff %}
+                <option value="{{ person.id }}">{{ person.name }} ({{ person.email }})</option>
+              {% endfor %}
+            </select>
+            <label class="sg-check"><input type="checkbox" name="primary" value="1"> Für ausgewählte Personen als Hauptbüro setzen</label>
+            <div><button class="btn btn-primary" type="submit" {% if not staff %}disabled{% endif %}><i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i> Personen zuordnen</button></div>
+          </form>
+        </div>
+        <div class="sg-room-occupants">
+          <h3>Bereits zugeordnete Personen <span class="sg-pill sg-pill-neutral">{{ assigned|length }}</span></h3>
+          {% if assigned %}
+          <div class="sg-occupant-list">
+          {% for office,person in assigned %}
+            <div class="sg-occupant">
+              <div class="sg-occupant-avatar" aria-hidden="true">{{ person.name[:1]|upper }}</div>
+              <div class="sg-occupant-info">
+                <strong>{{ person.name }}</strong><small>{{ person.email }}</small>
+                <div class="sg-occupant-badges">
+                  {% if office.is_primary %}<span class="sg-pill sg-pill-neutral">Hauptbüro</span>{% endif %}
+                  <span class="sg-pill {{ 'sg-pill-success' if office.public else 'sg-pill-neutral' }}">{{ 'Öffentlich freigegeben' if office.public else 'Nur intern' }}</span>
+                </div>
+              </div>
+              <div class="sg-occupant-actions">
+                {% if not office.is_primary %}
+                <form action="/signage/rooms/{{ room.id }}/people" method="post">
+                  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="primary"><input type="hidden" name="user_id" value="{{ person.id }}">
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Hauptbüro</button>
+                </form>
+                {% endif %}
+                <form action="/signage/rooms/{{ room.id }}/people" method="post">
+                  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="remove"><input type="hidden" name="user_id" value="{{ person.id }}">
+                  <button class="btn btn-sm btn-outline-danger" type="submit" title="Nur diese Raumzuordnung entfernen">Entfernen</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+          </div>
+          {% else %}
+          <div class="sg-room-unassigned"><i class="fa-solid fa-users" aria-hidden="true"></i><strong>Hier ist noch niemand zugeordnet.</strong><p>Nutze die Mehrfachauswahl oben, um das Büro in wenigen Klicks zu besetzen.</p></div>
+          {% endif %}
+        </div>
+      </section>
+      <p class="sg-room-privacy"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>Zuordnen ist nicht Veröffentlichen: Ein Mitarbeitendenname erscheint auf einem öffentlichen Wegweiser erst nach ausdrücklicher Freigabe im persönlichen Profil. Diese Freigabe kann jederzeit widerrufen werden.</p>
+    {% else %}
+      <section class="sg-panel"><h2>Raum auswählen</h2><p>Wähle links ein Zimmer, um Personen zuzuordnen oder bestehende Belegungen zu bearbeiten.</p></section>
+    {% endif %}
+    </div>
+  </div>
+</main>
+{% endblock %}

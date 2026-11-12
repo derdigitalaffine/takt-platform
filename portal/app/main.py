@@ -644,8 +644,13 @@ def render(request: Request, name: str, user: User | None = None, **ctx) -> HTML
     messages = request.session.pop("flash", [])
     ui = branding.load()
     navctx = _navigation_context(request, user)
+    # All server-rendered person selectors inherit one surname-first order and
+    # only receive organization hints for people their controller already exposed.
+    from . import person_picker
+    picker_meta = person_picker.prepare_context(ctx) if user else {"people": {}, "organizations": []}
     return templates.TemplateResponse(request, name, {
         "user": user,
+        "picker_meta": picker_meta,
         "ui": ui, "brand": ui["name"], "product": ui["product"],
         "csrf": csrf_token(request.session),
         "messages": messages,
@@ -1837,6 +1842,7 @@ def _profile_page(request, user, db, details=None, profile_error=""):
     from . import profiles
     cfg = get_settings(db)
     signage_offices = []
+    signage_room_choices = []
     if "signage" in enabled_modules():
         from .signage_models import SignageOffice, SignageRoom, SignageFloor, SignageBuilding
         rows = db.execute(select(SignageOffice, SignageRoom, SignageFloor, SignageBuilding)
@@ -1849,9 +1855,12 @@ def _profile_page(request, user, db, details=None, profile_error=""):
                                  floor=floor.name, building=building.name, public=office.public,
                                  is_primary=office.is_primary)
                            for office, room, floor, building in rows]
+        from . import signage_offices as signage_workplaces
+        signage_room_choices = signage_workplaces.available_room_choices(db, user)
     return render(request, "profile.html", user,
                   signage_enabled="signage" in enabled_modules(),
                   signage_offices=signage_offices,
+                  signage_room_choices=signage_room_choices,
                   allow_user_keys=cfg.get("allow_user_keys") == "1",
                   own_key_mask=mask_secret(decrypt(user.sm_api_key_enc)),
                   profile_groups=profiles.GROUPS,

@@ -323,6 +323,7 @@
 
   /* ---- Auswahlfelder (Tom Select) ------------------------------------- */
   $('select.js-select').forEach(function (sel) {
+    if (sel.tomselect) return; // Shared person picker already enhanced this select.
     new TomSelect(sel, {
       allowEmptyOption: true,
       create: false,
