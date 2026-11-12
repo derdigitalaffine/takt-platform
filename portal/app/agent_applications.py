@@ -333,7 +333,7 @@ def snapshot(db, user, action):
     if action["operation"] == "assign":
         for model, key in ((User, "user_id"), (Group, "group_id"), (Organization, "org_id")):
             action[key + "_name"] = (
-                db.get(model, action[key]).name if action[key] else ""
+                db.get(model, action.get(key)).name if action.get(key) else ""
             )
         group = db.get(Group, action.get("group_id")) if action.get("group_id") else None
         action["responsible_org_id"] = action.get("org_id") or (group.org_id if group else None)
