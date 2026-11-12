@@ -43,15 +43,17 @@ def collect(db, user, modules: set[str]) -> list[dict]:
 
     def append(kind, obj, *, invited=None, answered=0, registered=0,
                pending=None, note='', destination=''):
-        status = 'Archiviert' if obj.archived_at else (
-            ('Läuft' if kind in {'vote', 'live'} else 'Offen')
-            if {'form': lambda: fm.is_open(obj),
-                'poll': lambda: pl.is_open(obj),
-                'vote': lambda: vt.is_open(obj),
-                'live': lambda: obj.status == 'open'}[kind]()
-            else ('Entwurf' if kind == 'live' and obj.status == 'draft'
-                  else 'Entwurf' if kind == 'vote' and obj.status == 'draft'
-                  else 'Beendet'))
+        if obj.archived_at:
+            status = 'Archiviert'
+        elif kind == 'form':
+            status = 'Offen' if fm.is_open(obj) else ('Entwurf' if not obj.published_at else 'Beendet')
+        elif kind == 'poll':
+            status = 'Offen' if pl.is_open(obj) else ('Entwurf' if not obj.published_at else 'Beendet')
+        else:
+            status = 'Entwurf' if obj.status == 'draft' else (
+                'Läuft' if ({'vote': lambda: vt.is_open(obj),
+                              'live': lambda: obj.status == 'open'}[kind]())
+                else 'Beendet')
         rate = round(registered * 100 / invited, 1) if invited else None
         out.append(dict(kind=kind, id=obj.id, title=obj.title, description=obj.description,
                         status=status, updated=obj.updated_at, invited=invited,
