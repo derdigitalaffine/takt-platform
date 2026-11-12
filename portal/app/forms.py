@@ -21,7 +21,7 @@ from datetime import date, datetime, time as dtime
 from pathlib import Path
 
 import regex
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from . import form_fields, form_validation, csvsafe, links, mailtpl, notify
 from .form_validation import constraints as validation_constraints, hint as validation_hint
@@ -1255,6 +1255,22 @@ def template_items() -> list[dict]:
              "subtype": "text", "placeholder": ""},
             {"id": new_id(), "type": "short", "title": "E-Mail-Adresse", "description": "", "required": False,
              "subtype": "email", "placeholder": ""}]
+
+
+def completed_form_ids(db, user: User, invites: list[FormInvite]) -> set[int]:
+    """Existing identifiable survey responses for this member, including older
+    submissions through the public link whose invite status was never updated.
+    Anonymous surveys must not be linked back to a person's responses.
+    """
+    ids = {i.form_id for i in invites if i.form is not None
+           and i.form.kind == "survey" and not i.form.anonymous}
+    if not ids:
+        return set()
+    return set(db.scalars(select(FormResponse.form_id).where(
+        FormResponse.form_id.in_(ids),
+        or_(FormResponse.user_id == user.id,
+            (FormResponse.source == "invite") & (FormResponse.email == user.email))
+    ).distinct()).all())
 
 
 def user_invites(db, user: User) -> list[FormInvite]:

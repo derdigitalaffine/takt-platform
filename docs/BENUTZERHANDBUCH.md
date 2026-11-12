@@ -629,7 +629,7 @@ Die **Bibliothek** (Menü **Datenblöcke**) sehen alle mit dem Recht „Formular
 | Nimmt Antworten an | Aus = alle Links zeigen „Formular geschlossen“; neue Formulare und Kopien beginnen geschlossen |
 | Frist | Danach werden keine Antworten mehr angenommen. Die Frist steht in Einladung und Erinnerung |
 | Anonym | Name und E-Mail von Eingeladenen und Angemeldeten werden nicht zur Antwort gespeichert. Sie sehen bei Einladungen nur, *dass* jemand geantwortet hat (für Erinnerungen) |
-| Mehrfach ausfüllen | Eingeladene dürfen mehrere Antworten abgeben (sonst nur eine). Über den öffentlichen Link geht mehrfaches Ausfüllen immer |
+| Mehrfach ausfüllen | Bei Aktivierung sind wiederholte Antworten über persönliche und öffentliche Links möglich. Sonst erkennt TAKT bereits abgegebene Antworten bei angemeldeten Personen, persönlichen Einladungen und im gleichen Browser, soweit technisch möglich. Ohne Anmeldung oder persönlichen Nachweis ist eine Einmalteilnahme nicht geräteübergreifend garantiert |
 | Eingangsbestätigung | Die ausfüllende Person bekommt eine Kopie ihrer Antworten per Mail (bei öffentlichen Links an die Adresse aus der ersten E-Mail-Frage) |
 | Text nach dem Absenden | z. B. „Danke! Wir melden uns bis Freitag.“ |
 | Zusammenfassung vor dem Absenden | Vor dem Absenden sehen Ausfüllende alle Angaben noch einmal und können einzelne Abschnitte ändern (ab drei Fragen) |

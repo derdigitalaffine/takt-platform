@@ -4,6 +4,7 @@
 {% block content %}
 <div class="form-fill">
   {% if preview %}<div class="alert alert-warning"><i class="fa-regular fa-eye me-1"></i><strong>Vorschau</strong> – so sieht das Formular für Ausfüllende aus. Absenden ist hier nicht möglich.</div>{% endif %}
+  {% if previously_submitted %}<div class="alert alert-info" role="status"><i class="fa-solid fa-circle-check me-1"></i><strong>Bereits teilgenommen.</strong> Für diese Umfrage sind weitere Antworten ausdrücklich zugelassen. Das erneute Absenden erzeugt eine zusätzliche Antwort, keine Korrektur der bisherigen Teilnahme.</div>{% endif %}
   <div class="card mb-3 border-top border-primary border-4"><div class="card-body">
     <h1 class="h3 mb-2">{{ form.title }}</h1>
     {% if form.description %}<div class="text-secondary">{{ form.description | richtext }}</div>{% endif %}

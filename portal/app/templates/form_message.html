@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ form.title if form else 'Formular' }}{% endblock %}
 {% block content %}
-<div class="form-fill"><div class="card mt-3 border-top border-4 {{ 'border-success' if kind == 'thanks' else 'border-secondary' }}"><div class="card-body p-4 p-md-5 text-center">
+<div class="form-fill"><div class="card mt-3 border-top border-4 {{ 'border-success' if kind in ('thanks', 'done') else 'border-secondary' }}"><div class="card-body p-4 p-md-5 text-center">
   {% if kind == 'thanks' %}
     <i class="fa-solid fa-circle-check fa-3x text-success mb-3"></i>
     <h1 class="h4">{{ form.title }}</h1>
@@ -25,7 +25,9 @@
     {% endif %}
   {% elif kind == 'done' %}
     <i class="fa-solid fa-clipboard-check fa-3x text-success mb-3"></i>
-    <h1 class="h4">{{ form.title }}</h1><p class="mb-0 text-secondary">Sie haben dieses Formular bereits ausgefüllt. Vielen Dank!</p>
+    <h1 class="h4">{{ form.title }}</h1>
+    <p class="mb-1 text-secondary">{% if device_only %}Über diesen Browser wurde bereits eine Antwort abgegeben.{% else %}Sie haben dieses Formular bereits ausgefüllt. Vielen Dank!{% endif %}</p>
+    {% if completed_at %}<p class="small text-secondary mb-0">Teilnahme gespeichert am {{ completed_at | local("%d.%m.%Y um %H:%M") }} Uhr.</p>{% endif %}
   {% elif kind == 'closed' %}
     <i class="fa-solid fa-lock fa-3x text-secondary mb-3"></i>
     <h1 class="h4">{{ form.title }}</h1><p class="mb-0 text-secondary">Dieses Formular nimmt keine Antworten mehr an.</p>

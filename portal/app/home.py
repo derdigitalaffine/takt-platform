@@ -104,8 +104,11 @@ def _bookings(db, user):
 
 def _inbox(db, user):
     from . import forms as fm
-    invites = [i for i in fm.user_invites(db, user) if not i.submitted_at and fm.is_open(i.form)]
-    return {"items": invites[:6], "count": len(invites)}
+    invites = [i for i in fm.user_invites(db, user) if i.form is not None]
+    answered = fm.completed_form_ids(db, user, invites)
+    open_invites = [i for i in invites if not i.submitted_at and
+                    (i.form.anonymous or i.form_id not in answered) and fm.is_open(i.form)]
+    return {"items": open_invites[:6], "count": len(open_invites)}
 
 
 def _responses(db, user):
