@@ -76,7 +76,7 @@ def test_info_unpublished_expired_archived_hidden_and_module_disabled(db, actors
     make(db,actors,publish_on=(now+timedelta(days=3)).isoformat())
     monkeypatch.setattr(cl, 'utcnow', lambda: now+timedelta(days=2))
     assert cl.pending_tasks(db,actors[1]) == []
-    make(db,actors)
+    active, _, _ = make(db, actors)
     assert main._task_badge(actors[1])==1
     settings(module_circulations='0')
     user=login(actors[1].email,'passwort-test-123')
@@ -84,6 +84,6 @@ def test_info_unpublished_expired_archived_hidden_and_module_disabled(db, actors
     # these modules now contribute their own independent actionable work.
     page = user.get('/tasks')
     assert page.status_code == 200
-    assert 'Umlauf' not in page.text
+    assert f'/umlaeufe/{active.id}' not in page.text
     assert main._task_badge(actors[1]) == 0
     assert 'data-nav-id="tasks"' in user.get('/').text
