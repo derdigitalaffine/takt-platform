@@ -32,7 +32,7 @@ Ein **Online-Antrag** ist ein Formular, bei dem jede Einsendung zum Vorgang wird
 
 1. **Formulare**, Titel eintippen, daneben **Online-Antrag** wählen, **Anlegen**. Name und E-Mail-Adresse (Pflicht) sind schon enthalten – die Adresse braucht es für Bestätigung und Rückfragen.
 2. Fragen ergänzen wie bei jedem Formular (z. B. Datei-Upload für Nachweise, „Ort in der Karte“ für Standort, Trasse oder Fläche).
-3. Reiter **Antrag** (den Schalter „Als Online-Antrag verwenden“ bedient, wer das Recht „Online-Anträge einrichten“ hat): Kürzel für das Aktenzeichen (z. B. `SN` für Sondernutzung), Bearbeitungsfrist in Tagen, zuständige Person/Gruppe/Funktionspostfach, bei Bedarf **Weiterleitungsregeln** (z. B. „Ortsgemeinde = Katzweiler → Kolleg:in X“) und den Eintrag im **Antragskatalog** mit Kategorie, Gebühr, Bearbeitungsdauer und benötigten Unterlagen. Unter **Ablagebereich** wählen Sie, wo die Anträge in der [Ablage](../../../../BENUTZERHANDBUCH.md#12b-ablage-dms) landen.
+3. Reiter **Antrag** (den Schalter „Als Online-Antrag verwenden“ bedient, wer das Recht „Online-Anträge einrichten“ hat): Kürzel für das Aktenzeichen (z. B. `SN` für Sondernutzung), Bearbeitungsfrist in Tagen, zuständige Person/Gruppe/Funktionspostfach, bei Bedarf **Weiterleitungsregeln** (z. B. „Ortsgemeinde = Katzweiler → Kolleg:in X“) und den Eintrag im **Antragskatalog** mit Kategorie, Gebühr, Bearbeitungsdauer und benötigten Unterlagen. Unter **Ablagebereich** wählen Sie, wo die Anträge in der [Ablage](../../BENUTZERHANDBUCH.md#12b-ablage-dms) landen.
 4. Fertig: Der Antrag steht im öffentlichen Katalog (`/antraege`) und hat einen öffentlichen Link (Reiter „Teilen“, mit QR-Code).
 
 ### Was Antragsteller:innen erleben
