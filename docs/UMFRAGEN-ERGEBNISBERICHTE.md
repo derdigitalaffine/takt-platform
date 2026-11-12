@@ -139,3 +139,50 @@ Vor jeder Zusammenführung vollständige Testsuite mit
 Berechtigungs- und Anonymitätsregressionen ausführen. Produktiver
 Rollout wird gesondert durchgeführt; ein GitHub-Merge ist kein
 automatisches Deployment.
+
+
+## Kompakter A4-Ergebnisexport (Folgeausbau)
+
+Der vertrauliche PDF-Export von Formular- und Terminumfragen ist auf eine
+**kompakte Ergebnisübersicht mit möglichst nur einer A4-Seite** ausgerichtet.
+Ein Seitenlimit, das Ergebnisse abschneidet, existiert bewusst nicht.
+
+* **Kein künstlicher Detailanhang mehr:** Der bisher erzwungene Seitenumbruch
+  vor den Teilnehmerdaten entfällt. Ein kurzer Titel, eine zweispaltige
+  Informationszeile und verdichtete Ergebnis- und Detailtabellen nutzen den
+  Platz einer Hochformat-A4-Seite besser aus.
+* **Terminumfragen:** Oben stehen alle Terminoptionen mit Nr., Datum/Uhrzeit,
+  Rangfolge und einem farbigen Balken wie in der Webansicht. Die anschließende
+  Antwortmatrix hat **Teilnehmende als Zeilen, Termine als nummerierte
+  Spalten**; die Spaltennummern verweisen direkt auf die Terminübersicht.
+  **Grün = Ja, Gelb = Wenn nötig, Rot = Nein.** Die Hintergrundfarben
+  werden stets durch ausgeschriebene Antworttexte ergänzt und sind
+  nicht die einzige Information. Namen, E-Mails, Antwortzeit, Summenzeilen
+  und Kommentare des bestehenden CSV-Exports bleiben enthalten.
+* **Formularumfragen:** Antworten je Frage mit schmalen Balken sowie direkt
+  anschließend eine kompakte Feld-/Werte-Tabelle pro Teilnahme. Wiederholte
+  große Überschriften, überflüssige Abstände und die separate Anhang-Titelseite
+  entfallen. Personen- und Freitextdaten bleiben vollständig enthalten.
+* **Große Erhebungen:** Viele Personen oder Terminvorschläge erzeugen
+  automatisch weitere A4-Seiten. Terminspalten werden in nummerierte
+  Gruppen aufgeteilt; Namen und Antworten werden vollständig wiederholt,
+  wo dies für die Lesbarkeit erforderlich ist. Sehr lange Freitexte und
+  Geodaten werden als über Seiten umbrechbare Absätze ausgegeben.
+  Es werden keine Zellen, Teilnehmer, Kommentare oder CSV-Spalten abgeschnitten.
+* **Corporate Design:** Organisationsname/-primärfarbe und zulässiges
+  Rasterlogo bleiben erhalten, ebenso Vertraulichkeitsvermerk, Datum
+  und fortlaufende Seitennummerierung. Die Farbkategorien entsprechen
+  den Webklassen Bootstrap Success / Warning / Danger:
+  **#198754 / #FFC107 / #DC3545**. Farbige Zellen haben zusätzlich
+  eine helle Hintergrundtönung für den Ausdruck.
+
+Die bestehende API, der geschützte Download, die Berechtigungen und die
+CSV-/JSON-Dateien bleiben unverändert. Der Bericht ist ein
+**vertraulicher Managementexport**, kein frei zugänglicher Teilnehmerauszug.
+Bei normalen kurzen Umfragen wird eine Seite mit einem automatisierten
+PDF-Seitenzahltest verlangt; bei sehr langen Inhalten geht
+**Vollständigkeit vor einer Ein-Seiten-Garantie**.
+
+Zusätzliche Regressionen prüfen eine A4-Seite für kleine Beispielumfragen,
+tatsächliche Farbgebung, alle CSV-Spalten und -Werte, Unicode,
+Vertraulichkeit, Berechtigungsschutz und mehrseitige Texte.
