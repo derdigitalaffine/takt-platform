@@ -166,13 +166,19 @@ with tempfile.TemporaryDirectory(prefix='takt-browser-') as root:
         server=subprocess.Popen([sys.executable,'-m','uvicorn','survey_ui_app:app','--app-dir','tests/browser',
                                  '--host','127.0.0.1','--port','8765','--lifespan','off'],env=env,stdout=log,stderr=subprocess.STDOUT)
         try:
-            for attempt in range(60):
+            # Under parallel CI load cold imports/migrations can exceed 15s.
+            # Still fail decisively if the process exits, and keep real UI tests.
+            for attempt in range(160):
                 try:
-                    if httpx.get(BASE+'/login',timeout=1).status_code==200:break
+                    if httpx.get(BASE+'/login',timeout=1,trust_env=False).status_code==200:break
                 except httpx.HTTPError:pass
-                if server.poll() is not None:raise RuntimeError('Test server failed to start; see server.log')
+                if server.poll() is not None:
+                    raise RuntimeError('Test server failed to start; see server.log')
                 time.sleep(.25)
-            else:raise RuntimeError('Test server did not become ready')
+            else:
+                log.flush()
+                detail=(OUTPUT/'server.log').read_text(errors='replace').splitlines()[-20:]
+                raise RuntimeError('Test server did not become ready after startup grace period:\\n'+'\\n'.join(detail))
             with sync_playwright() as playwright:
                 browser=playwright.chromium.launch()
                 try:
