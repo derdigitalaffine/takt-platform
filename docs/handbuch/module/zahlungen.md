@@ -34,7 +34,7 @@ Gebühren und Zahlungsstatus bei Buchungen oder Dienstleistungen nachvollziehen.
 - [Alle Module](../../BENUTZERHANDBUCH.md)
 - [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du musst für eine Buchung bezahlen oder eine Zahlung prüfen?
 
