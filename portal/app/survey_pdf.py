@@ -24,9 +24,9 @@ from . import branding, forms as fm, polls as pl
 from .db import get_settings, to_local, utcnow
 
 BLUE = "#286C92"
-GREEN = "#3F916D"
-YELLOW = "#D7A63B"
-RED = "#C66B67"
+GREEN = "#198754"
+YELLOW = "#FFC107"
+RED = "#DC3545"
 GREY = "#E4EAF0"
 DARK = "#25364A"
 MUTED = "#5A6A7B"
@@ -81,6 +81,11 @@ def _bar(parts, width=73 * mm, height=9 * mm):
 
 
 def _report(db, title, report_type, description, metadata, story_builder):
+    """Compact A4 report with a restrained header and two-column facts.
+
+    One page is the target for ordinary polls, never a hard cap on data.
+    No truncation of CSV-equivalent answer/participant details is permitted.
+    """
     font = _font()
     brand = branding.build(get_settings(db))
     primary = brand.get("primary", BLUE)
@@ -90,31 +95,29 @@ def _report(db, title, report_type, description, metadata, story_builder):
     now = to_local(utcnow()).strftime("%d.%m.%Y, %H:%M Uhr")
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
-        buf, pagesize=A4, leftMargin=19 * mm, rightMargin=19 * mm,
-        topMargin=42 * mm, bottomMargin=21 * mm,
+        buf, pagesize=A4, leftMargin=17 * mm, rightMargin=17 * mm,
+        topMargin=25 * mm, bottomMargin=17 * mm,
         title=f"{report_type} – {title}", author=org_name,
-        subject="Vertraulicher Ergebnisbericht mit aggregierter und vollständiger CSV-Detailauswertung",
+        subject="Vertraulicher kompakter Ergebnisbericht mit vollständiger CSV-Detailauswertung",
         pageCompression=1,
     )
-    normal = _style(font, size=9.2, leading=13.5, gap=3 * mm)
-    small = _style(font, size=8, leading=11, color=MUTED)
-    heading = _style(font, size=15, leading=21, color=DARK, gap=4 * mm)
-    section = _style(font, size=10.7, leading=15, color=DARK, gap=2 * mm)
+    normal = _style(font, size=8, leading=10.5, gap=1.2 * mm)
+    small = _style(font, size=7.1, leading=9, color=MUTED)
+    heading = _style(font, size=14, leading=17, color=DARK, gap=2 * mm)
+    section = _style(font, size=9.5, leading=12, color=DARK, gap=1 * mm)
     styles = dict(normal=normal, small=small, heading=heading, section=section,
-                  label=_style(font, size=8, color=MUTED),
-                  count=_style(font, size=9, color=DARK))
+                  label=_style(font, size=6.7, leading=9, color=MUTED),
+                  count=_style(font, size=7.2, leading=9, color=DARK))
 
     def page(canvas, pdf):
         canvas.saveState()
         w, h = A4
         canvas.setFillColor(colors.HexColor(primary))
-        canvas.rect(0, h - 5 * mm, w, 5 * mm, fill=1, stroke=0)
-        canvas.setFont(font, 8)
+        canvas.rect(0, h - 3.5 * mm, w, 3.5 * mm, fill=1, stroke=0)
+        canvas.setFont(font, 7.6)
         canvas.setFillColor(colors.HexColor(MUTED))
-        canvas.drawString(19 * mm, h - 14 * mm, org_name)
-        canvas.drawRightString(w - 19 * mm, h - 14 * mm, "TAKT · ERGEBNISBERICHT")
-        # Raster logo only; SVG is intentionally excluded from ReportLab's
-        # image decoder. No public URL fetching or unsafe path traversal.
+        canvas.drawString(17 * mm, h - 10.5 * mm, org_name)
+        canvas.drawRightString(w - 17 * mm, h - 10.5 * mm, "TAKT · ERGEBNISBERICHT")
         name = get_settings(db).get("ui_logo", "") if brand.get("custom") else ""
         if name and Path(name).name == name and name.lower().endswith((".png", ".jpg", ".jpeg")):
             path = branding.BRAND_DIR / name
@@ -123,63 +126,73 @@ def _report(db, title, report_type, description, metadata, story_builder):
                     from reportlab.lib.utils import ImageReader
                     img = ImageReader(str(path))
                     iw, ih = img.getSize()
-                    max_w, max_h = 27 * mm, 11 * mm
-                    scale = min(max_w / iw, max_h / ih)
-                    canvas.drawImage(img, w - 19 * mm - iw * scale, h - 29 * mm,
+                    scale = min(22 * mm / iw, 6 * mm / ih)
+                    canvas.drawImage(img, w - 17 * mm - iw * scale, h - 18.5 * mm,
                                      iw * scale, ih * scale, mask="auto")
                 except (OSError, ValueError):
                     pass
         canvas.setStrokeColor(colors.HexColor(GREY))
-        canvas.line(19 * mm, h - 32 * mm, w - 19 * mm, h - 32 * mm)
-        canvas.line(19 * mm, 14 * mm, w - 19 * mm, 14 * mm)
-        canvas.setFont(font, 7.5)
-        canvas.drawString(19 * mm, 9.5 * mm, "Erstellt am " + now + " · Vertraulich – nur für Berechtigte")
-        canvas.drawRightString(w - 19 * mm, 9.5 * mm, f"Seite {pdf.page}")
+        canvas.line(17 * mm, h - 21 * mm, w - 17 * mm, h - 21 * mm)
+        canvas.line(17 * mm, 13 * mm, w - 17 * mm, 13 * mm)
+        canvas.setFont(font, 6.8)
+        canvas.drawString(17 * mm, 9 * mm, "Erstellt " + now + " · Vertraulich – nur für Berechtigte")
+        canvas.drawRightString(w - 17 * mm, 9 * mm, f"Seite {pdf.page}")
         canvas.restoreState()
 
     items = [
-        Paragraph(_plain(report_type, 100).upper(), _style(font, size=8, color=primary, gap=2 * mm)),
+        Paragraph(_plain(report_type, 100).upper(), _style(font, size=7, color=primary, gap=1.2 * mm)),
         Paragraph(_plain(title, 250), heading),
     ]
     if description:
-        items.append(Paragraph(_plain(description, 1000), normal))
-    rows = [[Paragraph(_plain(key, 100), styles["label"]),
-             Paragraph(_plain(value, 255), styles["count"])]
-            for key, value in metadata if value not in (None, "")]
-    if rows:
-        table = Table(rows, colWidths=[47 * mm, 118 * mm], hAlign="LEFT")
+        brief = re.sub(r"\s+", " ", str(description)).strip()
+        if len(brief) > 220:
+            brief = brief[:217].rstrip() + "…"
+        items.append(Paragraph(_plain(brief, 240), small))
+        items.append(Spacer(1, 1.2 * mm))
+    facts = [(Paragraph(_plain(k, 110), styles["label"]),
+              Paragraph(_plain(v, 320), styles["count"]))
+             for k, v in metadata if v not in (None, "")]
+    if facts:
+        rows = []
+        for i in range(0, len(facts), 2):
+            left = facts[i]
+            right = facts[i + 1] if i + 1 < len(facts) else ("", "")
+            rows.append([left[0], left[1], right[0], right[1]])
+        table = Table(rows, colWidths=[29 * mm, 58 * mm, 29 * mm, 58 * mm],
+                      hAlign="LEFT", splitByRow=1)
         table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#EDF3F7")),
-            ("LINEBELOW", (0, 0), (-1, -2), 0.45, colors.HexColor("#D3DEE8")),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 9),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ("TOPPADDING", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F1F5F9")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.3, colors.HexColor("#D9E3EB")),
         ]))
-        items += [table, Spacer(1, 8 * mm)]
+        items.extend([table, Spacer(1, 3 * mm)])
     items.extend(story_builder(styles, font))
-    if len(items) < 5:
+    if len(items) < 3:
         items.append(Paragraph("Noch keine auswertbaren Antworten vorhanden.", normal))
     doc.build(items, onFirstPage=page, onLaterPages=page)
     return buf.getvalue()
 
 
+
 def _chart_table(labels, values, font, *, bar_color=BLUE):
     maximum = max([int(v) for v in values] + [1])
     rows = []
-    for label, value in zip(labels[:150], values[:150]):
-        span = _bar([(value, bar_color), (max(0, maximum - value), GREY)], width=72 * mm)
-        rows.append([Paragraph(_plain(label, 110), _style(font, size=8.2, leading=12)),
+    for label, value in zip(labels, values):
+        span = _bar([(value, bar_color), (max(0, maximum - value), GREY)], width=72 * mm, height=4.2 * mm)
+        rows.append([Paragraph(_plain(label, 110), _style(font, size=7.2, leading=9)),
                      span,
-                     Paragraph(str(int(value)), _style(font, size=8.2))])
+                     Paragraph(str(int(value)), _style(font, size=7.2))])
     if not rows:
         return None
     table = Table(rows, colWidths=[75 * mm, 72 * mm, 18 * mm], hAlign="LEFT", splitByRow=1)
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
         ("LINEBELOW", (0, 0), (-1, -2), .4, colors.HexColor(GREY)),
     ]))
     return table
