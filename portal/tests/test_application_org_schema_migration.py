@@ -15,18 +15,26 @@ def test_legacy_form_schema_is_repaired_without_losing_existing_rows(tmp_path, m
     # Existing production data already has the rest of the schema, but is
     # missing the new org foreign key on the forms table.
     model.Base.metadata.create_all(engine)
-    with Session(engine) as session:
-        existing = model.Form(title="Bestehender Antrag", kind="application",
-                              app_prefix="ALT", app_group_id=None)
-        session.add(existing)
-        session.commit()
-        form_id = existing.id
-
+    # Recreate just the historical form table with its full former column
+    # set. SQLite refuses DROP COLUMN for a newly-created FK; production
+    # never had that FK in the first place. All other tables remain intact.
     with engine.begin() as conn:
-        # Newly-created test schema has the ORM index; older production did
-        # not, as its app_org_id column was missing entirely.
-        conn.execute(text("DROP INDEX IF EXISTS ix_forms_app_org_id"))
-        conn.execute(text("ALTER TABLE forms DROP COLUMN app_org_id"))
+        conn.execute(text("DROP TABLE forms"))
+        legacy_columns = []
+        for column in model.Form.__table__.columns:
+            if column.name == "app_org_id":
+                continue
+            ddl_type = column.type.compile(dialect=engine.dialect)
+            legacy_columns.append(
+                f'"{column.name}" {ddl_type}' +
+                (" PRIMARY KEY" if column.primary_key else "")
+            )
+        conn.execute(text("CREATE TABLE forms (" + ", ".join(legacy_columns) + ")"))
+        conn.execute(text(
+            "INSERT INTO forms (id, title, kind, app_prefix) "
+            "VALUES (991, 'Bestehender Antrag', 'application', 'ALT')"
+        ))
+        form_id = 991
         # The incorrect previous migration may already have written this
         # extra (unused) group column. It must not prevent repair.
         conn.execute(text(
