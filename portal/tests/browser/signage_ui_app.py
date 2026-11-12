@@ -1,9 +1,10 @@
 """Isolated fixtures for the passive-signage browser smoke test."""
+from sqlalchemy import select
 from app.db import Organization, SessionLocal, User, init_db, set_setting
 from app.org_models import OrgMembership
 from app.main import app
 from app.security import hash_password
-from app.signage_models import SignageBuilding, SignageFloor, SignageRoom, SignageWayEdge, SignageWayNode
+from app.signage_models import SignageBuilding, SignageFloor, SignageRoom, SignageWayEdge, SignageWayNode, SignageOffice
 
 init_db()
 with SessionLocal() as db:
@@ -33,4 +34,9 @@ with SessionLocal() as db:
     db.add_all([start, destination])
     db.flush()
     db.add(SignageWayEdge(from_node_id=start.id, to_node_id=destination.id))
+    # Public names are independently consented; private assignments are
+    # created in the browser test and must remain absent on the kiosk.
+    public_user = db.scalar(select(User).where(User.email == "anja-sg@example.org"))
+    db.add(SignageOffice(user_id=public_user.id, room_id=room.id,
+                         public=True, is_primary=True))
     db.commit()

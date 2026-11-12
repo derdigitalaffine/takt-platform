@@ -42,6 +42,7 @@ def exercise():
         picker.locator("input").fill("Lars")
         page.locator(".sg-room-add .ts-dropdown .option").filter(
             has_text="Lars Berg").click()
+        expect(page.locator(".sg-room-add .pp-picker-count")).to_contain_text("1 Personen ausgewählt")
         page.get_by_role("button", name="Personen zuordnen").click()
         expect(page.locator(".sg-occupant").get_by_text("Lars Berg")).to_be_visible()
 
@@ -71,6 +72,10 @@ def exercise():
             kiosk.goto(f"{BASE}/signage/view/{screen_id}")
             expect(kiosk.get_by_text("Bürgerbüro", exact=True)).to_be_visible()
             expect(kiosk.get_by_text("Rechts", exact=True)).to_be_visible()
+            expect(kiosk.get_by_text("Anja Zander", exact=True)).to_be_visible()
+            expect(kiosk.get_by_text("Lars Berg", exact=True)).to_have_count(0)
+            expect(kiosk.locator(".sd-target-room")).to_contain_text("Raum 01")
+            expect(kiosk.locator(".sd-target-people li")).to_have_count(1)
             expect(kiosk.locator("button, input, select, details")).to_have_count(0)
             assert kiosk.evaluate("document.documentElement.scrollWidth === innerWidth")
             assert kiosk.evaluate("document.documentElement.scrollHeight <= innerHeight")

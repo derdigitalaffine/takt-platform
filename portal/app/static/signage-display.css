@@ -113,3 +113,54 @@ body {overflow-x:hidden}
 .sd-stale-message h2{color:#fff;font-size:clamp(1.7rem,3.6vw,3.6rem);font-weight:800;line-height:1.15;margin:0 0 16px}
 .sd-stale-message p{font-size:clamp(1rem,2vw,1.65rem);line-height:1.6;margin:0 auto 20px}
 .sd-stale-message small{display:block;font-size:clamp(.85rem,1.4vw,1.2rem);opacity:.72}
+
+
+/* 2026 directory refresh: large destination hierarchy at entrances, lifts and
+   decisions points. The color accent is an aid, never the only direction cue.
+   All text stays real, selectable HTML and the player remains read-only. */
+.sd-stage.sd-passive {
+  padding:clamp(18px,2.3vw,40px);
+  gap:clamp(12px,2vh,26px);
+  background:var(--sg-bg);
+}
+.sd-passive .sd-header {padding-bottom:clamp(10px,1.4vh,20px)}
+.sd-passive .sd-brand-name {font-size:clamp(.9rem,1.3vw,1.3rem)}
+.sd-passive .sd-header-meta {font-size:clamp(.85rem,1.2vw,1.16rem)}
+.sd-passive .sd-title-row {margin-bottom:clamp(12px,2vh,24px)}
+.sd-passive .sd-title-row h1 {font-size:clamp(1.8rem,min(4vw,6vh),4.5rem);font-weight:790;line-height:1.08;max-width:25ch}
+.sd-passive .sd-time-wrap strong {font-size:clamp(1.75rem,3vw,3.75rem)}
+.sd-passive .sd-target-pages {gap:8px}
+.sd-directory-page {display:flex;flex-direction:column;gap:12px;min-width:0}
+.sd-floor-bar {display:flex;align-items:center;gap:15px;padding:5px 4px 10px;border-bottom:2px solid color-mix(in srgb,var(--sg-fg) 38%,transparent)}
+.sd-floor-mark {display:grid;place-items:center;flex:none;width:clamp(34px,3.1vw,52px);height:clamp(34px,3.1vw,52px);border-radius:10px;background:var(--sg-accent);color:var(--sg-bg);font-size:clamp(1rem,1.6vw,1.6rem)}
+.sd-floor-heading {margin:0;font-size:clamp(1.4rem,2.6vw,2.8rem);font-weight:820;line-height:1.2;letter-spacing:-.03em}
+.sd-floor-hint {margin-left:auto;font-size:clamp(.78rem,1vw,1.1rem);font-weight:640;white-space:nowrap;color:color-mix(in srgb,var(--sg-fg) 83%,transparent)}
+.sd-passive .sd-targets {grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(10px,1.2vw,20px)}
+.sd-passive .sd-target {min-width:0;min-height:clamp(138px,20vh,230px);display:grid;grid-template-columns:clamp(62px,7vw,122px) minmax(0,1fr);gap:clamp(12px,1.5vw,22px);padding:clamp(12px,1.45vw,24px);border:1px solid color-mix(in srgb,var(--sg-fg) 30%,transparent);border-left:5px solid var(--sg-accent);border-radius:12px;background:color-mix(in srgb,var(--sg-fg) 9%,var(--sg-bg));align-items:center}
+.sd-passive .sd-target-arrow {display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;min-width:0;text-align:center;color:var(--sg-accent)}
+.sd-passive .sd-target-arrow strong {font-weight:790;font-size:clamp(3rem,min(5.4vw,7vh),6.8rem);line-height:1}
+.sd-passive .sd-target-arrow span {font-size:clamp(.78rem,1.18vw,1.24rem);font-weight:740;letter-spacing:.015em}
+.sd-passive .sd-target-no-route {color:color-mix(in srgb,var(--sg-fg) 66%,transparent)}
+.sd-passive .sd-target-route-label {display:flex;flex-direction:column;gap:6px}
+.sd-passive .sd-target-route-label i {font-size:clamp(1.35rem,2vw,2.2rem)}
+.sd-passive .sd-target-info {display:flex;flex-direction:column;align-items:start;gap:clamp(5px,.6vh,11px);min-width:0;overflow-wrap:anywhere}
+.sd-passive .sd-target-kicker {display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.sd-passive .sd-target-room {font-size:clamp(.98rem,min(1.45vw,2.3vh),1.65rem);color:var(--sg-accent);font-weight:800;letter-spacing:.02em}
+.sd-passive .sd-target-accessible {font-size:clamp(.72rem,.85vw,.95rem);color:var(--sg-fg);font-weight:680;white-space:nowrap}
+.sd-passive .sd-target-accessible i {margin-right:4px;color:var(--sg-accent)}
+.sd-passive .sd-target-name {display:block;font-size:clamp(1.28rem,min(2.25vw,3.6vh),2.8rem);font-weight:820;line-height:1.12;letter-spacing:-.025em}
+.sd-passive .sd-target-people {display:flex;flex-wrap:wrap;gap:5px 12px;list-style:none;padding:0;margin:2px 0 0;max-width:100%}
+.sd-passive .sd-target-people li {font-size:clamp(.98rem,min(1.44vw,2.7vh),1.7rem);line-height:1.25;font-weight:650;overflow-wrap:anywhere}
+.sd-passive .sd-target-people li+li::before {content:"·";display:inline-block;margin-right:12px;color:var(--sg-accent);font-weight:800}
+.sd-passive .sd-target-location {font-size:clamp(.75rem,1vw,1.08rem);font-weight:570;color:color-mix(in srgb,var(--sg-fg) 79%,transparent)}
+.sd-passive .sd-page-count {font-size:clamp(.74rem,1vw,1rem);color:color-mix(in srgb,var(--sg-fg) 80%,transparent);font-weight:650}
+.sd-passive .sd-footer {padding-top:10px}
+.sd-passive .sd-special {border:2px solid var(--sg-accent);background:color-mix(in srgb,var(--sg-accent) 10%,var(--sg-bg));border-radius:12px}
+.sd-passive .sd-special h2 {font-weight:830}
+@media(orientation:portrait), (max-width:800px) {
+  .sd-passive .sd-targets {grid-template-columns:minmax(0,1fr)}
+  .sd-passive .sd-target {min-height:clamp(132px,17vh,240px);grid-template-columns:clamp(60px,10vw,110px) minmax(0,1fr)}
+  .sd-passive .sd-target-arrow strong {font-size:clamp(2.9rem,min(8vw,7vh),6.5rem)}
+  .sd-passive .sd-target-name {font-size:clamp(1.4rem,min(3.7vw,3.5vh),2.7rem)}
+  .sd-floor-hint {display:none}
+}

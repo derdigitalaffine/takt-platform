@@ -59,10 +59,26 @@
     const id = 'pp-org-' + (++uid);
     let orgFilter = '';
     const search = query => normal(query);
+    const orgPathCache = new Map();
+    const orgPathFor = value => {
+      const key = String(value);
+      if (orgPathCache.has(key)) return orgPathCache.get(key);
+      const ids = new Set(people[key]?.orgs || []);
+      const path = orgs.filter(org => ids.has(org.id))
+        .sort((a, b) => (b.path || '').length - (a.path || '').length)[0]?.path || '';
+      orgPathCache.set(key, path);
+      return path;
+    };
+    const fullLabel = value => String(value || '').replace(/\s*\([^)]*@[^)]*\)\s*$/, '').trim();
+    const initials = label => {
+      const chunks = fullLabel(label).split(/[\s,]+/).filter(Boolean);
+      return (chunks.length > 1 ? chunks[0][0] + chunks[chunks.length - 1][0]
+        : (chunks[0] || '?').slice(0, 2)).toLocaleUpperCase('de-DE');
+    };
     const control = new window.TomSelect(select, {
       create: false,
       allowEmptyOption: true,
-      maxOptions: 250,
+      maxOptions: 120,
       searchField: ['text', 'value'],
       sortField: [{field: '$order', direction: 'asc'}],
       plugins: select.multiple ? ['remove_button'] : [],
@@ -74,19 +90,58 @@
           if (orgFilter === '__without__' && match && match.orgs.length) return 0;
           if (orgFilter && orgFilter !== '__without__'
               && (!match || !match.orgs.includes(Number(orgFilter)))) return 0;
-          const haystack = search((option.text || '') + ' ' + (option.value || ''));
+          const haystack = search((option.text || '') + ' ' + orgPathFor(option.value));
           return needle && !haystack.includes(needle) ? 0 : 1;
         };
       },
       render: {
         option: function(item, escape) {
-          return '<div>' + escape(item.text || '') + '</div>';
+          const name = fullLabel(item.text || '');
+          const details = orgPathFor(item.value);
+          return '<div class="pp-person-result">'
+            + '<span class="pp-person-avatar" aria-hidden="true">' + escape(initials(name)) + '</span>'
+            + '<span class="pp-person-lines"><strong>' + escape(name) + '</strong>'
+            + (details ? '<small>' + escape(details) + '</small>' : '') + '</span>'
+            + '</div>';
         },
-        no_results: () => '<div class="no-results p-2">Keine passenden Personen</div>'
+        item: function(item, escape) {
+          return '<div class="pp-selected-item">' + escape(fullLabel(item.text || '')) + '</div>';
+        },
+        no_results: () => '<div class="pp-empty">Keine passenden Personen. Bitte Namen oder Organisation prüfen.</div>'
       }
     });
     control.wrapper.classList.add('pp-person-control');
     control.wrapper.dataset.personPicker = '1';
+    control.wrapper.classList.toggle('pp-multiple', select.multiple);
+    const actions = document.createElement('div');
+    actions.className = 'pp-picker-actions';
+    const selectionStatus = document.createElement('span');
+    selectionStatus.className = 'pp-picker-count';
+    selectionStatus.setAttribute('role', 'status');
+    selectionStatus.setAttribute('aria-live', 'polite');
+    actions.append(selectionStatus);
+    if (select.multiple) {
+      const clearButton = document.createElement('button');
+      clearButton.type = 'button';
+      clearButton.className = 'pp-picker-clear';
+      clearButton.textContent = 'Auswahl aufheben';
+      clearButton.addEventListener('click', () => {
+        control.clear();
+        control.focus();
+      });
+      actions.append(clearButton);
+    }
+    control.wrapper.insertAdjacentElement('afterend', actions);
+    function updateSelection() {
+      const count = control.items.length;
+      selectionStatus.textContent = select.multiple
+        ? (count ? count + ' Personen ausgewählt' : 'Noch keine Person ausgewählt')
+        : (count ? 'Person ausgewählt' : 'Person auswählen');
+      const clearButton = actions.querySelector('button');
+      if (clearButton) clearButton.hidden = count === 0;
+    }
+    control.on('change', updateSelection);
+    updateSelection();
     if (orgs.length && [...select.options].some(option => people[option.value]?.orgs.length)) {
       const box = document.createElement('div');
       box.className = 'pp-org-filter';

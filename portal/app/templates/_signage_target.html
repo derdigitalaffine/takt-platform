@@ -1,11 +1,25 @@
 {% macro target(point) %}
 <li class="sd-target">
-  <div class="sd-target-arrow">
-    {% if point.arrow %}<strong aria-hidden="true">{{ point.arrow[0] }}</strong><span>{{ point.arrow[1] }}</span>{% endif %}
+  <div class="sd-target-arrow{{ ' sd-target-no-route' if not point.arrow else '' }}">
+    {% if point.arrow %}
+      <strong aria-hidden="true">{{ point.arrow[0] }}</strong>
+      <span>{{ point.arrow[1] }}</span>
+    {% else %}
+      <span class="sd-target-route-label"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> Ziel</span>
+    {% endif %}
   </div>
   <div class="sd-target-info">
-    <strong>{{ point.label }}</strong>
-    {% if point.number %}<span>{{ point.building }} · {{ point.floor }} · Raum {{ point.number }}{% if point.accessible %} · Stufenfreier Weg{% endif %}</span>{% endif %}
+    <div class="sd-target-kicker">
+      {% if point.number %}<span class="sd-target-room">Raum {{ point.number }}</span>{% endif %}
+      {% if point.accessible %}<span class="sd-target-accessible"><i class="fa-solid fa-wheelchair-move" aria-hidden="true"></i> Stufenfrei</span>{% endif %}
+    </div>
+    <strong class="sd-target-name">{{ point.label }}</strong>
+    {% if point.people %}
+    <ul class="sd-target-people" aria-label="Öffentlich freigegebene Ansprechpersonen">
+      {% for person in point.people %}<li>{{ person }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if point.number %}<span class="sd-target-location">{{ point.floor }}{% if point.building %} · {{ point.building }}{% endif %}</span>{% endif %}
   </div>
 </li>
 {% endmacro %}
