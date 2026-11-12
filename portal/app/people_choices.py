@@ -1,5 +1,8 @@
 """Small presentation records for the shared, progressively enhanced selection UI."""
 
+from .person_picker import sort_people
+
+
 
 def users(people, *, targets=False, hints=None):
     hints = hints or {}
@@ -11,7 +14,7 @@ def users(people, *, targets=False, hints=None):
             kind="person",
             disabled=False,
         )
-        for p in people
+        for p in sort_people(people)
         if p.active
     ]
 
