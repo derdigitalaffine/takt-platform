@@ -42,16 +42,18 @@
       {% if passive %}
         {% if manual_direction %}<ul class="sd-targets sd-manual">{{ target(manual_direction) }}</ul>{% endif %}
         {% if destinations %}
-        <div class="sd-target-pages">
+        <div class="sd-target-pages" aria-label="Zielverzeichnis">
           {% for heading, points in destination_groups.items() %}
-          {% for page in points|batch(4 if special or manual_direction else 6) %}
-            <section data-sg-target-page>
-              {% if heading %}<h2 class="sd-floor-heading">{{ heading }}</h2>{% endif %}
+          {% for page in points|batch(3 if special or manual_direction else 4) %}
+            <section class="sd-directory-page" data-sg-target-page>
+              {% if heading %}
+              <div class="sd-floor-bar"><span class="sd-floor-mark"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span><h2 class="sd-floor-heading">{{ heading }}</h2><span class="sd-floor-hint">Räume & Ansprechpersonen</span></div>
+              {% endif %}
               <ul class="sd-targets">{% for point in page %}{{ target(point) }}{% endfor %}</ul>
             </section>
           {% endfor %}
           {% endfor %}
-          <span class="sd-page-count" data-sg-page-count></span>
+          <span class="sd-page-count" data-sg-page-count aria-live="off"></span>
         </div>
         {% elif not manual_direction %}
         <p class="sd-empty">Für diesen Bereich sind derzeit keine Ziele verfügbar.</p>
