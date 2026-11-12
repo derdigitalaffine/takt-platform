@@ -70,10 +70,14 @@ def exercise():
         expect(campaign.locator("[name=room_id]")).not_to_have_value("")
         campaign.locator("[name=title]").fill("Briefwahlstelle heute")
         local_now = datetime.now(ZoneInfo("Europe/Berlin"))
-        campaign.locator("[name=starts_at]").fill(
-            (local_now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M"))
-        campaign.locator("[name=ends_at]").fill(
-            (local_now + timedelta(minutes=45)).strftime("%Y-%m-%dT%H:%M"))
+        # Portal's accessible German date widget wraps the canonical native
+        # datetime-local input. Exercise its *visible* text proxy.
+        campaign.locator("[name=starts_at]").locator("xpath=..").locator(
+            "input[type=text]").fill(
+            (local_now - timedelta(minutes=5)).strftime("%d.%m.%Y, %H:%M"))
+        campaign.locator("[name=ends_at]").locator("xpath=..").locator(
+            "input[type=text]").fill(
+            (local_now + timedelta(minutes=45)).strftime("%d.%m.%Y, %H:%M"))
         campaign.locator("[name=published]").check()
         campaign.get_by_role("button", name="Sonderanzeige anlegen").click()
         expect(page.get_by_text("Briefwahlstelle heute", exact=True)).to_be_visible()
