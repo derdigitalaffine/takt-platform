@@ -200,56 +200,176 @@ def _chart_table(labels, values, font, *, bar_color=BLUE):
 
 
 def _csv_detail(csv_source: str, font: str, *, form: bool) -> list:
-    """Full, readable CSV-parity detail appendix. Render exactly the exported
-    CSV cells; no selective omission, inferred identity or token correlation.
+    """Show *every* CSV field without a forced page break or bulky appendix.
 
-    Each field becomes a paragraph so even long free text / GeoJSON can span
-    several A4 pages. Never place entire responses in unsplittable table rows.
+    Use a color-coded participant/result matrix for date polls; form questions
+    receive compact, labelled table rows. Truly long open text remains
+    splittable between pages: never truncate or clip it to meet a page quota.
     """
     records = list(csv.reader(io.StringIO(csv_source.lstrip("\ufeff")), delimiter=";"))
     if not records:
         return []
-    headings, *records = records
-    title = "Einzelantworten und Teilnehmer" if form else "Teilnehmer und Terminpräferenzen"
-    items = [PageBreak(),
-             Paragraph(_plain(title, 200), _style(font, size=14, leading=19, gap=3 * mm)),
-             Paragraph("Vertraulicher Detailanhang. Alle Spalten und Werte entsprechen dem "
-                       "CSV-Export dieser Auswertung; auch offene Texte und Kommentare "
-                       "werden vollständig wiedergegeben.",
-                       _style(font, size=8.1, color=MUTED, gap=5 * mm))]
-    label_style = _style(font, size=8.5, leading=12.7)
-    header_style = _style(font, size=10.5, leading=14.5, color=DARK, gap=2 * mm)
-    for index, row in enumerate(records, 1):
-        summary = not form and bool(row) and row[0].startswith("Summe ")
-        if summary:
-            heading = row[0]
-        else:
-            person = (row[2] if len(row) > 2 else "") if form else (row[0] if row else "")
-            label = ("Antwort " if form else "Teilnahme ") + str(index)
-            heading = label + (" · " + person if person else "")
-        items.append(Spacer(1, 3.5 * mm))
-        items.append(Paragraph(_plain(heading, 350), header_style))
-        for column, name in enumerate(headings):
-            # Preserve empty CSV cells as a visible dash, including all column
-            # positions. If a CSV writer adds columns, they are included too.
-            raw = row[column] if column < len(row) else ""
-            items.append(Paragraph(
-                '<font color="' + MUTED + '">' + escape(name or f"Spalte {column + 1}") +
-                ':</font> ' + ("–" if not raw else ""),
-                label_style,
-            ) if not raw else Paragraph(
-                '<font color="' + MUTED + '">' + escape(name or f"Spalte {column + 1}") +
-                ':</font>',
-                label_style))
-            if raw:
-                # No truncation; ReportLab paragraphs split correctly across
-                # pages, including very long text fields and serialized geodata.
-                for start in range(0, len(raw), 1600):
-                    chunk = raw[start:start + 1600].replace("\r\n", "\n").replace("\r", "\n")
+    headings, *rows = records
+    return (_form_detail_table(headings, rows, font) if form
+            else _poll_detail_grid(headings, rows, font))
+
+
+def _detail_cell(value, font, *, size=7.2, color=DARK):
+    return Paragraph(escape(str(value if value not in (None, "") else "–"))
+                     .replace("\n", "<br/>"),
+                     _style(font, size=size, leading=size * 1.32, color=color))
+
+
+def _form_detail_table(headings, rows, font):
+    """One compact field/value table per response; long CSV cells can split.
+
+    A ReportLab table cannot split an oversized *single row*. For lengthy open
+    text or GeoJSON we flush the short rows and render the original text as
+    normal, splittable paragraphs, then continue the same response.
+    """
+    if not rows:
+        return []
+    items = [Paragraph("Einzelantworten & Teilnehmer", _style(font, size=9.5, leading=12)),
+             Paragraph("Vollständige vertrauliche Angaben aus dem CSV-Export",
+                       _style(font, size=7, color=MUTED, gap=2 * mm))]
+    name_style = _style(font, size=8.2, leading=10.5, color=DARK, gap=0.7 * mm)
+    label_style = _style(font, size=6.6, leading=8.5, color=MUTED)
+    value_style = _style(font, size=7, leading=9.2, color=DARK)
+    long_style = _style(font, size=7.1, leading=9.5, color=DARK)
+    for index, record in enumerate(rows, 1):
+        name = record[2] if len(record) > 2 else ""
+        items.append(Paragraph(f"{index}. " + escape(name or "Antwort"),
+                               name_style))
+        short_rows = []
+
+        def flush():
+            if not short_rows:
+                return
+            table = Table(short_rows[:], colWidths=[42 * mm, 132 * mm],
+                          hAlign="LEFT", splitByRow=1)
+            table.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ROWBACKGROUNDS", (0, 0), (-1, -1),
+                 [colors.HexColor("#F3F7FA"), colors.white]),
+                ("LINEBELOW", (0, 0), (-1, -2), .25,
+                 colors.HexColor("#DDE7EE")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+            ]))
+            items.append(table)
+            short_rows.clear()
+
+        for column, label in enumerate(headings):
+            raw = record[column] if column < len(record) else ""
+            label_text = str(label or f"Spalte {column + 1}")
+            if len(raw) > 650:
+                flush()
+                items.append(Paragraph("<b>" + escape(label_text) + ":</b>",
+                                       _style(font, size=7.1, leading=9.2,
+                                              color=MUTED)))
+                # A true paragraph may split across pages, even for long or
+                # unbroken free texts/serialized geographic coordinates.
+                for pos in range(0, len(raw), 1100):
+                    chunk = raw[pos:pos + 1100].replace("\r\n", "\n").replace("\r", "\n")
                     items.append(Paragraph(escape(chunk).replace("\n", "<br/>"),
-                                           label_style))
+                                           long_style))
+            else:
+                short_rows.append([
+                    Paragraph(escape(label_text), label_style),
+                    Paragraph(escape(raw or "–").replace("\n", "<br/>"),
+                              value_style),
+                ])
+        flush()
         items.append(Spacer(1, 2 * mm))
     return items
+
+
+def _poll_detail_grid(headings, rows, font):
+    """Compact colored equivalent of the Web participant x term grid.
+
+    Full CSV option titles are printed in the preceding term ranking, with
+    matching 1-based column numbers. This grid includes each participant's
+    name, email, submission time, vote and comment; summary CSV rows too.
+    """
+    options = headings[3:-1]
+    participants = [row for row in rows if row and not row[0].startswith("Summe ")]
+    totals = [row for row in rows if row and row[0].startswith("Summe ")]
+    items = [
+        Paragraph("Teilnehmer & Ergebnisraster", _style(font, size=9.5, leading=12)),
+        Paragraph("Name · E-Mail · Geantwortet · Kommentar. "
+                  "Spaltennummern entsprechen den Terminen oben.",
+                  _style(font, size=7, color=MUTED, gap=1.5 * mm)),
+    ]
+    if not options:
+        # A CSV can have no proposed dates: still show its participant details.
+        items.extend(_form_detail_table(headings, participants + totals, font))
+        return items
+    for offset in range(0, len(options), 5):
+        batch = options[offset:offset + 5]
+        width = min(111 * mm, len(batch) * 24 * mm)
+        first = 174 * mm - width
+        widths = [first] + [width / len(batch)] * len(batch)
+        header = [_detail_cell("Name / E-Mail / Geantwortet", font, size=7.1)]
+        header += [_detail_cell(str(offset + i + 1), font, size=7.5)
+                   for i in range(len(batch))]
+        table_rows = [header]
+        marks = []
+        for row in participants:
+            profile = "<b>" + escape(row[0] if len(row) > 0 else "") + "</b>"
+            profile += "<br/>" + escape(row[1] if len(row) > 1 else "")
+            profile += "<br/>" + escape(row[2] if len(row) > 2 else "")
+            cells = [Paragraph(profile, _style(font, size=6.7, leading=8.3))]
+            for local_index in range(len(batch)):
+                idx = 3 + offset + local_index
+                answer = row[idx] if idx < len(row) else ""
+                color = {"Ja": "#DEF1E6", "Wenn nötig": "#FFF1BE",
+                         "Nein": "#FCE4E7"}.get(answer, "#F1F4F7")
+                cells.append(_detail_cell(answer, font, size=7.1))
+                marks.append((len(table_rows), local_index + 1, color))
+            table_rows.append(cells)
+        for row in totals:
+            cells = [_detail_cell(row[0], font, size=7)]
+            cells += [_detail_cell(row[3 + offset + i]
+                     if 3 + offset + i < len(row) else "", font, size=7)
+                      for i in range(len(batch))]
+            table_rows.append(cells)
+        table = Table(table_rows, colWidths=widths, hAlign="LEFT", repeatRows=1,
+                      splitByRow=1)
+        rules = [
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8F1F7")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.4, colors.HexColor("#DBE4EC")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]
+        if totals:
+            rules.append(("BACKGROUND", (0, len(table_rows) - len(totals)),
+                          (-1, -1), colors.HexColor("#EDF3F7")))
+        for row_index, col_index, shade in marks:
+            rules.append(("BACKGROUND", (col_index, row_index),
+                          (col_index, row_index), colors.HexColor(shade)))
+        table.setStyle(TableStyle(rules))
+        items.append(table)
+        if offset + len(batch) < len(options):
+            items.append(Spacer(1, 1.2 * mm))
+    comments = [(row[0], row[-1]) for row in participants if row and row[-1]]
+    if comments:
+        items.append(Spacer(1, 2 * mm))
+        items.append(Paragraph("Kommentare", _style(font, size=8.5, leading=11,
+                                                    color=DARK, gap=1 * mm)))
+        comment_style = _style(font, size=7.1, leading=9.5)
+        for person, value in comments:
+            raw = escape(value).replace("\r\n", "\n").replace("\r", "\n")
+            items.append(Paragraph("<b>" + escape(person) + ":</b>", comment_style))
+            for pos in range(0, len(raw), 1100):
+                items.append(Paragraph(raw[pos:pos + 1100].replace("\n", "<br/>"),
+                                       comment_style))
+    return items
+
 
 
 def form_report(db, form) -> bytes:
