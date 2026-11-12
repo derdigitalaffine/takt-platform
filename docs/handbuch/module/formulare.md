@@ -274,3 +274,15 @@ Beim Ausfüllen (auch für Gäste über einen Link):
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du willst Informationen von anderen einsammeln?
+
+1. **Formulare** öffnen und ein neues Formular anlegen.
+2. Fragen hinzufügen und klar formulieren.
+3. Pflichtfelder und Bedingungen prüfen.
+4. Formular selbst testen, dann den vorgesehenen Link teilen.
+5. Eingegangene Antworten im berechtigten Bereich ansehen und auswerten.
+
+**Merksatz:** Erst testen, dann verteilen. Sonst merken die ersten Teilnehmenden, was du vergessen hast.
