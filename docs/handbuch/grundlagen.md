@@ -66,7 +66,7 @@ Portal-Adresse öffnen, E-Mail und Passwort eingeben, **Anmelden**. Ist für Ihr
 - **E-Mail:** Das Portal schickt Ihnen einen Code (10 Minuten gültig). Kommt er nicht: Spam-Ordner prüfen oder „Neuen Code senden“.
 - **Notfallcode:** Wenn Telefon und Postfach nicht greifbar sind, einen Ihrer Wiederherstellungscodes verwenden (jeder gilt einmal).
 
-Wie Sie das einrichten, steht in [Kapitel 13](../../BENUTZERHANDBUCH.md#13-profil-und-sicherheit-zwei-faktor).
+Wie Sie das einrichten, steht in [Kapitel 13](../BENUTZERHANDBUCH.md#13-profil-und-sicherheit-zwei-faktor).
 
 ### Passwort vergessen
 
