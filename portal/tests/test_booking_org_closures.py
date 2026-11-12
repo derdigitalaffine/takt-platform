@@ -6,7 +6,7 @@ from datetime import timedelta
 from app import booking_integration, btypes
 from app.db import (
     BookingHours, BookingPage, BookingType, Organization,
-    get_settings, to_local, utcnow,
+    get_settings, set_setting, to_local, utcnow,
 )
 from app.leave_extensions import Closure
 from app.org_models import OrgMembership
@@ -75,7 +75,10 @@ def test_creator_org_closures_block_speaking_hours_but_can_be_disabled(db, task_
 
         page.integration_json = json.dumps({"creator_org_id": child.id, "org_closures": True})
         db.flush()
-        settings(module_calendars="0")
+        # Use the SAME transaction: a second SQLite session would compete for
+        # a write lock while this test has pending organization changes.
+        set_setting(db, "module_calendars", "0")
+        db.commit()
         assert booking_integration.creator_closure_days(db, page, day, day) == set()
         assert booking_integration.internal_busy(
             db, owner.id, utcnow(), utcnow() + timedelta(hours=1)
