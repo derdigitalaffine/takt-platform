@@ -35,3 +35,15 @@
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du brauchst Büromaterial, hast einen Mangel entdeckt oder möchtest etwas verbessern?
+
+1. **Interne Anliegen** öffnen.
+2. Kurz beschreiben, was los ist. Falls angeboten, kann dir der KI-Assistent beim Formulieren helfen.
+3. Vorschlag prüfen, Kategorie auswählen und Anliegen absenden.
+4. In der Übersicht nachsehen, ob es bearbeitet wird.
+5. Wenn du selbst zuständig bist: Zugewiesenes Anliegen öffnen und den Bearbeitungsstand aktualisieren.
+
+**Merksatz:** Ein Anliegen ist noch keine erledigte Bestellung. Schau auf den Status.
