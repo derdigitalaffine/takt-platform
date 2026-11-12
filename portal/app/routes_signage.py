@@ -107,6 +107,7 @@ def _signage_context(db: Session, user: User):
         calendars=[cal for cal in db.scalars(select(Calendar).where(Calendar.source == "free").order_by(Calendar.title))
                    if calendars.access(db, user, cal)],
         resources=list(db.scalars(select(Resource).where(Resource.active.is_(True)).order_by(Resource.name)))
+    )
 
 
 @app.get("/signage")
