@@ -544,6 +544,12 @@ def form_export(form_id: int, fmt: str, user: User = Depends(current_user), db: 
     if fmt == "json":
         return Response(fm.to_json(form, list(form.responses)), media_type="application/json; charset=utf-8",
                         headers={"Content-Disposition": f'attachment; filename="{slug}-{stamp}.json"'})
+    if fmt == "pdf" and form.kind == "survey":
+        from . import survey_pdf
+        return Response(survey_pdf.form_report(db, form), media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{slug}-{stamp}.pdf"',
+                                 "Cache-Control": "private, no-store",
+                                 "X-Content-Type-Options": "nosniff"})
     raise HTTPException(404)
 
 
@@ -669,6 +675,9 @@ def _fill_page(request: Request, form: Form, *, preview: bool = False, action: s
 def _message(request: Request, form: Form | None, kind: str, status: int = 200, **ctx):
     response = render(request, "form_message.html", None, form=form, kind=kind, **ctx)
     response.status_code = status
+    if form and form.kind == "survey" and kind in ("thanks", "done"):
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
     return response
 
 
@@ -756,7 +765,8 @@ async def _submit(request: Request, db: Session, form: Form, invite: FormInvite 
     worker.wake()
     if completion is not None:
         return completion
-    response = _message(request, form, "thanks", payment=payment, money=payments.money)
+    response = _message(request, form, "thanks", payment=payment, money=payments.money,
+                        completed_at=resp.created_at, review_url=action)
     if invite is None and form.kind == "survey" and form.public_token and action == f"/f/{form.public_token}":
         response.set_cookie(_receipt_cookie_name(form), _receipt_cookie_value(form),
                             max_age=180 * 86400, httponly=True, samesite="lax",
