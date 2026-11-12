@@ -79,11 +79,13 @@ def test_account_revisiting_public_link_without_cookie_cannot_duplicate_response
     assert first.status_code in (302, 303)
     fresh_browser = login("admin@example.org", "admin-passwort-123")
     seen = fresh_browser.get(f"/t/{TOKEN}")
-    assert seen.status_code == 200
-    assert "Deine Teilnahme wurde gespeichert" in seen.text
-    assert f"/t/p/" in seen.text
+    assert seen.status_code == 303
+    assert seen.headers["location"].startswith("/t/p/")
+    personal = fresh_browser.get(seen.headers["location"])
+    assert personal.status_code == 200
+    assert "Deine Teilnahme wurde gespeichert" in personal.text
     post = fresh_browser.post(f"/t/{TOKEN}", data={
-        "csrf": csrf_of(seen.text), "name": "Tester", "o_" + str(opt): "no"})
+        "csrf": csrf_of(personal.text), "name": "Tester", "o_" + str(opt): "no"})
     assert post.status_code in (302, 303)
     with SessionLocal() as db:
         count = db.scalar(select(func.count(PollParticipant.id)).where(
