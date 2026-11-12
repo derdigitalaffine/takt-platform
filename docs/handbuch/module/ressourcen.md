@@ -292,7 +292,7 @@ Ob darüber hinaus Führerscheinprüfung, Fahrtenbuch oder Fahrzeugübergabe vor
 
 ---
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 **Du willst einfach nur einen Raum oder ein Gerät buchen?** Kein Problem – hier die Version ohne Verwaltungsdeutsch:
 
