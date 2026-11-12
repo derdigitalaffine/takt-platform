@@ -142,8 +142,8 @@
         {% if keys %}<div class="sg-links">{% for key in keys %}<div class="sg-link-row"><span>Link #{{ key.id }} · bis {{ key.expires_at.strftime('%d.%m.%Y') }} {% if key.revoked %}<em>(widerrufen)</em>{% endif %}</span>{% if not key.revoked %}<form method="post" action="/signage/{{ screen.id }}/link/{{ key.id }}/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger">Widerrufen</button></form>{% endif %}</div>{% endfor %}</div>{% endif %}
       </div>
       <div class="sg-panel">
-        <h2>Geräte & Monitoring</h2>
-        <p class="sg-muted">Player nutzen separate Zugangsdaten und melden ihren Zustand über die Heartbeat-API.</p>
+        <div class="sg-panel-head"><div><h2>Geräte & Monitoring</h2><p class="sg-muted">Player nutzen separate Zugangsdaten und melden ihren Zustand über die Heartbeat-API.</p></div><a href="/signage/fleet" class="btn btn-sm btn-outline-primary">Alle Geräte</a></div>
+
         <form method="post" action="/signage/{{ screen.id }}/device" class="sg-create-form"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Gerätename<input class="form-control" name="name" placeholder="z. B. Empfang EG" maxlength="180" required></label><button class="btn btn-outline-primary" type="submit">Geräteschlüssel erstellen</button></form>
         <div class="sg-links">{% for device in devices %}<div class="sg-link-row"><div><strong>{{ device.name }}</strong><small class="d-block sg-muted">#{{ device.id }} · {% if device.revoked %}<span class="sg-status-offline">Gesperrt</span>{% elif device.last_seen_at and (now - device.last_seen_at).total_seconds() < 300 %}<span class="sg-status-online">Online</span>{% elif device.last_seen_at %}<span class="sg-status-offline">Offline</span> · zuletzt {{ device.last_seen_at.strftime('%d.%m.%Y %H:%M') }} UTC{% else %}Noch kein Heartbeat{% endif %}</small></div>{% if not device.revoked %}<form method="post" action="/signage/{{ screen.id }}/device/{{ device.id }}/revoke"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-danger">Sperren</button></form>{% endif %}</div>{% endfor %}</div>
       </div>
