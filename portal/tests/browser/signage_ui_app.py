@@ -14,12 +14,16 @@ with SessionLocal() as db:
     root = Organization(name="Verwaltung", kind="verwaltung")
     db.add(root); db.flush()
     team = Organization(name="Service", kind="team", parent_id=root.id)
-    db.add(team); db.flush()
-    for name, address in [("Anja Zander", "anja-sg@example.org"),
-                          ("Lars Berg", "lars-sg@example.org")]:
+    finance = Organization(name="Finanzen", kind="team", parent_id=root.id)
+    db.add_all([team, finance]); db.flush()
+    for name, address, org_id in [
+        ("Anja Zander", "anja-sg@example.org", team.id),
+        ("Lars Berg", "lars-sg@example.org", team.id),
+        ("Tina Bereich", "tina-sg@example.org", finance.id),
+    ]:
         worker = User(name=name, email=address, password_hash=hash_password("browser-test-password"))
         db.add(worker); db.flush()
-        db.add(OrgMembership(user_id=worker.id, org_id=team.id, is_primary=True))
+        db.add(OrgMembership(user_id=worker.id, org_id=org_id, is_primary=True))
         building = SignageBuilding(name="Rathaus")
     db.add(building)
     db.flush()

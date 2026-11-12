@@ -241,3 +241,27 @@ Die Web-Oberfläche ersetzt **keine** baurechtlich erforderlichen, taktilen oder
 Der portalweite Personenpicker nutzt weiterhin native Single-/Multi-`select`-Felder und erhält deren `name`, `value`, `multiple`, `required` und Berechtigungsumfang. Der sichtbare Ergebnisbereich enthält nun ein Initialenmonogramm, den angezeigten Namen und die spezifischste sichtbare Organisationshierarchie. Die Suche berücksichtigt **nur bereits autorisiert an diese Seite übergebene Benutzer** und ihre Organisationspfade. In der Mehrfachauswahl bleiben Chips sichtbar; der Auswahlzähler sowie ein explizites „Auswahl aufheben“ erleichtern große Raumzuordnungen. Das Setzen eines Organisationsfilters deaktiviert **keine** bereits selektierten Werte, damit Formulardaten nicht verloren gehen. Die Filter- und Organisationsinformationen sind für dynamisch geladene und mobil dargestellte native Auswahlfelder nachverwendbar.
 
 Nicht umgesetzt: serverseitig streamende/virtuelle Typahead-Suche über ein beliebig großes gesamtes Mitarbeiterverzeichnis. Eine solche API würde eigene Berechtigungs- und Datenschutzprüfungen erfordern.
+
+
+## Einheitlicher Personenpicker mit integriertem Organisationsbrowser
+
+Die frühere doppelte Eingabe (*Organisations-Select über dem Personen-Select*) ist entfernt. Eine einzige native `<select>`-Eingabe wird bei aktiviertem JavaScript mit **Tom Select** ergänzt: Die Ergebnissuche und der Organisationsbaum erscheinen **im selben Dropdown**.
+
+**Ablauf:** Picker öffnen → bei Bedarf im Dropdown den Filterchip **„Alle Organisationseinheiten“** öffnen → im hierarchischen Baum „Verwaltung / Fachbereich / Team“ auswählen → Person suchen und auswählen. Eine Mehrfachauswahl bleibt **über Wechsel zwischen beliebigen Organisationseinheiten hinweg** erhalten. Die ausgewählten Benutzer stehen weiter als Chips im selben Feld und werden gemeinsam abgesendet. „Alle Organisationseinheiten“ setzt nur den **Sichtfilter** zurück; „Auswahl aufheben“ entfernt ausdrücklich die aktuelle Auswahl. Auch Personen ohne Organisationsmitgliedschaft können separat gefiltert werden, sofern sie bereits im autorisierten Optionsumfang enthalten sind.
+
+### Ursache und Behebung
+
+Tom Select verarbeitet die native Optionsliste mit Sifter, dessen Suche leere Suchanfragen teilweise gesondert behandelt. Die frühere Implementierung prüfte die Organisations-ID ausschließlich in einem benutzerdefinierten **Score**. Beim Wechsel des externen Selects erschien deshalb häufig weiterhin die unbeschränkte Trefferliste. Statt an Scores oder deaktivierten `<option>`-Elementen zu manipulieren, wird das **Result-Set nach der ursprünglichen Suche** um Organisationsmitgliedschaften eingeschränkt; das greift auch bei leerem Suchtext und verändert keine schon ausgewählten Benutzer-IDs oder Formularwerte.
+
+**Sicherheit & UI-Architektur:** Die Metadaten kommen ausschließlich aus der bereits vom Controller autorisierten Benutzer-Auswahlliste. Personen anderer Rechtebereiche werden durch den Picker nicht nachgeladen. Die Backend-Orgstruktur enthält Vorfahren-IDs, sodass ein Team auch über seine übergeordnete Organisation auffindbar ist. Der Organisationsbrowser ist **neben**, nicht **innerhalb**, der Listbox-Optionen platziert: interaktive Filterbuttons stehen nicht in `role=option`-Elementen. Native Form-Attribute (`name`, `required`, `multiple`, Werte) bleiben erhalten; ohne JavaScript ist das ursprüngliche Auswahlfeld weiterhin nutzbar. Der Browser ist auf mobilen Ansichten scrollfähig, der Filter übernimmt keine unbestätigten Änderungen an Raum- oder Sichtbarkeitsrechten.
+
+Technische Referenzen: [Tom Select – Search, Options, Dropdown](https://tom-select.js.org/docs/api/), [Tom Select – Konfiguration und Mehrfachauswahl](https://tom-select.js.org/docs/), [W3C WAI-ARIA Listbox Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/). Insbesondere rät W3C davon ab, weitere interaktive Schaltflächen *innerhalb* einer Listbox-Option zu verschachteln.
+
+### Abnahmekriterien
+
+- Beim Öffnen existiert **nur ein Personenauswahl-Picker**, kein zweites HTML-Organisations-Select; der Baum wird im Dropdown ausgeklappt.
+- Ein Organisationswechsel filtert die angezeigten Personen **sofort und auch bei leerem Suchtext**; Vorfahr- und Untereinheitsfilter wirken.
+- In Mehrfachfeldern kann erst Person A aus Bereich X, danach Person B aus Bereich Y gewählt werden; nach dem Speichern sind **beide** korrekt zugeordnet. Keine stille Deaktivierung bestehender Selektionswerte.
+- Benutzer und Organisationsbezeichnungen werden textbasiert geescaped; die verfügbare Optionsliste überschreitet nie den ursprünglichen autorisierten Umfang.
+- Escape, Buttons und Statusmeldungen sind mit der Tastatur bedienbar; mobile Darstellung und dunkles Farbschema bleiben erhalten.
+- Für riesige Verzeichnisse bleibt eine getrennte, später zu prüfende serverseitige Suche offen.

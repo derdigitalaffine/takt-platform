@@ -79,6 +79,10 @@
       create: false,
       allowEmptyOption: true,
       maxOptions: 120,
+      // Prevent results from covering the submit button after selection.
+      // The picker is immediately reusable and the selected chips persist.
+      closeAfterSelect: true,
+      clearAfterSelect: true,
       searchField: ['text', 'value'],
       sortField: [{field: '$order', direction: 'asc'}],
       plugins: select.multiple ? ['remove_button'] : [],
@@ -86,10 +90,6 @@
       score: function(query) {
         const needle = search(query);
         return function(option) {
-          const match = people[String(option.value)];
-          if (orgFilter === '__without__' && match && match.orgs.length) return 0;
-          if (orgFilter && orgFilter !== '__without__'
-              && (!match || !match.orgs.includes(Number(orgFilter)))) return 0;
           const haystack = search((option.text || '') + ' ' + orgPathFor(option.value));
           return needle && !haystack.includes(needle) ? 0 : 1;
         };
@@ -110,6 +110,26 @@
         no_results: () => '<div class="pp-empty">Keine passenden Personen. Bitte Namen oder Organisation prüfen.</div>'
       }
     });
+    // Tom Select's Sifter may treat an empty query as 'all results',
+    // skipping custom score filters. Filter the returned result set instead:
+    // this works with empty/nonempty searches and every dropdown refresh.
+    // Never remove or disable options: selected values must survive a
+    // cross-organization multi-select without changing form submission.
+    const baseSearch = control.search.bind(control);
+    const selectedUsers = new Set([...select.options].map(option => option.value)
+      .filter(value => value && value !== '0'));
+    function inOrg(value) {
+      if (!orgFilter) return true;
+      const memberships = people[String(value)]?.orgs || [];
+      if (orgFilter === '__without__') return !memberships.length;
+      return memberships.includes(Number(orgFilter));
+    }
+    control.search = function(query) {
+      const response = baseSearch(query);
+      if (!orgFilter) return response;
+      const filtered = response.items.filter(row => inOrg(String(row.id)));
+      return {...response, items: filtered, total: filtered.length};
+    };
     control.wrapper.classList.add('pp-person-control');
     control.wrapper.dataset.personPicker = '1';
     control.wrapper.classList.toggle('pp-multiple', select.multiple);
@@ -142,39 +162,204 @@
     }
     control.on('change', updateSelection);
     updateSelection();
-    if (orgs.length && [...select.options].some(option => people[option.value]?.orgs.length)) {
-      const box = document.createElement('div');
-      box.className = 'pp-org-filter';
-      const label = document.createElement('label');
-      label.htmlFor = id;
-      label.textContent = 'Organisationseinheit';
-      const filter = document.createElement('select');
-      filter.id = id;
-      filter.className = 'form-select form-select-sm';
-      filter.dataset.personPicker = 'off';
-      const all = document.createElement('option');
-      all.value = ''; all.textContent = 'Alle Organisationseinheiten';
-      filter.appendChild(all);
-      const present = new Set([...select.options].flatMap(option => people[option.value]?.orgs || []));
-      for (const org of orgs) {
-        if (!present.has(org.id)) continue;
-        const option = document.createElement('option');
-        option.value = String(org.id);
-        option.textContent = org.path || org.name;
-        filter.appendChild(option);
+    // Organization browsing is part of the SAME picker dropdown. A separate
+    // select made the UI confusing and did not reliably refresh blank searches.
+    // Controls are siblings of the Tom Select listbox, never interactive
+    // descendants of listbox options (ARIA APG).
+    if (orgs.length && [...selectedUsers].some(value => people[value]?.orgs.length)) {
+      const relevant = [...select.options].filter(option => selectedUsers.has(option.value));
+      const allowed = new Set(relevant.flatMap(option => people[option.value]?.orgs || []));
+      const available = orgs.filter(org => allowed.has(org.id));
+      const orgById = new Map(available.map(org => [org.id, org]));
+      const children = new Map();
+      for (const org of available) {
+        const parent = orgById.has(org.parent_id) ? org.parent_id : 0;
+        if (!children.has(parent)) children.set(parent, []);
+        children.get(parent).push(org);
       }
-      const without = document.createElement('option');
-      without.value = '__without__'; without.textContent = 'Ohne Organisationszuordnung';
-      filter.appendChild(without);
-      label.appendChild(filter);
-      box.appendChild(label);
-      control.wrapper.insertAdjacentElement('beforebegin', box);
-      filter.addEventListener('change', () => {
-        orgFilter = filter.value;
-        // Filter suggestions, not already chosen option values. Disabling
-        // selected native options would silently omit them from form submission.
-        control.refreshOptions(false);
+      // Precompute subtree counts once instead of rescanning every person
+      // for every organization (important for large municipal directories).
+      const counts = new Map();
+      let unassigned = 0;
+      for (const option of relevant) {
+        const memberships = people[option.value]?.orgs || [];
+        if (!memberships.length) unassigned++;
+        for (const oid of memberships) counts.set(oid, (counts.get(oid) || 0) + 1);
+      }
+      const countFor = id => id === '__without__' ? unassigned : (counts.get(Number(id)) || 0);
+      const toolbar = document.createElement('div');
+      toolbar.className = 'pp-integrated-toolbar';
+      toolbar.setAttribute('aria-label', 'Organisationseinheiten filtern');
+      const top = document.createElement('div');
+      top.className = 'pp-integrated-top';
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'pp-org-toggle';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-controls', id);
+      toggle.textContent = 'Alle Organisationseinheiten';
+      const count = document.createElement('span');
+      count.className = 'pp-visible-count';
+      count.setAttribute('role', 'status');
+      count.setAttribute('aria-live', 'polite');
+      top.append(toggle, count);
+      const panel = document.createElement('div');
+      panel.className = 'pp-org-panel';
+      panel.id = id;
+      panel.hidden = true;
+      const hint = document.createElement('p');
+      hint.className = 'pp-org-hint';
+      hint.textContent = 'Bereich auswählen · Untereinheiten sind eingeschlossen';
+      const all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'pp-org-choice';
+      all.dataset.ppOrgId = '';
+      all.textContent = 'Alle Organisationseinheiten';
+      panel.append(hint, all);
+      const tree = document.createElement('ul');
+      tree.className = 'pp-org-tree';
+      tree.setAttribute('aria-label', 'Organisationseinheiten');
+      function branch(org) {
+        const li = document.createElement('li');
+        li.className = 'pp-org-node';
+        const line = document.createElement('div');
+        line.className = 'pp-org-line';
+        const choice = document.createElement('button');
+        choice.type = 'button';
+        choice.className = 'pp-org-choice';
+        choice.dataset.ppOrgId = String(org.id);
+        choice.title = org.path || org.name;
+        const name = document.createElement('span');
+        name.className = 'pp-org-name';
+        name.textContent = org.name;
+        const peopleCount = document.createElement('span');
+        peopleCount.className = 'pp-org-count';
+        const total = countFor(org.id);
+        peopleCount.textContent = String(total);
+        peopleCount.setAttribute('aria-label', total + ' verfügbare Personen');
+        choice.append(name, peopleCount);
+        line.append(choice);
+        const suborgs = children.get(org.id) || [];
+        if (suborgs.length) {
+          const expand = document.createElement('button');
+          expand.type = 'button';
+          expand.className = 'pp-org-expand';
+          expand.textContent = '▸';
+          expand.setAttribute('aria-label', 'Untereinheiten von ' + org.name + ' anzeigen');
+          const sub = document.createElement('ul');
+          sub.className = 'pp-org-subtree';
+          sub.hidden = true;
+          suborgs.forEach(child => sub.append(branch(child)));
+          expand.setAttribute('aria-expanded', 'false');
+          expand.addEventListener('click', () => {
+            sub.hidden = !sub.hidden;
+            expand.setAttribute('aria-expanded', String(!sub.hidden));
+            expand.textContent = sub.hidden ? '▸' : '▾';
+          });
+          line.insertBefore(expand, choice);
+          li.append(line, sub);
+        } else {
+          const space = document.createElement('span');
+          space.className = 'pp-org-expand-placeholder';
+          space.setAttribute('aria-hidden', 'true');
+          line.insertBefore(space, choice);
+          li.append(line);
+        }
+        return li;
+      }
+      (children.get(0) || []).forEach(org => tree.append(branch(org)));
+      panel.append(tree);
+      if (relevant.some(option => !(people[option.value]?.orgs || []).length)) {
+        const noOrg = document.createElement('button');
+        noOrg.type = 'button';
+        noOrg.className = 'pp-org-choice pp-org-no-assignment';
+        noOrg.dataset.ppOrgId = '__without__';
+        noOrg.textContent = 'Ohne Organisationszuordnung';
+        panel.append(noOrg);
+      }
+      toolbar.append(top, panel);
+      control.dropdown.insertBefore(toolbar, control.dropdown_content);
+
+      // Pointer interactions must not blur Tom Select and close the dropdown
+      // before the organization filter can be activated.
+      toolbar.addEventListener('mousedown', event => {
+        if (event.target.closest('button')) event.preventDefault();
       });
+      // Tom Select normally closes on input blur. Keep it open when keyboard
+      // navigation moves into our sibling filter toolbar, then close normally
+      // when leaving the entire picker. This keeps filters keyboard-accessible.
+      const baseBlur = control.onBlur.bind(control);
+      control.onBlur = event => {
+        if (event?.relatedTarget && toolbar.contains(event.relatedTarget)) return;
+        return baseBlur(event);
+      };
+      toolbar.addEventListener('focusout', event => {
+        const next = event.relatedTarget;
+        if (!next || (!control.wrapper.contains(next) && !control.dropdown.contains(next))) {
+          control.close();
+        }
+      });
+      // Discoverable keyboard shortcut from the one search field. The
+      // organization buttons remain normal keyboard-operable buttons.
+      control.control_input.addEventListener('keydown', event => {
+        if ((event.altKey && event.key === 'ArrowDown') || event.key === 'F4') {
+          event.preventDefault();
+          event.stopPropagation();
+          control.open();
+          panel.hidden = false;
+          toggle.setAttribute('aria-expanded', 'true');
+          toggle.focus();
+        }
+      });
+      function updateFilter(openAfter = true) {
+        const current = orgById.get(Number(orgFilter));
+        toggle.textContent = orgFilter === '__without__'
+          ? 'Ohne Organisation' : current ? current.name : 'Alle Organisationseinheiten';
+        toggle.classList.toggle('pp-org-filter-active', !!orgFilter);
+        const amount = relevant.filter(option => inOrg(option.value)).length;
+        count.textContent = amount + (amount === 1 ? ' Person' : ' Personen');
+        panel.querySelectorAll('[data-pp-org-id]').forEach(button => {
+          const selected = button.dataset.ppOrgId === orgFilter;
+          button.classList.toggle('is-selected', selected);
+          button.setAttribute('aria-pressed', String(selected));
+        });
+        // Tom Select caches result sets by the search string. The search
+        // override applies scope *after* scoring, including empty queries.
+        control.refreshOptions(false);
+        if (openAfter) {
+          control.open();
+          control.positionDropdown();
+        }
+      }
+      panel.addEventListener('click', event => {
+        const choice = event.target.closest('.pp-org-choice');
+        if (!choice) return;
+        orgFilter = choice.dataset.ppOrgId;
+        panel.hidden = true;
+        toggle.setAttribute('aria-expanded', 'false');
+        updateFilter();
+        control.focus();
+      });
+      toggle.addEventListener('click', () => {
+        panel.hidden = !panel.hidden;
+        toggle.setAttribute('aria-expanded', String(!panel.hidden));
+        control.open();
+        control.positionDropdown();
+      });
+      toolbar.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !panel.hidden) {
+          panel.hidden = true;
+          toggle.setAttribute('aria-expanded', 'false');
+          control.focus();
+          event.stopPropagation();
+          event.preventDefault();
+        }
+      });
+      control.on('dropdown_close', () => {
+        panel.hidden = true;
+        toggle.setAttribute('aria-expanded', 'false');
+      });
+      updateFilter(false);
     }
   }
   function scan(root) {
