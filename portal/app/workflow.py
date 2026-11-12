@@ -681,6 +681,7 @@ def _create_task(db, resp: FormResponse, step: dict) -> ApplicationTask:
         from . import payments as pay
         task.state = "waiting"
         task.assignee_id, task.group_id = resp.assignee_id, resp.group_id
+        task.responsible_org_id = resp.responsible_org_id
         cents = step_amount(resp, step)
         p = pay.create(db, kind="step", subject_id=None, purpose=f"{step.get('label') or 'Gebühr'}: {resp.form.title} ({resp.ref_no})",
                        lines=[{"label": step.get("label") or "Gebühr", "qty": 1, "unit_cents": cents}],
@@ -701,7 +702,6 @@ def _create_task(db, resp: FormResponse, step: dict) -> ApplicationTask:
     if step["type"] == "request" and step.get("compose") == "clerk":
         # Die Sachbearbeitung stellt die Nachforderung zusammen (Vorschlag aus dem Prozess), erst dann wartet der Prozess
         task.assignee_id, task.group_id = _resolve(db, resp, step)
-    task.responsible_org_id = _resolve_org(db, resp, step)
         task.responsible_org_id = _resolve_org(db, resp, step)
         task.due_at = now + timedelta(days=step["compose_days"]) if step.get("compose_days") else None
         task.data_json = json.dumps({"compose": True})
@@ -713,6 +713,7 @@ def _create_task(db, resp: FormResponse, step: dict) -> ApplicationTask:
     if step["type"] == "request":
         task.state = "waiting"
         task.assignee_id, task.group_id = resp.assignee_id, resp.group_id
+        task.responsible_org_id = resp.responsible_org_id
         task.due_at = now + timedelta(days=step.get("due_days") or 14)
         resp.tasks.append(task)
         db.flush()
@@ -725,6 +726,7 @@ def _create_task(db, resp: FormResponse, step: dict) -> ApplicationTask:
                        step.get("items", []), qids, task.due_at, "Prozess", task=task)
         return task
     task.assignee_id, task.group_id = _resolve(db, resp, step)
+    task.responsible_org_id = _resolve_org(db, resp, step)
     task.due_at = now + timedelta(days=step["due_days"]) if step.get("due_days") else None
     resp.tasks.append(task)
     db.flush()
