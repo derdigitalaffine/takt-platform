@@ -194,7 +194,7 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         memberships=shown,
         linked_group=linked_group,
         group_members=group_members,
-        group_member_ids={m.user_id for m in group_members},
+        group_member_ids={str(m.user_id) for m in group_members},
         own_memberships=own,
         people=people,
         org_groups=groups,
