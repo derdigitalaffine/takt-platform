@@ -7,7 +7,7 @@ import json
 import secrets
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app import application_orgs as ao, applications as apps, workflow as wf
 from app.db import (ApplicationTask, Form, FormResponse, Group, GroupMember,
@@ -35,7 +35,8 @@ def responsibility(db):
     db.flush()
     group = Group(name="Zuständigkeit Gruppe " + suffix, org_id=group_node.id)
     form = Form(owner_id=admin.id, title="Org-Verantwortung " + suffix, kind="application",
-                schema_json="[]", app_routing_json="[]", app_org_id=child.id)
+                schema_json=json.dumps([{"id": "ort", "type": "short", "title": "Ortsgemeinde", "required": False}]),
+                app_routing_json="[]", app_org_id=child.id)
     db.add_all([group, form])
     db.flush()
     db.add_all([OrgMembership(user_id=a.id, org_id=child.id, is_primary=True,
@@ -48,26 +49,24 @@ def responsibility(db):
     yield {"admin": admin.id, "person": a.id, "outsider": outsider.id,
            "parent": parent.id, "child": child.id, "group_node": group_node.id,
            "group": group.id, "form": form.id, "resp": resp.id}
-    # Tests are persisted in a shared database: remove our own isolated rows.
+    # The app and test client use independent DB sessions. Remove FK-dependent
+    # memberships before their target units; SQLite may not have DB-level
+    # ON DELETE CASCADE enabled for every fixture connection.
+    db.rollback()
     db.expire_all()
-    for task in db.scalars(select(ApplicationTask).where(ApplicationTask.response_id == resp.id)).all():
-        db.delete(task)
+    db.execute(delete(GroupMember).where(GroupMember.group_id == group.id))
+    db.execute(delete(OrgMembership).where(OrgMembership.org_id == child.id))
+    db.execute(delete(ApplicationTask).where(ApplicationTask.response_id == resp.id))
+    db.execute(delete(FormResponse).where(FormResponse.id == resp.id))
+    db.execute(delete(Form).where(Form.id == form.id))
+    db.execute(delete(Group).where(Group.id == group.id))
     db.flush()
-    r = db.get(FormResponse, resp.id)
-    if r: db.delete(r)
-    db.flush()
-    f = db.get(Form, form.id)
-    if f: db.delete(f)
-    db.flush()
-    g = db.get(Group, group.id)
-    if g: db.delete(g)
-    db.flush()
+    # Child first, then parent; deleting the group node must not disturb the
+    # original administrative root hierarchy or any existing groups.
     for oid in (child.id, group_node.id, parent.id):
-        node = db.get(Organization, oid)
-        if node: db.delete(node)
+        db.execute(delete(Organization).where(Organization.id == oid))
     for uid in (a.id, outsider.id):
-        u = db.get(User, uid)
-        if u: db.delete(u)
+        db.execute(delete(User).where(User.id == uid))
     db.commit()
 
 
