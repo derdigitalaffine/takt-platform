@@ -208,7 +208,7 @@ Persönliche Seminarlinks, Dozentenzugänge und Kalenderdateien können vertraul
 
 > **Hinweis:** Einzelne Funktionen hängen von Modulaktivierung, Rechten, Veranstaltungseinstellungen und verfügbaren Integrationen ab. Die erste Ausbaustufe organisiert kostenlose Veranstaltungen; Gebühren, Prüfungen und Noten gehören nicht zum beschriebenen Funktionsumfang.
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du willst ein Seminar besuchen oder selbst organisieren?
 
