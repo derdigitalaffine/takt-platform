@@ -79,7 +79,7 @@ def _render_display(request, db, screen, *, public, viewer=None):
     data = signage.context(db, screen, public=public, viewer=viewer)
     org = db.get(Organization, screen.org_id) if screen.org_id else None
     response = templates.TemplateResponse(request, "signage_display.html", {
-        **data, "refresh": request.method == "GET", "ui": branding.load(), "org_logo": f"/org/{org.id}/logo" if org and org.logo else None,
+        **data, "refresh": (request.method == "GET" and public), "ui": branding.load(), "org_logo": f"/org/{org.id}/logo" if org and org.logo else None,
     })
     response.headers.update({"Cache-Control": "no-store, max-age=0",
                              "Referrer-Policy": "no-referrer",
