@@ -452,7 +452,9 @@ async def signage_heartbeat(device_id: int, request: Request, db: Session = Depe
     device, screen = _device_access(request, db, device_id)
     payload = {}
     if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() == "application/json":
-        if request.headers.get("content-length", "0").isdigit() and int(request.headers["content-length"]) > 2048:
+        claimed_length = request.headers.get("content-length")
+        if claimed_length is not None and (
+                not claimed_length.isdecimal() or int(claimed_length) > 2048):
             raise HTTPException(413, "Diagnosepaket zu groß.")
         raw = await request.body()
         if len(raw) > 2048:
