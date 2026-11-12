@@ -39,7 +39,7 @@
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du möchtest auf einem Bildschirm zeigen, wer wo sitzt oder wohin Besucher gehen sollen?
 
