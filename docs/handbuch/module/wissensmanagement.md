@@ -34,3 +34,15 @@
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du suchst eine Arbeitsanleitung oder möchtest Wissen für Kollegen festhalten?
+
+1. **Wissensmanagement** öffnen.
+2. Nach dem Thema suchen und passende Inhalte lesen.
+3. Falls du berechtigt bist, einen Eintrag erstellen oder überarbeiten.
+4. Titel, Inhalt und zuständigen Bereich verständlich angeben.
+5. Vor dem Teilen prüfen, wer den Inhalt sehen darf.
+
+**Merksatz:** Wissen hilft nur, wenn es richtig, auffindbar und für die richtigen Personen sichtbar ist.
