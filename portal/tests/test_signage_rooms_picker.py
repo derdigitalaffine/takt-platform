@@ -159,7 +159,7 @@ def test_room_permissions_and_org_hierarchy_filter_for_profile(place):
                    {"room_id": str(good_id)}, "/profile").status_code == 303
     # Organizational metadata is generated for *visible* picker users only.
     admin_html = c.get("/signage/rooms").text
-    match = re.search(r'<script id="takt-person-picker-meta" type="application/json">(.*?)</script>', admin_html, re.S)
+    match = re.search(r'<script\\b[^>]*\\bid="takt-person-picker-meta"[^>]*>(.*?)</script>', admin_html, re.S)
     assert match, "The common person picker must be part of portal base layout"
     metadata = json.loads(match.group(1))
     assert parent.id in metadata["people"][str(person_id)]["orgs"]
