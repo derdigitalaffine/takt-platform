@@ -87,9 +87,17 @@ def prepare_context(ctx):
                 current = all_orgs[current].parent_id
             ancestors[org_id] = list(reversed(path))
         used = {oid for path in ancestors.values() for oid in path}
+        def org_path(org_id):
+            path = []
+            seen = set()
+            while org_id and org_id in all_orgs and org_id not in seen:
+                seen.add(org_id)
+                path.append(all_orgs[org_id].name)
+                org_id = all_orgs[org_id].parent_id
+            return " / ".join(reversed(path))
         orgs = [
             {"id": org.id, "parent_id": org.parent_id if org.parent_id in used else None,
-             "name": org.name, "path": " / ".join(all_orgs[oid].name for oid in ancestors.get(org.id, [org.id]))}
+             "name": org.name, "path": org_path(org.id)}
             for org in all_orgs.values() if org.id in used and org.active
         ]
         # The information is limited to the persons actually passed to this template.
