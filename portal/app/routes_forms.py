@@ -106,7 +106,9 @@ def forms_create(request: Request, title: str = FormField(...), kind: str = Form
 @app.get("/forms/inbox")
 def forms_inbox(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     invites = [i for i in fm.user_invites(db, user) if i.form is not None]
-    return render(request, "forms_inbox.html", user, invites=invites, is_open=fm.is_open, link=fm.invite_link)
+    answered = fm.completed_form_ids(db, user, invites)
+    return render(request, "forms_inbox.html", user, invites=invites, answered=answered,
+                  is_open=fm.is_open, link=fm.invite_link)
 
 
 # --- Baukasten -------------------------------------------------------------------
