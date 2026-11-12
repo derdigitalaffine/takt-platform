@@ -507,6 +507,21 @@ async def handle_action(request, user, db, data):
                         else os.delete_role
                     )(db, user, values)
             count = len(selected)
+        elif action == "group_members_save":
+            os.require(db, user, oid, "members")
+            node = db.get(Organization, oid)
+            group = og.group_of(db, node)
+            if group is None:
+                raise HTTPException(422, "Bitte einen bestehenden Gruppenknoten wählen.")
+            if os.protected_group(db, group.id) and not (
+                user.is_admin or user.can("org_roles")
+            ):
+                raise HTTPException(403, "Gruppen mit Bereichsrollen erfordern Organisationsrollen-Rechte.")
+            wanted = {os.number(v) for v in data.getlist("members")}
+            og.set_group_members(db, group, wanted)
+            os.audit(db, user, oid, "group_members", group=group.id,
+                     count=len(wanted))
+            count = len(wanted)
         elif action == "membership":
             os.set_membership(db, user, data)
         elif action == "membership_remove":
@@ -528,6 +543,13 @@ async def handle_action(request, user, db, data):
             values, errors = orgs.clean(data, existing, os.kinds(db))
             if errors:
                 raise HTTPException(422, " ".join(errors))
+            requested_kind = values["kind"]
+            if existing:
+                if (existing.kind == og.KIND) != (requested_kind == og.KIND):
+                    raise HTTPException(422, "Ein Gruppenknoten kann nicht in einen anderen Typ "
+                                            "umgewandelt werden. Bitte die Gruppe verschieben.")
+            elif requested_kind == og.KIND and not og.available_name(db, values["name"]):
+                raise HTTPException(422, "Gruppenname bereits vergeben oder länger als 120 Zeichen.")
             if str(data.get("kind", "")) not in os.kinds(db):
                 raise HTTPException(422, "Gültigen Ebenentyp wählen.")
             if existing and not user.can("orgs"):
@@ -590,6 +612,10 @@ async def handle_action(request, user, db, data):
             if existing is None:
                 db.add(row)
             db.flush()
+            if row.kind == og.KIND:
+                if len(row.note or "") > 255:
+                    raise HTTPException(422, "Gruppenbeschreibungen dürfen maximal 255 Zeichen enthalten.")
+                og.sync_from_node(db, row, allow_create=existing is None)
             oid = row.id
             os.audit(db, user, oid, "unit_save", name=row.name, parent=row.parent_id)
         elif action == "unit_delete":
@@ -598,7 +624,10 @@ async def handle_action(request, user, db, data):
             row = db.get(Organization, oid)
             if not row:
                 raise HTTPException(404)
+            linked_group = og.group_of(db, row)
             used = {k: v for k, v in orgs.usage(db, row).items() if v}
+            if linked_group and os.protected_group(db, linked_group.id):
+                raise HTTPException(422, "Gruppe hat noch Bereichsrollen. Diese zuerst entfernen.")
             if used:
                 raise HTTPException(
                     422,
@@ -608,6 +637,9 @@ async def handle_action(request, user, db, data):
                 )
             old_logo = row.logo
             os.audit(db, user, oid, "unit_delete", name=row.name)
+            if linked_group:
+                db.delete(linked_group)
+                db.flush()
             db.delete(row)
             oid = None
         elif action in {"kind", "kind_remove"}:
