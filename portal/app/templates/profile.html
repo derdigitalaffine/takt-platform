@@ -80,9 +80,25 @@
 <section id="signage-offices" class="mb-5" aria-labelledby="signage-offices-title">
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
     <h2 class="h4 mb-0" id="signage-offices-title"><i class="fa-solid fa-building-user me-2"></i>Dienstliche Bürozuordnungen</h2>
-    {% if user.can('signage_manage') %}<a class="btn btn-sm btn-outline-secondary" href="/signage#offices">Standorte und Büros verwalten</a>{% endif %}
+    {% if user.can('signage_manage') %}<a class="btn btn-sm btn-outline-secondary" href="/signage/rooms">Standorte und Büros verwalten</a>{% endif %}
   </div>
   <p class="text-secondary small">Diese strukturierten Angaben werden in TAKT zentral als Gebäude, Geschoss und Zimmer gepflegt. Sie sind unabhängig von den verschlüsselten freiwilligen Profilangaben. Die öffentliche Anzeige deines Namens und Büros ist standardmäßig ausgeschaltet.</p>
+  {% if signage_room_choices %}
+  <div class="card border-primary-subtle mb-3"><div class="card-body">
+    <h3 class="h6"><i class="fa-solid fa-location-dot me-2" aria-hidden="true"></i>Mein Büro hinzufügen oder Hauptbüro ändern</h3>
+    <p class="small text-secondary">Wähle den richtigen Arbeitsplatz aus. Die Zuordnung bleibt zunächst intern; du entscheidest anschließend separat, ob Besucher deinen Namen sehen dürfen.</p>
+    <form method="post" action="/profile/signage/office" class="d-flex flex-column gap-2">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label for="profile-sg-room" class="form-label mb-0">Gebäude, Geschoss und Zimmer</label>
+      <select id="profile-sg-room" name="room_id" class="form-select js-select" data-search="1" required>
+        <option value="">Raum auswählen …</option>
+        {% for rid,label in signage_room_choices %}<option value="{{ rid }}">{{ label }}</option>{% endfor %}
+      </select>
+      <label class="form-check"><input class="form-check-input" type="checkbox" name="primary" value="1"><span class="form-check-label">Als mein Hauptbüro festlegen</span></label>
+      <div><button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Büro zuordnen</button></div>
+    </form>
+  </div></div>
+  {% endif %}
   {% if signage_offices %}
   <div class="row g-3">
     {% for office in signage_offices %}
@@ -106,12 +122,16 @@
             <button class="btn btn-sm btn-outline-primary" type="submit" name="public" value="1"><i class="fa-solid fa-eye me-1"></i>Im Besucherwegweiser anzeigen</button>
           {% endif %}
         </form>
+        <form method="post" action="/profile/signage/office/{{ office.id }}/remove">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="btn btn-sm btn-outline-secondary" type="submit" title="Dieses Büro aus meinem Profil entfernen"><i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Zuordnung entfernen</button>
+        </form>
       </div>
     </div></div></div>
     {% endfor %}
   </div>
   {% else %}
-  <div class="alert alert-light border small">Dir ist noch kein strukturiertes Büro zugeordnet. Zuständige mit Digital-Signage-Berechtigung können dies in der zentralen Gebäudeverwaltung einrichten.</div>
+  <div class="alert alert-light border small">Du hast noch kein Büro hinterlegt. Wähle oben deinen Arbeitsplatz; eine öffentliche Anzeige erfolgt erst nach deiner Freigabe.</div>
   {% endif %}
 </section>
 {% endif %}
