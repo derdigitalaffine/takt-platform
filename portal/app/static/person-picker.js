@@ -80,8 +80,7 @@
       },
       render: {
         option: function(item, escape) {
-          const hidden = item._ppFiltered ? ' hidden aria-hidden="true"' : '';
-          return '<div' + hidden + '>' + escape(item.text || '') + '</div>';
+          return '<div>' + escape(item.text || '') + '</div>';
         },
         no_results: () => '<div class="no-results p-2">Keine passenden Personen</div>'
       }
@@ -117,20 +116,8 @@
       control.wrapper.insertAdjacentElement('beforebegin', box);
       filter.addEventListener('change', () => {
         orgFilter = filter.value;
-        for (const [value, item] of Object.entries(control.options)) {
-          if (!/^\d+$/.test(value)) continue;
-          const membership = people[value];
-          const excluded = orgFilter === '__without__'
-            ? !!membership?.orgs?.length
-            : !!orgFilter && (!membership || !membership.orgs.includes(Number(orgFilter)));
-          if (item._ppFiltered !== excluded) {
-            control.updateOption(value, {...item,
-              _ppFiltered: excluded,
-              disabled: !!item._ppOriginallyDisabled || excluded,
-              _ppOriginallyDisabled: !!(item._ppOriginallyDisabled ||
-                (!item._ppFiltered && item.disabled))});
-          }
-        }
+        // Filter suggestions, not already chosen option values. Disabling
+        // selected native options would silently omit them from form submission.
         control.refreshOptions(false);
       });
     }
