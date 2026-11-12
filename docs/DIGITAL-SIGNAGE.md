@@ -207,3 +207,37 @@ Gebäude, Gebäudeteile, Geschosse und Räume können ebenfalls nach exakter Nam
 - Konsequent getrennte „Bearbeiten“, „Freigeben“ und „Löschen“-Aktionen; irreversible Löschung mit Folgenaufklärung und bestätigter Bezeichnung analog [Carbon Design System – Remove](https://carbondesignsystem.com/community/patterns/remove-pattern/)
 - Alle Formulare bleiben mit Serverrendering nutzbar; JavaScript optimiert lediglich Suche und abhängige Auswahllisten
 - Folgeausbau: Grundriss-Visualisierung (SVG), detaillierte Raumbereichszuordnung bei mehreren Flügeln auf einem Geschoss, betrieblich geprüfte Offline-Player und Evakuierungsfunktionen
+
+
+## Öffentlich freigegebene Personen auf passiven Wegweisern (Nov 2026)
+
+Die früher getrennten Datenquellen für passive Raumziele (`signage_public_destinations`) und die vom Mitarbeitenden selbst freigegebenen Bürostandorte (`signage_offices`) werden jetzt bei **jeder öffentlichen Projektion gemeinsam und ohne Datenkopie** ausgewertet. Damit zeigen Gebäude-, Geschoss- und Flurverzeichnisse endlich die verantwortlichen Namen unter der jeweiligen Fachstelle.
+
+Eine Person erscheint dort nur unter **drei gleichzeitig wirksamen Bedingungen**:
+
+1. Das Zimmer selbst ist ausdrücklich zur öffentlichen Ausschilderung freigegeben.
+2. Die Person ist ein aktiver TAKT-Benutzer und dem Zimmer zugeordnet.
+3. Diese konkrete Bürozuordnung wurde **von der betroffenen Person** öffentlich freigegeben (`SignageOffice.public=True`).
+
+Der Personenname stammt ausschließlich aus dem vorgesehenen Portal-Benutzernamen – nie aus verschlüsselten privaten Profildaten, Kalenderterminen oder internen Aufgaben. Ohne Einwilligung wird kein Name dargestellt; bei Widerruf, Deaktivierung des Benutzerkontos oder Aufhebung der Zimmerfreigabe entfällt er mit dem nächsten serverseitigen Abruf. Der Browserkiosk verwendet bereits die Fail-closed-Aktualisierung: Kann der Server nicht erreicht werden, verdeckt er veraltete Anzeigen vollständig. Personen werden je Zimmer **nach Nachnamen** sortiert; ein Sammelabruf verhindert eine eigene Datenbankabfrage pro Zimmer.
+
+## Neues visuelles Leitsystem: Hierarchie statt Kachelwand
+
+Professionelle Verzeichnisse unterscheiden **Orientierung** (welches Gebäude/Geschoss?), **Identifikation** (welcher Raum/Fachbereich?), **Person** (wer arbeitet hier?) und **Richtung** (wohin?). Das neue Display stellt die vier Ebenen in dieser Reihenfolge dar:
+
+- Große, klare Geschossüberschriften mit wiedererkennbarem Symbol und gut kontrastierter Trennlinie
+- Auffällige Raumnummern und primär lesbare Ziel-/Dienststellenbezeichnungen
+- Sekundäre, trotzdem gut lesbare Namen **nur nach persönlicher Freigabe**
+- Dominante Richtungspfeile mit ausgeschriebenem Richtungswort; wenn kein geprüfter Weg berechnet werden kann, **kein erfundener Pfeil**, sondern eine neutrale Zielmarkierung
+- Bewusst nur drei bis vier Ziele pro Bildschirmseite, mit automatischer Rotation ohne hektische Animation; möglichst große Lesbarkeit bei 16:9 und hochkant montierten Monitoren
+- Öffentliche Kiosks bleiben frei von Eingabe- und Bedienkomponenten; wichtige Inhalte werden nicht allein durch Farbe kommuniziert
+
+**Orientierende Quellen:** [Cornell Interior Signage – Directories und Directional Signs](https://fcs.cornell.edu/sites/default/files/2019-10/101400_Interior%20Signage.pdf) (alphabetische Nutzerangaben, Eingänge/Lifte/Entscheidungspunkte), [UK Department of Health – Wayfinding](https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/148500/Wayfinding.pdf) (geschossspezifische Gruppierung und klare visuelle Gliederung), [Accessibility Standards Canada – Signage](https://accessible.canada.ca/standards-and-technical-guides/standards-and-technical-guides-database/can-asc-24-wayfinding-and-signage/12-signage) (Kontrast, Lesbarkeit, mehrkanalige Orientierung).
+
+Die Web-Oberfläche ersetzt **keine** baurechtlich erforderlichen, taktilen oder notfallsicheren Hinweisschilder. Visuelle Lesbarkeit, tatsächliche Aufstellposition und korrekte Pfeilrichtung sind weiterhin im Gebäude zu prüfen.
+
+## Personenpicker: klare Auswahl mit Organisationsebenen
+
+Der portalweite Personenpicker nutzt weiterhin native Single-/Multi-`select`-Felder und erhält deren `name`, `value`, `multiple`, `required` und Berechtigungsumfang. Der sichtbare Ergebnisbereich enthält nun ein Initialenmonogramm, den angezeigten Namen und die spezifischste sichtbare Organisationshierarchie. Die Suche berücksichtigt **nur bereits autorisiert an diese Seite übergebene Benutzer** und ihre Organisationspfade. In der Mehrfachauswahl bleiben Chips sichtbar; der Auswahlzähler sowie ein explizites „Auswahl aufheben“ erleichtern große Raumzuordnungen. Das Setzen eines Organisationsfilters deaktiviert **keine** bereits selektierten Werte, damit Formulardaten nicht verloren gehen. Die Filter- und Organisationsinformationen sind für dynamisch geladene und mobil dargestellte native Auswahlfelder nachverwendbar.
+
+Nicht umgesetzt: serverseitig streamende/virtuelle Typahead-Suche über ein beliebig großes gesamtes Mitarbeiterverzeichnis. Eine solche API würde eigene Berechtigungs- und Datenschutzprüfungen erfordern.
