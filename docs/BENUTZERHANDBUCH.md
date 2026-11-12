@@ -6,6 +6,8 @@ Willkommen im TAKT-Portal. Die Dokumentation ist jetzt **nach Aufgaben geglieder
 
 > **Du siehst einen Menüpunkt nicht?** Nicht alle Module sind in jeder Organisation aktiviert. Zusätzlich entscheiden persönliche und organisatorische Rechte, welche Aufgaben und Informationen du sehen oder bearbeiten darfst.
 
+**Ganz wenig Zeit oder keine Lust auf lange Anleitungen?** [**Für ganz Bblöde oder faule – der Zwei-Minuten-Spickzettel für alle Module**](handbuch/fuer-ganz-bbloede-oder-faule.md).
+
 ## Einstieg: Grundlagen
 
 <a id="1-anmelden"></a><a id="2-die-oberfläche"></a><a id="13-profil-und-sicherheit-zwei-faktor"></a><a id="14-datenschutz-in-der-praxis"></a><a id="15-hilfe-bei-problemen"></a>
