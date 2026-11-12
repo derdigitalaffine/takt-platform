@@ -3037,8 +3037,7 @@ _NEW_COLUMNS = {
     "application_requests": {"prefill_json": "TEXT NOT NULL DEFAULT '{}'"},
     "payments": {"active_refund": "VARCHAR(36) NOT NULL DEFAULT ''"},
     "groups": {"lead_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
-               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
-               "app_org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
+               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
     "booking_pages": {"listed": "BOOLEAN NOT NULL DEFAULT 0", "extended": "BOOLEAN NOT NULL DEFAULT 0",
                       "days_ahead": "INTEGER NOT NULL DEFAULT 60", "step_minutes": "INTEGER NOT NULL DEFAULT 15",
                       "holidays_closed": "BOOLEAN NOT NULL DEFAULT 1",
@@ -3082,6 +3081,10 @@ _NEW_COLUMNS = {
               "app_fee": "VARCHAR(255) NOT NULL DEFAULT ''", "app_duration": "VARCHAR(255) NOT NULL DEFAULT ''",
               "app_assignee_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
               "app_group_id": "INTEGER REFERENCES groups(id) ON DELETE SET NULL",
+              # Antragsbearbeitung: this FK is on FORMS, never on GROUPS.
+              # Existing installations receive it on next init_db() without
+              # rewriting submitted forms, cases or their group assignments.
+              "app_org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
               "app_mailbox": "VARCHAR(255) NOT NULL DEFAULT ''", "app_routing_json": "TEXT NOT NULL DEFAULT '[]'",
               "app_deadline_days": "INTEGER NOT NULL DEFAULT 14", "app_catalog": "BOOLEAN NOT NULL DEFAULT 1",
               "app_pdf": "BOOLEAN NOT NULL DEFAULT 1", "app_seq_year": "INTEGER NOT NULL DEFAULT 0",
@@ -3169,6 +3172,14 @@ def _migrate() -> None:
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_form_responses_track_token "
                           "ON form_responses (track_token)"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_groups_org_id ON groups (org_id)"))
+        # ALTER TABLE ADD COLUMN does not create SQLAlchemy's index=True
+        # indexes on existing SQLite/PostgreSQL deployments.
+        for index_name, table, column in (
+            ("ix_forms_app_org_id", "forms", "app_org_id"),
+            ("ix_form_responses_responsible_org_id", "form_responses", "responsible_org_id"),
+            ("ix_application_tasks_responsible_org_id", "application_tasks", "responsible_org_id"),
+        ):
+            conn.execute(text(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table} ({column})"))
         # SQLite UNIQUE over nullable org_id does not deduplicate global rules.
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_anliegen_global_rule_revision "
                           "ON anliegen_process_rules (category_id, process_id, revision) WHERE org_id IS NULL"))
