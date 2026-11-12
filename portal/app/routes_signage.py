@@ -84,6 +84,7 @@ def _render_display(request, db, screen, *, public, viewer=None):
     response.headers.update({"Cache-Control": "no-store, max-age=0",
                              "Referrer-Policy": "no-referrer",
                              "X-Content-Type-Options": "nosniff",
+                             "X-TAKT-Signage": "display",
                              "X-Robots-Tag": "noindex, nofollow"})
     return response
 
