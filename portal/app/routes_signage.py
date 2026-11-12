@@ -965,3 +965,7 @@ from . import routes_signage_campaign  # noqa: E402,F401
 
 # Fleet operations are registered after the existing scoped device routes.
 from . import routes_signage_fleet  # noqa: E402,F401
+
+
+# Hierarchical building browser and safe CRUD under the shared signage gate.
+from . import routes_signage_hierarchy  # noqa: E402,F401
