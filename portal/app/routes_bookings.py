@@ -431,6 +431,8 @@ def booking_copy(request: Request, page_id: int, user: User = Depends(booking_us
     from . import booking_integration
     opts = booking_integration.options(clone)
     opts.pop("creator_org_id", None)
+    clone.integration_json = json.dumps(opts, ensure_ascii=False)
+    # Resolve against the new owner's memberships, not the original page.
     opts["creator_org_id"] = booking_integration.creator_org_id(db, clone)
     clone.integration_json = json.dumps(opts, ensure_ascii=False)
     db.add(clone)
