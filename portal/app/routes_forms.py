@@ -1,5 +1,7 @@
 """Seiten des Formularservers: Verwaltung, Baukasten, Teilen, Auswertung und Ausfüllen."""
 
+import hashlib
+import hmac
 import json
 import re
 from datetime import datetime, timezone
@@ -7,12 +9,13 @@ from urllib.parse import quote
 
 from fastapi import Depends, Form as FormField, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from . import applications as apps, fees, formio, forms as fm, payments, shortlinks as sl, worker, ai_provider, ai_knowledge, form_ai
 from .db import LOCAL_TZ, SessionLocal, Form, FormInvite, FormResponse, FormShare, FormBlock, Group, User, get_settings, to_local, utcnow
 from .ai_models import AIProvider
+from .config import settings
 from .main import (
     app, check_csrf, current_user, enabled_modules, flash, get_db, rate_limit, redirect, render, require, session_user,
 )
@@ -628,7 +631,8 @@ def form_restore(request: Request, form_id: int, user: User = Depends(current_us
 # --- Ausfüllen (öffentlich bzw. per persönlichem Link) ------------------------------
 
 def _fill_page(request: Request, form: Form, *, preview: bool = False, action: str = "", invite: FormInvite | None = None,
-               values: dict | None = None, errors: dict | None = None, page_index: int = 0, status: int = 200):
+               values: dict | None = None, errors: dict | None = None, page_index: int = 0, status: int = 200,
+               previously_submitted: bool = False):
     if form.internal and not preview:
         from .form_access import submitting_user
         with SessionLocal() as db:
@@ -654,7 +658,8 @@ def _fill_page(request: Request, form: Form, *, preview: bool = False, action: s
     response = render(request, "form_fill.html", None, form=form, pages=page_list, preview=preview, action=action,
                       review=form.review and len(fm.questions(items)) >= 3, legal=legal,
                       invite=invite, values=values or {}, errors=errors or {}, page_index=page_index,
-                      types=fm.TYPES, other=fm.OTHER, geo_bundle=geo_bundle)
+                      types=fm.TYPES, other=fm.OTHER, geo_bundle=geo_bundle,
+                      previously_submitted=previously_submitted)
     response.status_code = status
     return response
 
@@ -704,7 +709,8 @@ async def _submit(request: Request, db: Session, form: Form, invite: FormInvite 
     if invite is not None:
         resp.source = "invite"
         if not form.anonymous:
-            resp.name, resp.email, resp.user_id = invite.name, invite.email, invite.user_id
+            resp.name, resp.email, resp.user_id = (invite.name, invite.email,
+                invite.user_id or (member.id if member and member.email.lower() == invite.email.lower() else None))
         invite.submitted_at = utcnow()
     elif member is not None:
         resp.source = "user"
@@ -717,6 +723,15 @@ async def _submit(request: Request, db: Session, form: Form, invite: FormInvite 
         answers.update(await fm.store_uploads(resp, uploads))
     resp.answers_json = json.dumps(answers, ensure_ascii=False)
     db.flush()
+    # A member submitting through the public survey link also completes any
+    # invitation addressed to that account. Keep this outside anonymous surveys:
+    # an invitation must never be connected to an anonymous answer.
+    if invite is None and action.startswith("/f/") and form.kind == "survey" and not form.anonymous and member:
+        for existing in db.scalars(select(FormInvite).where(
+                FormInvite.form_id == form.id,
+                or_(FormInvite.user_id == member.id, FormInvite.email == member.email))):
+            if existing.submitted_at is None:
+                existing.submitted_at = utcnow()
     if apps.is_application(form):
         # Online-Antrag: Aktenzeichen, Zuständigkeit, Frist, Eingangsbestätigung mit PDF
         if not resp.name:
@@ -739,7 +754,50 @@ async def _submit(request: Request, db: Session, form: Form, invite: FormInvite 
     worker.wake()
     if completion is not None:
         return completion
-    return _message(request, form, "thanks", payment=payment, money=payments.money)
+    response = _message(request, form, "thanks", payment=payment, money=payments.money)
+    if invite is None and form.kind == "survey" and form.public_token and action == f"/f/{form.public_token}":
+        response.set_cookie(_receipt_cookie_name(form), _receipt_cookie_value(form),
+                            max_age=180 * 86400, httponly=True, samesite="lax",
+                            secure=settings.secure_cookies, path="/f")
+    return response
+
+
+def _receipt_cookie_name(form: Form) -> str:
+    return f"form_done_{form.id}"
+
+
+def _receipt_cookie_value(form: Form) -> str:
+    # This receipt contains neither an identity nor an answer identifier. It
+    # only remembers that THIS browser submitted using the current public link.
+    payload = f"survey-receipt:{form.id}:{form.public_token or ''}".encode()
+    return hmac.new(settings.secret_key.encode(), payload, hashlib.sha256).hexdigest()
+
+
+def _browser_submitted(request: Request, form: Form) -> bool:
+    if form.kind != "survey" or not form.public_token:
+        return False
+    value = request.cookies.get(_receipt_cookie_name(form), "")
+    return bool(value) and hmac.compare_digest(value, _receipt_cookie_value(form))
+
+
+def _account_response(db: Session, form: Form, member: User | None) -> FormResponse | None:
+    if form.kind != "survey" or form.anonymous or member is None:
+        return None
+    return db.scalar(select(FormResponse).where(
+        FormResponse.form_id == form.id,
+        or_(FormResponse.user_id == member.id,
+            (FormResponse.source == "invite") & (FormResponse.email == member.email))
+    ).order_by(FormResponse.created_at.desc()))
+
+
+def _submission_state(request: Request, db: Session, form: Form, invite: FormInvite | None = None):
+    member = session_user(request, db)
+    previous = _account_response(db, form, member)
+    invited_at = invite.submitted_at if invite else None
+    # Anonymous or guest participation must never acquire an account-to-answer
+    # relation. A browser receipt is merely a convenience, not a unique voter ID.
+    device_seen = invite is None and (member is None or form.anonymous) and _browser_submitted(request, form)
+    return bool(previous or invited_at or device_seen), (previous.created_at if previous else invited_at), bool(device_seen and not previous)
 
 
 def _guess_name(form: Form, answers: dict) -> str:
@@ -768,14 +826,30 @@ def _closed_or_none(request: Request, form: Form | None):
 
 @app.get("/f/{token}")
 def form_public_fill(request: Request, token: str, db: Session = Depends(get_db)):
+    from .form_access import submitting_user
     form = db.scalar(select(Form).where(Form.public_token == token)) if len(token) > 10 else None
-    return _closed_or_none(request, form) or _fill_page(request, form, action=f"/f/{token}")
+    blocked = _closed_or_none(request, form)
+    if blocked:
+        return blocked
+    submitting_user(request, db, form)
+    already, completed_at, device_only = _submission_state(request, db, form)
+    if already and not form.multiple:
+        return _message(request, form, "done", completed_at=completed_at, device_only=device_only)
+    return _fill_page(request, form, action=f"/f/{token}", previously_submitted=already)
 
 
 @app.post("/f/{token}", dependencies=[Depends(check_csrf)])
 async def form_public_submit(request: Request, token: str, db: Session = Depends(get_db)):
+    from .form_access import submitting_user
     form = db.scalar(select(Form).where(Form.public_token == token)) if len(token) > 10 else None
-    return _closed_or_none(request, form) or await _submit(request, db, form, None, f"/f/{token}")
+    blocked = _closed_or_none(request, form)
+    if blocked:
+        return blocked
+    submitting_user(request, db, form)
+    already, completed_at, device_only = _submission_state(request, db, form)
+    if already and not form.multiple:
+        return _message(request, form, "done", completed_at=completed_at, device_only=device_only)
+    return await _submit(request, db, form, None, f"/f/{token}")
 
 
 def _invite(db: Session, token: str) -> FormInvite | None:
@@ -789,9 +863,13 @@ def form_invite_fill(request: Request, token: str, db: Session = Depends(get_db)
     blocked = _closed_or_none(request, form)
     if blocked:
         return blocked
-    if inv.submitted_at and not form.multiple:
-        return _message(request, form, "done")
-    return _fill_page(request, form, action=f"/f/i/{token}", invite=inv)
+    from .form_access import submitting_user
+    submitting_user(request, db, form)
+    already, completed_at, _ = _submission_state(request, db, form, inv)
+    if already and not form.multiple:
+        return _message(request, form, "done", completed_at=completed_at)
+    return _fill_page(request, form, action=f"/f/i/{token}", invite=inv,
+                      previously_submitted=already)
 
 
 @app.post("/f/i/{token}", dependencies=[Depends(check_csrf)])
@@ -801,6 +879,9 @@ async def form_invite_submit(request: Request, token: str, db: Session = Depends
     blocked = _closed_or_none(request, form)
     if blocked:
         return blocked
-    if inv.submitted_at and not form.multiple:
-        return _message(request, form, "done")
+    from .form_access import submitting_user
+    submitting_user(request, db, form)
+    already, completed_at, _ = _submission_state(request, db, form, inv)
+    if already and not form.multiple:
+        return _message(request, form, "done", completed_at=completed_at)
     return await _submit(request, db, form, inv, f"/f/i/{token}")
