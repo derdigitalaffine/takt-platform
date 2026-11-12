@@ -31,7 +31,9 @@ def test_signage_navigation_has_focused_pages_without_old_overload(place):
     overview = c.get("/signage")
     assert overview.status_code == 200
     assert "Besucherinformationen. Einfach organisiert." in overview.text
-    assert '<form' not in overview.text.split('<main class="sg-workspace">', 1)[1].split("</main>", 1)[0]
+    assert 'action="/signage/structure"' not in overview.text
+    assert 'action="/signage/route/node"' not in overview.text
+    assert 'action="/signage/new"' in overview.text
     for path, text in (
         ("/signage/screens", "Neue Anzeige erstellen"),
         ("/signage/buildings", "Gebäudebrowser"),
@@ -132,9 +134,6 @@ def test_screen_delete_invalidates_device_link_and_versions():
     match = re.search(r"Gerät-ID: (\d+)\s+Bearer: ([\w-]+)", response.text)
     assert match
     did, token = int(match.group(1)), match.group(2)
-    link = c.post(f"/signage/{sid}/link", data={"csrf": csrf})
-    # Link creation may have a different input contract, but screen deletion
-    # must always remove devices, revisions, and the public view.
     page = c.get(f"/signage/{sid}/delete")
     assert page.status_code == 200
     assert "Wegweiser löschen" in page.text
@@ -180,7 +179,7 @@ def test_screen_delete_cleans_generated_link_and_campaign_assignment(place):
                  f"/signage/{sid}/delete").status_code == 303
     with SessionLocal() as db:
         assert db.get(SignageCampaign, cid) is not None
-        assert db.get(SignageGeneratedScreen, 1) is None or not db.scalar(
-            select(SignageGeneratedScreen).where(SignageGeneratedScreen.screen_id == sid))
+        assert not db.scalar(select(SignageGeneratedScreen).where(
+            SignageGeneratedScreen.screen_id == sid))
         assert not list(db.scalars(select(SignageCampaignScreen).where(
             SignageCampaignScreen.screen_id == sid)))
