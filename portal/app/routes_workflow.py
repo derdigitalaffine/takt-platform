@@ -46,7 +46,7 @@ def _groups(db):
 @app.get("/tasks")
 def tasks_page(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     mods = enabled_modules()
-    if not mods & {"applications", "resources", "circulations", "tasks", "anliegen"}:
+    if not mods & {"applications", "resources", "circulations", "tasks", "anliegen", "forms", "polls"}:
         raise HTTPException(404, "Kein Aufgabenmodul ist eingeschaltet.")
     from . import task_overview, tasks as native
     from urllib.parse import urlencode
