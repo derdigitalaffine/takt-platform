@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Digital Signage · TAKT{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace">
+  <div class="sg-page-intro"><div><span class="sg-eyebrow">TAKT · DIGITAL SIGNAGE</span>
+    <h1>Besucherinformationen. Einfach organisiert.</h1>
+    <p>Ein zentraler Einstieg – Anzeigen, Gebäudestruktur und Sonderbetrieb haben jeweils ihren eigenen Arbeitsbereich.</p>
+  </div><div class="sg-intro-icon"><i class="fa-solid fa-signs-post" aria-hidden="true"></i></div></div>
+  {% set section = 'home' %}{% include "_signage_nav.html" %}
+  <div class="sg-metrics" aria-label="Signage-Überblick">
+    <div class="sg-metric"><span>Displays</span><strong>{{ screens|length }}</strong></div>
+    <div class="sg-metric"><span>Gebäude</span><strong>{{ buildings|length }}</strong></div>
+    <div class="sg-metric"><span>Räume</span><strong>{{ rooms|length }}</strong></div>
+    <div class="sg-metric"><span>Öffentliche Displays</span><strong>{{ screens|selectattr('visibility','equalto','public')|list|length }}</strong></div>
+  </div>
+  <div class="sg-home-grid">
+    <a class="sg-home-tile sg-home-primary" href="/signage/screens"><i class="fa-solid fa-display" aria-hidden="true"></i>
+      <span class="sg-eyebrow">01 · ERSTER SCHRITT</span><h2>Anzeigen erstellen</h2><p>Bildschirm auswählen, professionelle Vorlage verwenden und anschließend im Studio gestalten.</p>
+      <strong>Anzeigen öffnen <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></strong></a>
+    <a class="sg-home-tile" href="/signage/buildings"><i class="fa-solid fa-building" aria-hidden="true"></i>
+      <span class="sg-eyebrow">02 · STAMMDATEN</span><h2>Gebäude & Räume</h2><p>Interaktiver Hierarchiebrowser mit Gebäudeteilen, Geschossen, Räumen, Bearbeitung und Freigaben.</p>
+      <strong>Gebäude öffnen <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></strong></a>
+    <a class="sg-home-tile" href="/signage/campaigns"><i class="fa-solid fa-calendar-check" aria-hidden="true"></i>
+      <span class="sg-eyebrow">03 · SONDERBETRIEB</span><h2>Veranstaltungen</h2><p>Ratssitzungen, Wahlen und Briefwahlstellen einmal planen und auf passende Displays verteilen.</p>
+      <strong>Sonderbetrieb öffnen <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></strong></a>
+    <a class="sg-home-tile" href="/signage/wayfinding"><i class="fa-solid fa-route" aria-hidden="true"></i>
+      <span class="sg-eyebrow">04 · WEGWEISER</span><h2>Wege & Büros</h2><p>Wegenetz und barrierefreie Routen verwalten. Büros und Freigaben sauber zuordnen.</p>
+      <strong>Wegenetz öffnen <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></strong></a>
+    <a class="sg-home-tile" href="/signage/fleet"><i class="fa-solid fa-desktop" aria-hidden="true"></i>
+      <span class="sg-eyebrow">05 · BETRIEB</span><h2>Geräte überwachen</h2><p>Playerstatus, Ausfälle, Schlüsselrotation und Versionsstände zentral prüfen.</p>
+      <strong>Geräte öffnen <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></strong></a>
+  </div>
+  <section class="sg-panel sg-home-recent">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">SCHNELLZUGRIFF</span><h2>Zuletzt angelegte Anzeigen</h2></div>
+      <a class="btn btn-sm btn-outline-primary" href="/signage/screens">Alle Anzeigen</a></div>
+    {% if screens %}
+      <div class="sg-home-recent-list">
+      {% for screen in screens[-5:]|reverse %}
+        <a href="/signage/{{ screen.id }}/edit"><i class="fa-solid fa-display" aria-hidden="true"></i>
+          <span><strong>{{ screen.name }}</strong><small>{{ kinds.get(screen.kind, screen.kind) }}</small></span>
+          <span class="sg-pill {{ 'sg-pill-success' if screen.visibility == 'public' else 'sg-pill-neutral' }}">{{ 'Öffentlich' if screen.visibility == 'public' else 'Nicht öffentlich' }}</span>
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </a>
+      {% endfor %}
+      </div>
+    {% else %}<div class="sg-empty"><h3>Noch keine Displays</h3><p>Lege deine erste Anzeige unter „Anzeigen erstellen“ an.</p></div>{% endif %}
+  </section>
+</main>
+{% endblock %}
