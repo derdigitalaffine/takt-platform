@@ -29,6 +29,53 @@
   {% endif %}
   {% if error %}<div class="alert alert-danger"><i class="fa-solid fa-circle-exclamation me-1"></i>{{ error }}</div>{% endif %}
 
+  {% if participant and participant.answered_at %}
+  <section class="card mb-3 border-success border-2" id="teilnahme-bestaetigung" aria-labelledby="poll-confirmation-title">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-start gap-3 mb-3">
+        <i class="fa-solid fa-circle-check text-success fs-2" aria-hidden="true"></i>
+        <div class="flex-grow-1">
+          <h2 class="h5 mb-1" id="poll-confirmation-title">Deine Teilnahme wurde gespeichert.</h2>
+          <p class="text-secondary small mb-0">Abgegeben am {{ participant.answered_at | local }} Uhr.
+            {% if is_open %}Du kannst deine Angaben bis zum Ende der Umfrage ändern.{% else %}Die Teilnahme ist abgeschlossen und bleibt hier einsehbar.{% endif %}
+          </p>
+        </div>
+        <span class="badge text-bg-success">Abgeschlossen</span>
+      </div>
+      <div class="rounded-3 bg-body-tertiary p-3 mb-3">
+        <h3 class="h6">Deine gespeicherten Terminwünsche</h3>
+        <ul class="list-unstyled mb-0">
+        {% for o in poll.options %}
+          {% set choice = participant.answers.get(o.id|string) %}
+          {% if choice and choice in answers %}
+          <li class="d-flex justify-content-between align-items-start gap-2 border-bottom py-2">
+            <span>{{ parts(o).label }}</span>
+            <strong class="{{ 'text-success' if choice == 'yes' else 'text-warning-emphasis' if choice == 'maybe' else 'text-secondary' }}">{{ answers[choice][0] }}</strong>
+          </li>
+          {% endif %}
+        {% endfor %}
+        </ul>
+        {% if participant.comment %}<p class="small text-secondary mt-2 mb-0">Dein Kommentar: {{ participant.comment }}</p>{% endif %}
+      </div>
+      {% if poll.final_option %}
+      <div class="alert alert-success d-flex flex-wrap gap-2 align-items-center">
+        <i class="fa-regular fa-calendar-check" aria-hidden="true"></i>
+        <span class="flex-grow-1">Der Termin steht fest: <strong>{{ parts(poll.final_option).label }}</strong></span>
+        <a class="btn btn-sm btn-outline-success" href="/t/p/{{ participant.edit_token }}/termin.ics"><i class="fa-solid fa-calendar-plus me-1" aria-hidden="true"></i>In Kalender übernehmen</a>
+      </div>
+      {% endif %}
+      <div class="small text-secondary mb-2">Mit deinem persönlichen Link kannst du diesen Teilnahmestatus auch später erneut aufrufen – selbst wenn die Umfrage geschlossen ist. Bitte gib den Link nicht an andere weiter.</div>
+      <div class="input-group mb-2">
+        <input class="form-control form-control-sm" readonly id="poll-personal-url" value="{{ personal_url }}" aria-label="Persönlicher Link zur Teilnahme">
+        <button class="btn btn-sm btn-outline-primary" type="button" data-copy="#poll-personal-url"><i class="fa-regular fa-copy me-1" aria-hidden="true"></i>Link kopieren</button>
+      </div>
+      {% if member and participant.user_id == member.id %}
+      <a class="btn btn-sm btn-outline-secondary" href="/meine-umfragen"><i class="fa-solid fa-clipboard-check me-1" aria-hidden="true"></i>Meine Umfragen</a>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
   {% if others %}
   <div class="card mb-3"><div class="card-header small fw-semibold">Bisherige Antworten</div><div class="card-body p-2">
     {% set rows = others %}{% include "_poll_grid.html" %}
