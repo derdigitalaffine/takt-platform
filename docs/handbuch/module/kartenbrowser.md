@@ -66,3 +66,15 @@ Formularersteller können bei Kartenfeldern mit erlaubten Flächen **Öffentlich
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du suchst eine Adresse, ein Flurstück oder Informationen auf der Karte?
+
+1. **Kartenbrowser** öffnen.
+2. Nach Adresse oder dem gewünschten Ort suchen.
+3. Zur richtigen Stelle zoomen.
+4. Benötigte Kartenebene beziehungsweise Fachinformation auswählen.
+5. Angaben sorgfältig prüfen und bei rechtlich wichtigen Fragen die zuständige Fachstelle einbeziehen.
+
+**Merksatz:** Eine Kartenanzeige ist hilfreich, aber nicht automatisch ein amtlicher Nachweis für jede Fragestellung.
