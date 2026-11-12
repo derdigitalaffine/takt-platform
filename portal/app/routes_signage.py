@@ -907,3 +907,7 @@ async def signage_special_save(sid: int, request: Request, user: User = Depends(
     db.commit()
     flash(request, "Sonderanzeige gespeichert.")
     return redirect(f"/signage/{sid}/edit#special")
+
+
+# Central campaign management is registered after base signage routes.
+from . import routes_signage_campaign  # noqa: E402,F401
