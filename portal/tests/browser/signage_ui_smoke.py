@@ -58,6 +58,11 @@ def exercise():
             expect(kiosk.locator("button, input, select, details")).to_have_count(0)
             assert kiosk.evaluate("document.documentElement.scrollWidth === innerWidth")
             assert kiosk.evaluate("document.documentElement.scrollHeight <= innerHeight")
+            # A disconnected kiosk must immediately mask stale room and
+            # special-event details; no input elements appear on the screen.
+            kiosk.evaluate("window.dispatchEvent(new Event('offline'))")
+            expect(kiosk.locator("[data-sg-stale]")).to_be_visible()
+            expect(kiosk.get_by_text("Informationen momentan nicht verfügbar")).to_be_visible()
             kiosk.close()
 
         # Central building action is configured once and picked up by the
@@ -92,6 +97,29 @@ def exercise():
         simulation_at = local_now.strftime("%Y-%m-%dT%H:%M")
         page.goto(f"{BASE}/signage/campaigns/simulate?building_id={building_id}&at={simulation_at}")
         expect(page.get_by_text("Briefwahlstelle heute")).to_be_visible()
+
+        # Pair a real API player and verify the operations dashboard.
+        page.goto(f"{BASE}/signage/{screen_id}/edit")
+        registration = page.locator(f'form[action="/signage/{screen_id}/device"]')
+        registration.locator('[name=name]').fill("Empfangsmonitor Probelauf")
+        registration.get_by_role("button", name="Geräteschlüssel erstellen").click()
+        secret_text = page.locator("#sg-secret").inner_text()
+        found = re.search(r"Gerät-ID: (\d+)\s+Bearer: ([\w-]+)", secret_text)
+        assert found, "One-time pairing secret must be visible"
+        device_id, device_token = found.group(1), found.group(2)
+        pulse = httpx.post(
+            f"{BASE}/signage/api/device/{device_id}/heartbeat",
+            headers={"Authorization": f"Bearer {device_token}"},
+            json={"platform": "browser", "client_version": "1.0.0",
+                  "screen_width": 1280, "screen_height": 720,
+                  "diagnostic_code": "ok"}, trust_env=False)
+        assert pulse.status_code == 200, pulse.text
+        page.goto(BASE + "/signage/fleet")
+        expect(page.get_by_role("heading", name="Geräte & Betriebszustand")).to_be_visible()
+        device = page.locator(f'[data-device-id="{device_id}"]')
+        expect(device.get_by_text("Empfangsmonitor Probelauf")).to_be_visible()
+        expect(device.locator("[data-fleet-health]")).to_contain_text("Online")
+        assert device_token not in page.content()
         browser.close()
 
 

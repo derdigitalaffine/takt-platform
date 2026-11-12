@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Geräteübersicht · Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-fleet.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace sg-fleet">
+  <div class="sg-page-intro">
+    <div><a href="/signage" class="sg-back"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Zur Displayverwaltung</a>
+      <span class="sg-eyebrow d-block mt-2">TAKT · SIGNAGE-BETRIEB</span>
+      <h1>Geräte & Betriebszustand</h1>
+      <p>Alle gekoppelten Anzeigegeräte im Blick. Geräte melden ausschließlich technische Zustandsdaten; die Diagnose arbeitet ohne persönliche Kennungen oder IP-Adressen.</p>
+    </div>
+    <div class="sg-intro-icon" aria-hidden="true"><i class="fa-solid fa-desktop"></i></div>
+  </div>
+  <div class="sg-fleet-summary" aria-label="Geräteübersicht">
+    <div><span><i class="fa-solid fa-circle-check"></i> Online</span><strong data-fleet-count="online">{{ counts.online }}</strong></div>
+    <div><span><i class="fa-solid fa-hourglass-half"></i> Verzögert</span><strong data-fleet-count="delayed">{{ counts.delayed }}</strong></div>
+    <div><span><i class="fa-solid fa-triangle-exclamation"></i> Offline</span><strong data-fleet-count="offline">{{ counts.offline }}</strong></div>
+    <div><span><i class="fa-solid fa-circle-question"></i> Neu</span><strong data-fleet-count="new">{{ counts.new }}</strong></div>
+    <div><span><i class="fa-solid fa-ban"></i> Gesperrt</span><strong data-fleet-count="revoked">{{ counts.revoked }}</strong></div>
+  </div>
+  <section class="sg-panel sg-fleet-inventory">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">ALLE GERÄTE</span>
+      <h2>Verbundene Player</h2>
+      <p>Online bei Heartbeats innerhalb von 3 Minuten, verzögert bis 15 Minuten, danach offline. Ein gesperrtes Gerät kann sich nicht mehr anmelden.</p>
+    </div><span class="sg-pill sg-pill-neutral">{{ devices|length }} insgesamt</span></div>
+    {% if devices %}
+    <div class="sg-fleet-toolbar">
+      <label for="sg-fleet-filter"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span class="visually-hidden">Geräte filtern</span>
+        <input id="sg-fleet-filter" class="form-control" type="search" placeholder="Name, Gebäude oder Anzeige suchen" autocomplete="off" data-fleet-search>
+      </label>
+      <span role="status" aria-live="polite" data-fleet-message>Technischer Status wird automatisch aktualisiert.</span>
+    </div>
+    <div class="sg-fleet-items">
+      {% for row in devices %}
+      <article class="sg-fleet-device" data-device-id="{{ row.device.id }}" data-fleet-item>
+        <div class="sg-fleet-device-main">
+          <div class="sg-fleet-device-icon"><i class="fa-solid fa-display" aria-hidden="true"></i></div>
+          <div><h3>{{ row.device.name }}</h3>
+            <p><a href="/signage/{{ row.screen.id }}/edit">{{ row.screen.name }}</a>
+              {% if row.building %}<span aria-hidden="true">·</span> {{ row.building }}{% endif %}
+            </p>
+            <span class="sg-fleet-code">Gerät #{{ row.device.id }} · Display v{{ row.screen.version }}</span>
+          </div>
+        </div>
+        <div class="sg-fleet-device-health">
+          <span class="sg-fleet-state state-{{ row.health.code }}" data-fleet-health aria-label="Zustand {{ row.health.label }}">
+            <i class="fa-solid fa-circle" aria-hidden="true"></i>{{ row.health.label }}
+          </span>
+          <span class="sg-fleet-age" data-fleet-age>
+            {% if row.health.age_seconds is not none %}
+              Letztes Signal vor {{ (row.health.age_seconds // 60) }} Min.
+            {% else %}Kein aktuelles Signal{% endif %}
+          </span>
+          {% if row.telemetry %}
+          <span class="sg-fleet-meta">
+            {{ row.telemetry.platform }}{% if row.telemetry.client_version %} · Player {{ row.telemetry.client_version }}{% endif %}
+            {% if row.telemetry.screen_width and row.telemetry.screen_height %} · {{ row.telemetry.screen_width }} × {{ row.telemetry.screen_height }}{% endif %}
+          </span>
+          {% if row.telemetry.reported_screen_version is not none and row.telemetry.reported_screen_version != row.screen.version %}
+            <span class="sg-fleet-warning">Player zeigt noch v{{ row.telemetry.reported_screen_version }} statt v{{ row.screen.version }}</span>
+          {% endif %}
+          {% if row.health.diagnostic and row.health.diagnostic != 'ok' %}
+            <span class="sg-fleet-warning">Diagnose: {{ diagnostic_labels[row.health.diagnostic] }}</span>
+          {% endif %}
+          {% endif %}
+        </div>
+        <div class="sg-fleet-device-actions">
+          <a class="btn btn-sm btn-outline-primary" href="/signage/{{ row.screen.id }}/edit">Konfigurieren</a>
+          {% if not row.device.revoked %}
+            <form action="/signage/{{ row.screen.id }}/device/{{ row.device.id }}/rotate" method="post">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-outline-secondary" type="submit" title="Der bisherige Geräteschlüssel wird sofort ungültig">Schlüssel erneuern</button>
+            </form>
+            <form action="/signage/{{ row.screen.id }}/device/{{ row.device.id }}/revoke" method="post">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Sperren</button>
+            </form>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="sg-empty"><i class="fa-solid fa-desktop"></i>
+        <h3>Keine Geräte gekoppelt</h3>
+        <p>Öffne eine Anzeige und registriere im Bereich „Geräte & Monitoring“ einen neuen Player. Der Zugangsschlüssel ist ausschließlich bei der Registrierung sichtbar.</p>
+        <a href="/signage" class="btn btn-outline-primary">Displays auswählen</a>
+      </div>
+    {% endif %}
+  </section>
+  <section class="sg-panel sg-fleet-help">
+    <h2>Einfach einrichten, sicher betreiben</h2>
+    <div class="sg-fleet-steps">
+      <div><strong>1</strong><h3>Display vorbereiten</h3><p>Im Studio das Display konfigurieren und seine tatsächliche Blickrichtung prüfen.</p></div>
+      <div><strong>2</strong><h3>Player koppeln</h3><p>Geräteschlüssel einmalig erzeugen und geschützt im Player hinterlegen. Niemals in die Adressleiste kopieren.</p></div>
+      <div><strong>3</strong><h3>Verbindung überwachen</h3><p>Der Player meldet sich regelmäßig mit seinem separaten Bearer-Token. Diese Übersicht erkennt Ausfälle und veraltete Versionen.</p></div>
+    </div>
+    <p class="sg-fleet-footnote">Der Online-Status bestätigt nur technische Heartbeats, nicht die Lesbarkeit des physischen Monitors. Eine Notfall- oder Evakuierungsanzeige braucht eine getrennte fachliche Sicherheitsabnahme. Für geschützte Freigabelinks müssen Reverse-Proxy-Zugriffslogs die URL-Schlüssel maskieren.</p>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="/static/signage-fleet.js" defer></script>{% endblock %}

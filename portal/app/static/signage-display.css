@@ -103,3 +103,13 @@ body {overflow-x:hidden}
 .sd-floor-heading {font-size:clamp(1rem,2.4vw,2rem);margin:0 0 .4em}
 .sd-manual {grid-template-columns:1fr;margin-bottom:12px}
 .sd-empty[hidden], .sd-special[hidden], [data-sg-target-page][hidden] {display:none}
+
+/* Fail-closed public kiosk: hide all potentially stale dates, availability and
+   event directions behind a fully opaque connectivity message. */
+.sd-stale-overlay[hidden]{display:none!important}
+.sd-stale-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:auto;background:#102334;color:#fff;padding:max(24px,5vw)}
+.sd-stale-message{max-width:800px;text-align:center}
+.sd-stale-message>i{font-size:clamp(2.8rem,7vw,6rem);color:#8fdbc8;margin-bottom:18px}
+.sd-stale-message h2{color:#fff;font-size:clamp(1.7rem,3.6vw,3.6rem);font-weight:800;line-height:1.15;margin:0 0 16px}
+.sd-stale-message p{font-size:clamp(1rem,2vw,1.65rem);line-height:1.6;margin:0 auto 20px}
+.sd-stale-message small{display:block;font-size:clamp(.85rem,1.4vw,1.2rem);opacity:.72}

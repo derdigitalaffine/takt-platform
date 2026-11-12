@@ -227,3 +227,21 @@ class SignageGeneratedScreen(Base):
     generator_key: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SignageDeviceTelemetry(Base):
+    """Privacy-minimal operational diagnostics from an authenticated kiosk player.
+
+    The report deliberately excludes hostname, IP, serial number and free text.
+    A new table keeps upgrades additive for existing linked devices.
+    """
+    __tablename__ = "signage_device_telemetry"
+    device_id: Mapped[int] = mapped_column(
+        ForeignKey("signage_devices.id", ondelete="CASCADE"), primary_key=True)
+    platform: Mapped[str] = mapped_column(String(20), default="unknown")
+    client_version: Mapped[str] = mapped_column(String(32), default="")
+    screen_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    screen_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reported_screen_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    diagnostic_code: Mapped[str] = mapped_column(String(24), default="ok")
+    observed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
