@@ -168,3 +168,15 @@ Menü **Abstimmungen** (Recht „Abstimmungen“) – im selben Bereich wie die 
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du willst wissen, wann alle Zeit haben – oder eine Entscheidung abfragen?
+
+1. **Umfragen & Abstimmungen** öffnen.
+2. Passenden Typ auswählen: **Terminumfrage** für Termine, **Abstimmung** für eine Entscheidung.
+3. Frage und Antwortmöglichkeiten beziehungsweise Termine eintragen.
+4. Link mit den richtigen Personen teilen.
+5. Antworten abwarten, Ergebnis prüfen und gegebenenfalls den Termin festlegen.
+
+**Merksatz:** Eine Stimme in einer Terminumfrage ist noch keine verbindliche Seminaranmeldung.

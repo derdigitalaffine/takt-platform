@@ -83,3 +83,17 @@ Viele Texte auf einmal: **Dateien hochladen**, Ebene und Art wählen, mehrere Da
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du suchst eine Satzung oder andere Rechtsgrundlage?
+
+1. **Rechtstexte & Ortsrecht** öffnen.
+2. Nach Thema oder Titel suchen.
+3. Das passende Dokument öffnen.
+4. Fassung, Datum und Geltungsbereich prüfen.
+5. Nur die tatsächlich geltende Version für deine Arbeit verwenden.
+
+**Für Berechtigte:** Neue Fassungen erst nach den vorgesehenen Prüf- und Veröffentlichungsschritten freigeben.
+
+**Merksatz:** Gefunden heißt nicht automatisch aktuell.

@@ -74,3 +74,15 @@ Tipp: Für gedruckte QR-Codes immer einen **Kurzlink** verwenden. Der Code wird 
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du hast einen langen Link, den niemand abtippen möchte?
+
+1. **Kurzlinks & QR-Codes** öffnen.
+2. Zieladresse eintragen.
+3. Kurzlink erstellen und selbst testen.
+4. Falls nötig, einen QR-Code erzeugen und ausprobieren.
+5. Erst danach auf Aushang, Brief oder Webseite veröffentlichen.
+
+**Merksatz:** Ein hübscher QR-Code hilft nur, wenn der Link dahinter stimmt.

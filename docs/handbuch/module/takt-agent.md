@@ -35,3 +35,15 @@
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du möchtest dem TAKT-Agenten eine Frage stellen?
+
+1. **TAKT Agent** öffnen.
+2. In normalen Worten sagen, was du wissen oder erledigen möchtest.
+3. Antwort und angegebene Quellen prüfen.
+4. Wenn der Agent eine Aktion vorschlägt, genau ansehen, **was** passieren soll.
+5. Nur die passende Aktion bewusst bestätigen.
+
+**Merksatz:** Fragen stellen ist etwas anderes als Änderungen im Portal durchführen. Wichtige Angaben selbst kontrollieren.

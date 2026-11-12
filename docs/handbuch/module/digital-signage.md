@@ -38,3 +38,15 @@
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du möchtest auf einem Bildschirm zeigen, wer wo sitzt oder wohin Besucher gehen sollen?
+
+1. **Digital Signage** öffnen.
+2. Passende Anzeige beziehungsweise Standort auswählen.
+3. Räume, Personen oder Wegweiserangaben nach den vorhandenen Funktionen zuordnen.
+4. Vorschau kontrollieren: Stimmen Namen, Räume und Richtung?
+5. Anzeige für den vorgesehenen Bildschirm bereitstellen und dort prüfen.
+
+**Merksatz:** Eine Zuordnung im Editor ist erst gut, wenn sie auch auf dem echten Bildschirm richtig aussieht.

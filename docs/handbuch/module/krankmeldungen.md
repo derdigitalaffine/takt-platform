@@ -55,3 +55,16 @@ Mit dem Recht „Krankmeldungen“ und als Zuständige:r eines Arbeitgebers: Men
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du bist krank und musst dich melden?
+
+1. **Krankmeldungen** öffnen.
+2. Die geforderten Angaben zum Zeitraum eintragen.
+3. Meldung prüfen und absenden.
+4. Den Status auf der persönlichen Seite verfolgen und gegebenenfalls angeforderte Angaben ergänzen.
+
+**Für berechtigte Personalstellen:** Meldung öffnen, Bearbeitungsstand prüfen und die vorgesehenen Schritte dokumentieren.
+
+**Merksatz:** Eine Krankmeldung ist kein öffentlicher Kalendereintrag. Gesundheitsdaten gehören nur an berechtigte Stellen.

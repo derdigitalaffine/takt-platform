@@ -29,3 +29,14 @@ Werden Sie selbst als Vertretung eingetragen, bekommen Sie eine Mail. Möchten S
 - [Grundlagen und Problemlösung](../grundlagen.md)
 - [Alle Module](../../BENUTZERHANDBUCH.md)
 - [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
+
+## Für blöde erklärt:
+
+Du bist nicht da und jemand soll dich vertreten?
+
+1. **Abwesenheiten** öffnen und deinen Zeitraum eintragen.
+2. Wenn nötig, eine Vertretung auswählen.
+3. Speichern und auf mögliche Zustimmung der Vertretung achten.
+4. Bist du früher zurück, die Abwesenheit über **Zurück** beenden.
+
+**Merksatz:** Eine eingetragene Vertretung sieht nur die dafür vorgesehenen Aufgaben und Rechte.

@@ -36,3 +36,15 @@
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du willst nicht vergessen, wer was machen soll?
+
+1. **Aufgaben** öffnen.
+2. Neue Aufgabe mit klarem Titel und Beschreibung anlegen.
+3. Zuständige Person und gegebenenfalls Frist festlegen.
+4. Bei Bedarf Schritte als Checkliste ergänzen oder ein Kanbanboard nutzen.
+5. Fortschritt eintragen und die Aufgabe erst nach Erledigung abschließen.
+
+**Merksatz:** Eine Aufgabe ohne Zuständigkeit bleibt gern liegen.

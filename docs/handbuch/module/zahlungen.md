@@ -33,3 +33,16 @@ Gebühren und Zahlungsstatus bei Buchungen oder Dienstleistungen nachvollziehen.
 - [Grundlagen und Problemlösung](../grundlagen.md)
 - [Alle Module](../../BENUTZERHANDBUCH.md)
 - [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
+
+## Für blöde erklärt:
+
+Du musst für eine Buchung bezahlen oder eine Zahlung prüfen?
+
+1. Buchung und **Zahlungsstatus** öffnen.
+2. Betrag, Frist und angebotene Zahlungsart kontrollieren.
+3. Über den vorgesehenen Weg bezahlen.
+4. Später prüfen, ob die Zahlung als erledigt angezeigt wird.
+
+**Für die Verwaltung:** Zahlung und Buchungsstatus getrennt prüfen, bevor du einen Vorgang abschließt.
+
+**Merksatz:** **Gebucht** und **bezahlt** sind zwei verschiedene Dinge.

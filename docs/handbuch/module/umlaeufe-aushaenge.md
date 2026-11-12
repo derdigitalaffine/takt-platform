@@ -48,3 +48,15 @@ Im erweiterten Modus kann der Herausgeber bei Einzelbestätigungen eine verbindl
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du sollst ein Dokument lesen, bestätigen oder freigeben?
+
+1. **Umläufe & Aushänge** oder **Meine Aufgaben** öffnen.
+2. Das Dokument und die verlangte Aktion genau ansehen.
+3. Prüfen, ob du nur Kenntnis nehmen oder tatsächlich freigeben sollst.
+4. Die passende Aktion ausdrücklich ausführen.
+5. Danach den Rückmeldungsstand kontrollieren.
+
+**Merksatz:** **Gelesen** ist nicht immer **bestätigt** – und **bestätigt** ist nicht automatisch **freigegeben**.
