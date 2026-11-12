@@ -235,6 +235,12 @@ def set_membership(db, actor, data):
         group = group_of(db, node)
         if not group:
             raise HTTPException(409, "Gruppe ist nicht verknüpft.")
+        if not active_path(db, oid):
+            raise HTTPException(422, "Mitglieder dürfen nur aktiven Gruppen zugeordnet werden.")
+        if protected_group(db, group.id) and not (
+            actor.is_admin or actor.can("org_roles")
+        ):
+            raise HTTPException(403, "Gruppen mit Bereichsrollen benötigen Organisationsrollen-Rechte.")
         if data.get("is_primary") == "1":
             raise HTTPException(422, "Gruppen sind zusätzliche Mitgliedschaften, keine Hauptzuordnung.")
         if db.get(GroupMember, (group.id, uid)) is None:
