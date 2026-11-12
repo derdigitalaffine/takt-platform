@@ -142,3 +142,52 @@ def test_online_application_remains_repeatable_even_with_prior_response(survey):
         db.commit()
     c = login("admin@example.org", "admin-passwort-123")
     assert 'id="fill-form"' in c.get(f"/f/{TOKEN}").text
+
+
+def test_completed_surveys_remain_recognizable_after_they_close(survey):
+    user = login("admin@example.org", "admin-passwort-123")
+    assert _post(user, f"/f/{TOKEN}").status_code == 200
+    with SessionLocal() as db:
+        db.get(Form, survey).active = False
+        db.commit()
+    for url in (f"/f/{TOKEN}", f"/f/i/{INVITE_TOKEN}"):
+        page = user.get(url)
+        assert page.status_code == 200
+        assert "bereits ausgefüllt" in page.text
+        assert "ausgefüllt" in page.text
+        assert "noch einmal" not in page.text
+    post = user.post(f"/f/{TOKEN}", data={"csrf": csrf_of(user.get(f"/f/{TOKEN}").text)})
+    assert post.status_code == 200
+    assert _count(survey) == 1
+
+
+def test_guest_receipt_after_closing_and_fresh_guest_still_gets_closed_page(survey):
+    guest = client()
+    assert _post(guest, f"/f/{TOKEN}").status_code == 200
+    with SessionLocal() as db:
+        db.get(Form, survey).active = False
+        db.commit()
+    done = guest.get(f"/f/{TOKEN}")
+    assert done.status_code == 200
+    assert "Über diesen Browser wurde bereits" in done.text
+    other = client()
+    closed = other.get(f"/f/{TOKEN}")
+    assert closed.status_code == 200
+    assert "nimmt keine Antworten mehr an" in closed.text
+    assert _count(survey) == 1
+
+
+def test_expired_survey_with_multiple_allowed_still_shows_receipt(survey):
+    with SessionLocal() as db:
+        form = db.get(Form, survey)
+        form.multiple = True
+        db.commit()
+    user = login("admin@example.org", "admin-passwort-123")
+    assert _post(user, f"/f/{TOKEN}").status_code == 200
+    with SessionLocal() as db:
+        db.get(Form, survey).active = False
+        db.commit()
+    page = user.get(f"/f/{TOKEN}")
+    assert page.status_code == 200
+    assert "bereits ausgefüllt" in page.text
+    assert "id=\"fill-form\"" not in page.text
