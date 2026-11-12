@@ -644,8 +644,13 @@ def render(request: Request, name: str, user: User | None = None, **ctx) -> HTML
     messages = request.session.pop("flash", [])
     ui = branding.load()
     navctx = _navigation_context(request, user)
+    # All server-rendered person selectors inherit one surname-first order and
+    # only receive organization hints for people their controller already exposed.
+    from . import person_picker
+    picker_meta = person_picker.prepare_context(ctx) if user else {"people": {}, "organizations": []}
     return templates.TemplateResponse(request, name, {
         "user": user,
+        "picker_meta": picker_meta,
         "ui": ui, "brand": ui["name"], "product": ui["product"],
         "csrf": csrf_token(request.session),
         "messages": messages,
