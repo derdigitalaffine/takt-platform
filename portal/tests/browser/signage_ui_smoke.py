@@ -31,11 +31,13 @@ def exercise():
         page.locator('[name="email"]').fill("signage@example.org")
         page.locator('[name="password"]').fill("browser-test-password")
         page.locator('button[type="submit"]').click()
-        page.goto(BASE + "/signage")
-        row = page.locator("tr").filter(has_text="Bürgerbüro")
-        row.get_by_label("Raum 01 freigeben").check()
-        row.get_by_role("button", name="Freigabe speichern").click()
+        # Building publication lives in the dedicated hierarchy browser.
+        page.goto(BASE + "/signage/buildings")
+        page.locator(".sg-tree-room").filter(has_text="Bürgerbüro").click()
+        page.get_by_label("Raum für öffentliche Anzeigen freigeben").check()
+        page.get_by_role("button", name="Freigabe speichern").click()
 
+        page.goto(BASE + "/signage/screens")
         wizard = page.locator('form[action="/signage/new"]')
         wizard.get_by_label("Name").fill("Wegweiser am Eingang")
         wizard.get_by_label("Vorlage").select_option("sign_corridor")
