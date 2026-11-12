@@ -113,6 +113,34 @@ das später geplante gemeinsame transaktionale Berechtigungsmodell.
 Regressionssuite: `test_my_surveys.py` sowie die vorhandenen
 `test_live.py`, `test_live_quiz.py` und Browsertests.
 
+## Inkrement 3: berechtigtes, lesendes Teilnahme-Cockpit
+
+`/teilnahme-cockpit` verwendet die bereits vorhandenen ACL-Mechanismen
+für Formular-, Termin- und Stimmabfragen; für Live-Umfragen ist nur die
+Besitzerrolle (oder Portaladministration) freigeschaltet. Ergebnisansichten
+der jeweiligen Fachmodule bleiben die alleinigen Quellen für fachliche
+Einzeldaten und dynamische Veröffentlichungsregeln.
+
+- Das Cockpit liefert Einladungszahlen, erledigte Einladungen, offene
+  Einladungen und gegebenenfalls die Gesamtzahl der Antworten.
+- In den Summen wird zwischen **Rücklauf aus Einladungen** und zusätzlichen
+  öffentlichen Antworten unterschieden. Für öffentliche Teilnahme ohne
+  Einladung ist eine verlässliche Quote nicht berechenbar.
+- Ein anonymes Live-Gerät wird nur als **aggregierter Distinct-Count** gezählt;
+  weder Gerätehash, Anzeigename noch Antworten werden zurückgegeben.
+- Bei geheimer Wahl wird ausschließlich `VoteVoter.voted`/Berechtigung
+  aggregiert. Es erfolgt kein Zugriff auf `VoteBallot`.
+- Die Sichtbarkeit ist unabhängig von der Teilnahmesicht der
+  eingeladenen Person: Persönliche Einladung ist keine Berechtigung,
+  andere Teilnahmen auszuwerten. Das Cockpit erfordert Besitzer/Admin
+  oder mindestens Einladungs-/Managementfreigabe.
+- Alle Datensätze bleiben in den ursprünglichen Engine-Tabellen;
+  es sind keine Migrationen oder Änderungen an Live-POST-Endpunkten nötig.
+
+Regressionssuite: `portal/tests/test_survey_cockpit.py` plus
+`test_live.py`, `test_live_quiz.py`, `test_my_surveys.py`
+und die bestehenden Browserprüfungen.
+
 ## Weitere Ausbaustufen
 
 

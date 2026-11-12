@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Teilnahme-Cockpit{% endblock %}
+{% block content %}
+<div class="survey-workspace">
+  {% call m.page_header('Teilnahme-Cockpit', 'Rückläufe, Einladungen und Beteiligung aller berechtigten Umfragen – ohne personenbezogene Antwortinhalte.') %}
+    {% if polls_enabled %}<a class="btn btn-sm btn-outline-secondary" href="/umfragen"><i class="fa-solid fa-square-poll-vertical me-1" aria-hidden="true"></i>Umfragen verwalten</a>{% endif %}
+    {% if forms_enabled %}<a class="btn btn-sm btn-outline-secondary" href="/forms"><i class="fa-solid fa-clipboard-list me-1" aria-hidden="true"></i>Formulare verwalten</a>{% endif %}
+  {% endcall %}
+  <div class="row g-3 mb-4" aria-label="Zusammenfassung">
+    {% for n,label,icon in [(totals.surveys,'Umfragen','fa-square-poll-vertical'),
+                           (totals.invitations,'Einladungen','fa-envelope'),
+                           (totals.completed,'Teilnahmen über Einladungen','fa-user-check'),
+                           (totals.pending,'Noch offen','fa-hourglass-half')] %}
+      <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body py-3">
+        <div class="d-flex align-items-center gap-2 small text-secondary"><i class="fa-solid {{ icon }}" aria-hidden="true"></i>{{ label }}</div>
+        <div class="h3 mb-0 mt-1">{{ n }}</div>
+      </div></div></div>
+    {% endfor %}
+  </div>
+  <form class="ds-search-panel mb-4" action="/teilnahme-cockpit" method="get" role="search">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-lg"><label for="tc-q" class="form-label">Suchen</label>
+        <input id="tc-q" name="q" value="{{ q }}" maxlength="160" type="search" class="form-control" placeholder="Titel oder Beschreibung"></div>
+      <div class="col-6 col-lg-3"><label for="tc-kind" class="form-label">Umfrageart</label>
+        <select id="tc-kind" name="kind" class="form-select">
+          <option value="all">Alle Arten</option>
+          {% for key, item in kinds.items() %}<option value="{{ key }}" {% if kind == key %}selected{% endif %}>{{ item[0] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-3"><label for="tc-state" class="form-label">Status</label>
+        <select id="tc-state" name="state" class="form-select">
+          <option value="all" {% if state == 'all' %}selected{% endif %}>Alle</option>
+          <option value="active" {% if state == 'active' %}selected{% endif %}>Aktuell</option>
+          <option value="archived" {% if state == 'archived' %}selected{% endif %}>Archiviert</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-auto"><button type="submit" class="btn btn-outline-primary w-100"><i class="fa-solid fa-filter me-1" aria-hidden="true"></i>Anzeigen</button></div>
+    </div>
+  </form>
+  {% if rows %}
+  <div class="row g-3" aria-label="Rücklaufübersicht">
+  {% for row in rows %}
+    <div class="col-12 col-lg-6 col-xxl-4">
+      <article class="card h-100 ds-survey-card"><div class="card-body d-flex flex-column gap-3">
+        <div class="d-flex justify-content-between gap-2 align-items-center">
+          <span class="small text-secondary"><i class="fa-solid {{ kinds[row.kind][1] }} me-1" aria-hidden="true"></i>{{ kinds[row.kind][0] }}</span>
+          <span class="badge {{ 'text-bg-success' if row.status == 'Läuft' or row.status == 'Offen' else 'text-bg-secondary' }}">{{ row.status }}</span>
+        </div>
+        <div>
+          <h2 class="h5 mb-1">{{ row.title }}</h2>
+          {% if row.description %}<p class="small text-secondary mb-0 ds-clamp">{{ row.description | striptags | truncate(180) }}</p>{% endif %}
+        </div>
+        {% if row.kind == 'live' %}
+          <div class="rounded-3 bg-body-tertiary p-3">
+            <div class="h4 mb-1">{{ row.answers }}</div><div class="small text-secondary">Beteiligte Geräte (aggregiert)</div>
+          </div>
+          <p class="small text-secondary mb-0"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>Keine Zuordnung zu Portalkonten oder Einzelantworten.</p>
+        {% else %}
+          <div class="row g-2 text-center">
+            <div class="col-4"><div class="rounded-3 bg-body-tertiary p-2"><div class="h5 mb-1">{{ row.invited or 0 }}</div><div class="small text-secondary">Eingeladen</div></div></div>
+            <div class="col-4"><div class="rounded-3 bg-body-tertiary p-2"><div class="h5 mb-1">{{ row.registered }}</div><div class="small text-secondary">Erledigt</div></div></div>
+            <div class="col-4"><div class="rounded-3 bg-body-tertiary p-2"><div class="h5 mb-1">{{ row.pending or 0 }}</div><div class="small text-secondary">Offen</div></div></div>
+          </div>
+          {% if row.invited %}<div class="progress" role="progressbar" aria-label="Rücklauf" aria-valuenow="{{ row.rate }}" aria-valuemin="0" aria-valuemax="100" style="height:.5rem">
+            <div class="progress-bar bg-success" style="width: {{ [100, row.rate] | min }}%"></div>
+          </div><div class="small text-secondary">{{ row.rate }} % Rücklauf der Einladungen</div>{% endif %}
+          <div class="small text-secondary">{{ row.answers }} insgesamt registrierte Antwort(en)</div>
+        {% endif %}
+        {% if row.note %}<div class="small text-secondary"><i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>{{ row.note }}</div>{% endif %}
+        <div class="mt-auto">
+          <a class="btn btn-sm btn-outline-primary" href="{{ row.url }}"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>Zur Auswertung</a>
+        </div>
+      </div></article>
+    </div>
+  {% endfor %}
+  </div>
+  {% else %}
+    {{ m.empty_state('Keine passenden Umfragen', 'Du siehst hier nur Umfragen, für die du zuständig bist oder die mit entsprechenden Rechten für dich freigegeben wurden.', '/teilnahme-cockpit' if q or kind != 'all' or state != 'all' else '', 'Filter zurücksetzen', 'fa-chart-simple') }}
+  {% endif %}
+  <p class="text-secondary small mt-4"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>
+    Das Cockpit zeigt nur aggregierte Rückläufe. Geheime Stimmzettel, anonyme Einzelantworten und Gerätekennungen von Live-Umfragen werden nicht geladen oder angezeigt. Öffentliche Teilnahmen können zusätzlich zu den eingeladenen Personen erfolgen.
+  </p>
+</div>
+{% endblock %}

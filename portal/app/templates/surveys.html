@@ -4,6 +4,7 @@
 {% block content %}
 <div class="survey-workspace">
 {% call m.page_header('Umfragen & Abstimmungen', 'Feedback sammeln, gemeinsam abstimmen oder einen Termin finden. Alle Umfragen an einem Ort.', '/umfragen/neu' if create_kinds else '', 'Neu erstellen') %}
+  <a class="btn btn-outline-secondary" href="/teilnahme-cockpit"><i class="fa-solid fa-chart-pie me-1" aria-hidden="true"></i>Teilnahme-Cockpit</a>
 {% endcall %}
 <nav class="ds-nav nav nav-tabs ds-section-nav mb-4" aria-label="Umfragestatus">
 {% for key,label,icon in [('active','Aktuell','fa-layer-group'),('archive','Archiv','fa-box-archive'),('trash','Papierkorb','fa-trash-can')] %}

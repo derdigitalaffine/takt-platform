@@ -1,7 +1,7 @@
 """Unified navigation and creation; existing engines retain their protected endpoints."""
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from . import my_surveys, poll_lifecycle, surveys
+from . import my_surveys, poll_lifecycle, survey_cockpit, surveys
 from .db import User
 from .main import app, current_user, enabled_modules, get_db, render
 
@@ -11,6 +11,30 @@ def _modules():
     if 'polls' not in modules:
         raise HTTPException(404, 'Umfragen sind auf diesem Server nicht eingeschaltet.')
     return modules
+
+
+@app.get('/teilnahme-cockpit')
+def participation_cockpit(request: Request, q: str = '', kind: str = 'all',
+                          state: str = 'all',
+                          user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Cross-engine manager dashboard. No raw or personal answer data."""
+    modules = enabled_modules()
+    if not modules.intersection({'forms', 'polls'}):
+        raise HTTPException(404, 'Keine Umfragen aktiviert.')
+    entries = survey_cockpit.collect(db, user, modules)
+    kind = kind if kind in ('all', *survey_cockpit.KINDS) else 'all'
+    state = state if state in ('all', 'active', 'archived') else 'all'
+    q = q.strip()[:160]
+    rows = [r for r in entries if (kind == 'all' or r['kind'] == kind)
+            and (state == 'all' or (r['status'] == 'Archiviert') == (state == 'archived'))
+            and (not q or q.casefold() in (r['title'] + ' ' + r['description']).casefold())]
+    response = render(request, 'survey_cockpit.html', user, rows=rows,
+                      totals=survey_cockpit.totals(rows), kind=kind, state=state, q=q,
+                      kinds=survey_cockpit.KINDS,
+                      forms_enabled='forms' in modules, polls_enabled='polls' in modules)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
 
 
 @app.get('/meine-umfragen')
