@@ -218,3 +218,12 @@ class SignageCampaignScreen(Base):
     campaign_id: Mapped[int] = mapped_column(ForeignKey("signage_campaigns.id", ondelete="CASCADE"), primary_key=True)
     screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), primary_key=True)
     included: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SignageGeneratedScreen(Base):
+    """Idempotency record for bulk-created private screens, not a publication grant."""
+    __tablename__ = "signage_generated_screens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    generator_key: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
