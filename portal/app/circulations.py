@@ -247,6 +247,65 @@ def item_access(db, user, item):
     return True
 
 
+
+def publication_issues(db, row, user):
+    """Explain why a saved draft cannot yet be published, without modifying it.
+
+    This is advisory feedback for the editor. The publish operation remains
+    authoritative and repeats authorization and validation before writing.
+    """
+    c = content(row)
+    issues = []
+
+    def add(section, message):
+        issue = (section, message)
+        if issue not in issues:
+            issues.append(issue)
+
+    if not c['title'].strip():
+        add('cl-content', 'Bitte einen Titel eingeben und den Entwurf speichern.')
+    if not c['body'].strip() and not c['items']:
+        add('cl-content', 'Bitte einen Einleitungstext oder mindestens ein Dokument hinzufügen.')
+    if c['dynamic'] and c['sequential']:
+        add('cl-flow', 'Eine feste Stationsfolge kann keine dynamischen Empfänger haben.')
+    if c['public'] and (c['audience']['guests'] or c['mode'] != 'info'):
+        add('cl-flow', 'Öffentliche Aushänge dürfen keine Gastempfänger oder personenbezogene Bestätigung verwenden.')
+
+    audience = audience_users(db, c['audience'])
+    if not audience and not c['audience']['guests'] and not c['public']:
+        add('cl-audience', 'Bitte mindestens einen aktiven Empfänger auswählen. Leere Gruppen zählen nicht.')
+
+    for item in c['items']:
+        if item['kind'] not in {'law', 'form', 'dms'}:
+            continue
+        label = item.get('title') or 'Verknüpftes Dokument'
+        try:
+            source(db, user, item, allow_archived=True)
+        except HTTPException as exc:
+            add('cl-content', f'{label}: {exc.detail}')
+            continue
+        if item['kind'] == 'law':
+            law = db.get(LawText, item['id'])
+            if law.internal and (c['public'] or c['audience']['guests']):
+                add('cl-content', f'{label}: Interne Dienstanweisungen sind nicht für Gäste oder öffentliche Aushänge verfügbar.')
+        elif item['kind'] == 'form':
+            form = db.get(Form, item['id'])
+            if form.internal and (c['public'] or c['audience']['guests']):
+                add('cl-content', f'{label}: Interne Formulare können nicht an Gäste oder öffentlich verteilt werden.')
+        elif item['kind'] == 'dms':
+            if c['public'] or c['audience']['guests']:
+                add('cl-content', f'{label}: DMS-Verweise sind nur für interne Empfänger zulässig.')
+            elif any(not item_access(db, recipient, item) for recipient in audience):
+                add('cl-audience', f'{label}: Mindestens ein Empfänger hat keine Leseberechtigung für dieses DMS-Dokument.')
+
+    start = at(c['publish_on']) or utcnow()
+    if any(c[k] and at(c[k]) <= start for k in ['due_on', 'expires_on']):
+        add('cl-flow', 'Bestätigungsfrist und Ablauf müssen nach dem Veröffentlichungszeitpunkt liegen.')
+    if c['due_on'] and c['expires_on'] and at(c['due_on']) > at(c['expires_on']):
+        add('cl-flow', 'Die Bestätigungsfrist darf nicht nach dem Ablauf liegen.')
+    return issues
+
+
 def publish(db, row, user, reack=True):
     if not may_publish(db, user, row):
         raise HTTPException(403, 'Das Recht zum Veröffentlichen fehlt.')
