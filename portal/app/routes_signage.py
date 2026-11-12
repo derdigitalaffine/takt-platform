@@ -751,15 +751,14 @@ async def signage_office(request: Request, user: User = Depends(manage_user), db
     room = db.get(SignageRoom, rid) if rid else None
     if not staff or not staff.active or not room:
         raise HTTPException(422)
-    row = db.scalar(select(SignageOffice).where(SignageOffice.user_id == uid, SignageOffice.room_id == rid))
-    if not row:
-        row = SignageOffice(user_id=uid, room_id=rid)
-        db.add(row)
-    row.public = form.get("public") == "1"
-    row.is_primary = form.get("primary") == "1"
+    from . import signage_offices
+    # Public visibility is deliberately *never* granted by a supervisor on
+    # assignment. Only the individual can consent through their profile.
+    signage_offices.assign(db, user_id=uid, room_id=rid,
+                           make_primary=form.get("primary") == "1")
     db.commit()
-    flash(request, "Bürozuordnung gespeichert; öffentliche Freigabe wird separat gesteuert.")
-    return redirect("/signage/wayfinding#offices")
+    flash(request, "Bürozuordnung gespeichert. Die Person kann die öffentliche Anzeige selbst freigeben.")
+    return redirect(f"/signage/rooms?room={rid}")
 
 
 @app.post("/profile/signage/office/{office_id:int}/visibility",
@@ -969,3 +968,7 @@ from . import routes_signage_fleet  # noqa: E402,F401
 
 # Hierarchical building browser and safe CRUD under the shared signage gate.
 from . import routes_signage_hierarchy  # noqa: E402,F401
+
+
+# Room-based staff directory and personal workplace self-service.
+from . import routes_signage_rooms  # noqa: E402,F401
