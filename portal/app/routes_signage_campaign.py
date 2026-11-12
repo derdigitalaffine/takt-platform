@@ -1,4 +1,5 @@
 """Central digital-signage campaigns: create once, project to an entire building."""
+import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -6,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import calendars, signage_campaign, signage_passive
+from . import calendars, signage, signage_campaign, signage_passive
 from .calendar_models import Calendar, CalendarEvent
 from .db import LOCAL_TZ, User, utcnow
 from .main import app, check_csrf, flash, get_db, redirect, render
@@ -14,6 +15,7 @@ from .routes_signage import _enabled, _int, manage_user
 from .signage_models import (
     SignageBuilding, SignageCampaign, SignageCampaignScreen, SignageFloor,
     SignagePassiveConfig, SignagePublicDestination, SignageRoom, SignageScreen,
+    SignageGeneratedScreen, SignageRevision, SignageWayNode, SignageDisplayAnchor,
 )
 
 SCOPES = {
@@ -257,3 +259,65 @@ def signage_campaign_simulate(request: Request, user: User = Depends(manage_user
         preview.append({"screen": screen, "special": special})
     return render(request, "signage_campaign_simulation.html", user,
                   building=building, at=at, preview=preview)
+
+
+@app.post("/signage/generate", dependencies=[Depends(check_csrf)])
+async def signage_generate_for_building(request: Request,
+                                        user: User = Depends(manage_user),
+                                        db: Session = Depends(get_db)):
+    """Create private starter displays for a building without duplicate entries.
+
+    Flur displays get their real graph node but no invented viewing direction.
+    A human still validates sightlines and explicitly publishes the screens.
+    """
+    _enabled()
+    form = await request.form()
+    building = _building(db, _int(form.get("building_id")))
+    with_building = form.get("building") == "1"
+    with_floors = form.get("floors") == "1"
+    with_corridors = form.get("corridors") == "1"
+    if not any((with_building, with_floors, with_corridors)):
+        raise HTTPException(422, "Mindestens einen Anzeigetyp auswählen.")
+    floors = list(db.scalars(select(SignageFloor).where(
+        SignageFloor.building_id == building.id).order_by(SignageFloor.level, SignageFloor.id)).all())
+    requests = []
+    if with_building:
+        requests.append((f"building:{building.id}", "sign_building", f"{building.name} · Gebäudeübersicht", None, None))
+    if with_floors:
+        requests.extend((f"floor:{floor.id}", "sign_floor",
+                         f"{building.name} · {floor.name} · Geschossübersicht", floor.id, None)
+                        for floor in floors)
+    if with_corridors:
+        for floor in floors:
+            nodes = db.scalars(select(SignageWayNode).where(
+                SignageWayNode.floor_id == floor.id,
+                SignageWayNode.kind.in_(("entrance", "corridor"))
+            ).order_by(SignageWayNode.id).limit(30)).all()
+            requests.extend((f"corridor:{node.id}", "sign_corridor",
+                             f"{building.name} · {floor.name} · {node.label}",
+                             floor.id, node.id) for node in nodes)
+    if len(requests) > 90:
+        raise HTTPException(422, "Zu viele automatische Anzeigen. Gebäude in Etappen einrichten.")
+    created = []
+    for key, kind, name, floor_id, node_id in requests:
+        if db.scalar(select(SignageGeneratedScreen).where(
+                SignageGeneratedScreen.generator_key == key)) is not None:
+            continue
+        screen = SignageScreen(
+            name=name[:180], kind=kind, visibility="private", owner_id=user.id,
+            org_id=building.org_id, enabled=True,
+            layout_json=json.dumps(signage.TEMPLATES[kind]))
+        db.add(screen)
+        db.flush()
+        db.add(SignagePassiveConfig(
+            screen_id=screen.id, building_id=building.id, floor_id=floor_id,
+            facing="", radius_m=25))
+        if node_id:
+            db.add(SignageDisplayAnchor(screen_id=screen.id, node_id=node_id))
+        db.add(SignageRevision(screen_id=screen.id, version=1,
+                               snapshot_json=signage.design_snapshot(screen), actor_id=user.id))
+        db.add(SignageGeneratedScreen(generator_key=key, screen_id=screen.id))
+        created.append(screen.id)
+    db.commit()
+    flash(request, f"{len(created)} interne Displays vorbereitet. Vor öffentlicher Freigabe Blickrichtung und Ziele prüfen.")
+    return redirect(f"/signage/{created[0]}/edit" if len(created) == 1 else "/signage")
