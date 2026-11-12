@@ -281,6 +281,17 @@ Ob darüber hinaus Führerscheinprüfung, Fahrtenbuch oder Fahrzeugübergabe vor
 - Rollen und Berechtigungen begrenzen, wer Ressourcen konfigurieren, Anfragen bearbeiten, Zahlungsstände sehen oder personenbezogene Daten exportieren darf.
 - Bei fehlender Berechtigung nicht auf einen öffentlichen Buchungslink als Ersatz für interne Verwaltungsrechte ausweichen.
 
+## Hilfe, Rechte und weiterführende Informationen
+
+- [Allgemeine Bedienung, Sicherheit und Problemlösung](../grundlagen.md)
+- [Übersicht aller Module](../../BENUTZERHANDBUCH.md)
+- [Zahlungen und Gebühren](zahlungen.md).
+- Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
+
+> **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+---
+
 ## Für blöde erklärt:
 
 **Du willst einfach nur einen Raum oder ein Gerät buchen?** Kein Problem – hier die Version ohne Verwaltungsdeutsch:
@@ -303,12 +314,3 @@ Ob darüber hinaus Führerscheinprüfung, Fahrtenbuch oder Fahrzeugübergabe vor
 - **Bezahlt** ist nicht automatisch **zurückgegeben**.
 
 Und wenn etwas nicht klappt: Erst den **Status** prüfen, dann die **Fristen**, dann die **Berechtigungen**. Meist steckt die Lösung genau dort.
-
-## Hilfe, Rechte und weiterführende Informationen
-
-- [Allgemeine Bedienung, Sicherheit und Problemlösung](../grundlagen.md)
-- [Übersicht aller Module](../../BENUTZERHANDBUCH.md)
-- [Zahlungen und Gebühren](zahlungen.md).
-- Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
-
-> **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
