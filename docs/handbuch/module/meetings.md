@@ -40,7 +40,7 @@ Auf der Seite des Meetings steht der **Einladungslink für Gäste**. Kopieren Si
 
 - Gäste dürfen **nicht aufnehmen** und werden **nie automatisch Moderator:in** – auch nicht, wenn sie vor Ihnen im Raum sind. Sie können einen Gast in der Konferenz bewusst zum Moderator machen.
 - Ist der Link in falsche Hände geraten: **Neuen Gastlink erzeugen**. Der alte funktioniert dann sofort nicht mehr.
-- Mit dem Recht „Kurzlinks“ können Sie aus dem Gastlink einen kurzen Link oder QR-Code machen (siehe [Kapitel 7](../../../../BENUTZERHANDBUCH.md#7-kurzlinks-und-qr-codes)).
+- Mit dem Recht „Kurzlinks“ können Sie aus dem Gastlink einen kurzen Link oder QR-Code machen (siehe [Kapitel 7](../../BENUTZERHANDBUCH.md#7-kurzlinks-und-qr-codes)).
 
 ### Freie Räume ohne Anmeldung
 
