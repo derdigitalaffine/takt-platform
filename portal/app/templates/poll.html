@@ -10,7 +10,7 @@
   <div class="dropdown"><button class="btn btn-outline-secondary" data-bs-toggle="dropdown" aria-label="Weitere Aktionen"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i> Mehr</button>
     <ul class="dropdown-menu dropdown-menu-end">
       <li><a class="dropdown-item" href="/polls/{{ poll.id }}/export.csv"><i class="fa-solid fa-file-csv fa-fw me-2"></i>Export (CSV)</a></li>
-      <li><a class="dropdown-item" href="/polls/{{ poll.id }}/export.pdf"><i class="fa-solid fa-file-pdf fa-fw me-2"></i>Ergebnisbericht (DIN A4)</a></li>
+      <li><a class="dropdown-item" href="/polls/{{ poll.id }}/export.pdf"><i class="fa-solid fa-file-pdf fa-fw me-2"></i>Ergebnisbericht mit Teilnehmern (DIN A4)</a></li>
       {% if user.can('polls') %}<li><form method="post" action="/polls/{{ poll.id }}/copy"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="dropdown-item"><i class="fa-regular fa-copy fa-fw me-2"></i>Kopie anlegen</button></form></li>{% endif %}
       {% if level >= 3 %}
       <li><form method="post" action="/polls/{{ poll.id }}/state"><input type="hidden" name="csrf" value="{{ csrf }}">
