@@ -2515,13 +2515,10 @@ async def admin_groups_update(request: Request, gid: int, action: str = Form("sa
     group.description = " ".join(str(form.get("description", "")).split())[:255]
     group.lead_id = int(form["lead_id"]) if str(form.get("lead_id", "")).isdigit() and db.get(User, int(form["lead_id"])) else None
     ids = {int(u) for u in form.getlist("members") if str(u).isdigit()}
-    group.members = list(db.scalars(select(User).where(User.id.in_(ids)))) if ids else []
     db.add(group)
     db.flush()
-    from .db import GroupMember
-    from sqlalchemy import update
-    db.execute(update(GroupMember).where(GroupMember.group_id==group.id,GroupMember.user_id.in_(ids)).values(manual=True))
-    from .organization_groups import sync_from_group
+    from .organization_groups import set_group_members, sync_from_group
+    set_group_members(db, group, ids)
     sync_from_group(db, group)
     db.commit()
     flash(request, f"Gruppe „{group.name}“ gespeichert." + (" Der Name ist schon vergeben." if clash else ""))
