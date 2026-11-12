@@ -128,3 +128,36 @@ def test_rotating_a_revoked_or_other_screen_device_is_rejected():
     assert c.post(f"/signage/{other}/device/{did}/rotate", data={"csrf": csrf}).status_code == 404
     assert c.post(f"/signage/{sid}/device/{did}/revoke", data={"csrf": csrf}).status_code == 303
     assert c.post(f"/signage/{sid}/device/{did}/rotate", data={"csrf": csrf}).status_code == 404
+
+
+def test_public_kiosk_is_explicitly_marked_and_fails_closed_when_connection_lost():
+    c = _admin()
+    sid = _screen(c, "Statische Rathausanzeige", visibility="public")
+    visitor = client()
+    page = visitor.get(f"/signage/view/{sid}")
+    assert page.status_code == 200
+    assert page.headers["x-takt-signage"] == "display"
+    assert "no-store" in page.headers["cache-control"]
+    assert 'data-sg-auto-refresh="60"' in page.text
+    assert 'data-sg-stale' in page.text
+    assert "Informationen momentan nicht verfügbar" in page.text
+    assert "<noscript><meta http-equiv=\"refresh\"" in page.text
+    preview = c.get(f"/signage/{sid}/preview")
+    assert preview.status_code == 200
+    assert 'data-sg-auto-refresh="0"' in preview.text
+
+
+def test_telemetry_state_and_credential_revoke_does_not_expose_old_diagnostics():
+    c, sid, did, secret = _paired()
+    client().post(f"/signage/api/device/{did}/heartbeat", headers=_auth(secret),
+                  json={"platform": "android", "diagnostic_code": "network_error",
+                        "client_version": "2.4.0"})
+    feed = c.get("/signage/fleet/status").json()
+    assert any(x["id"] == did and x["diagnostic_code"] == "network_error"
+               for x in feed["devices"])
+    csrf = csrf_of(c.get(f"/signage/{sid}/edit").text)
+    assert c.post(f"/signage/{sid}/device/{did}/revoke", data={"csrf": csrf}).status_code == 303
+    feed = c.get("/signage/fleet/status").json()
+    assert any(x["id"] == did and x["status"] == "revoked" for x in feed["devices"])
+    assert client().post(f"/signage/api/device/{did}/heartbeat",
+                         headers=_auth(secret)).status_code == 403
