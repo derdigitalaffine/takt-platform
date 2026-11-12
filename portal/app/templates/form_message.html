@@ -21,13 +21,19 @@
     <p class="small text-secondary mt-2 mb-3">Bitte notieren Sie das Aktenzeichen.{% if mail_sent %} Eine Eingangsbestätigung mit allen Angaben ist per E-Mail unterwegs.{% else %} Speichern Sie sich den folgenden Link – damit sehen Sie den Stand der Bearbeitung.{% endif %}</p>
     <a class="btn {{ 'btn-outline-primary' if payment and payment.status == 'open' else 'btn-primary' }}" href="{{ track_link }}"><i class="fa-solid fa-magnifying-glass-location me-1"></i>Stand der Bearbeitung ansehen</a>
     {% else %}
-    <div class="mb-0">{{ (form.submit_message or 'Vielen Dank, Ihre Antwort wurde gespeichert.') | richtext }}</div>
+    <div class="mb-2">{{ (form.submit_message or 'Vielen Dank, Ihre Antwort wurde gespeichert.') | richtext }}</div>
+    <p class="small text-secondary">Deine Teilnahme ist gespeichert{% if completed_at %} · {{ completed_at | local }} Uhr{% endif %}. Über deinen Umfragelink kannst du später den Teilnahmestatus erneut prüfen.</p>
+    <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
+      {% if review_url %}<a class="btn btn-outline-primary" href="{{ review_url }}"><i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>Teilnahmestatus aufrufen</a>{% endif %}
+      {% if request.session.get("uid") %}<a class="btn btn-outline-secondary" href="/meine-umfragen"><i class="fa-solid fa-clipboard-check me-1" aria-hidden="true"></i>Meine Umfragen</a>{% endif %}
+    </div>
     {% endif %}
   {% elif kind == 'done' %}
     <i class="fa-solid fa-clipboard-check fa-3x text-success mb-3"></i>
     <h1 class="h4">{{ form.title }}</h1>
     <p class="mb-1 text-secondary">{% if device_only %}Über diesen Browser wurde bereits eine Antwort abgegeben.{% else %}Sie haben dieses Formular bereits ausgefüllt. Vielen Dank!{% endif %}</p>
-    {% if completed_at %}<p class="small text-secondary mb-0">Teilnahme gespeichert am {{ completed_at | local("%d.%m.%Y um %H:%M") }} Uhr.</p>{% endif %}
+    {% if completed_at %}<p class="small text-secondary mb-2">Teilnahme gespeichert am {{ completed_at | local("%d.%m.%Y um %H:%M") }} Uhr.</p>{% endif %}
+    {% if request.session.get("uid") %}<a class="btn btn-outline-primary mt-3" href="/meine-umfragen"><i class="fa-solid fa-clipboard-check me-1" aria-hidden="true"></i>Meine Umfragen</a>{% endif %}
   {% elif kind == 'closed' %}
     <i class="fa-solid fa-lock fa-3x text-secondary mb-3"></i>
     <h1 class="h4">{{ form.title }}</h1><p class="mb-0 text-secondary">Dieses Formular nimmt keine Antworten mehr an.</p>
