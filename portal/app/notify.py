@@ -211,7 +211,7 @@ def text_to_html(text: str, frame: dict | None = None, *, kind: str = "") -> str
     } and "TERMINÜBERSICHT" not in text:
         legacy_rows = []
         for raw_line in text.splitlines():
-            hit = re.match(r"^\\s*(Termin|Anliegen|Datum|Uhrzeit|Ort|Wann|Wo):\\s*(.+?)\\s*$", raw_line, re.I)
+            hit = re.match(r"^\s*(Termin|Anliegen|Datum|Uhrzeit|Ort|Wann|Wo):\s*(.+?)\s*$", raw_line, re.I)
             if hit and not hit.group(2).startswith(("http://", "https://")):
                 label, value = hit.group(1), hit.group(2)
                 if len(value) <= 300 and len(legacy_rows) < 5:
