@@ -56,7 +56,7 @@ Mit dem Recht „Krankmeldungen“ und als Zuständige:r eines Arbeitgebers: Men
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du bist krank und musst dich melden?
 
