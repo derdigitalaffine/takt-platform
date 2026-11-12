@@ -100,7 +100,8 @@ def signage_campaigns_page(request: Request, user: User = Depends(manage_user),
     source_events = []
     if calendar_id and any(calendar_id == cal.id for cal in available_calendars):
         q = select(CalendarEvent).where(CalendarEvent.calendar_id == calendar_id)
-        source_events = list(db.scalars(q.order_by(CalendarEvent.starts_at.desc()).limit(150)))
+        source_events = [ev for ev in db.scalars(q.order_by(CalendarEvent.starts_at.desc()).limit(150))
+                         if signage_passive.source_access(db, user, ev, SimpleNamespace(org_id=None))]
     return render(request, "signage_campaigns.html", user,
         buildings=buildings, rooms=rooms, floors=floors, screens=screens,
         campaigns=listed, affected=affected, conflicts=conflicts,
