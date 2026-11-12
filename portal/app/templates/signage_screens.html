@@ -15,6 +15,7 @@
   {% if screens %}
   <div class="sg-screen-grid">
   {% for screen in screens %}
+    <div class="sg-screen-item" data-sg-screen-item>
     <a class="sg-screen-card" href="/signage/{{ screen.id }}/edit">
       <div class="sg-screen-preview" style="--sg-bg:{{ (screen.theme_json|default('')) and '#17283d' or '#17283d' }}">
         <div class="sg-screen-preview-top"><i class="fa-solid {{ {'agenda':'fa-calendar-days','room':'fa-door-open','directory':'fa-address-book','info':'fa-bullhorn'}.get(screen.kind, 'fa-signs-post') }}"></i><span>TAKT Signage</span></div>
@@ -23,6 +24,10 @@
       <div class="sg-screen-card-foot"><div><strong>{{ screen.name }}</strong><span>{{ kinds[screen.kind] }}</span></div>
         <span class="sg-pill {{ 'sg-pill-success' if screen.visibility == 'public' else 'sg-pill-neutral' }}">{{ {'private':'Intern','public':'Öffentlich','link':'Sicherer Link'}[screen.visibility] }}</span></div>
     </a>
+    <div class="sg-screen-controls">
+      <a href="/signage/{{ screen.id }}/edit" class="btn btn-sm btn-outline-primary">Bearbeiten</a>
+      <a href="/signage/{{ screen.id }}/delete" class="btn btn-sm btn-outline-danger">Löschen</a>
+    </div></div>
   {% endfor %}
   </div>
   {% else %}
