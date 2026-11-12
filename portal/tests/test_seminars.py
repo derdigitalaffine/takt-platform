@@ -141,3 +141,87 @@ def test_session_post_recurrence_then_cancelled_calendar(db,people):
     e=rec(db,row,t,people[1]);sm.request_place(db,row,e);db.commit()
     assert c.post(f'/seminare/{row.id}/sessions/{t.id}',data={'csrf':token,'revision':t.revision,'action':'cancel','reason':'Dozent verhindert'}).status_code==303
     db.expire_all();assert 'STATUS:CANCELLED' in sm.calendar_text(db,row,e)
+
+
+def test_staff_cancel_post_promotes_waitlist_and_queues_confirmation(db, people):
+    """The real POST must commit cancellation, mail and seat promotion together."""
+    from app.db import Notification
+
+    row, term = make(db, people, capacity=1)
+    confirmed = rec(db, row, term, people[1])
+    waiting = rec(db, row, term, people[2])
+    sm.request_place(db, row, confirmed)
+    sm.request_place(db, row, waiting)
+    db.commit()
+    assert confirmed.status == 'confirmed' and waiting.status == 'waitlist'
+
+    planner = login(people[0].email, 'passwort-test-123')
+    page = planner.get(f'/seminare/{row.id}/participants')
+    assert page.status_code == 200
+    response = planner.post(f'/seminare/{row.id}/participants/{confirmed.id}/decision',
+                            data={'csrf': csrf_of(page.text), 'action': 'cancel',
+                                  'reason': 'Teilnahme abgesagt'})
+    assert response.status_code == 303
+    db.refresh(confirmed)
+    db.refresh(waiting)
+    assert confirmed.status == 'cancelled' and confirmed.reason == 'Teilnahme abgesagt'
+    assert waiting.status == 'offered'
+    assert db.scalar(select(SeminarEvent).where(
+        SeminarEvent.seminar_id == row.id,
+        SeminarEvent.kind == 'cancellation')) is not None
+    assert db.scalar(select(Notification).where(
+        Notification.to_addr == confirmed.email,
+        Notification.kind == 'seminar',
+        Notification.subject.contains('Abmeldung bestätigt'))) is not None
+
+
+def test_personal_cancel_post_commits_status(db, people):
+    """Self-service uses the same transactional cancellation path."""
+    row, term = make(db, people)
+    term.starts_at = utcnow() + timedelta(days=10)
+    term.ends_at = term.starts_at + timedelta(hours=2)
+    enrollment = rec(db, row, term, people[1])
+    sm.request_place(db, row, enrollment)
+    db.commit()
+
+    member = login(people[1].email, 'passwort-test-123')
+    path = sm.personal_path(enrollment)
+    page = member.get(path)
+    assert page.status_code == 200
+    response = member.post(path + '/action', data={
+        'csrf': csrf_of(page.text), 'action': 'cancel', 'reason': 'Verhindert'})
+    assert response.status_code == 303
+    db.refresh(enrollment)
+    assert enrollment.status == 'cancelled' and enrollment.reason == 'Verhindert'
+
+
+def test_legacy_seminar_cancellation_columns_are_migrated_idempotently(monkeypatch):
+    """Older SQLite databases must support both locking and queued cancellation mail."""
+    from sqlalchemy import create_engine, inspect, text
+    from app import db as database
+    from app.db import Notification
+
+    engine = create_engine('sqlite:///:memory:')
+    database.Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(Seminar.__table__.insert().values(
+            id=77, owner_id=1, title='Bestehendes Seminar'))
+        connection.execute(Notification.__table__.insert().values(
+            id=77, kind='seminar', to_addr='legacy@example.org',
+            subject='Alte Nachricht', body='Unverändert'))
+        connection.execute(text('ALTER TABLE seminars DROP COLUMN seat_lock'))
+        connection.execute(text('ALTER TABLE notifications DROP COLUMN guard_json'))
+
+    monkeypatch.setattr(database, 'engine', engine)
+    database._migrate()
+    database._migrate()
+
+    assert 'seat_lock' in {c['name'] for c in inspect(engine).get_columns('seminars')}
+    assert 'guard_json' in {c['name'] for c in inspect(engine).get_columns('notifications')}
+    with engine.connect() as connection:
+        assert connection.execute(text(
+            'SELECT title, seat_lock FROM seminars WHERE id = 77')).one() == (
+                'Bestehendes Seminar', 0)
+        assert connection.execute(text(
+            'SELECT subject, guard_json FROM notifications WHERE id = 77')).one() == (
+                'Alte Nachricht', None)
