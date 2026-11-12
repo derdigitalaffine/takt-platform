@@ -196,3 +196,74 @@ def test_room_rename_updates_live_projection_without_republishing(place):
     page = client().get(f"/signage/view/{sid}").text
     assert "Bürgerservice aktualisiert" in page and "Raum P1A" in page
     assert "Bürgerbüro Passiv" not in page
+
+
+def test_passive_building_floor_and_corridor_render_only_opted_in_people(place):
+    """Root cause: passive room projection previously ignored consented offices."""
+    from app.signage_models import SignageOffice
+    from test_signage_rooms_picker import _person
+
+    c = _admin()
+    _, _, room, _ = place
+    acker = _person("Berta Acker", "display-acker")
+    zander = _person("Anton Zander", "display-zander")
+    private = _person("Clara Privat", "display-private")
+    inactive = _person("Emil Inaktiv", "display-inactive")
+
+    with SessionLocal() as db:
+        from app.db import User
+        db.add_all([
+            SignageOffice(user_id=acker, room_id=room, public=True, is_primary=True),
+            SignageOffice(user_id=zander, room_id=room, public=True, is_primary=True),
+            SignageOffice(user_id=private, room_id=room, public=False, is_primary=True),
+            SignageOffice(user_id=inactive, room_id=room, public=True, is_primary=True),
+        ])
+        db.get(User, inactive).active = False
+        db.commit()
+
+    for kind in ("sign_building", "sign_floor", "sign_corridor"):
+        screen_id, _ = _setup(c, place, kind)
+        html = client().get(f"/signage/view/{screen_id}").text
+        assert "Bürgerbüro Passiv" in html
+        assert "Raum P1" in html
+        assert "Berta Acker" in html and "Anton Zander" in html
+        assert html.index("Berta Acker") < html.index("Anton Zander")
+        assert "Clara Privat" not in html and "Emil Inaktiv" not in html
+        assert "Öffentlich freigegebene Ansprechpersonen" in html
+
+    # Consent revoked: the *next request* must no longer contain the name.
+    with SessionLocal() as db:
+        db.scalar(select(SignageOffice).where(SignageOffice.user_id == acker)).public = False
+        db.commit()
+    html = client().get(f"/signage/view/{screen_id}").text
+    assert "Berta Acker" not in html and "Anton Zander" in html
+
+
+def test_public_person_requires_separate_public_room_release(place):
+    """Opting into the directory does not override room publication approval."""
+    from app.signage_models import SignageOffice, SignagePublicDestination
+    from test_signage_rooms_picker import _person
+
+    c = _admin()
+    person_id = _person("Tina Geschützt", "display-protected")
+    building, floor, room, origin = place
+    with SessionLocal() as db:
+        db.add(SignageOffice(user_id=person_id, room_id=room, public=True))
+        db.commit()
+
+    result = _post(c, "/signage/new", {
+        "name": "Unveröffentlichte Zimmer", "kind": "sign_building",
+        "building_id": building, "floor_id": floor, "node_id": origin, "facing": "north"
+    })
+    assert result.status_code == 303, result.text
+    sid = int(result.headers["location"].split("/")[2])
+    with SessionLocal() as db:
+        db.get(SignageScreen, sid).visibility = "public"
+        db.commit()
+    html = client().get(f"/signage/view/{sid}").text
+    assert "Tina Geschützt" not in html
+    _post(c, f"/signage/room/{room}/destination", {"listed": "1"})
+    assert "Tina Geschützt" in client().get(f"/signage/view/{sid}").text
+    # Withdrawing room publicity immediately hides the entire destination.
+    _post(c, f"/signage/room/{room}/destination", {"listed": "0"})
+    assert "Tina Geschützt" not in client().get(f"/signage/view/{sid}").text
