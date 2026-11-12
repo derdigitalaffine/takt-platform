@@ -18,7 +18,7 @@ from datetime import timedelta
 
 from sqlalchemy import or_, select
 
-from . import forms as fm, icons, links, mailtpl, notify
+from . import application_orgs as ao, forms as fm, icons, links, mailtpl, notify
 from .config import settings
 from .db import (
     ApplicationEvent, ApplicationTask, Form, FormResponse, SessionLocal, User, get_settings, to_local, utcnow,
@@ -84,23 +84,37 @@ def clean_rules(raw: list, items: list[dict]) -> list[dict]:
         value = str(r.get("value") or "").strip()[:500]
         user_id = int(r["user_id"]) if str(r.get("user_id") or "").isdigit() else None
         group_id = int(r["group_id"]) if str(r.get("group_id") or "").isdigit() else None
+        org_id = int(r["org_id"]) if str(r.get("org_id") or "").isdigit() else None
         email = str(r.get("email") or "").strip().lower()[:255]
         if email and not EMAIL_RE.match(email):
             email = ""
-        if value and (user_id or group_id or email):
+        if value and (user_id or group_id or org_id or email):
             rules.append({"question": r["question"], "value": value, "user_id": user_id, "group_id": group_id,
-                          "email": email})
+                          "org_id": org_id, "email": email})
     return rules
 
 
-def route(form: Form, answers: dict) -> tuple[int | None, int | None, str]:
-    """Zuständigkeit: erste passende Regel (Antwort enthält den Wert), sonst die Vorgabe des Antrags."""
+def matched_rule(form: Form, answers: dict) -> dict | None:
+    """A single first-match decision is used by both old and new routing fields."""
     for rule in routing_rules(form):
         given = answers.get(rule["question"])
         values = given if isinstance(given, list) else [given]
         if any(str(v).strip().lower() == rule["value"].lower() for v in values if v is not None):
-            return rule.get("user_id"), rule.get("group_id"), rule.get("email") or ""
+            return rule
+    return None
+
+
+def route(form: Form, answers: dict) -> tuple[int | None, int | None, str]:
+    """Backward-compatible existing person/group/mail routing contract."""
+    rule = matched_rule(form, answers)
+    if rule is not None:
+        return rule.get("user_id"), rule.get("group_id"), rule.get("email") or ""
     return form.app_assignee_id, form.app_group_id, form.app_mailbox or ""
+
+
+def route_org(form: Form, answers: dict) -> int | None:
+    rule = matched_rule(form, answers)
+    return rule.get("org_id") if rule is not None else form.app_org_id
 
 
 def checksum(resp: FormResponse) -> str:
@@ -129,12 +143,16 @@ def access(db, user: User, resp: FormResponse) -> int:
     level = fm.access_level(db, resp.form, user)
     groups = _group_ids(db, user)
     ids = _user_ids(db, user)
-    if level >= fm.INVITE or resp.assignee_id in ids or (resp.group_id and resp.group_id in groups):
+    org_ids = ao.assigned_org_ids(db, ids)
+    if (level >= fm.INVITE or resp.assignee_id in ids or
+        (resp.group_id and resp.group_id in groups) or
+        (resp.responsible_org_id and resp.responsible_org_id in org_ids)):
         return 2
     if resp.form.owner_id in ids[1:]:
         return 2
     # Wer einen Arbeitsschritt im Vorgang hat (offen oder erledigt), arbeitet mit
-    if any(t.assignee_id in ids or (t.group_id and t.group_id in groups) for t in resp.tasks):
+    if any(t.assignee_id in ids or (t.group_id and t.group_id in groups) or
+           (t.responsible_org_id and t.responsible_org_id in org_ids) for t in resp.tasks):
         return 2
     return 1 if level >= fm.VIEW else 0
 
@@ -146,11 +164,14 @@ def inbox_query(db, user: User):
         return q
     groups = _group_ids(db, user)
     ids = _user_ids(db, user)
+    org_ids = ao.assigned_org_ids(db, ids)
     shared_forms = [f.id for f, _lvl in fm.shared_with(db, user)]
     task_cases = select(ApplicationTask.response_id).where(
-        or_(ApplicationTask.assignee_id.in_(ids), ApplicationTask.group_id.in_(groups or [-1])))
+        or_(ApplicationTask.assignee_id.in_(ids), ApplicationTask.group_id.in_(groups or [-1]),
+            ApplicationTask.responsible_org_id.in_(org_ids or [-1])))
     return q.where(or_(Form.owner_id.in_(ids), FormResponse.assignee_id.in_(ids),
-                       FormResponse.group_id.in_(groups or [-1]), Form.id.in_(shared_forms or [-1]),
+                       FormResponse.group_id.in_(groups or [-1]),
+                       FormResponse.responsible_org_id.in_(org_ids or [-1]), Form.id.in_(shared_forms or [-1]),
                        FormResponse.id.in_(task_cases)))
 
 
@@ -169,6 +190,8 @@ def _staff_addresses(db, form: Form, resp: FormResponse) -> list[str]:
         for member in resp.group.members:
             if member.active:
                 add(member.email)
+    for addr in ao.emails(db, resp.responsible_org_id):
+        add(addr)
     add(resp.route_email)
     if not out and form.owner and form.owner.active:   # niemand zugeordnet: an die Besitzer:in
         add(form.owner.email)
@@ -189,6 +212,7 @@ def _common(form: Form, resp: FormResponse) -> dict:
             "frist": to_local(resp.due_at).strftime("%d.%m.%Y") if resp.due_at else "",
             "zustaendig": ", ".join(x for x in (resp.assignee.name if resp.assignee else "",
                                                  f"Gruppe {resp.group.name}" if resp.group else "",
+                                                 resp.responsible_org.name if resp.responsible_org else "",
                                                  resp.route_email) if x) or "nicht zugeordnet"}
 
 
@@ -241,6 +265,7 @@ def on_submit(db, form: Form, resp: FormResponse) -> None:
     resp.ref_no = next_ref(form)
     resp.status, resp.status_at = "received", utcnow()
     resp.assignee_id, resp.group_id, resp.route_email = route(form, resp.answers)
+    resp.responsible_org_id = route_org(form, resp.answers)
     resp.due_at = utcnow() + timedelta(days=max(form.app_deadline_days or 0, 0)) if form.app_deadline_days else None
     resp.track_token = secrets.token_urlsafe(24)
     resp.checksum = checksum(resp)
@@ -297,8 +322,10 @@ def note(resp: FormResponse, text: str, actor: User) -> None:
     _event(resp, "note", text, actor)
 
 
-def assign(db, resp: FormResponse, user_id: int | None, group_id: int | None, actor: User) -> None:
+def assign(db, resp: FormResponse, user_id: int | None, group_id: int | None, actor: User,
+           org_id: int | None = None) -> None:
     resp.assignee_id, resp.group_id = user_id, group_id
+    resp.responsible_org_id = ao.validate(db, org_id)
     db.flush()
     db.refresh(resp)
     who = _common(resp.form, resp)["zustaendig"]

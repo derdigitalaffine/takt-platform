@@ -9,7 +9,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import applications as apps, forms as fm, icons, worker, workflow
+from . import application_orgs as ao, applications as apps, forms as fm, icons, worker, workflow
 from .config import settings
 from .db import LOCAL_TZ, Form, FormResponse, Group, Process, User, get_settings, set_setting, utcnow
 from .main import (
@@ -44,10 +44,22 @@ def form_application(request: Request, form_id: int, user: User = Depends(curren
     from .routes_forms import _ctx
     items = fm.schema(form)
     from . import orgs
+    selected_default = form.app_org_id
+    if not selected_default and form.app_group_id:
+        old_group = db.get(Group, form.app_group_id)
+        selected_default = old_group.org_id if old_group else None
+    resolved_rules = []
+    for rule in apps.routing_rules(form):
+        rule = dict(rule)
+        if not rule.get("org_id") and rule.get("group_id"):
+            old_group = db.get(Group, rule["group_id"])
+            rule["org_id"] = old_group.org_id if old_group else None
+        resolved_rules.append(rule)
     auto = apps.style_of(Form(title=form.title, app_category=form.app_category), apps.category_styles(db))
     return render(request, "form_application.html", user, **_ctx(db, form, "application", level),
                   org_options=orgs.options(db), icon_list=icons.picker_data(), icon_auto=auto["icon"], icon_color=auto["color"],
-                  questions=fm.questions(items), rules=apps.routing_rules(form),
+                  questions=fm.questions(items), rules=resolved_rules,
+                  responsible_options=ao.options(db), selected_default_org=selected_default,
                   users=db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)).all(),
                   groups=db.scalars(select(Group).order_by(Group.name)).all(),
                   has_email=any(q["type"] == "short" and q.get("subtype") == "email" for q in fm.questions(items)),
@@ -101,7 +113,12 @@ async def form_application_save(request: Request, form_id: int, user: User = Dep
     form.app_fee = " ".join(str(data.get("app_fee", "")).split())[:255]
     form.app_duration = " ".join(str(data.get("app_duration", "")).split())[:255]
     form.app_assignee_id = int(data["app_assignee_id"]) if str(data.get("app_assignee_id", "")).isdigit() else None
-    form.app_group_id = int(data["app_group_id"]) if str(data.get("app_group_id", "")).isdigit() else None
+    if "app_org_id" in data:
+        form.app_org_id = ao.validate(db, data.get("app_org_id"))
+        # A selected organization supersedes the old group-only assignment.
+        form.app_group_id = None
+    else:
+        form.app_group_id = int(data["app_group_id"]) if str(data.get("app_group_id", "")).isdigit() else None
     mailbox = str(data.get("app_mailbox", "")).strip().lower()[:255]
     form.app_mailbox = mailbox if EMAIL_RE.match(mailbox or "-") else ""
     try:
@@ -122,9 +139,19 @@ async def form_application_save(request: Request, form_id: int, user: User = Dep
         laws.invalidate_refs()
     form.app_catalog = data.get("app_catalog") == "1"
     form.app_pdf = data.get("app_pdf") == "1"
-    rules = [{"question": q, "value": v, "user_id": u, "group_id": g, "email": e} for q, v, u, g, e in zip(
-        data.getlist("rule_question"), data.getlist("rule_value"), data.getlist("rule_user"),
-        data.getlist("rule_group"), data.getlist("rule_email"))]
+    # Keep aligned routing rows, including historical rule_group-only clients.
+    rule_q = data.getlist("rule_question")
+    rule_org = data.getlist("rule_org") if "rule_org" in data else []
+    rule_group = data.getlist("rule_group") if "rule_group" in data else []
+    rules = []
+    for i, q in enumerate(rule_q):
+        org_id = ao.validate(db, rule_org[i]) if i < len(rule_org) else None
+        rules.append({"question": q,
+                      "value": (data.getlist("rule_value")[i] if i < len(data.getlist("rule_value")) else ""),
+                      "user_id": (data.getlist("rule_user")[i] if i < len(data.getlist("rule_user")) else ""),
+                      "group_id": (rule_group[i] if i < len(rule_group) and not org_id else ""),
+                      "org_id": org_id,
+                      "email": (data.getlist("rule_email")[i] if i < len(data.getlist("rule_email")) else "")})
     form.app_routing_json = json.dumps(apps.clean_rules(rules, fm.schema(form)), ensure_ascii=False)
     if mailbox and not form.app_mailbox:
         flash(request, "Die Adresse des Funktionspostfachs ist ungültig und wurde nicht übernommen.", "error")
@@ -166,7 +193,9 @@ def applications_inbox(request: Request, status: str = "open", form: str = "", s
         items = [r for r in items if r.status == status]
     if scope == "mine":
         groups = set(apps._group_ids(db, user))
-        items = [r for r in items if r.assignee_id == user.id or (r.group_id in groups)]
+        org_ids = ao.assigned_org_ids(db, apps._user_ids(db, user))
+        items = [r for r in items if r.assignee_id == user.id or
+                 (r.group_id in groups) or (r.responsible_org_id in org_ids)]
     if form.isdigit():
         items = [r for r in items if r.form_id == int(form)]
     if q.strip():
@@ -225,6 +254,7 @@ def application_detail(request: Request, form_id: int, resp_id: int, user: User 
                   questions=workflow.case_questions(resp), display=fm.display, statuses=apps.STATUSES, closed=apps.CLOSED,
                   users=db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)).all(),
                   groups=db.scalars(select(Group).order_by(Group.name)).all(), now=utcnow(),
+                  responsible_options=ao.options(db),
                   track_link=apps.track_link(resp), applicant=apps.applicant_email(resp.form, resp),
                   checksum_ok=apps.checksum(resp) == resp.checksum, mail_ready=apps.mail_ready(db),
                   task=task, step=step, geo_features=geo_features, compose=compose,
@@ -271,14 +301,16 @@ async def application_action(request: Request, form_id: int, resp_id: int, user:
     elif action == "assign":
         uid = int(data["user_id"]) if str(data.get("user_id", "")).isdigit() else None
         gid = int(data["group_id"]) if str(data.get("group_id", "")).isdigit() else None
-        apps.assign(db, resp, uid, gid, user)
+        org_id = ao.validate(db, data.get("responsible_org_id")) if "responsible_org_id" in data else None
+        apps.assign(db, resp, uid, gid if org_id is None and "responsible_org_id" not in data else None,
+                    user, org_id=org_id)
         flash(request, "Zuständigkeit geändert.")
     elif action == "due":
         due = _local_date(str(data.get("due", ""))) if data.get("due") else None
         apps.set_due(resp, due, user)
         flash(request, "Frist geändert.")
     elif action == "take":
-        apps.assign(db, resp, user.id, resp.group_id, user)
+        apps.assign(db, resp, user.id, resp.group_id, user, org_id=resp.responsible_org_id)
         if resp.status == "received":
             apps.set_status(db, resp, "in_progress", "", user, inform=data.get("inform") == "1")
         flash(request, "Sie bearbeiten diesen Antrag.")

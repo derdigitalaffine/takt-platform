@@ -24,7 +24,7 @@
   {{ status_badge(resp.status) }}
   {% if overdue %}<span class="badge text-bg-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Frist überschritten</span>{% endif %}
   <span class="small text-secondary">Eingang {{ resp.created_at | local }} Uhr{% if resp.due_at %} · Frist {{ resp.due_at | local('%d.%m.%Y') }}{% endif %}</span>
-  <span class="small text-secondary">· Vorgang: {{ resp.assignee.name if resp.assignee else '' }}{% if resp.group %} Gruppe {{ resp.group.name }}{% endif %}{% if not resp.assignee and not resp.group %}{{ resp.route_email or 'niemand' }}{% endif %}</span>
+  <span class="small text-secondary">· Vorgang: {{ resp.assignee.name if resp.assignee else '' }}{% if resp.group %} Gruppe {{ resp.group.name }}{% endif %}{% if resp.responsible_org %} · {{ resp.responsible_org.name }}{% endif %}{% if not resp.assignee and not resp.group and not resp.responsible_org %}{{ resp.route_email or 'niemand' }}{% endif %}</span>
   {% if resp.process_version %}<span class="small text-secondary">· Prozess „{{ resp.process_version.process.name }}“ v{{ resp.process_version.version }}</span>{% endif %}
   {% if level < 2 %}<span class="badge text-bg-light border">nur Lesezugriff</span>{% endif %}
 </div>
@@ -52,7 +52,7 @@
       <div class="flex-grow-1">
         <div class="small text-secondary"><i class="fa-solid {{ step_types[task.kind][1] }} me-1"></i>Aktueller Schritt · {{ step_types[task.kind][0] }}</div>
         <h2 class="h5 mb-1">{{ task.name }}</h2>
-        <div class="small">Zuständig: <strong>{{ task.assignee.name if task.assignee else '' }}{% if task.group and not task.assignee %}Gruppe {{ task.group.name }}{% elif task.group %} (Gruppe {{ task.group.name }}){% endif %}{% if not task.assignee and not task.group %}{{ 'Antragsteller:in' if task.kind == 'request' else 'Zuständige des Vorgangs' }}{% endif %}</strong>
+        <div class="small">Zuständig: <strong>{{ task.assignee.name if task.assignee else '' }}{% if task.group and not task.assignee %}Gruppe {{ task.group.name }}{% elif task.group %} (Gruppe {{ task.group.name }}){% endif %}{% if task.responsible_org %} · {{ task.responsible_org.name }}{% endif %}{% if not task.assignee and not task.group and not task.responsible_org %}{{ 'Antragsteller:in' if task.kind == 'request' else 'Zuständige des Vorgangs' }}{% endif %}</strong>
           {% if task.due_at %} · Frist <span class="{{ 'text-danger fw-semibold' if tdue }}">{{ task.due_at | local('%d.%m.%Y') }}{% if tdue %} (überfällig){% endif %}</span>{% endif %}</div>
       </div>
       {% if task.state == 'open' and task.assignee_id != user.id and (can_work or level >= 2) %}
@@ -132,7 +132,7 @@
       <div class="row g-2 mt-1">
         <form method="post" action="{{ act }}/task/{{ task.id }}" class="col-lg-6 d-flex flex-wrap gap-2 align-items-center"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="reassign">
           <select class="form-select form-select-sm w-auto" name="user_id" aria-label="Person"><option value="">– Person –</option>{% for u in users %}<option value="{{ u.id }}" {% if task.assignee_id == u.id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select>
-          <select class="form-select form-select-sm w-auto" name="group_id" aria-label="Gruppe"><option value="">– Gruppe –</option>{% for g in groups %}<option value="{{ g.id }}" {% if task.group_id == g.id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}</select>
+          <select class="form-select form-select-sm w-auto" name="responsible_org_id" aria-label="Organisationseinheit oder Gruppe"><option value="">– Organisationseinheit / Gruppe –</option>{% for oid, name in responsible_options %}<option value="{{ oid }}" {% if (task.responsible_org_id or (task.group.org_id if task.group else None)) == oid %}selected{% endif %}>{{ name }}</option>{% endfor %}</select>
           <button class="btn btn-sm btn-outline-primary" type="submit">Zuweisen</button></form>
         <form method="post" action="{{ act }}/task/{{ task.id }}" class="col-lg-3 d-flex gap-2"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="due">
           <input class="form-control form-control-sm" type="date" name="due" value="{{ task.due_at | local('%Y-%m-%d') if task.due_at else '' }}" aria-label="Frist des Schritts"><button class="btn btn-sm btn-outline-secondary" type="submit">Frist</button></form>
@@ -265,7 +265,7 @@
     <div class="card mb-4"><div class="card-header"><i class="fa-solid fa-user-tie me-2"></i>Zuständigkeit &amp; Frist des Vorgangs</div><div class="card-body">
       <form method="post" action="{{ act }}/action" class="row g-2 mb-3"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="assign">
         <div class="col-6"><select class="form-select form-select-sm" name="user_id" aria-label="Person"><option value="">– Person –</option>{% for u in users %}<option value="{{ u.id }}" {% if resp.assignee_id == u.id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select></div>
-        <div class="col-6"><select class="form-select form-select-sm" name="group_id" aria-label="Gruppe"><option value="">– Gruppe –</option>{% for g in groups %}<option value="{{ g.id }}" {% if resp.group_id == g.id %}selected{% endif %}>{{ g.name }}</option>{% endfor %}</select></div>
+        <div class="col-6"><select class="form-select form-select-sm" name="responsible_org_id" aria-label="Zuständige Organisationseinheit oder Gruppe"><option value="">– Organisationseinheit / Gruppe –</option>{% for oid, name in responsible_options %}<option value="{{ oid }}" {% if (resp.responsible_org_id or (resp.group.org_id if resp.group else None)) == oid %}selected{% endif %}>{{ name }}</option>{% endfor %}</select></div>
         <div class="col-12"><button class="btn btn-outline-primary btn-sm" type="submit">Zuweisen (mit Hinweis per Mail)</button></div>
       </form>
       <form method="post" action="{{ act }}/action" class="d-flex gap-2"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="due">

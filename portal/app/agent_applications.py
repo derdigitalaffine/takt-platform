@@ -8,12 +8,13 @@ from itertools import islice
 from fastapi import HTTPException
 from sqlalchemy import func, or_, select
 
-from . import applications as apps, workflow as wf
+from . import application_orgs as ao, applications as apps, workflow as wf
 from .db import (
     ApplicationEvent,
     Form,
     FormResponse,
     Group,
+    Organization,
     LOCAL_TZ,
     User,
     to_local,
@@ -54,11 +55,12 @@ def revision(db, row):
         row.closed_at,
         row.assignee_id,
         row.group_id,
+        row.responsible_org_id,
         row.due_at,
         row.process_version_id,
         latest_event,
         [
-            (t.id, t.state, t.assignee_id, t.group_id, t.completed_by_id, t.due_at)
+            (t.id, t.state, t.assignee_id, t.group_id, t.responsible_org_id, t.completed_by_id, t.due_at)
             for t in row.tasks
         ],
     ]
@@ -121,6 +123,8 @@ def search(db, user, spec, phrase, pattern):
             or_(
                 FormResponse.assignee_id.in_(apps._user_ids(db, user)),
                 FormResponse.group_id.in_(apps._group_ids(db, user)),
+                FormResponse.responsible_org_id.in_(
+                    ao.assigned_org_ids(db, apps._user_ids(db, user)) or [-1]),
             )
         )
 
@@ -210,10 +214,12 @@ def validate(db, user, action):
                 409, "Die Empfängeradresse hat sich geändert. Bitte neu planen."
             )
     if operation == "assign":
-        for model, key in ((User, "user_id"), (Group, "group_id")):
+        for model, key in ((User, "user_id"), (Group, "group_id"), (Organization, "org_id")):
             if (record_id := action.get(key)) is not None:
                 item = db.get(model, record_id)
-                if item is None or (model is User and not item.active):
+                if item is None or (model is User and not item.active) or (
+                    model is Organization and not ao.validate(db, record_id)
+                ):
                     raise HTTPException(
                         409, "Die gewählte Zuständigkeit ist nicht verfügbar."
                     )
@@ -300,14 +306,20 @@ def normalize(db, user, raw, findings):
 
     row, _ = validate(db, user, action)
     if operation == "assign":
-        if not raw.get("person") and not raw.get("group"):
-            raise ValueError("Bitte eine Person oder Gruppe für die Zuweisung angeben.")
+        if not raw.get("person") and not raw.get("group") and not raw.get("organization"):
+            raise ValueError("Bitte eine Person, Gruppe oder Organisationseinheit für die Zuweisung angeben.")
         action["user_id"] = (
             resolve_name(db, User, raw["person"]) if raw.get("person") else None
         )
         action["group_id"] = (
             resolve_name(db, Group, raw["group"]) if raw.get("group") else None
         )
+        action["org_id"] = (
+            resolve_name(db, Organization, raw["organization"])
+            if raw.get("organization") else None
+        )
+        if action["org_id"] is not None:
+            ao.validate(db, action["org_id"])
     action.update(form_id=row.form_id, version=revision(db, row))
     return snapshot(db, user, action)
 
@@ -319,10 +331,12 @@ def snapshot(db, user, action):
             apps.applicant_email(row.form, row).encode()
         ).hexdigest()
     if action["operation"] == "assign":
-        for model, key in ((User, "user_id"), (Group, "group_id")):
+        for model, key in ((User, "user_id"), (Group, "group_id"), (Organization, "org_id")):
             action[key + "_name"] = (
-                db.get(model, action[key]).name if action[key] else ""
+                db.get(model, action.get(key)).name if action.get(key) else ""
             )
+        group = db.get(Group, action.get("group_id")) if action.get("group_id") else None
+        action["responsible_org_id"] = action.get("org_id") or (group.org_id if group else None)
     return action
 
 
@@ -370,15 +384,21 @@ def edited(db, user, original, data):
     elif operation == "due":
         action["due"] = due_date(data.get("due", action["due"]))
     elif operation == "assign":
-        for key in ("user_id", "group_id"):
+        for key in ("user_id", "group_id", "responsible_org_id"):
             if key in data:
                 value = data[key]
                 if not isinstance(value, str) or (
                     value and (not value.isascii() or not value.isdigit())
                 ):
                     raise ValueError("Bitte eine gültige Zuständigkeit wählen.")
-                action[key] = int(value) if value else None
-                action.pop(key + "_name", None)
+                if key == "responsible_org_id":
+                    action["org_id"] = ao.validate(db, int(value) if value else None)
+                    action["group_id"] = None
+                    action.pop("group_id_name", None)
+                    action.pop("org_id_name", None)
+                else:
+                    action[key] = int(value) if value else None
+                    action.pop(key + "_name", None)
     action["reviewed"] = True
     return snapshot(db, user, action)
 
@@ -434,11 +454,11 @@ def preview(db, action):
             lines.append("Der Status wechselt zu „In Bearbeitung“.")
     elif operation == "assign":
         names = [
-            action[key] for key in ("user_id_name", "group_id_name") if action[key]
+            action.get(key) for key in ("user_id_name", "group_id_name", "org_id_name") if action.get(key)
         ]
         lines.append(
             "Zuständigkeit ändern · "
-            + (" und ".join(names) if names else "keine Person oder Gruppe")
+            + (" und ".join(names) if names else "keine Person oder Organisationseinheit")
         )
         lines.append("Neu Zuständige erhalten einen Hinweis.")
     if action.get("text"):
@@ -498,9 +518,10 @@ def execute(db, user, action):
             user,
         )
     elif operation == "assign":
-        apps.assign(db, row, action["user_id"], action["group_id"], user)
+        apps.assign(db, row, action["user_id"], action.get("group_id"), user,
+                    org_id=action.get("org_id"))
     elif operation == "take":
-        apps.assign(db, row, user.id, row.group_id, user)
+        apps.assign(db, row, user.id, row.group_id, user, org_id=row.responsible_org_id)
         if row.status == "received":
             apps.set_status(db, row, "in_progress", "", user, inform=False)
     return dict(label=label, url=path(row), target_id=row.id)

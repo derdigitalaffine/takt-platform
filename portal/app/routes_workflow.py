@@ -178,7 +178,10 @@ async def task_action(request: Request, form_id: int, resp_id: int, task_id: int
         if action == "reassign":
             uid = int(data["user_id"]) if str(data.get("user_id", "")).isdigit() else None
             gid = int(data["group_id"]) if str(data.get("group_id", "")).isdigit() else None
-            wf.reassign(db, task, uid, gid, user)
+            from . import application_orgs as ao
+            org_id = ao.validate(db, data.get("responsible_org_id")) if "responsible_org_id" in data else None
+            wf.reassign(db, task, uid, gid if "responsible_org_id" not in data else None,
+                        user, org_id=org_id)
             flash(request, "Schritt neu zugewiesen.")
         elif action == "due":
             wf.set_task_due(task, _local_date(str(data.get("due", ""))) if data.get("due") else None, user)
@@ -530,6 +533,7 @@ def process_editor(request: Request, process_id: int, user: User = Depends(proce
     process = _process(db, process_id)
     definition = wf.definition_of(process)
     use = wf.usage(db, process)
+    from . import application_orgs as ao
     editor = {
         "definition": definition, "types": wf.STEP_TYPES, "assignModes": wf.ASSIGN_MODES, "ops": wf.OPS,
         "fieldTypes": wf.FIELD_TYPES, "actionTypes": wf.ACTION_TYPES, "mailTargets": wf.MAIL_TARGETS,
@@ -537,6 +541,7 @@ def process_editor(request: Request, process_id: int, user: User = Depends(proce
         "statuses": {k: v[0] for k, v in apps.STATUSES.items()}, "closed": sorted(apps.CLOSED - {"withdrawn"}),
         "users": [{"id": u.id, "name": u.name} for u in _users(db)],
         "groups": [{"id": g.id, "name": g.name} for g in _groups(db)],
+        "organizations": [{"id": oid, "name": label} for oid, label in ao.options(db)],
         "questions": wf.question_titles(db, process),
         "requestTypes": {k: fm.TYPES[k][:2] for k in wf.REQUEST_TYPES},
         "subtypes": fm.SUBTYPES,

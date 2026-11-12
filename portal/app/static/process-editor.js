@@ -63,6 +63,7 @@
     if (s.type === 'auto') { return 'automatisch'; }
     if (a.mode === 'user') { var u = byId(D.users, a.user_id); return u ? u.name : 'Person fehlt!'; }
     if (a.mode === 'group') { var g = byId(D.groups, a.group_id); return g ? 'Gruppe ' + g.name : 'Gruppe fehlt!'; }
+    if (a.mode === 'org') { var o = byId(D.organizations || [], a.org_id); return o ? o.name : 'Organisationseinheit fehlt!'; }
     return D.assignModes[a.mode || 'case'];
   }
   function condText(c) {
@@ -132,6 +133,7 @@
   function section(title, icon, body) { return '<h3 class="h6 mt-4 mb-2 pb-1 border-bottom"><i class="fa-solid ' + icon + ' me-2 text-secondary"></i>' + title + '</h3>' + body; }
   var users = function () { return [['', '– Person wählen –']].concat(D.users.map(function (u) { return [u.id, u.name]; })); };
   var groups = function () { return [['', '– Gruppe wählen –']].concat(D.groups.map(function (g) { return [g.id, g.name]; })); };
+  var organizations = function () { return [['', '– Organisationseinheit wählen –']].concat((D.organizations || []).map(function (o) { return [o.id, o.name]; })); };
   var statusOpts = function (empty) { return (empty ? [['', empty]] : []).concat(keys('statuses').map(function (k) { return [k, D.statuses[k]]; })); };
   var otherSteps = function (s, first) {
     return [['', first]].concat(def.steps.filter(function (x) { return x.id !== s.id; }).map(function (x) { return [x.id, (stepIndex(x.id) + 1) + '. ' + x.name]; }));
@@ -176,11 +178,13 @@
     var a = s.assign || {}, e = s.escalate || {};
     var h = '<div class="row g-2">' + lbl('Zuständig', sel('assign.mode', keys('assignModes').map(function (k) { return [k, D.assignModes[k]]; }), a.mode || 'case'), 'col-sm-6');
     if (a.mode === 'user') { h += lbl('Person', sel('assign.user_id', users(), a.user_id || ''), 'col-sm-6'); }
-    if (a.mode === 'group') { h += lbl('Gruppe', sel('assign.group_id', groups(), a.group_id || ''), 'col-sm-6', 'Alle Mitglieder sehen die Aufgabe und können sie übernehmen.'); }
+    if (a.mode === 'group') { h += lbl('Bisherige Gruppe', sel('assign.group_id', groups(), a.group_id || ''), 'col-sm-6', 'Bestehende Gruppen-Zuweisungen bleiben erhalten.'); }
+    if (a.mode === 'org') { h += lbl('Organisationseinheit / Gruppe', sel('assign.org_id', organizations(), a.org_id || ''), 'col-sm-6', 'Direkte Mitglieder der Einheit bzw. des Gruppenknotens können den Schritt bearbeiten.'); }
     h += lbl('Bearbeitungsfrist', '<div class="input-group input-group-sm"><input class="form-control" type="number" min="0" max="365" data-p="' + dueKey + '" data-num="1" value="' + esc(s[dueKey] || 0) + '"><span class="input-group-text">Tage</span></div>', 'col-sm-6', '0 = keine Frist. Bei Überschreitung wird erinnert.');
     h += '</div><div class="row g-2 mt-1"><div class="col-12 small fw-semibold">Eskalation bei Fristüberschreitung (optional)</div>' +
       lbl('', sel('escalate.user_id', [['', '– Person –']].concat(D.users.map(function (u) { return [u.id, u.name]; })), e.user_id || ''), 'col-sm-4') +
-      lbl('', sel('escalate.group_id', [['', '– Gruppe –']].concat(D.groups.map(function (g) { return [g.id, g.name]; })), e.group_id || ''), 'col-sm-4') +
+      lbl('', sel('escalate.group_id', [['', '– Bisherige Gruppe –']].concat(D.groups.map(function (g) { return [g.id, g.name]; })), e.group_id || ''), 'col-sm-4') +
+      lbl('', sel('escalate.org_id', organizations(), e.org_id || ''), 'col-sm-4') +
       lbl('', '<div class="input-group input-group-sm"><span class="input-group-text">nach</span><input class="form-control" type="number" min="0" max="90" data-p="escalate.after_days" data-num="1" value="' + esc(e.after_days || 0) + '"><span class="input-group-text">Tagen</span></div>', 'col-sm-4') +
       '<div class="col-12">' + sw('escalate.reassign', 'Aufgabe dabei an die Vertretung übertragen (statt nur zu informieren)', e.reassign) + '</div></div>';
     return h;
@@ -220,7 +224,7 @@
           '<div class="col-sm-6 d-flex flex-column justify-content-end">' + sw(p + 'public', 'Auf der Statusseite abrufbar', a.public) + sw(p + 'send', 'Per Mail an Antragsteller:in', a.send) + '</div>' +
           lbl('Text des Dokuments', area(p + 'body', a.body, 8, 'data-ph="1"'), 'col-12', 'Leerzeile = neuer Absatz. Briefkopf, Anschrift, Datum und Aktenzeichen setzt das Portal selbst.') + '</div>';
       } else if (a.type === 'assign') {
-        body = '<div class="row g-2">' + lbl('Person', sel(p + 'user_id', users(), a.user_id || ''), 'col-sm-6') + lbl('Gruppe', sel(p + 'group_id', groups(), a.group_id || ''), 'col-sm-6') + '</div>';
+        body = '<div class="row g-2">' + lbl('Person', sel(p + 'user_id', users(), a.user_id || ''), 'col-sm-4') + lbl('Bisherige Gruppe', sel(p + 'group_id', groups(), a.group_id || ''), 'col-sm-4') + lbl('Organisationseinheit / Gruppe', sel(p + 'org_id', organizations(), a.org_id || ''), 'col-sm-4') + '</div>';
       }
       return '<div class="card mb-2"><div class="card-header py-1 d-flex align-items-center small"><strong>' + (i + 1) + '. ' + esc(D.actionTypes[a.type]) + '</strong>' +
         '<button type="button" class="btn btn-sm btn-link text-danger ms-auto" data-del-action="' + i + '">Entfernen</button></div><div class="card-body py-2">' + body + '</div></div>';
@@ -356,7 +360,7 @@
       setPath(target, p, value);
       var f = target.fields[+p.split('.')[1]];
       if (!f.key) { var u2 = {}; def.steps.forEach(function (x) { (x.fields || []).forEach(function (g) { u2[g.key] = 1; }); }); var m = 1; while (u2[String(m)]) { m++; } f.key = String(m); }
-    } else if (/(user_id|group_id)$/.test(p)) {
+    } else if (/(user_id|group_id|org_id)$/.test(p)) {
       setPath(target, p, value ? parseInt(value, 10) : null);
     } else {
       setPath(target, p, value);

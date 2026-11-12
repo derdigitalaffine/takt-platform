@@ -95,7 +95,7 @@
     const allowed = {
       configure_anliegen_category: ['title', 'routing', 'assignee_id', 'enabled', 'apply_open'],
       application_command: {status: ['status', 'text', 'inform'], note: ['text'], message: ['text'],
-        assign: ['user_id', 'group_id'], due: ['due'], take: []}[fields.operation],
+        assign: ['user_id', 'responsible_org_id'], due: ['due'], take: []}[fields.operation],
       application_step: ['comment', ...(fields.input_names || [])],
       create_form: ['title', 'description', 'items_json'],
       edit_form: ['title', 'description', 'items_json'],
