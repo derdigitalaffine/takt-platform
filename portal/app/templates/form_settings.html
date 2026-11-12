@@ -20,7 +20,7 @@
         <div class="form-text">Danach werden keine Antworten mehr angenommen. Die Frist steht in Einladung und Erinnerung.</div></div>
       {{ sw('anonymous', 'Anonym', form.anonymous, 'Name und E-Mail von Eingeladenen und angemeldeten Personen werden nicht zur Antwort gespeichert. Bei Einladungen ist trotzdem sichtbar, wer schon geantwortet hat (für Erinnerungen).') }}
       {{ sw('internal', 'Nur berechtigte angemeldete Beschäftigte', form.internal, 'Erfordert das Benutzerrecht „Interne Formulare ausfüllen“. Vorgangslinks bleiben auf die eigene Person und berechtigte Bearbeitende beschränkt.') }}
-      {{ sw('multiple', 'Mehrfach ausfüllen erlaubt', form.multiple, 'Eingeladene können mehrere Antworten abgeben. Über den öffentlichen Link ist mehrfaches Ausfüllen immer möglich.') }}
+      {{ sw('multiple', 'Mehrfach ausfüllen erlaubt', form.multiple, 'Erlaubt wiederholte Antworten auch über öffentliche Links. Ohne diese Option werden angemeldete Personen, persönliche Einladungen und bereits genutzte Browser nach Möglichkeit wiedererkannt. Ohne Anmeldung oder persönlichen Link ist eine garantierte Einmalteilnahme nicht möglich.') }}
       {{ sw('review', 'Übersicht vor dem Absenden', form.review, 'Ab drei Fragen zeigt die letzte Seite alle Angaben zur Kontrolle, mit Sprung zum Ändern.') }}
       {{ sw('confirm_mail', 'Eingangsbestätigung mit Kopie der Antworten an die ausfüllende Person', form.confirm_mail, 'An Eingeladene bzw. angemeldete Personen; bei öffentlichen Links an die Adresse aus der ersten E-Mail-Frage.') }}
       <label class="form-label mt-2" for="s-msg">Text nach dem Absenden</label>
