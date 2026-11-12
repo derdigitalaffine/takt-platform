@@ -215,6 +215,9 @@ def test_poll_color_matrix_has_web_yes_maybe_no_and_untruncated_csv(reports):
             }), comment="Drei Möglichkeiten geprüft.",
         ))
         db.commit()
+        # The participant collection was loaded above; refresh it after adding
+        # a new participant by poll_id so CSV and PDF see the committed row.
+        db.expire(poll, ["participants", "options"])
         csv_text = pl.to_csv(poll)
         pdf = survey_pdf.poll_report(db, poll)
     reader = PdfReader(io.BytesIO(pdf))
