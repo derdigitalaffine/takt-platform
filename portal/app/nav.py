@@ -90,7 +90,7 @@ ITEMS: list[Item] = [
     Item("anliegen", "work", "/anliegen", "fa-inbox", "Interne Anliegen",
          lambda c: "anliegen" in c.modules, _pre("/anliegen")),
     Item("tasks", "work", "/tasks", "fa-list-check", "Meine Aufgaben",
-         lambda c: _apps(c) or c.res_nav or "circulations" in c.modules or "tasks" in c.modules, lambda p: _pre("/tasks", "/aufgaben")(p) and not p.startswith("/tasks/boards"), _tasks_badge),
+         lambda c: _apps(c) or c.res_nav or bool(c.modules & {"circulations", "tasks", "forms", "polls", "anliegen"}), lambda p: _pre("/tasks", "/aufgaben")(p) and not p.startswith("/tasks/boards"), _tasks_badge),
     Item("my_surveys", "work", "/meine-umfragen", "fa-clipboard-check", "Meine Umfragen",
          lambda c: bool(c.modules & {"forms", "polls"}), _pre("/meine-umfragen")),
     Item("kanban", "work", "/tasks/boards", "fa-table-columns", "Aufgabenboards",
