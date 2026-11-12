@@ -29,6 +29,50 @@
   });
   updateClock();
   setInterval(updateClock, 15000);
+  // A kiosk must not pass stale room occupancy or special-operation directions
+  // off as current after losing the connection. Probe a same-origin, verified
+  // display document before reloading; never cache protected display content.
+  const refreshSeconds = Number(document.body.dataset.sgAutoRefresh || 0);
+  const staleOverlay = document.querySelector('[data-sg-stale]');
+  if (refreshSeconds > 0 && staleOverlay) {
+    let checking = false;
+    function showStale() {
+      staleOverlay.hidden = false;
+    }
+    async function refresh() {
+      if (checking) return;
+      checking = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch(window.location.href, {
+          cache: 'no-store', credentials: 'same-origin', redirect: 'manual',
+          headers: { Accept: 'text/html' }, signal: controller.signal
+        });
+        if (!response.ok || response.type === 'opaqueredirect'
+            || response.headers.get('X-TAKT-Signage') !== 'display') {
+          showStale();
+          return;
+        }
+        // A real reload is needed for new server-rendered room data and
+        // publication status. Its next response is independently authorized.
+        window.location.reload();
+      } catch (_) {
+        showStale();
+      } finally {
+        clearTimeout(timeout);
+        checking = false;
+      }
+    }
+    const cadence = Math.max(15, Math.min(180, refreshSeconds)) * 1000;
+    setInterval(refresh, cadence);
+    window.addEventListener('offline', showStale);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refresh();
+    });
+    if (navigator.onLine === false) showStale();
+  }
   const pages = Array.from(document.querySelectorAll('[data-sg-target-page]'));
   const pageCount = document.querySelector('[data-sg-page-count]');
   if (pages.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
