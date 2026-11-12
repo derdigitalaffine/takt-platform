@@ -91,8 +91,6 @@ ITEMS: list[Item] = [
          lambda c: "anliegen" in c.modules, _pre("/anliegen")),
     Item("tasks", "work", "/tasks", "fa-list-check", "Meine Aufgaben",
          lambda c: _apps(c) or c.res_nav or bool(c.modules & {"circulations", "tasks", "forms", "polls", "anliegen"}), lambda p: _pre("/tasks", "/aufgaben")(p) and not p.startswith("/tasks/boards"), _tasks_badge),
-    Item("my_surveys", "work", "/meine-umfragen", "fa-clipboard-check", "Meine Umfragen",
-         lambda c: bool(c.modules & {"forms", "polls"}), _pre("/meine-umfragen")),
     Item("kanban", "work", "/tasks/boards", "fa-table-columns", "Aufgabenboards",
          lambda c: "tasks" in c.modules, _pre("/tasks/boards")),
     Item("inbox", "work", "/forms/inbox", "fa-inbox", "Zum Ausfüllen", lambda c: "forms" in c.modules, _pre("/forms/inbox")),
@@ -130,8 +128,8 @@ ITEMS: list[Item] = [
     Item("meeting_plan", "comm", "/meetings/plan", "fa-calendar-plus", "Besprechung planen", lambda c: c.can("video"),
          _is("/meetings/plan")),
     Item("surveys", "comm", "/umfragen", "fa-square-poll-vertical", "Umfragen & Abstimmungen",
-         lambda c: "polls" in c.modules and (c.can("votes") or c.can("polls") or bool(c.shared & {"polls", "votes"})),
-         _pre("/umfragen", "/votes", "/polls")),
+         lambda c: "polls" in c.modules,
+         _pre("/umfragen", "/meine-umfragen", "/votes", "/polls")),
     Item("polls", "comm", "/polls", "fa-calendar-check", "Terminumfragen",
          lambda c: "polls" in c.modules and (c.can("polls") or "polls" in c.shared), _pre("/polls")),
     Item("votes", "comm", "/votes", "fa-check-to-slot", "Abstimmungen",
@@ -196,7 +194,7 @@ BY_ID = {it.id: it for it in ITEMS}
 # Stable entry IDs preserve bookmarks and personal favorites.
 FAMILIES = [
     ("calendars",), ("leave",),
-    ("anliegen",), ("tasks",), ("my_surveys",), ("kanban",), ("circulations", "circulation_reports"),
+    ("anliegen",), ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
     ("surveys", "polls", "votes"), ("shortlinks",),
     ("meetings", "meeting_plan"), ("seminars",),
     ("resources", "res_planner", "res_bookings"), ("signage",), ("bookings",),
@@ -218,10 +216,9 @@ DESCRIPTIONS = {
     "knowledge": ("Organisationswissen, Arbeitsanleitungen und Prozesse strukturiert dokumentieren, sicher teilen und ohne KI durchsuchen.", "Wissensräume öffnen · Prozesse und Beiträge finden", "Wissen Wissensmanagement Prozess Organisationsatlas Dokumentation FAQ Anleitung"),
     "ai": ("Der zentrale KI-Arbeitsplatz: Fragen beantworten, freigegebenes Wissen nutzen und vorausgefüllte Fachvorschläge prüfen.", "TAKT Agent öffnen · Wissen und Fachabläufe", "KI LLM AI Chat Gemma Wissen"),
     "tasks": ("Sehen Sie, was Sie als Nächstes erledigen können. Eigene Aufgaben und Aufgaben aus Ihren Fachbereichen an einem Ort.", "Aufgaben bearbeiten · Zuständigkeiten prüfen", "Aufgaben Arbeitsplatz"),
-    "my_surveys": ("Persönliche Einladungen, beantwortete Umfragen und eigene Abstimmungen mit dem richtigen Teilnahmestatus auf einen Blick.", "Offene Umfragen beantworten · Erledigte Teilnahmen finden", "Meine Umfragen Teilnahmestatus Einladung Befragung Terminabstimmung"),
     "kanban": ("Organisieren Sie gemeinsame Arbeit in übersichtlichen Spalten. Verknüpfte Aufgaben und Umfragen zeigen ihren aktuellen Status.", "Boards öffnen · Arbeit organisieren", "Board Projekt"),
     "circulations": ("Teilen Sie Informationen und verfolgen Sie Rückmeldungen und Kenntnisnahmen.", "Aushänge lesen · Rückmeldungen geben", "Umlauf Sammelmappe Kenntnisnahme"),
-    "surveys": ("Sammeln Sie Feedback, stimmen Sie gemeinsam ab oder finden Sie einen passenden Termin.", "Umfragen öffnen · Gemeinsam entscheiden", "Poll Vote Live Feedback Terminumfrage"),
+    "surveys": ("Persönliche Umfragen, Terminumfragen und Abstimmungen an einem Ort. Berechtigte Personen können außerdem neue Umfragen verwalten.", "Meine Umfragen ansehen · Teilnehmen · Umfragen verwalten", "Meine Umfragen Poll Vote Live Feedback Teilnahmehistorie Terminumfrage"),
     "shortlinks": ("Machen Sie lange Links leichter teilbar und erstellen Sie passende QR-Codes.", "Links verwalten · QR-Codes erstellen", "Link verkürzen QR"),
     "calendars": ("Sehen Sie persönliche, freigegebene und organisatorische Kalender. Geräte verbinden Sie mit eigenen widerrufbaren Zugängen.", "Kalender öffnen · Gerät verbinden", "Jahreskalender CalDAV Termine"),
     "leave": ("Planen Sie eigenen Urlaub, sehen Sie die Personenzeitachse und bearbeiten Sie berechtigte Genehmigungen oder Schließzeiten.", "Urlaubsplaner öffnen · Mein Urlaub · Genehmigungen", "Urlaub Abwesenheit Besetzung"),
@@ -243,7 +240,7 @@ for family in FAMILIES:
     head = BY_ID[family[0]]
     group = ("personal" if head.id in {"absences", "krank_me"} else
              "schedule" if head.id in {"meetings", "seminars", "resources", "bookings", "calendars"} else
-             "work" if head.id in {"tasks", "kanban", "circulations", "surveys", "shortlinks", "my_surveys"} else head.group)
+             "work" if head.id in {"tasks", "kanban", "circulations", "surveys", "shortlinks"} else head.group)
     for key in family:
         BY_ID[key].group = group
 for key, label in {"resources": "Räume & Ressourcen", "dms": "Dokumentenablage",
