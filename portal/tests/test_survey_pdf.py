@@ -73,7 +73,7 @@ def _read(data):
     return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
-def test_manager_downloads_branded_form_and_poll_pdf_without_private_answers(reports):
+def test_manager_downloads_branded_form_and_poll_pdf_with_csv_details(reports):
     c = login("admin@example.org", "admin-passwort-123")
     for kind, resource in (("forms", reports["form"]), ("polls", reports["poll"])):
         result = c.get(f"/{kind}/{resource}/export.pdf")
@@ -84,10 +84,10 @@ def test_manager_downloads_branded_form_and_poll_pdf_without_private_answers(rep
         pdftext = _read(result.content)
         assert "ERGEBNISBERICHT" in pdftext
         assert "Seite 1" in pdftext
-        assert "PERSONAL_SECRET_TEXT" not in pdftext
-        assert "Private Person" not in pdftext
-        assert "do-not-print@example.org" not in pdftext
-        assert "DoNotPrintPrivateComment" not in pdftext
+        assert "PERSONAL_SECRET_TEXT" in pdftext
+        assert "Private Person" in pdftext
+        assert "do-not-print@example.org" in pdftext
+        assert "DoNotPrintPrivateComment" in pdftext
     assert "Prüfung digitale Arbeitsmittel" in _read(c.get(
         f'/forms/{reports["form"]}/export.pdf').content)
     assert "Teamtag Terminfindung" in _read(c.get(
