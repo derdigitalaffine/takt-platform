@@ -4,14 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  {% if refresh %}<meta http-equiv="refresh" content="{{ 30 if passive or special else 60 }}">{% endif %}
+  {% if refresh %}<noscript><meta http-equiv="refresh" content="{{ 30 if passive or special else 60 }}"></noscript>{% endif %}
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
   <title>{{ screen.name }} · TAKT Signage</title>
   <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="/static/signage-display.css">
 </head>
-<body style="--sg-bg:{{ theme.background }};--sg-fg:{{ theme.foreground }};--sg-accent:{{ theme.accent }}">
+<body data-sg-auto-refresh="{{ (30 if passive or special else 60) if refresh else 0 }}" style="--sg-bg:{{ theme.background }};--sg-fg:{{ theme.foreground }};--sg-accent:{{ theme.accent }}">
   <main class="sd-stage{{ ' sd-passive' if passive else '' }}" aria-label="Digitale Anzeige {{ screen.name }}">
     <header class="sd-header">
       <div class="sd-brand">
@@ -120,6 +120,14 @@
     </section>
     <footer class="sd-footer"><span>{{ ui.product }} · Digitale Informationen</span><span>Anzeige wird automatisch aktualisiert</span></footer>
   </main>
+  <section class="sd-stale-overlay" data-sg-stale hidden role="alert" aria-live="assertive">
+    <div class="sd-stale-message">
+      <i class="fa-solid fa-wifi-slash" aria-hidden="true"></i>
+      <h2>Informationen momentan nicht verfügbar</h2>
+      <p>Diese Anzeige kann gerade nicht aktualisiert werden. Bitte wende dich an das Personal vor Ort.</p>
+      <small>Die Verbindung wird automatisch erneut geprüft.</small>
+    </div>
+  </section>
   <script src="/static/signage-display.js" defer></script>
 </body>
 </html>
