@@ -185,8 +185,8 @@ def internal_busy(db, user_id: int, start: datetime, end: datetime, *, scopes=No
 
     selected = set(SCOPES if scopes is None else scopes).intersection(SCOPES)
     busy = []
-    if not calendars_enabled(db):
-        return busy
+    # Explicitly opted-in busy-time checks remain valid when calendar UI is
+    # disabled: existing calendar data must not suddenly permit double bookings.
     if start >= end or not selected:
         return busy
 
