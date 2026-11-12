@@ -13,7 +13,11 @@
   const handled = new WeakSet();
   const normal = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('de-DE').trim();
   function surname(label) {
-    const name = String(label || '').replace(/\s*\([^)]*@[^)]*\)\s*$/, '').replace(/\s*<[^>]*>\s*$/, '').trim();
+    const name = String(label || '')
+      .split(/\s+[·•]\s+/)[0]
+      .replace(/\s*\((?:ich|me|selbst)\)\s*$/i, '')
+      .replace(/\s*\([^)]*@[^)]*\)\s*$/, '')
+      .replace(/\s*<[^>]*>\s*$/, '').trim();
     if (name.includes(',')) {
       const [family, first] = name.split(',', 2);
       return [normal(family), normal(first)];
@@ -76,6 +80,10 @@
         };
       },
       render: {
+        option: function(item, escape) {
+          const hidden = item._ppFiltered ? ' hidden aria-hidden="true"' : '';
+          return '<div' + hidden + '>' + escape(item.text || '') + '</div>';
+        },
         no_results: () => '<div class="no-results p-2">Keine passenden Personen</div>'
       }
     });
@@ -110,6 +118,20 @@
       control.wrapper.insertAdjacentElement('beforebegin', box);
       filter.addEventListener('change', () => {
         orgFilter = filter.value;
+        for (const [value, item] of Object.entries(control.options)) {
+          if (!/^\d+$/.test(value)) continue;
+          const membership = people[value];
+          const excluded = orgFilter === '__without__'
+            ? !!membership?.orgs?.length
+            : !!orgFilter && (!membership || !membership.orgs.includes(Number(orgFilter)));
+          if (item._ppFiltered !== excluded) {
+            control.updateOption(value, {...item,
+              _ppFiltered: excluded,
+              disabled: !!item._ppOriginallyDisabled || excluded,
+              _ppOriginallyDisabled: !!(item._ppOriginallyDisabled ||
+                (!item._ppFiltered && item.disabled))});
+          }
+        }
         control.refreshOptions(false);
       });
     }
