@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from . import my_surveys, poll_lifecycle, surveys
 from .db import User
-from .main import app, current_user, enabled_modules, get_db, render
+from .main import app, current_user, enabled_modules, get_db, redirect, render
 
 
 def _modules():
@@ -11,6 +11,18 @@ def _modules():
     if 'polls' not in modules:
         raise HTTPException(404, 'Umfragen sind auf diesem Server nicht eingeschaltet.')
     return modules
+
+
+def _can_manage(db: Session, user: User, modules: set[str]) -> bool:
+    """Personal participation must be available without managing other surveys."""
+    if 'polls' not in modules:
+        return False
+    if user.is_admin or surveys.available(user, modules):
+        return True
+    # A share can give read-only manager access even without module-wide
+    # create/edit rights. Keep archived shares discoverable too.
+    return bool(surveys.collect(db, user, modules, state='active') or
+                surveys.collect(db, user, modules, state='archive'))
 
 
 @app.get('/meine-umfragen')
@@ -30,7 +42,8 @@ def my_surveys_page(request: Request, q: str = '', status: str = 'all', kind: st
             and (not q or q.casefold() in (row['title'] + ' ' + row['description']).casefold())]
     response = render(request, 'my_surveys.html', user, rows=rows, totals=totals,
                       status=status, kind=kind, q=q,
-                      forms_enabled='forms' in modules, polls_enabled='polls' in modules)
+                      forms_enabled='forms' in modules, polls_enabled='polls' in modules,
+                      can_manage=_can_manage(db, user, modules))
     response.headers['Cache-Control'] = 'no-store'
     return response
 
@@ -40,6 +53,8 @@ def my_surveys_page(request: Request, q: str = '', status: str = 'all', kind: st
 def survey_list(request: Request, q: str = '', kind: str = '', state: str = 'active', scope: str = 'all',
                 user: User = Depends(current_user), db: Session = Depends(get_db)):
     modules = _modules()
+    if not _can_manage(db, user, modules):
+        return redirect('/meine-umfragen')
     q = q.strip()[:200]
     kind = kind if kind in surveys.KINDS else ''
     state = state if state in ('active', 'archive', 'trash') else 'active'
