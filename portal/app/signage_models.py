@@ -184,3 +184,37 @@ class SignageSpecial(Base):
     starts_at: Mapped[datetime | None] = mapped_column(DateTime)
     ends_at: Mapped[datetime | None] = mapped_column(DateTime)
     published: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SignageCampaign(Base):
+    """Approved special signage event with a building-wide or targeted scope.
+
+    No raw calendar titles or user profile fields are copied to public output.
+    """
+    __tablename__ = "signage_campaigns"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    building_id: Mapped[int] = mapped_column(ForeignKey("signage_buildings.id", ondelete="CASCADE"), index=True)
+    floor_id: Mapped[int | None] = mapped_column(ForeignKey("signage_floors.id", ondelete="SET NULL"), nullable=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("signage_rooms.id", ondelete="CASCADE"), index=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("calendar_events.id", ondelete="SET NULL"), nullable=True)
+    scope: Mapped[str] = mapped_column(String(16), default="building")
+    preset: Mapped[str] = mapped_column(String(16), default="event")
+    title: Mapped[str] = mapped_column(String(120))
+    message: Mapped[str] = mapped_column(String(250), default="")
+    priority: Mapped[int] = mapped_column(Integer, default=30)
+    mode: Mapped[str] = mapped_column(String(10), default="overlay")
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    lead_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    tail_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    published: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SignageCampaignScreen(Base):
+    """Explicit include/exclude override; normal campaigns discover screens live."""
+    __tablename__ = "signage_campaign_screens"
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("signage_campaigns.id", ondelete="CASCADE"), primary_key=True)
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), primary_key=True)
+    included: Mapped[bool] = mapped_column(Boolean, default=True)
