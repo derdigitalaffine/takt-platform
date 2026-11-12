@@ -55,7 +55,28 @@
       <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus me-1"></i>Anzeige gestalten</button>
     </form>
   </section>
-  <section id="buildings" class="sg-panel" aria-labelledby="sg-buildings-title">
+  <section id="sg-auto-generator" class="sg-panel" aria-labelledby="sg-auto-generator-title">
+    <div class="sg-panel-head"><div>
+      <span class="sg-eyebrow">EINMAL KONFIGURIEREN, SOFORT PROFITIEREN</span>
+      <h2 id="sg-auto-generator-title">Gebäudeanzeigen automatisch erzeugen</h2>
+      <p>Ein Klick bereitet die passenden passiven Gebäude- und Geschossübersichten vor. Vorhandene Wegepunkte können zusätzlich zu Flurdisplays werden. Bestehende automatisch erzeugte Displays bleiben bei erneutem Ausführen erhalten.</p>
+    </div></div>
+    <form method="post" action="/signage/generate" class="sg-form-stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Gebäude <select name="building_id" class="form-select" required>
+        <option value="">Gebäude auswählen</option>
+        {% for building in buildings if building.active %}<option value="{{ building.id }}">{{ building.name }}</option>{% endfor %}
+      </select></label>
+      <div class="sg-generator-options">
+        <label class="sg-check"><input type="checkbox" name="building" value="1" checked> Eine Gebäudeübersicht</label>
+        <label class="sg-check"><input type="checkbox" name="floors" value="1" checked> Eine Übersicht pro Geschoss</label>
+        <label class="sg-check"><input type="checkbox" name="corridors" value="1"> Vorbereitete Flurdisplays je hinterlegtem Wegepunkt</label>
+      </div>
+      <p class="sg-muted"><i class="fa-solid fa-shield-halved me-1"></i> Alle neu erzeugten Anzeigen sind zunächst <strong>intern</strong>. Ein Flurdisplay erhält seinen echten Standort, aber noch keine ungeprüfte Blickrichtung. Die öffentliche Freigabe erfolgt erst nach der Kontrolle.</p>
+      <button type="submit" class="btn btn-outline-primary" {% if not buildings %}disabled{% endif %}><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Passende Anzeigen vorbereiten</button>
+    </form>
+  </section>
+    <section id="buildings" class="sg-panel" aria-labelledby="sg-buildings-title">
     <div class="sg-panel-head"><div><span class="sg-eyebrow">ZENTRALE STAMMDATEN</span><h2 id="sg-buildings-title">Standorte, Gebäude und Räume</h2><p>Nutze bereits vorhandene zentrale Orte, Organisationen und Ressourcen.</p></div></div>
     <div class="sg-structure-grid">
       <form action="/signage/structure" method="post" class="sg-mini-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="building">
