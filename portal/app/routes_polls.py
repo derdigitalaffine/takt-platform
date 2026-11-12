@@ -360,6 +360,7 @@ def _vote_page(request: Request, db: Session, poll: Poll, participant: PollParti
                   others=[] if poll.hidden else others, counts=counts, best=pl.best(poll, counts),
                   parts=pl.option_parts, answers=pl.ANSWERS, is_open=pl.is_open(poll),
                   full=pl.full_options(poll, participant), error=error, member=member,
+                  personal_url=pl.personal_link(participant) if participant and participant.answered_at else "",
                   answered_count=sum(1 for p in poll.participants if p.answered_at))
     page.status_code = status
     return page
@@ -387,12 +388,34 @@ def poll_personal(request: Request, token: str, db: Session = Depends(get_db)):
     return _vote_page(request, db, p.poll, p, f"/t/p/{token}")
 
 
+@app.get("/t/p/{token}/termin.ics")
+def poll_personal_calendar(token: str, db: Session = Depends(get_db)):
+    """The personal participation link also survives after the poll is closed."""
+    person = _participant_by_token(db, token)
+    if person is None or not person.answered_at or not person.poll.published_at or not person.poll.final_option:
+        raise HTTPException(404)
+    return Response(
+        pl.final_calendar(person.poll, person.poll.final_option),
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="termin.ics"',
+                 "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer"})
+
+
 @app.get("/t/{token}")
 def poll_public(request: Request, token: str, db: Session = Depends(get_db)):
     poll = _poll_by_token(db, token)
     if poll is None:
         return _closed_page(request, None)
-    # Wer schon abgestimmt hat, bekommt seine Antwort wieder (Cookie mit dem persönlichen Schlüssel)
+    # Registered members first: a public link must not create a second
+    # participation just because the browser cookie is missing.
+    member = session_user(request, db)
+    if member:
+        mine = db.scalar(select(PollParticipant).where(
+            PollParticipant.poll_id == poll.id, PollParticipant.user_id == member.id
+        ).order_by(PollParticipant.answered_at.desc(), PollParticipant.id.desc()))
+        if mine:
+            return redirect(f"/t/p/{mine.edit_token}")
+    # Guest browser receipt: a cookie is a bearer convenience, not a user ID.
     own = _participant_by_token(db, request.cookies.get(COOKIE + str(poll.id), ""))
     if own is not None and own.poll_id == poll.id:
         return _vote_page(request, db, poll, own, f"/t/p/{own.edit_token}")
@@ -403,6 +426,12 @@ async def _save_vote(request: Request, db: Session, poll: Poll, p: PollParticipa
     rate_limit(request, "poll-vote", limit=40)
     if not pl.is_open(poll):
         return _vote_page(request, db, poll, p, action, "Die Abstimmung ist beendet.", 409)
+    if p is None:
+        member = session_user(request, db)
+        if member:
+            p = db.scalar(select(PollParticipant).where(
+                PollParticipant.poll_id == poll.id, PollParticipant.user_id == member.id
+            ).order_by(PollParticipant.answered_at.desc(), PollParticipant.id.desc()))
     data = await request.form()
     if data.get("website"):  # Honigtopf gegen Spam-Bots
         return redirect(action)
