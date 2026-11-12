@@ -17,13 +17,20 @@
           <summary class="card-header d-flex align-items-center justify-content-between gap-2">
             <span class="fw-semibold">{{node.name}}</span>
             <span class="d-flex gap-1 flex-wrap">
-              {% if member %}<span class="badge text-bg-{{'primary' if member.is_primary else 'light'}}">{{'Hauptzuordnung' if member.is_primary else 'Zusätzlich'}}</span>{% endif %}
+              {% if node.kind == 'gruppe' %}<span class="badge text-bg-light border">Gruppe</span>{% if entry.group_member %}<span class="badge text-bg-secondary">Mitglied</span>{% endif %}
+              {% elif member %}<span class="badge text-bg-{{'primary' if member.is_primary else 'light'}}">{{'Hauptzuordnung' if member.is_primary else 'Zusätzlich'}}</span>{% endif %}
               {% if 'lead' in entry.grants %}<span class="badge text-bg-primary">Leitung</span>{% endif %}
               {% if 'deputy' in entry.grants %}<span class="badge text-bg-info">Stellvertretung</span>{% endif %}
             </span>
           </summary>
           <div class="card-body">
-            {% if entry.can_members %}
+            {% if entry.can_members and node.kind == 'gruppe' %}
+              <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="member_{{node.id}}" value="1" {{'checked' if entry.group_member}} {{'disabled' if entry.group_managed}}>
+                <span class="form-check-label">Mitglied dieser Gruppe</span>
+              </label>
+              <p class="small text-secondary mb-3">Gruppenmitgliedschaft gilt für Einladungen und Rechte, aber nicht als Personal-Hauptzuordnung oder für die Stellenbesetzung.{% if entry.group_managed %} Diese Mitgliedschaft wird extern synchronisiert und kann hier nicht entfernt werden.{% endif %}</p>
+            {% elif entry.can_members %}
               <label class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" name="member_{{node.id}}" value="1" {{'checked' if member}}>
                 <span class="form-check-label">Organisationszuordnung aktiv</span>
