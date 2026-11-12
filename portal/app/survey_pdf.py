@@ -16,7 +16,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import (KeepTogether, Paragraph, SimpleDocTemplate,
+from reportlab.platypus import (Paragraph, SimpleDocTemplate,
                                Spacer, Table, TableStyle)
 
 from . import branding, forms as fm, polls as pl
@@ -146,7 +146,7 @@ def _report(db, title, report_type, description, metadata, story_builder):
              Paragraph(_plain(value, 255), styles["count"])]
             for key, value in metadata if value not in (None, "")]
     if rows:
-        table = Table(rows, colWidths=[49 * mm, 123 * mm], hAlign="LEFT")
+        table = Table(rows, colWidths=[47 * mm, 118 * mm], hAlign="LEFT")
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#EDF3F7")),
             ("LINEBELOW", (0, 0), (-1, -2), 0.45, colors.HexColor("#D3DEE8")),
@@ -174,7 +174,7 @@ def _chart_table(labels, values, font, *, bar_color=BLUE):
                      Paragraph(str(int(value)), _style(font, size=8.2))])
     if not rows:
         return None
-    table = Table(rows, colWidths=[80 * mm, 73 * mm, 19 * mm], hAlign="LEFT", splitByRow=1)
+    table = Table(rows, colWidths=[75 * mm, 72 * mm, 18 * mm], hAlign="LEFT", splitByRow=1)
     table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 5),
@@ -275,7 +275,7 @@ def poll_report(db, poll) -> bytes:
                           _style(font, size=8.1)),
             ])
         if rows:
-            table = Table(rows, colWidths=[80 * mm, 73 * mm, 19 * mm], hAlign="LEFT", splitByRow=1)
+            table = Table(rows, colWidths=[75 * mm, 72 * mm, 18 * mm], hAlign="LEFT", splitByRow=1)
             table.setStyle(TableStyle([
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LINEBELOW", (0, 0), (-1, -2), .4, colors.HexColor(GREY)),
