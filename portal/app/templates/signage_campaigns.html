@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Sonderbetrieb · Digital Signage{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-campaigns.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-campaigns.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
 {% block content %}
 <main class="sg-workspace sg-campaigns">
   <div class="sg-page-intro">
@@ -43,7 +43,8 @@
     {% endif %}
   </section>
   {% endif %}
-    <div class="sg-campaign-steps" aria-label="So funktioniert die Einrichtung">
+    {% set section = 'campaigns' %}{% include "_signage_nav.html" %}
+  <div class="sg-campaign-steps" aria-label="So funktioniert die Einrichtung">
     <div><strong>1</strong><span>Gebäude und Zielraum wählen</span></div>
     <div><strong>2</strong><span>Zeitraum und passende Displays bestimmen</span></div>
     <div><strong>3</strong><span>Prüfen und freigeben</span></div>
@@ -54,7 +55,7 @@
         <h2>{{ 'Sonderanzeige bearbeiten' if editing else 'Neue Sonderanzeige' }}</h2>
         <p>Vier Startvorlagen machen die Einrichtung einfach. Alle Einstellungen bleiben anschließend veränderbar.</p>
       </div></div>
-      {% if not rooms %}<div class="alert alert-warning">Zuerst mindestens einen Raum unter <a href="/signage#buildings">Standorte und Räume</a> für öffentliche Richtungsanzeigen freigeben.</div>{% endif %}
+      {% if not rooms %}<div class="alert alert-warning">Zuerst mindestens einen Raum unter <a href="/signage/buildings">Standorte und Räume</a> für öffentliche Richtungsanzeigen freigeben.</div>{% endif %}
       {% if calendars %}
       <details class="sg-campaign-calendar" {% if selected_calendar %}open{% endif %}>
         <summary>Optional: aus einem bestehenden TAKT-Termin übernehmen</summary>
