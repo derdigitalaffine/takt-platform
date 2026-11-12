@@ -8,6 +8,17 @@
     <p>Ein zentraler Einstieg – Anzeigen, Gebäudestruktur und Sonderbetrieb haben jeweils ihren eigenen Arbeitsbereich.</p>
   </div><div class="sg-intro-icon"><i class="fa-solid fa-signs-post" aria-hidden="true"></i></div></div>
   {% set section = 'home' %}{% include "_signage_nav.html" %}
+  <section class="sg-home-quickstart sg-panel" aria-label="Erste Anzeige erstellen">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">SCHNELLSTART</span><h2>Neue Anzeige in wenigen Sekunden</h2>
+      <p>Ein Name genügt. Für Wegweiser mit Gebäudezuordnung findest du weitere Vorlagen im Anzeigenbereich.</p>
+    </div></div>
+    <form class="sg-home-quickstart-form" method="post" action="/signage/new">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="info">
+      <label><span class="visually-hidden">Anzeigename</span><input class="form-control" name="name" required maxlength="180" placeholder="z. B. Infomonitor Rathaus"></label>
+      <button class="btn btn-primary" type="submit">Info-Anzeige erstellen</button>
+      <a class="btn btn-outline-primary" href="/signage/screens">Alle Vorlagen</a>
+    </form>
+  </section>
   <div class="sg-metrics" aria-label="Signage-Überblick">
     <div class="sg-metric"><span>Displays</span><strong>{{ screens|length }}</strong></div>
     <div class="sg-metric"><span>Gebäude</span><strong>{{ buildings|length }}</strong></div>
