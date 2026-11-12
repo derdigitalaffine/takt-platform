@@ -281,7 +281,7 @@ def test_navigation_returns_a_link_without_llm_or_auto_redirect(monkeypatch):
     assert "link.href = data.open_url" in js
 
 
-def test_malformed_small_model_plan_has_safe_friendly_fallback(monkeypatch):
+def test_simple_task_does_not_depend_on_small_model_output(monkeypatch):
     _enable()
     calls = []
 
@@ -294,10 +294,9 @@ def test_malformed_small_model_plan_has_safe_friendly_fallback(monkeypatch):
     assert response.status_code == 200, response.text
     data = response.json()
     assert data["mode"] == "operate"
-    assert data["proposals"] == []
-    assert data["plan_id"] == ""
-    assert "keinen sicheren TAKT-Vorschlag" in data["message"]
-    assert len(calls) == 2
+    assert "Inventur" in data["proposals"][0]
+    assert data["open_task_draft"] is True
+    assert calls == []
     with SessionLocal() as db:
         assert db.scalar(select(Task).where(Task.title == "Inventur")) is None
 

@@ -46,6 +46,8 @@ with SessionLocal() as db:
 
 
 async def complete(provider, messages, **kwargs):
+    if '"patch"' in messages[0]['content']:
+        return json.dumps({"patch": {"due_date": "2030-12-12", "priority": "high"}})
     searching = '"searches"' in messages[0]['content']
     if not searching and '"actions"' not in messages[0]['content']:
         return 'Das ist eine Chat-Antwort. Für Portalaufträge verwende /takt.'

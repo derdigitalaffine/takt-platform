@@ -15,6 +15,32 @@ OUTPUT = Path('browser-artifacts')
 OUTPUT.mkdir(exist_ok=True)
 
 
+def exercise_live_task(page, chat_url):
+    page.goto(chat_url)
+    page.locator('#ai-prompt').fill('/takt Erstelle eine Aufgabe Inventur planen')
+    draft_request = re.compile(r'/agent/draft\?plan_id=')
+    pending = []
+    page.route(draft_request, lambda route: pending.append(route))
+    with page.expect_request(draft_request):
+        page.get_by_role('button', name='Nachricht senden', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/aufgaben/neu\?agent_plan='))
+    editor = page.locator('form[data-task-create]')
+    expect(editor.locator('[name="title"]')).to_have_value('Inventur planen')
+    editor.locator('[name="description"]').fill('Manuell ergänzt')
+    assert len(pending) == 1
+    pending[0].continue_()
+    page.unroute(draft_request)
+    page.get_by_label('Aufgabe ergänzen').fill('Fällig am 12.12.2030 mit hoher Priorität')
+    page.get_by_role('button', name='Entwurf ergänzen').click()
+    expect(editor.locator('[name="due_date"]')).to_have_value('2030-12-12')
+    expect(editor.locator('[name="description"]')).to_have_value('Manuell ergänzt')
+    expect(editor.locator('[name="priority"]')).to_have_value('high')
+    page.get_by_role('button', name='Vorschlag prüfen', exact=True).click()
+    expect(page.locator('[data-agent-final-preview]')).to_contain_text('Manuell ergänzt')
+    page.get_by_role('button', name='Diesen Schritt verbindlich speichern', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/aufgaben/[0-9]+$'))
+
+
 def exercise(page):
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
@@ -103,6 +129,7 @@ def exercise(page):
     handoff('Anliegen bearbeiten: Browser Anliegen starten', r'/anliegen/[0-9]+\?agent_plan=', 'status', 'in_progress')
     handoff('Anliegen zuweisen: Browser Anliegen an Alex Agent', r'/anliegen/[0-9]+\?agent_plan=')
     handoff('Routing ändern: Agent IT Anliegen an Alex Agent ohne bestehende Vorgänge umzuweisen', r'/anliegen/kategorien\?agent_plan=', 'title', 'Agent IT Anliegen Team')
+    exercise_live_task(page, chat_url)
     handoff('Aufgabe vorbereiten: Browser Aufgabe mit Unterlagen prüfen', r'/aufgaben/neu\?agent_plan=', 'title', 'Browser Aufgabe')
     handoff('Aufgabe zuweisen: Browser Aufgabe an Alex Agent', r'/aufgaben/[0-9]+/bearbeiten\?agent_plan=')
     handoff('Aufgabe priorisieren: Browser Aufgabe hoch', r'/aufgaben/[0-9]+/bearbeiten\?agent_plan=', 'priority', 'high')

@@ -319,7 +319,8 @@ def normalize_plan(reply, user, findings, categories, db):
             title = str(raw.get("title") or "").strip()
             description = str(raw.get("description") or "").strip()
             limit = 200 if tool == "create_anliegen" else 300
-            if not 3 <= len(title) <= limit or (tool == "create_anliegen" and not 5 <= len(description) <= 10000) or len(description) > 30000:
+            minimum = 3 if tool == "create_anliegen" else 1
+            if not minimum <= len(title) <= limit or (tool == "create_anliegen" and not 5 <= len(description) <= 10000) or len(description) > 30000:
                 raise ValueError("Titel oder Beschreibung des Vorschlags sind ungültig.")
             action.update(title=title, description=description)
         if tool == "create_task":
@@ -480,11 +481,12 @@ def preview(db, actions):
         if tool in ("create_task", "create_anliegen"):
             label += "\nBeschreibung: " + (action["description"] or "–")
             if tool == "create_task":
-                person = db.get(User, action["assignee_id"])
+                assignee = action["assignee_id"]
+                person = db.get(User, assignee) if assignee else None
                 for key, title in (("due_date", "Fällig am"), ("due_time", "Uhrzeit"), ("starts_at", "Start"), ("tags", "Tags"), ("checklist", "Checkliste")):
                     if action.get(key):
                         label += "\n" + title + ": " + action[key]
-                label += "\nZuständig: " + person.name + " · Priorität: " + ts.PRIORITIES[action["priority"]]
+                label += "\nZuständig: " + (person.name if person else "noch offen") + " · Priorität: " + ts.PRIORITIES[action["priority"]]
             else:
                 cat = db.get(AnliegenCategory, action["category_id"])
                 label += "\nKategorie: " + cat.title + " · Zuständig: " + (action["routing_snapshot"][3]["recipient"] or "noch nicht zugewiesen")
