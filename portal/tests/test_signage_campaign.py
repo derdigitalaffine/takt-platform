@@ -11,7 +11,7 @@ from app.db import SessionLocal, utcnow, User
 from app.signage_models import (
     SignageBuilding, SignageCampaign, SignageCampaignScreen, SignageFloor,
     SignagePassiveConfig, SignagePublicDestination, SignageRoom, SignageScreen,
-    SignageSpecial,
+    SignageSpecial, SignageGeneratedScreen,
 )
 
 
@@ -234,3 +234,43 @@ def test_campaign_never_crosses_building_ownership(place):
         db.commit()
     _create(c, place, title="Nur Gebäude A")
     assert "Nur Gebäude A" not in client().get(f"/signage/view/{screen_b}").text
+
+
+def test_bulk_generator_is_idempotent_private_and_preserves_existing_displays(place):
+    c = _admin()
+    building, floor, room, origin = place
+    with SessionLocal() as db:
+        node = db.get(__import__("app.signage_models", fromlist=["SignageWayNode"]).SignageWayNode, origin)
+        node.kind = "entrance"
+        db.commit()
+    payload = {"building_id": str(building), "building": "1", "floors": "1", "corridors": "1"}
+    first = _post(c, "/signage/generate", payload)
+    assert first.status_code == 303, first.text
+    with SessionLocal() as db:
+        entries = list(db.scalars(select(SignageGeneratedScreen)))
+        assert len(entries) == 3
+        screens = [db.get(SignageScreen, entry.screen_id) for entry in entries]
+        assert all(screen.visibility == "private" for screen in screens)
+        corridor = next(screen for screen in screens if screen.kind == "sign_corridor")
+        assert db.get(SignagePassiveConfig, corridor.id).facing == ""
+        assert client().get(f"/signage/view/{corridor.id}").status_code == 404
+    second = _post(c, "/signage/generate", payload)
+    assert second.status_code == 303
+    with SessionLocal() as db:
+        assert len(list(db.scalars(select(SignageGeneratedScreen)))) == 3
+
+
+def test_generator_does_not_publish_or_fabricate_directions(place):
+    c = _admin()
+    building, floor, room, origin = place
+    response = _post(c, "/signage/generate", {
+        "building_id": building, "building": "1", "floors": "1"
+    })
+    assert response.status_code == 303
+    with SessionLocal() as db:
+        generated = list(db.scalars(select(SignageGeneratedScreen)))
+        assert len(generated) == 2
+        for entry in generated:
+            screen = db.get(SignageScreen, entry.screen_id)
+            assert screen.visibility == "private" and screen.enabled
+            assert db.get(SignagePassiveConfig, screen.id).building_id == building
