@@ -173,3 +173,37 @@ Die **Sonderbetriebszentrale** zeigt eingehende, eindeutig erkennbare kommunale 
 **Datenschutz:** Kalenderbeschreibungen, Teilnehmer, E-Mail-Adressen, Standort-Freitexte und vertrauliche Titel werden nicht in öffentliche Anzeigen übernommen. Die Vorschlagskarten sind ausschließlich über die mit `signage_manage` geschützte Administrationsroute erreichbar. Das Erkennungsverfahren ist bewusst erklärbar und verwendet keine externe KI oder Websuche.
 
 **Grenzen:** Die Vorschlagslogik ersetzt keine fachliche Prüfung oder einen echten Sitzungsmanagement-Konnektor; ohne explizite Veröffentlichung darf TAKT keinerlei öffentliche Terminankündigung auslösen. Die Erkennung ist auf eine begrenzte Anzahl vorhandener freier Kalender und Ereignisse beschränkt. Eine spätere fachliche Gremienintegration braucht eigene stabile Schnittstellen und Rechte.
+
+
+## Neue Informationsarchitektur und Gebäudebrowser
+
+Digital Signage ist bewusst nicht mehr auf einer unübersichtlichen Verwaltungsseite aufgebaut:
+
+- **Übersicht** `/signage`: Kennzahlen, direkte Navigation und Ein-Feld-Schnellstart einer internen Info-Anzeige; kein tiefes Administrationsformular
+- **Anzeigen** `/signage/screens`: Anzeigenliste und Suche, professioneller Vorlagenassistent, Gebäude-/Geschoss-/Flur-Generator, Studio pro Bildschirm und expliziter Löschzugang
+- **Gebäude & Räume** `/signage/buildings`: grafischer, aufklappbarer Hierarchiebrowser mit kontextbezogenem Bearbeitungspanel und getrennten Erstellen- und Löschoptionen
+- **Wege & Büros** `/signage/wayfinding`: Wegepunkte, Kanten, barrierefreie Wege und öffentliche Bürozuordnungen
+- **Sonderbetrieb** `/signage/campaigns`: Zeit- und Prioritätssteuerung, Aktionen und ausdrücklich freizugebende Kalender-Entwürfe
+- **Geräte** `/signage/fleet`: gekoppelte Player, Diagnosen, Schlüsselrotation und Offline-/Verzögerungsstatus
+
+Die Unterseiten verwenden eine gemeinsame, mobil bedienbare Navigation. Bestehende Studio-, API- und Freigaberouten bleiben bestehen. Frühere Ankerverweise sind auf die neuen Zielseiten umzulenken.
+
+### Gebäudehierarchie und dauerhafte Datenintegrität
+
+Der Browser zeigt Gebäude → **Gebäudeteile** (Flügel, Anbau oder Bereich, mit beliebig tiefen Unterbereichen) → Geschosse → Räume. Ein- und Ausklappen basiert auf nativen HTML-`details`- und `summary`-Elementen sowie normalen Links; eine unvollständige ARIA-Treeview mit nicht implementierten Pfeiltasten wird vermieden. Eine Suche filtert Einträge als progressive Ergänzung, die Navigation funktioniert ohne JavaScript.
+
+Gebäudeteile leben in `signage_building_parts`, die optionale Zuordnung eines bestehenden Geschosses in `signage_part_floors`. Das ist **additiv** und verändert keine bestehenden Gebäude-, Geschoss-, Raum-, Ressourcen- oder Kalender-IDs; ein Geschoss ist aktuell genau einem Gebäudeteil oder direkt dem Gebäude zugeordnet. Organisation/Standort, Kennung, Bezeichnungen, Geschossebene, Raumzugänglichkeit, TAKT-Ressource und Kalender lassen sich im jeweiligen Panel bearbeiten. Fremde Gebäudeteile und zyklische Verschachtelungen werden serverseitig abgewiesen. Bei bestehenden passiven Anzeigen ist ein unkontrollierter Organisationswechsel des Gebäudes gesperrt. Raumveröffentlichung benötigt weiterhin eine separate ausdrückliche Freigabe.
+
+### Löschen – verlässlich und bewusst
+
+Für jede Anzeige führt `/signage/<id>/delete` auf eine eigene Bestätigungsseite. Dort werden gekoppelte Geräte, Freigabelinks, Versionen und Kampagnen-Zuordnungen erklärt. Das endgültige POST verlangt CSRF, `signage_manage`, den **exakten Anzeigenamen** und die aktuelle **Versionsnummer** (Schutz gegen parallele Bearbeitung). Das Löschen entfernt Geräte-Bearer, Diagnosedaten, Freigabelinks, Designverlauf, Display-spezifische Wegweiser, Zuordnungen und Sonderanzeigen. Zentraler Gebäudestamm und zentrale Aktionen bleiben bestehen. Ohne Display existiert kein öffentlicher Abruf mehr.
+
+Gebäude, Gebäudeteile, Geschosse und Räume können ebenfalls nach exakter Namensbestätigung gelöscht werden. Eine zentrale Abhängigkeitsprüfung verhindert Löschen, solange untergeordnete Objekte, Displays, Wegepunkte, Bürozuordnungen oder Sonderanzeigen das Element verwenden. Damit wird nicht stillschweigend eine ganze Gebäudestruktur samt Wegweisung kaskadiert. Eine bloße öffentliche Raumfreigabe wird bei vollständiger, sonst nicht mehr genutzter Raum-Löschung mitentfernt. Vor jeder Löschung die physisch angebrachten Beschilderungen prüfen.
+
+### Design- und Zugänglichkeitsprinzipien
+
+- Aufgabenzentrierte Unterseiten und eine Ebene Detailtiefe pro Bearbeitungspanel, statt alle Aktionen permanent nebeneinander zu zeigen
+- Native, tastaturbedienbare Disclosure-Hierarchie und nachvollziehbare Breadcrumbs/Seitenwechsel. Orientierung an [W3C WAI-ARIA Authoring Practices](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/) ohne inkomplette Tree-Rollen
+- Konsequent getrennte „Bearbeiten“, „Freigeben“ und „Löschen“-Aktionen; irreversible Löschung mit Folgenaufklärung und bestätigter Bezeichnung analog [Carbon Design System – Remove](https://carbondesignsystem.com/community/patterns/remove-pattern/)
+- Alle Formulare bleiben mit Serverrendering nutzbar; JavaScript optimiert lediglich Suche und abhängige Auswahllisten
+- Folgeausbau: Grundriss-Visualisierung (SVG), detaillierte Raumbereichszuordnung bei mehreren Flügeln auf einem Geschoss, betrieblich geprüfte Offline-Player und Evakuierungsfunktionen
