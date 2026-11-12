@@ -510,6 +510,11 @@ class Group(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120), unique=True)
     description: Mapped[str] = mapped_column(String(255), default="")
+    # A single shared organizational node. Group IDs and GroupMember IDs stay
+    # canonical for invitations, ACL and external identity synchronisation.
+    org_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, unique=True, index=True
+    )
     # Gruppenleitung: darf Abwesenheiten und Vertretungen für die Mitglieder eintragen
     lead_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -3026,7 +3031,8 @@ _NEW_COLUMNS = {
     "map_layers": {"service_json": "TEXT NOT NULL DEFAULT '{}'"},
     "application_requests": {"prefill_json": "TEXT NOT NULL DEFAULT '{}'"},
     "payments": {"active_refund": "VARCHAR(36) NOT NULL DEFAULT ''"},
-    "groups": {"lead_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL"},
+    "groups": {"lead_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
     "booking_pages": {"listed": "BOOLEAN NOT NULL DEFAULT 0", "extended": "BOOLEAN NOT NULL DEFAULT 0",
                       "days_ahead": "INTEGER NOT NULL DEFAULT 60", "step_minutes": "INTEGER NOT NULL DEFAULT 15",
                       "holidays_closed": "BOOLEAN NOT NULL DEFAULT 1",
@@ -3154,6 +3160,7 @@ def _migrate() -> None:
             conn.execute(text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_form_responses_track_token "
                           "ON form_responses (track_token)"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_groups_org_id ON groups (org_id)"))
         # SQLite UNIQUE over nullable org_id does not deduplicate global rules.
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_anliegen_global_rule_revision "
                           "ON anliegen_process_rules (category_id, process_id, revision) WHERE org_id IS NULL"))
@@ -3217,6 +3224,10 @@ def init_db() -> None:
             linked.add(candidate.id)
         from .organization import seed as seed_organization
         seed_organization(db)
+        # Idempotent: existing groups become root-level group nodes once. Later
+        # moves and edits never get reset by migrations or app restarts.
+        from .organization_groups import ensure_all as ensure_organization_groups
+        ensure_organization_groups(db)
         from .anliegen import seed as seed_anliegen
         seed_anliegen(db)
         seed_map_layers(db)
