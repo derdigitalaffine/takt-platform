@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from . import calendars, signage_campaign, signage_passive
 from .calendar_models import Calendar, CalendarEvent
-from .db import User, get_settings, utcnow
+from .db import LOCAL_TZ, User, utcnow
 from .main import app, check_csrf, flash, get_db, redirect, render
 from .routes_signage import _enabled, _int, manage_user
 from .signage_models import (
@@ -106,7 +106,12 @@ def signage_campaigns_page(request: Request, user: User = Depends(manage_user),
         campaigns=listed, affected=affected, conflicts=conflicts,
         selected=selected, excluded=excluded, editing=row, calendars=available_calendars,
         source_events=source_events, selected_calendar=calendar_id,
-        scopes=SCOPES, presets=signage_passive.PRESETS, now=utcnow())
+        scopes=SCOPES, presets=signage_passive.PRESETS, now=utcnow(),
+        local_now=datetime.now(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M"),
+        start_local=(row.starts_at.replace(tzinfo=timezone.utc).astimezone(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M")
+                     if row and row.starts_at else ""),
+        end_local=(row.ends_at.replace(tzinfo=timezone.utc).astimezone(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M")
+                   if row and row.ends_at else ""))
 
 
 @app.post("/signage/campaigns/save", dependencies=[Depends(check_csrf)])
