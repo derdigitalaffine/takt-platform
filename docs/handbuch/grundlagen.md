@@ -14,6 +14,29 @@
 4. **Profil prüfen:** Über deinen Namen rechts oben erreichst du **Profil**, **Menü anpassen**, **Sicherheit**, Darstellung und **Abmelden**.
 5. **Hilfe nutzen:** Bei einer Fehlermeldung zuerst die Eingaben und Freigaben kontrollieren, anschließend die zuständige Administration kontaktieren.
 
+## So findest du die passende Anleitung
+
+Das Handbuch ist nach **allgemeiner Bedienung** und **Fachaufgaben** getrennt. Lies diese Grundlagen für Anmeldung, Profil, Berechtigungen und Navigation; wechsle anschließend zur [Übersicht der Modulanleitungen](../BENUTZERHANDBUCH.md#modulanleitungen).
+
+**Ein typischer Arbeitstag:** Öffne nach der Anmeldung zunächst die Übersicht und kontrolliere deine aktuellen Aufgaben. Suche danach das passende Modul über das Menü oder **Module entdecken**. Innerhalb des Moduls prüfst du den Bearbeitungsstand, öffnest das betreffende Objekt und speicherst Änderungen ausdrücklich. Bei Veröffentlichungen oder Freigaben prüfst du zusätzlich den Empfängerkreis.
+
+### Wenn etwas nicht angezeigt wird
+
+1. **Modul fehlt:** Prüfe die Modulübersicht und deine persönlichen Berechtigungen. Nicht jedes Modul ist in jeder Organisation aktiviert.
+2. **Eintrag fehlt:** Prüfe Suchbegriffe, Filter und gegebenenfalls den Archiv- oder Statusbereich.
+3. **Aktion fehlt:** Prüfe, ob du nur lesenden Zugriff hast oder dir eine Freigabe für den Vorgang fehlt.
+4. **Änderung nicht sichtbar:** Prüfe eine möglicherweise angezeigte Speicherfehlermeldung, den aktuellen Status und ob du die richtige Ansicht geöffnet hast.
+5. **Weiterhin unklar:** Melde der zuständigen Stelle den Modulnamen, die betroffene Aktion, den Zeitpunkt und möglichst den genauen Fehlertext. Keine Passwörter, Einmalcodes oder vertraulichen Teilnahmelinks mitschicken.
+
+### Was bedeuten typische Statusbegriffe?
+
+- **Entwurf:** Ein Inhalt wird vorbereitet; er ist nicht automatisch veröffentlicht.
+- **Veröffentlicht/freigegeben:** Der konfigurierte Empfängerkreis kann zugreifen, sofern die jeweiligen Regeln erfüllt sind.
+- **Geschlossen:** Neue Eingaben oder Teilnahmen sind möglicherweise gesperrt; vorhandene Daten müssen nicht gelöscht sein.
+- **Archiviert:** Ein Vorgang wird zur späteren Einsicht aufbewahrt; weitere Bearbeitung ist je nach Fachmodul eingeschränkt.
+
+Die genaue Wirkung eines Status steht immer in der jeweiligen Modulanleitung. Ein allgemeiner Statusbegriff ersetzt keine fachliche Prüfung.
+
 ## Übergreifende Bedienung
 
 ### Navigation und Favoriten

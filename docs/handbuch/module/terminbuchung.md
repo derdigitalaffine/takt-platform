@@ -20,6 +20,36 @@
 
 **Wichtig:** Interne Kalenderinhalte und Sperrzeiten werden nicht zu frei einsehbaren Personaldaten. Prüfe organisationsweite Schließtage und Zuständigkeiten.
 
+## Praxisbeispiel: Eine Bürgersprechstunde anbieten
+
+**Ausgangslage:** Eine Organisationseinheit bietet an zwei Wochentagen persönliche Gespräche zu je 30 Minuten an.
+
+1. Lege eine Buchungsseite mit einem verständlichen Titel, dem Ort und einer Kontaktmöglichkeit an.
+2. Stelle die **Dauer je Termin** ein und plane einen ausreichenden Puffer für die Nachbereitung ein.
+3. Hinterlege die tatsächlichen Sprechzeiten. Ergänze Ausnahmen für Urlaub, Fortbildungen und Schließtage, soweit diese Funktion für die Buchungsseite verfügbar und eingerichtet ist.
+4. Prüfe, ob die Seite öffentlich gelistet oder nur über persönliche Einladungen erreichbar sein soll. Für vertrauliche Gespräche ist eine kontrollierte Einladung oft geeigneter.
+5. Öffne den Buchungslink testweise wie ein Gast. Prüfe lesbare Beschreibungen, auswählbare Zeiten und den Ablauf der Bestätigung.
+6. Veröffentliche und teile erst danach die Buchungsseite. Kontrolliere neue Termine regelmäßig in der Terminliste.
+7. Bei einer Verhinderung verschiebe oder storniere den betroffenen Termin über die vorgesehene Aktion, damit die Benachrichtigung korrekt ausgelöst werden kann.
+
+## Vor der Veröffentlichung: kurze Kontrolle
+
+- Sind Dauer, Puffer, Fristen und Kapazität passend eingestellt?
+- Sind Feiertage, lokale Schließtage und individuelle Ausnahmen berücksichtigt? Organisationsbezogene Schließtage nur dann als automatisch berücksichtigt ansehen, wenn die konkrete Seite dies anzeigt beziehungsweise die Integration aktiv ist.
+- Wird ein öffentlicher Link wirklich benötigt, oder reichen persönliche Einladungen?
+- Stimmen Ort, Videokonferenzoption und Kontaktangaben?
+- Ist klar, wer die Buchungen betreut und bei Abwesenheit vertreten kann?
+
+## Typische Fragen und Lösungen
+
+| Beobachtung | Mögliche Ursache und nächster Schritt |
+|---|---|
+| Gäste sehen keine freien Zeiten | Zeitbereiche, Buchungsfrist, Kapazität und Ausnahmen prüfen; belegte Zeiten werden nicht erneut angeboten. |
+| Ein Gast möchte verschieben | Den Verwaltungslink aus der Bestätigung verwenden oder eine berechtigte Person um Bearbeitung bitten. Fristen beachten. |
+| Ein Feiertag ist buchbar | Die konkreten Ausnahmen und gegebenenfalls organisationsweite Schließtage kontrollieren; nicht von einer automatischen Übernahme ausgehen. |
+| Kolleg:innen sollen mithelfen | Die abgestuften Freigaben im Bereich **Im Portal freigeben** verwenden; Bearbeitung nur mit angemessener Stufe. |
+| Termine fehlen im externen Kalender | Abo-Link und Aktualisierungsintervall des Kalenderprogramms prüfen. Den vertraulichen Abo-Link nicht öffentlich weitergeben. |
+
 ## Ausführliche Bedienung
 
 Die folgenden ausführlicheren Arbeitsschritte stammen aus dem bisherigen Handbuch und wurden passend zu diesem Modul zusammengestellt.

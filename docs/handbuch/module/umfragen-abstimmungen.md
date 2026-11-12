@@ -20,6 +20,36 @@
 
 **Wichtig:** Abstimmungen können verdeckt sein. Vertrauliche Stimm- und Personenangaben werden nicht durch einen normalen Teilnahmelink veröffentlicht.
 
+## Praxisbeispiel: Einen gemeinsamen Besprechungstermin finden
+
+**Ausgangslage:** Eine Besprechung mit mehreren Beteiligten soll innerhalb der nächsten zwei Wochen stattfinden.
+
+1. Wähle eine **Terminumfrage** und trage Titel, Zweck, voraussichtliche Dauer und gegebenenfalls einen Ort ein.
+2. Erfasse mehrere realistische Tage und Uhrzeiten. Vermeide doppelte oder offensichtlich unpassende Vorschläge.
+3. Entscheide, ob „Wenn nötig“ erlaubt sein soll und ob Teilnehmende die Antworten anderer sehen dürfen. Bei sensiblen Abstimmungen nutze die **verdeckte** Variante.
+4. Veröffentliche die Umfrage nach einer Vorschau. Lade bekannte Personen möglichst persönlich ein, wenn du gezielt ausstehende Antworten nachverfolgen musst.
+5. Kontrolliere vor dem Ende die Beteiligung und erinnere bei Bedarf noch ausstehende Eingeladene.
+6. Vergleiche die Zusagen im Ergebnisraster. Lege erst danach den Termin fest und entscheide bewusst, ob Benachrichtigungen oder eine Besprechung erstellt werden sollen.
+7. Exportiere einen Bericht nur für den berechtigten Empfängerkreis. Bei Bedarf nutze den kompakten Bericht zum gemeinsamen Besprechen auf einer DIN-A4-Seite.
+
+## Entscheidungshilfe: Welchen Umfragetyp verwenden?
+
+| Ziel | Passender Einstieg |
+|---|---|
+| Einen Termin unter mehreren Optionen finden | **Terminumfrage** |
+| Eine verbindliche Entscheidung mit festgelegten Abstimmungsregeln treffen | **Abstimmung/Wahl** |
+| Während einer Veranstaltung Antworten live sammeln und darstellen | **Live-Umfrage** |
+| Umfangreiche Angaben oder Dateien von Teilnehmenden erfassen | [**Formulare**](formulare.md) |
+
+**Besonders wichtig bei Wahlen:** „geheim“, „anonym“ und „offen“ haben unterschiedliche Auswirkungen. Prüfe vor dem Start Wählerkreis und Ergebnisfreigabe. Eine bereits festgeschriebene Wahl wird nicht einfach wieder zur Änderung geöffnet.
+
+## Typische Fragen und Lösungen
+
+- **Teilnehmende können nicht abstimmen:** Prüfe Veröffentlichungsstatus, Frist, Einladung beziehungsweise Zugangsweg und ob die Abstimmung bereits beendet ist.
+- **Eine Antwort fehlt im Überblick:** Prüfe den Status der Teilnahme und deine Berechtigung zur Einsicht; bei verdeckten oder anonymen Verfahren sind Detailinformationen absichtlich eingeschränkt.
+- **Eine Umfrage soll erneut verwendet werden:** Erstelle eine Kopie, statt die Ergebnisse eines abgeschlossenen Verfahrens zu verändern.
+- **Ein Export soll weitergegeben werden:** Prüfe vorher, ob Namen, Kommentare oder Einzelantworten enthalten sind und ob Empfänger:innen diese Daten sehen dürfen.
+
 ## Ausführliche Bedienung
 
 Die folgenden ausführlicheren Arbeitsschritte stammen aus dem bisherigen Handbuch und wurden passend zu diesem Modul zusammengestellt.

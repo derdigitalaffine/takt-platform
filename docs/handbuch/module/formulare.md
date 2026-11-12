@@ -20,6 +20,31 @@
 
 **Wichtig:** Vertrauliche Teilnehmerdaten sind nur für berechtigte Auswertende sichtbar. Ein Ergebnisbericht ist keine öffentliche Teilnehmerbestätigung.
 
+## Praxisbeispiel: Eine interne Bedarfsabfrage erstellen
+
+**Ausgangslage:** Mehrere Kolleginnen und Kollegen sollen ihren Bedarf an Büromaterial anmelden. Die Antworten dürfen nicht öffentlich sichtbar werden.
+
+1. Lege ein Formular mit einem aussagekräftigen Titel an, beispielsweise **„Büromaterialbedarf – Dezember“**. Ergänze den Zweck und eine Abgabefrist in der Beschreibung.
+2. Nutze ein kurzes Textfeld für die Bezeichnung, ein Zahlenfeld für die Menge und bei Bedarf eine Mehrfachauswahl für Materialkategorien. Kennzeichne notwendige Angaben als **Pflichtfeld**.
+3. Füge eine optionale Bemerkung hinzu. Frage keine personenbezogenen Daten ab, die für die Bearbeitung nicht erforderlich sind.
+4. Prüfe im Vorschaumodus die Reihenfolge, die mobile Darstellung und die Pflichtfeldmeldungen. Probiere auch absichtlich eine unvollständige Eingabe aus.
+5. Speichere den Entwurf, konfiguriere die zulässige Teilnahme und gib das Formular erst dann über den vorgesehenen Weg frei.
+6. Öffne nach den ersten Einsendungen die Ergebnisansicht. Prüfe die Berechtigungen, bevor du Antworten exportierst oder mit anderen teilst.
+
+**Vor der Freigabe prüfen:** Stimmen Zweck, Empfängerkreis, Datenschutzinformationen, Pflichtfelder und eventuelle Dateiuploads? Der Formularlink allein ist kein Ersatz für eine bewusste Freigabekonfiguration.
+
+## Typische Fragen und Lösungen
+
+| Beobachtung | Was du prüfen solltest |
+|---|---|
+| Das Formular lässt sich nicht bearbeiten | Bist du Eigentümer:in oder mit ausreichenden Bearbeitungsrechten beteiligt? Ist das Formular noch bearbeitbar? |
+| Eine Frage erscheint beim Ausfüllen nicht | Prüfe ihre Sichtbarkeitsbedingung und eventuelle Bedingungen der gesamten Seite. |
+| Das Absenden wird abgelehnt | Kontrolliere Pflichtfelder, Eingabegrenzen und Dateien. Fehlermeldungen am betroffenen Feld beachten. |
+| Eingaben aus dem eigenen Profil fehlen | Prüfe die freiwillige Zustimmung zur Vorbelegung im Profil und ob der Feldtyp die Vorbelegung unterstützt. |
+| Ergebnisse sind für Kolleg:innen nicht sichtbar | Prüfe die ausdrücklich eingerichtete Freigabe; ein Teilnahmelink verleiht keine Auswertungsrechte. |
+
+**Abgrenzung:** Ein normales Formular sammelt Antworten. Für ein formales Verwaltungsverfahren mit Zuständigkeit, Bearbeitungsschritten und Aktenbezug ist gegebenenfalls [Online-Anträge](online-antraege.md) der passendere Einstieg.
+
 ## Ausführliche Bedienung
 
 Die folgenden ausführlicheren Arbeitsschritte stammen aus dem bisherigen Handbuch und wurden passend zu diesem Modul zusammengestellt.
