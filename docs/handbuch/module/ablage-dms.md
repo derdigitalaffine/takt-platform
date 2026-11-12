@@ -57,7 +57,7 @@ Verknüpfte Dokumente, laufende Vorgänge, noch geltende Aufbewahrungsfristen un
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du willst ein Dokument ablegen oder wiederfinden?
 

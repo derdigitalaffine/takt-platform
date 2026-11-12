@@ -30,7 +30,7 @@ Werden Sie selbst als Vertretung eingetragen, bekommen Sie eine Mail. Möchten S
 - [Alle Module](../../BENUTZERHANDBUCH.md)
 - [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du bist nicht da und jemand soll dich vertreten?
 

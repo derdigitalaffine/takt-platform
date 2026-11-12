@@ -134,7 +134,7 @@ Die Stufe lässt sich in der Liste jederzeit ändern, das ✕ entfernt die Freig
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du willst, dass andere einen freien Gesprächstermin bei dir buchen können?
 

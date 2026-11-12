@@ -75,7 +75,7 @@ Tipp: Für gedruckte QR-Codes immer einen **Kurzlink** verwenden. Der Code wird 
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
 
-## Für blöde erklärt:
+## Für Blöde erklärt:
 
 Du hast einen langen Link, den niemand abtippen möchte?
 
