@@ -156,3 +156,20 @@ Die nun integrierte Zentrale ermöglicht bereits Freigabe, Zeitsteuerung, Priori
 ### Weiter offene Fleet-Funktionen
 
 Geräte-Registrierung mittels zeitlich begrenzter Pairing-Codes, sichere Geräteinstallation/Shell-Skripte, konfigurierbare Betriebszeiten, native Windows-/Linux-/Android-/Raspberry-Pi-Player, signierter Offline-Cache mit ausdrücklich festgelegter Aktualitätszeit und sichere Fernaktionen bleiben getrennte Ausbaustufen. Ohne sichere Abnahme keine Notfallsteuerung.
+
+
+## Vorgeschlagene Sonderanzeigen aus vorhandenen TAKT-Kalendern
+
+Die **Sonderbetriebszentrale** zeigt eingehende, eindeutig erkennbare kommunale Veranstaltungen aus lesbaren TAKT-Kalendern als Vorschläge an – ohne zusätzliche Schnittstelle und ohne aktivierte fremde Fachmodule. Unterstützt werden nur konservative Ausdrücke wie **Gemeinderatssitzung**, **Ausschusssitzung**, **Briefwahlstelle**, **Wahllokal**, **Wahlraum** und **Bürgerversammlung**. Eine beliebige „Wahl“ oder interne Besprechung wird bewusst nicht als öffentlicher Wahltermin klassifiziert.
+
+**Bedienablauf:**
+
+1. Admin/Signage-Berechtigte öffnen **Digital Signage → Sonderbetrieb verwalten**. Wenn in den nächsten 45 Tagen aus geeigneten, für sie lesbaren TAKT-Kalendern Termine existieren, erscheinen höchstens zwölf Vorschlagskarten.
+2. **Entwurf vorbereiten** verknüpft den Kalendereintrag nur mit dem internen Formular. Der Vorschlag verwendet **ausschließlich die neutrale öffentliche Kategoriebezeichnung**, beispielsweise „Ratssitzung“, niemals automatisch die Originalüberschrift oder Beschreibung.
+3. Gebäude, ausdrücklich freigegebener öffentlicher Zielraum, Zeitquelle, Priorität, Verteilungsbereich, Laufzeit und Besuchertext müssen kontrolliert werden. **Die Veröffentlichung bleibt zunächst ausgeschaltet.** Beim Speichern muss sie ausdrücklich aktiviert werden.
+4. Bereits für eine Kampagne verwendete Kalendertermine erscheinen nicht mehr als neue Vorschläge. Wiederholungen, abweichende oder gestrichene Serieninstanzen werden durch dieselbe TAKT-Kalenderfunktion behandelt wie auf den bestehenden Raumdisplays.
+5. Wird die Lese-Berechtigung des verantwortlichen Kontos später entzogen, sperrt die zentrale Kampagnenprojektion weiterhin die betroffene Veranstaltung. Die neuen Vorschläge schaffen keine zusätzlichen Kalenderrechte und arbeiten auch bei fehlenden Kalendern nicht störend.
+
+**Datenschutz:** Kalenderbeschreibungen, Teilnehmer, E-Mail-Adressen, Standort-Freitexte und vertrauliche Titel werden nicht in öffentliche Anzeigen übernommen. Die Vorschlagskarten sind ausschließlich über die mit `signage_manage` geschützte Administrationsroute erreichbar. Das Erkennungsverfahren ist bewusst erklärbar und verwendet keine externe KI oder Websuche.
+
+**Grenzen:** Die Vorschlagslogik ersetzt keine fachliche Prüfung oder einen echten Sitzungsmanagement-Konnektor; ohne explizite Veröffentlichung darf TAKT keinerlei öffentliche Terminankündigung auslösen. Die Erkennung ist auf eine begrenzte Anzahl vorhandener freier Kalender und Ereignisse beschränkt. Eine spätere fachliche Gremienintegration braucht eigene stabile Schnittstellen und Rechte.
