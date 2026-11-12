@@ -6,12 +6,13 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from . import calendars, calendar_recurrence
+from .person_picker import surname_key
 from .calendar_models import Calendar, CalendarEvent
 from .db import LOCAL_TZ, User
 from .signage_models import (
     SignageBuilding, SignageDestinationOverride, SignageDisplayAnchor, SignageFloor,
     SignagePassiveConfig, SignagePublicDestination, SignageRoom, SignageSpecial,
-    SignageWayEdge, SignageWayNode,
+    SignageWayEdge, SignageWayNode, SignageOffice,
 )
 
 KINDS = {
@@ -134,6 +135,24 @@ def project(db, screen, now):
         SignageDestinationOverride.screen_id == screen.id))}
     points = {room.id: (room, floor, building, publication)
               for room, floor, building, publication in rows}
+    # The passive renderer must use the same explicit consent as the separate
+    # employee directory. Never infer a public name from office assignment,
+    # profile_data_enc, organization membership, or an internal room title.
+    # points contains *only* independently published rooms in this building.
+    occupants = {room_id: [] for room_id in points}
+    if points:
+        approved = db.execute(
+            select(SignageOffice.room_id, User.name, User.id)
+            .join(User, User.id == SignageOffice.user_id)
+            .where(SignageOffice.room_id.in_(list(points)),
+                   SignageOffice.public.is_(True),
+                   User.active.is_(True))
+        ).all()
+        for rid, name, uid in approved:
+            if rid in occupants:
+                occupants[rid].append((name, uid))
+        for rid, names in occupants.items():
+            names.sort(key=lambda entry: (surname_key(entry[0]), entry[1]))
     anchor = db.get(SignageDisplayAnchor, screen.id)
     nodes, paths = graph(db, screen, config, anchor) if passive else ({}, {})
     origin = nodes.get(anchor.node_id) if anchor else None
@@ -164,6 +183,7 @@ def project(db, screen, now):
         return {
             "label": (rule.label if rule else "") or publication.label or room.name or "Raum",
             "number": room.number, "floor": floor.name, "building": building.name,
+            "people": [name for name, _ in occupants.get(room_id, [])],
             "arrow": ARROWS.get(arrow), "rank": rule.rank if rule else 0,
             "accessible": bool(config and config.barrier_free and path and not (rule and rule.arrow)),
         }
