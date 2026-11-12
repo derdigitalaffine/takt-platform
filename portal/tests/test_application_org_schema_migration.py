@@ -23,6 +23,9 @@ def test_legacy_form_schema_is_repaired_without_losing_existing_rows(tmp_path, m
         form_id = existing.id
 
     with engine.begin() as conn:
+        # Newly-created test schema has the ORM index; older production did
+        # not, as its app_org_id column was missing entirely.
+        conn.execute(text("DROP INDEX IF EXISTS ix_forms_app_org_id"))
         conn.execute(text("ALTER TABLE forms DROP COLUMN app_org_id"))
         # The incorrect previous migration may already have written this
         # extra (unused) group column. It must not prevent repair.
