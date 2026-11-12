@@ -84,10 +84,16 @@ def test_manager_downloads_branded_form_and_poll_pdf_with_csv_details(reports):
         pdftext = _read(result.content)
         assert "ERGEBNISBERICHT" in pdftext
         assert "Seite 1" in pdftext
-        assert "PERSONAL_SECRET_TEXT" in pdftext
-        assert "Private Person" in pdftext
-        assert "do-not-print@example.org" in pdftext
-        assert "DoNotPrintPrivateComment" in pdftext
+        if kind == "forms":
+            assert "PERSONAL_SECRET_TEXT" in pdftext
+            assert "Private Person" in pdftext
+            assert "person-private@example.org" in pdftext
+            assert "do-not-print@example.org" not in pdftext
+        else:
+            assert "DoNotPrintPerson" in pdftext
+            assert "do-not-print@example.org" in pdftext
+            assert "DoNotPrintPrivateComment" in pdftext
+            assert "PERSONAL_SECRET_TEXT" not in pdftext
     assert "Prüfung digitale Arbeitsmittel" in _read(c.get(
         f'/forms/{reports["form"]}/export.pdf').content)
     assert "Teamtag Terminfindung" in _read(c.get(
