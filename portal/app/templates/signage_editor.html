@@ -5,11 +5,12 @@
 {% block content %}
 <div class="sg-workspace sg-editor">
   <div class="sg-editor-toolbar">
-    <div><a class="sg-back" href="/signage"><i class="fa-solid fa-arrow-left"></i> Alle Displays</a>
+    <div><a class="sg-back" href="/signage/screens"><i class="fa-solid fa-arrow-left"></i> Alle Displays</a>
       <span class="sg-eyebrow d-block mt-2">TAKT SIGNAGE STUDIO</span>
       <h1>{{ screen.name }}</h1>
       <p>Bildschirm gestalten, Inhalte verknüpfen und sicher veröffentlichen.</p></div>
     <div class="sg-toolbar-actions">
+      <a class="btn btn-outline-danger" href="/signage/{{ screen.id }}/delete"><i class="fa-solid fa-trash-can me-1"></i>Anzeige löschen</a>
       <a class="btn btn-outline-primary" href="/signage/campaigns"><i class="fa-solid fa-calendar-days me-1"></i>Zentrale Sonderanzeigen</a>
       <a class="btn btn-outline-secondary" href="/signage/{{ screen.id }}/preview" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square me-1"></i>Vollbild-Vorschau</a>
       <button class="btn btn-primary" type="submit" form="sg-design-form"><i class="fa-solid fa-floppy-disk me-1"></i>Speichern</button>

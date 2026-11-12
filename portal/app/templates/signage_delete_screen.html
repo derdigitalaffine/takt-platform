@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Anzeige löschen · Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace sg-confirm-delete">
+  <a class="sg-back" href="/signage/{{ screen.id }}/edit"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Zur Anzeige</a>
+  <div class="sg-panel">
+    <span class="sg-eyebrow">DIGITAL SIGNAGE · SICHERES LÖSCHEN</span>
+    <h1>„{{ screen.name }}“ löschen?</h1>
+    <p>Diese Aktion entfernt die Anzeige dauerhaft. Eine Kopie des Layouts lässt sich danach nicht mehr aus dem Designverlauf wiederherstellen.</p>
+    <div class="sg-delete-consequences">
+      <h2>Das wird ebenfalls entfernt oder ungültig:</h2>
+      <ul>
+        <li><strong>{{ devices|length }}</strong> gekoppelte Geräte und ihre Anmeldeschlüssel</li>
+        <li><strong>{{ links|length }}</strong> sichere Freigabelinks</li>
+        <li><strong>{{ revisions|length }}</strong> gespeicherte Designversionen</li>
+        <li><strong>{{ campaigns|length }}</strong> Zuordnungen zu zentralen Sonderanzeigen</li>
+        <li>Display-spezifische Wegweiser, Positionen und Sonderanzeigen</li>
+      </ul>
+      <p>Gebäude, Räume, Termine und zentrale Sonderbetriebsaktionen bleiben erhalten. Ein möglicherweise vorhandener Hardware-Player muss anschließend auf eine andere Anzeige umgestellt werden.</p>
+    </div>
+    <form method="post" action="/signage/{{ screen.id }}/delete" class="sg-form-stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="version" value="{{ screen.version }}">
+      <label>Zur Bestätigung den Anzeigenamen exakt eingeben:
+        <strong>{{ screen.name }}</strong>
+        <input class="form-control" name="confirm" required autocomplete="off" placeholder="Exakten Anzeigenamen eingeben">
+      </label>
+      <div class="sg-delete-actions">
+        <button class="btn btn-danger" type="submit"><i class="fa-solid fa-trash-can me-1" aria-hidden="true"></i> Anzeige endgültig löschen</button>
+        <a href="/signage/{{ screen.id }}/edit" class="btn btn-outline-secondary">Abbrechen</a>
+      </div>
+    </form>
+  </div>
+</main>
+{% endblock %}

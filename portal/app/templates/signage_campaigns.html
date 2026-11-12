@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Sonderbetrieb · Digital Signage{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-campaigns.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-campaigns.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
 {% block content %}
 <main class="sg-workspace sg-campaigns">
   <div class="sg-page-intro">
@@ -11,6 +11,39 @@
     </div>
     <div class="sg-intro-icon" aria-hidden="true"><i class="fa-solid fa-calendar-check"></i></div>
   </div>
+  {% if suggestions %}
+  <section class="sg-panel sg-calendar-suggestions" aria-labelledby="sg-candidates-title">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">VON TAKT VORGESCHLAGEN · NUR INTERN</span>
+      <h2 id="sg-candidates-title">Mögliche kommende Veranstaltungen</h2>
+      <p>Aus deinen lesbaren TAKT-Kalendern erkannt. Die Erkennung bereitet nur einen Entwurf vor – nichts wird automatisch veröffentlicht. Wähle Gebäude, Zielraum und öffentliche Bezeichnung anschließend ausdrücklich.</p>
+    </div><span class="sg-pill sg-pill-neutral">{{ suggestions|length }} Vorschläge</span></div>
+    <div class="sg-suggestion-grid">
+      {% for item in suggestions[:4] %}
+      <article class="sg-suggestion-card">
+        <span class="sg-suggestion-kind">{{ item.public_title }}</span>
+        <h3>{{ item.source_title }}</h3>
+        <p>{{ item.start.strftime('%d.%m.%Y · %H:%M') }} Uhr · {{ item.calendar_title }}</p>
+        <a class="btn btn-sm btn-outline-primary" href="/signage/campaigns?calendar={{ item.calendar_id }}&amp;suggest={{ item.event_id }}#campaign-form">Entwurf vorbereiten</a>
+      </article>
+      {% endfor %}
+    </div>
+    {% if suggestions|length > 4 %}
+    <details class="sg-more-suggestions"><summary>Weitere {{ suggestions|length - 4 }} Vorschläge anzeigen</summary>
+      <div class="sg-suggestion-grid">
+        {% for item in suggestions[4:] %}
+        <article class="sg-suggestion-card">
+          <span class="sg-suggestion-kind">{{ item.public_title }}</span>
+          <h3>{{ item.source_title }}</h3>
+          <p>{{ item.start.strftime('%d.%m.%Y · %H:%M') }} Uhr · {{ item.calendar_title }}</p>
+          <a class="btn btn-sm btn-outline-primary" href="/signage/campaigns?calendar={{ item.calendar_id }}&amp;suggest={{ item.event_id }}#campaign-form">Entwurf vorbereiten</a>
+        </article>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </section>
+  {% endif %}
+    {% set section = 'campaigns' %}{% include "_signage_nav.html" %}
   <div class="sg-campaign-steps" aria-label="So funktioniert die Einrichtung">
     <div><strong>1</strong><span>Gebäude und Zielraum wählen</span></div>
     <div><strong>2</strong><span>Zeitraum und passende Displays bestimmen</span></div>
@@ -22,7 +55,7 @@
         <h2>{{ 'Sonderanzeige bearbeiten' if editing else 'Neue Sonderanzeige' }}</h2>
         <p>Vier Startvorlagen machen die Einrichtung einfach. Alle Einstellungen bleiben anschließend veränderbar.</p>
       </div></div>
-      {% if not rooms %}<div class="alert alert-warning">Zuerst mindestens einen Raum unter <a href="/signage#buildings">Standorte und Räume</a> für öffentliche Richtungsanzeigen freigeben.</div>{% endif %}
+      {% if not rooms %}<div class="alert alert-warning">Zuerst mindestens einen Raum unter <a href="/signage/buildings">Standorte und Räume</a> für öffentliche Richtungsanzeigen freigeben.</div>{% endif %}
       {% if calendars %}
       <details class="sg-campaign-calendar" {% if selected_calendar %}open{% endif %}>
         <summary>Optional: aus einem bestehenden TAKT-Termin übernehmen</summary>
@@ -36,13 +69,14 @@
         </form>
       </details>
       {% endif %}
+      {% set active_preset = editing.preset if editing else (suggested_event.preset if suggested_event else 'council') %}
       <form id="sg-central-form" method="post" action="/signage/campaigns/save" class="sg-form-stack" data-sg-central-form>
         <input type="hidden" name="csrf" value="{{ csrf }}">
         {% if editing %}<input type="hidden" name="campaign_id" value="{{ editing.id }}">{% endif %}
         <div class="sg-campaign-field-grid">
           <label>1. Anlass <select class="form-select" name="preset" data-sg-campaign-preset>
             {% for key, data in presets.items() %}<option value="{{ key }}" data-priority="{{ data[1] }}"
-              {% if (editing and editing.preset == key) or (not editing and key == 'council') %}selected{% endif %}>{{ data[0] }}</option>{% endfor %}
+              {% if active_preset == key %}selected{% endif %}>{{ data[0] }}</option>{% endfor %}
           </select></label>
           <label>Zielgebäude <select class="form-select" name="building_id" required data-sg-campaign-building>
             <option value="">Gebäude auswählen</option>
@@ -55,12 +89,12 @@
           <option value="{{ room.id }}" data-building="{{ building.id }}" {% if editing and editing.room_id == room.id %}selected{% endif %}>{{ room.number }} · {{ room.name or 'Raum' }} · {{ floor.name }}</option>
           {% endfor %}
         </select></label>
-        <label>Was sollen Besucher lesen? <input class="form-control" name="title" maxlength="120" value="{{ editing.title if editing else '' }}" placeholder="z. B. Sitzung des Gemeinderats" data-sg-campaign-title></label>
+        <label>Was sollen Besucher lesen? <input class="form-control" name="title" maxlength="120" value="{{ editing.title if editing else (suggested_event.public_title if suggested_event else '') }}" placeholder="z. B. Sitzung des Gemeinderats" data-sg-campaign-title></label>
         <label>Zusätzlicher Hinweis (optional) <input class="form-control" name="message" maxlength="250" value="{{ editing.message if editing else '' }}" placeholder="z. B. Sitzung öffentlich · Beginn 18:00 Uhr"></label>
         {% if source_events %}
         <label>Termin aus TAKT <select class="form-select" name="event_id" data-sg-campaign-event>
           <option value="">Eigenen Zeitraum verwenden</option>
-          {% for event in source_events %}<option value="{{ event.id }}" {% if editing and editing.event_id == event.id %}selected{% endif %}>{{ event.title }} · {{ event.starts_at[:16] }}</option>{% endfor %}
+          {% for event in source_events %}<option value="{{ event.id }}" {% if (editing and editing.event_id == event.id) or (suggested_event and suggested_event.id == event.id) %}selected{% endif %}>{{ event.title }} · {{ event.starts_at[:16] }}</option>{% endfor %}
         </select></label>
         {% elif editing and editing.event_id %}
         <input type="hidden" name="event_id" value="{{ editing.event_id }}">
@@ -100,7 +134,7 @@
             <option value="overlay" {% if not editing or editing.mode == 'overlay' %}selected{% endif %}>Hervorgehobener Hinweis zusätzlich zur Normalanzeige</option>
             <option value="replace" {% if editing and editing.mode == 'replace' %}selected{% endif %}>Vollbild statt Normalanzeige</option>
           </select></label>
-          <label>Priorität <input class="form-control" type="number" name="priority" min="0" max="100" value="{{ editing.priority if editing else 50 }}" data-sg-campaign-priority></label>
+          <label>Priorität <input class="form-control" type="number" name="priority" min="0" max="100" value="{{ editing.priority if editing else presets[active_preset][1] }}" data-sg-campaign-priority></label>
         </div>
         <label class="sg-check sg-campaign-publish"><input type="checkbox" name="published" value="1" {% if editing and editing.published %}checked{% endif %}>
           <span><strong>Für Besucher freigeben</strong><small>Nur ausdrücklich veröffentlichte Einträge werden angezeigt. Interne Kalendertitel werden niemals übernommen.</small></span>

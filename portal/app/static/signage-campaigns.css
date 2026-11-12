@@ -52,3 +52,15 @@
 .sg-simulation-item.is-special {border-color:#84b5d7;background:var(--bs-primary-bg-subtle,var(--bs-tertiary-bg))}
 @media(max-width:950px){.sg-campaign-layout{grid-template-columns:1fr}}
 @media(max-width:580px){.sg-campaign-steps{grid-template-columns:1fr}.sg-campaign-field-grid{grid-template-columns:1fr}.sg-campaign-screen{flex-wrap:wrap}.sg-campaign-screen div{flex-basis:100%}}
+
+/* Administrative-only civic-event suggestions; never rendered on public kiosks. */
+.sg-calendar-suggestions{margin:18px 0 22px}
+.sg-suggestion-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:13px;margin-top:12px}
+.sg-suggestion-card{display:flex;flex-direction:column;align-items:start;gap:9px;padding:16px;border:1px solid var(--bs-border-color);border-radius:14px;background:var(--bs-tertiary-bg)}
+.sg-suggestion-kind{font-size:.72rem;font-weight:750;letter-spacing:.04em;text-transform:uppercase;color:var(--bs-primary)}
+.sg-suggestion-card h3{font-size:.96rem;font-weight:750;line-height:1.4;margin:0;overflow-wrap:anywhere}
+.sg-suggestion-card p{margin:0;color:var(--bs-secondary-color);font-size:.77rem;line-height:1.45}
+.sg-suggestion-card .btn{margin-top:auto}
+.sg-more-suggestions{border-top:1px solid var(--bs-border-color);padding-top:12px;margin-top:15px}
+.sg-more-suggestions summary{cursor:pointer;font-weight:650;font-size:.82rem}
+.sg-more-suggestions summary:focus-visible{outline:3px solid var(--bs-primary);outline-offset:4px}

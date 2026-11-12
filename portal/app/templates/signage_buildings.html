@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Gebäude & Räume · Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
+{% block content %}
+{% macro floor_branch(entry) %}
+  {% set floor = entry.floor %}
+  <li>
+    <details class="sg-tree-group sg-tree-floor" open>
+      <summary><i class="fa-solid fa-layer-group" aria-hidden="true"></i> {{ floor.name }} <small>Ebene {{ floor.level }}</small></summary>
+      <ul class="sg-tree-children">
+        <li><a href="/signage/buildings?select=floor:{{ floor.id }}" class="sg-tree-link {{ 'is-selected' if selected_kind == 'floor' and selected and selected.id == floor.id else '' }}" {% if selected_kind == 'floor' and selected and selected.id == floor.id %}aria-current="true"{% endif %}><i class="fa-solid fa-sliders" aria-hidden="true"></i> Geschoss bearbeiten</a></li>
+        {% for room in entry.rooms %}
+          <li><a href="/signage/buildings?select=room:{{ room.id }}" class="sg-tree-link sg-tree-room {{ 'is-selected' if selected_kind == 'room' and selected and selected.id == room.id else '' }}" {% if selected_kind == 'room' and selected and selected.id == room.id %}aria-current="true"{% endif %}>
+            <i class="fa-solid fa-door-closed" aria-hidden="true"></i><strong>{{ room.number }}</strong><span>{{ room.name or 'Unbenannter Raum' }}</span>
+            {% if room.id in published_rooms %}<i class="fa-solid fa-eye sg-tree-public" title="Öffentlich freigegeben" aria-label="Freigegeben" ></i>{% endif %}
+          </a></li>
+        {% else %}<li class="sg-tree-muted">Noch keine Räume</li>{% endfor %}
+      </ul>
+    </details>
+  </li>
+{% endmacro %}
+{% macro part_branch(node) %}
+  {% set part = node.part %}
+  <li>
+    <details class="sg-tree-group sg-tree-part" open>
+      <summary><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i> {{ part.name }}
+        {% if not part.active %}<small>Inaktiv</small>{% endif %}</summary>
+      <ul class="sg-tree-children">
+        <li><a href="/signage/buildings?select=part:{{ part.id }}" class="sg-tree-link {{ 'is-selected' if selected_kind == 'part' and selected and selected.id == part.id else '' }}" {% if selected_kind == 'part' and selected and selected.id == part.id %}aria-current="true"{% endif %}><i class="fa-solid fa-sliders" aria-hidden="true"></i> Gebäudeteil bearbeiten</a></li>
+        {% for child in node.parts %}{{ part_branch(child) }}{% endfor %}
+        {% for floor in node.floors %}{{ floor_branch(floor) }}{% endfor %}
+      </ul>
+    </details>
+  </li>
+{% endmacro %}
+<main class="sg-workspace sg-building-workspace">
+  <div class="sg-page-intro"><div>
+    <span class="sg-eyebrow">TAKT · DIGITAL SIGNAGE</span><h1>Gebäude & Räume</h1>
+    <p>Standortstruktur visuell durchsuchen: Gebäude → Gebäudeteile → Geschosse → Räume. Wähle links ein Element und bearbeite es rechts.</p>
+  </div><div class="sg-intro-icon"><i class="fa-solid fa-building" aria-hidden="true"></i></div></div>
+  {% set section = 'buildings' %}{% include "_signage_nav.html" %}
+  <div class="sg-building-metrics">
+    <span><strong>{{ buildings|length }}</strong> Gebäude</span><span><strong>{{ parts|length }}</strong> Gebäudeteile</span>
+    <span><strong>{{ floors|length }}</strong> Geschosse</span><span><strong>{{ rooms|length }}</strong> Räume</span>
+  </div>
+  <div class="sg-building-layout">
+    <section class="sg-panel sg-building-browser" aria-labelledby="sg-building-tree-title">
+      <div class="sg-panel-head"><div>
+        <span class="sg-eyebrow">HIERARCHIE</span><h2 id="sg-building-tree-title">Gebäudebrowser</h2>
+        <p>Ein- und ausklappbar; auch mit Tastatur bedienbar.</p>
+      </div></div>
+      <label class="sg-browser-search" for="sg-building-filter">
+        <span class="visually-hidden">Gebäude, Geschosse und Räume suchen</span>
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input id="sg-building-filter" type="search" class="form-control" placeholder="z. B. Ratssaal, Nordflügel, EG" data-sg-tree-search>
+      </label>
+      <p class="sg-browser-results" role="status" aria-live="polite" data-sg-tree-count></p>
+      {% if tree %}
+      <nav aria-label="Hierarchische Gebäudestruktur">
+        <ul class="sg-tree-root">
+          {% for entry in tree %}
+          {% set building = entry.building %}
+          <li>
+            <details class="sg-tree-group sg-tree-building" {% if not selected_building_id or selected_building_id == building.id %}open{% endif %}>
+              <summary><i class="fa-solid fa-building" aria-hidden="true"></i>
+                <span>{{ building.name }}</span>{% if not building.active %}<small>Inaktiv</small>{% endif %}</summary>
+              <ul class="sg-tree-children">
+                <li><a href="/signage/buildings?select=building:{{ building.id }}"
+                    class="sg-tree-link {{ 'is-selected' if selected_kind == 'building' and selected and selected.id == building.id else '' }}" {% if selected_kind == 'building' and selected and selected.id == building.id %}aria-current="true"{% endif %}><i class="fa-solid fa-sliders" aria-hidden="true"></i> Gebäudedaten bearbeiten</a></li>
+                {% for part in entry.parts %}{{ part_branch(part) }}{% endfor %}
+                {% for floor in entry.floors %}{{ floor_branch(floor) }}{% endfor %}
+              </ul>
+            </details>
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
+      {% else %}
+      <div class="sg-empty"><i class="fa-solid fa-building"></i><h3>Noch kein Gebäude</h3><p>Erstelle rechts unter „Hinzufügen“ zuerst ein Gebäude.</p></div>
+      {% endif %}
+    </section>
+    <div class="sg-building-main">
+      {% if selected %}
+      <section class="sg-panel sg-detail-panel" aria-labelledby="sg-selected-title">
+        <div class="sg-panel-head"><div><span class="sg-eyebrow">AUSGEWÄHLTES ELEMENT · {{ {'building':'GEBÄUDE','part':'GEBÄUDETEIL','floor':'GESCHOSS','room':'RAUM'}[selected_kind] }}</span>
+          <h2 id="sg-selected-title">{{ selected.number ~ ' · ' ~ (selected.name or 'Raum') if selected_kind == 'room' else selected.name }}</h2>
+          <p>Änderungen werden direkt in den zentralen Standortdaten gespeichert.</p>
+        </div></div>
+        <form method="post" action="/signage/hierarchy/{{ selected_kind }}/{{ selected.id }}/save" class="sg-form-stack">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>{{ 'Raumnummer' if selected_kind == 'room' else 'Bezeichnung' }}
+            <input class="form-control" name="name" maxlength="{{ 40 if selected_kind == 'room' else 100 if selected_kind == 'floor' else 120 if selected_kind == 'part' else 180 }}" required value="{{ selected.number if selected_kind == 'room' else selected.name }}">
+          </label>
+          {% if selected_kind == 'building' %}
+            <div class="sg-form-two">
+              <label>Gebäudekennung <input class="form-control" name="code" maxlength="40" value="{{ selected.code or '' }}" placeholder="z. B. Rathaus A"></label>
+              <label>Standort <select class="form-select" name="location_id">
+                <option value="">Kein Standort</option>{% for loc in locations %}<option value="{{ loc.id }}" {% if loc.id == selected.location_id %}selected{% endif %}>{{ loc.name }}</option>{% endfor %}
+              </select></label>
+            </div>
+            <label>Organisation <select class="form-select" name="org_id"><option value="">Organisationsübergreifend</option>
+              {% for org in organizations %}<option value="{{ org.id }}" {% if org.id == selected.org_id %}selected{% endif %}>{{ org.name }}</option>{% endfor %}
+            </select></label>
+            <label class="sg-check"><input type="checkbox" name="active" value="1" {% if selected.active %}checked{% endif %}> Gebäude aktiv</label>
+          {% elif selected_kind == 'part' %}
+            <div class="sg-form-two">
+              <label>Typ <select class="form-select" name="part_kind">
+                {% for key, label in part_kinds.items() %}<option value="{{ key }}" {% if selected.kind == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+              </select></label>
+              <label>Kennung <input class="form-control" name="code" maxlength="32" value="{{ selected.code or '' }}" placeholder="z. B. Nord"></label>
+            </div>
+            <label>Gehört zu <select name="parent_id" class="form-select">
+              <option value="">Direkt zum Gebäude</option>
+              {% for part in parts if part.building_id == selected.building_id and part.id != selected.id %}
+                <option value="{{ part.id }}" {% if selected.parent_id == part.id %}selected{% endif %}>{{ part.name }}</option>
+              {% endfor %}
+            </select></label>
+            <label>Beschreibung <textarea class="form-control" name="description" rows="2" maxlength="250">{{ selected.description or '' }}</textarea></label>
+            <label class="sg-check"><input type="checkbox" name="active" value="1" {% if selected.active %}checked{% endif %}> Gebäudeteil aktiv</label>
+          {% elif selected_kind == 'floor' %}
+            <div class="sg-form-two">
+              <label>Geschossebene <input class="form-control" type="number" name="level" min="-20" max="200" required value="{{ selected.level }}"></label>
+              <label>Gebäudeteil <select class="form-select" name="part_id">
+                <option value="">Direkt im Gebäude (ohne Gebäudeteil)</option>
+                {% for part in parts if part.building_id == selected.building_id %}
+                  <option value="{{ part.id }}" {% if selected_floor_mapping and selected_floor_mapping.part_id == part.id %}selected{% endif %}>{{ part.name }}</option>
+                {% endfor %}
+              </select></label>
+            </div>
+            <p class="sg-muted">Die Geschossnummer bleibt innerhalb eines Gebäudes eindeutig. Ein bestehendes Geschoss kann ohne Datenverlust einem Gebäudeteil zugeordnet werden.</p>
+          {% else %}
+            <label>Raumbezeichnung <input class="form-control" name="label" maxlength="180" value="{{ selected.name or '' }}" placeholder="z. B. Ratssaal"></label>
+            <div class="sg-form-two">
+              <label>Ressource <select class="form-select" name="resource_id">
+                <option value="">Keine Ressource</option>
+                {% for resource in resources %}<option value="{{ resource.id }}" {% if resource.id == selected.resource_id %}selected{% endif %}>{{ resource.name }}</option>{% endfor %}
+              </select></label>
+              <label>TAKT-Kalender <select class="form-select" name="calendar_id">
+                <option value="">Kein Kalender</option>
+                {% for cal in calendars %}<option value="{{ cal.id }}" {% if cal.id == selected.calendar_id %}selected{% endif %}>{{ cal.title }}</option>{% endfor %}
+                {% if selected.calendar_id and selected.calendar_id not in calendars|map(attribute='id')|list %}<option value="{{ selected.calendar_id }}" selected disabled>Keine Berechtigung für verknüpften Kalender</option>{% endif %}
+              </select></label>
+            </div>
+            <label class="sg-check"><input type="checkbox" name="accessible" value="1" {% if selected.accessible %}checked{% endif %}> Barrierefrei erreichbar</label>
+          {% endif %}
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-check me-1" aria-hidden="true"></i> Änderungen speichern</button>
+        </form>
+        {% if selected_kind == 'room' %}
+        <div class="sg-room-publication">
+          <h3>Öffentliche Wegweiser</h3>
+          <p>Nur ausdrücklich freigegebene Räume erscheinen auf passiven Anzeigen.</p>
+          <form method="post" action="/signage/room/{{ selected.id }}/destination" class="sg-form-stack">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label class="sg-check"><input type="checkbox" name="listed" value="1" {% if selected.id in published_rooms %}checked{% endif %}> Raum für öffentliche Anzeigen freigeben</label>
+            <label>Öffentliche Bezeichnung <input class="form-control" name="label" maxlength="120" value="{{ published_rooms.get(selected.id, '') }}" placeholder="z. B. Ratssaal"></label>
+            <button type="submit" class="btn btn-outline-primary">Freigabe speichern</button>
+          </form>
+        </div>
+        {% endif %}
+        <div class="sg-delete-zone">
+          <details>
+            <summary><i class="fa-solid fa-trash-can" aria-hidden="true"></i> Element löschen</summary>
+            {% if blockers %}
+              <p class="sg-muted">Das Element wird noch benötigt. Lösche oder löse zuerst diese Abhängigkeiten: <strong>{{ blockers|join(', ') }}</strong>.</p>
+              <a href="/signage/screens" class="btn btn-sm btn-outline-secondary">Anzeigen prüfen</a>
+              <a href="/signage/wayfinding" class="btn btn-sm btn-outline-secondary">Wege prüfen</a>
+            {% else %}
+              <p>Das Löschen ist endgültig. Bestätige die exakte Bezeichnung: <strong>{{ selected.number if selected_kind == 'room' else selected.name }}</strong>.</p>
+              <form method="post" action="/signage/hierarchy/{{ selected_kind }}/{{ selected.id }}/delete" class="sg-form-stack">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <label>Bezeichnung zur Bestätigung <input class="form-control" required name="confirm" autocomplete="off" placeholder="Exakte Bezeichnung eingeben"></label>
+                <button class="btn btn-outline-danger" type="submit"><i class="fa-solid fa-trash-can me-1"></i> Endgültig löschen</button>
+              </form>
+            {% endif %}
+          </details>
+        </div>
+      </section>
+      {% endif %}
+      <section class="sg-panel sg-structure-create">
+        <div class="sg-panel-head"><div><span class="sg-eyebrow">STRUKTUR ERWEITERN</span>
+          <h2>Element hinzufügen</h2><p>Wähle, was du in der Hierarchie anlegen möchtest. Nach dem Speichern öffnet sich das passende Bearbeitungspanel.</p>
+        </div></div>
+        <div class="sg-add-group">
+          <details><summary><i class="fa-solid fa-building"></i> Neues Gebäude</summary>
+            <form class="sg-form-stack" method="post" action="/signage/hierarchy/create">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="building">
+              <label>Bezeichnung <input class="form-control" name="name" maxlength="180" required placeholder="Neues Rathaus"></label>
+              <label>Gebäudekennung <input class="form-control" name="code" maxlength="40"></label>
+              <label>Standort <select class="form-select" name="location_id"><option value="">Kein Standort</option>{% for loc in locations %}<option value="{{ loc.id }}">{{ loc.name }}</option>{% endfor %}</select></label>
+              <label>Organisation <select class="form-select" name="org_id"><option value="">Organisationsübergreifend</option>{% for org in organizations %}<option value="{{ org.id }}">{{ org.name }}</option>{% endfor %}</select></label>
+              <button class="btn btn-outline-primary" type="submit">Gebäude anlegen</button>
+            </form>
+          </details>
+          <details><summary><i class="fa-solid fa-puzzle-piece"></i> Gebäudeteil</summary>
+            <form class="sg-form-stack" method="post" action="/signage/hierarchy/create">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="part">
+              <label>Gebäude <select class="form-select" name="building_id" required>{% for b in buildings %}<option value="{{ b.id }}" {% if b.id == selected_building_id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select></label>
+              <label>Bezeichnung <input class="form-control" name="name" maxlength="120" required placeholder="Nordflügel"></label>
+              <label>Art <select class="form-select" name="part_kind">{% for key, label in part_kinds.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
+              <label>Untergeordnet zu <select class="form-select" name="parent_id"><option value="">Direkt zum Gebäude</option>{% for part in parts %}<option value="{{ part.id }}" data-sg-building="{{ part.building_id }}">{{ part.name }}</option>{% endfor %}</select></label>
+              <label>Kennung (optional) <input class="form-control" name="code" maxlength="32"></label>
+              <label>Beschreibung (optional) <textarea class="form-control" rows="2" name="description" maxlength="250"></textarea></label>
+              <button class="btn btn-outline-primary" type="submit" {% if not buildings %}disabled{% endif %}>Gebäudeteil anlegen</button>
+            </form>
+          </details>
+          <details><summary><i class="fa-solid fa-layer-group"></i> Geschoss</summary>
+            <form class="sg-form-stack" method="post" action="/signage/hierarchy/create">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="floor">
+              <label>Gebäude <select class="form-select" name="building_id" required>{% for b in buildings %}<option value="{{ b.id }}" {% if b.id == selected_building_id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select></label>
+              <label>Bezeichnung <input class="form-control" name="name" maxlength="100" required placeholder="Erdgeschoss"></label>
+              <label>Ebene <input class="form-control" name="level" type="number" min="-20" max="200" value="0" required></label>
+              <label>Gebäudeteil (optional) <select class="form-select" name="part_id"><option value="">Direkt im Gebäude</option>{% for part in parts %}<option value="{{ part.id }}" data-sg-building="{{ part.building_id }}">{{ part.name }}</option>{% endfor %}</select></label>
+              <button class="btn btn-outline-primary" type="submit" {% if not buildings %}disabled{% endif %}>Geschoss anlegen</button>
+            </form>
+          </details>
+          <details><summary><i class="fa-solid fa-door-open"></i> Raum</summary>
+            <form class="sg-form-stack" method="post" action="/signage/hierarchy/create">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="kind" value="room">
+              <label>Geschoss <select class="form-select" name="floor_id" required>{% for floor in floors %}<option value="{{ floor.id }}" {% if selected_kind == 'floor' and selected.id == floor.id or selected_kind == 'room' and selected.floor_id == floor.id %}selected{% endif %}>{{ floor.name }} · {{ (buildings|selectattr('id','equalto',floor.building_id)|first).name }}</option>{% endfor %}</select></label>
+              <label>Raumnummer <input class="form-control" name="name" maxlength="40" required placeholder="1.14"></label>
+              <label>Raumbezeichnung <input class="form-control" name="label" maxlength="180" placeholder="Personalbüro"></label>
+              <label>Ressource <select class="form-select" name="resource_id"><option value="">Keine</option>{% for r in resources %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></label>
+              <label>Kalender <select class="form-select" name="calendar_id"><option value="">Kein Kalender</option>{% for cal in calendars %}<option value="{{ cal.id }}">{{ cal.title }}</option>{% endfor %}</select></label>
+              <label class="sg-check"><input type="checkbox" name="accessible" value="1"> Barrierefrei erreichbar</label>
+              <button class="btn btn-outline-primary" type="submit" {% if not floors %}disabled{% endif %}>Raum anlegen</button>
+            </form>
+          </details>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}<script src="/static/signage-workspace.js" defer></script>{% endblock %}

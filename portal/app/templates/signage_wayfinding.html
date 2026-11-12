@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Wegenetz & Büros · Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace">
+  <div class="sg-page-intro"><div><span class="sg-eyebrow">TAKT · DIGITAL SIGNAGE</span>
+    <h1>Wegenetz & Büros</h1><p>Wegepunkte, barrierefreie Verbindungen und freiwillige Bürozuordnungen verwalten. Gebäude und Geschosse bearbeitest du im Gebäudebrowser.</p>
+  </div><div class="sg-intro-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></div></div>
+  {% set section = 'ways' %}{% include "_signage_nav.html" %}
+    <section id="routing" class="sg-panel" aria-labelledby="sg-routing-title">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">INTELLIGENTE BESUCHERFÜHRUNG</span>
+      <h2 id="sg-routing-title">Digitale Wegepläne</h2>
+      <p>Baue ein Wegenetz mit Eingängen, Fluren, Aufzügen und Raumzielen auf. Die Distanz und barrierefreie Alternativen werden automatisch berechnet.</p>
+    </div></div>
+    <div class="sg-structure-grid">
+      <form method="post" action="/signage/route/node" class="sg-mini-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <h3><i class="fa-solid fa-location-dot me-1"></i> Wegepunkt</h3>
+        <label>Bezeichnung<input class="form-control" name="label" maxlength="120" placeholder="Eingang Nord oder Aufzug 1. OG" required></label>
+        <label>Geschoss<select class="form-select" name="floor_id" required>{% for floor in floors %}<option value="{{ floor.id }}">{{ (buildings|selectattr('id','equalto',floor.building_id)|first).name }} · {{ floor.name }}</option>{% endfor %}</select></label>
+        <label>Typ<select class="form-select" name="kind">
+          <option value="entrance">Eingang</option><option value="corridor" selected>Flur / Knoten</option>
+          <option value="elevator">Aufzug</option><option value="stairs">Treppe</option>
+          <option value="room">Raumziel</option><option value="exit">Ausgang</option>
+        </select></label>
+        <label>Verknüpftes Raumziel<select class="form-select" name="room_id"><option value="">Keines</option>{% for room in rooms %}<option value="{{ room.id }}">{{ room.number }} · {{ room.name }}</option>{% endfor %}</select></label>
+        <div class="sg-coordinate-row">
+          <label>Position X (%)<input class="form-control" type="number" name="x_pct" min="0" max="100" step="0.1" value="50"></label>
+          <label>Position Y (%)<input class="form-control" type="number" name="y_pct" min="0" max="100" step="0.1" value="50"></label>
+        </div>
+        <label class="sg-check"><input type="checkbox" name="accessible" value="1" checked> Barrierefrei erreichbar</label>
+        <button class="btn btn-outline-primary" type="submit" {% if not floors %}disabled{% endif %}>Wegepunkt hinzufügen</button>
+      </form>
+      <form method="post" action="/signage/route/edge" class="sg-mini-form">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <h3><i class="fa-solid fa-route me-1"></i> Verbindung</h3>
+        <label>Von<select class="form-select" name="from_node_id" required>{% for node in route_nodes %}<option value="{{ node.id }}">#{{ node.id }} · {{ node.label }}</option>{% endfor %}</select></label>
+        <label>Nach<select class="form-select" name="to_node_id" required>{% for node in route_nodes %}<option value="{{ node.id }}">#{{ node.id }} · {{ node.label }}</option>{% endfor %}</select></label>
+        <label>Entfernung in Metern<input class="form-control" name="distance_m" type="number" min="1" max="5000" value="10" required></label>
+        <label class="sg-check"><input type="checkbox" name="bidirectional" value="1" checked> In beide Richtungen begehbar</label>
+        <label class="sg-check"><input type="checkbox" name="accessible" value="1" checked> Barrierefreie Verbindung</label>
+        <button class="btn btn-outline-primary" type="submit" {% if route_nodes|length < 2 %}disabled{% endif %}>Verbindung speichern</button>
+      </form>
+      <div class="sg-mini-form sg-route-help">
+        <h3><i class="fa-solid fa-circle-info me-1"></i> So funktioniert die Wegeführung</h3>
+        <p>1. Lege pro Geschoss relevante Eingänge, Flurkreuzungen, Aufzüge, Treppen und Raumziele an.</p>
+        <p>2. Verbinde die Wegepunkte. Für Rollstuhlwege darfst du Treppen nicht als barrierefrei markieren.</p>
+        <p>3. Wähle im Display-Studio die tatsächliche Startposition des Monitors aus.</p>
+        <p>Die Anzeige findet die kürzeste Route und berechnet bei vorhandenen Aufzugwegen eine barrierefreie Alternative.</p>
+        <div class="sg-info-box"><i class="fa-solid fa-shield-halved"></i> Das Routing nutzt ausschließlich freigegebene Wege- und Raumstammdaten, nicht private Mitarbeiterprofile.</div>
+      </div>
+    </div>
+    {% if route_nodes %}
+    <div class="sg-route-collection">
+      <h3>Gespeicherte Wegepunkte <span class="sg-pill sg-pill-neutral">{{ route_nodes|length }}</span></h3>
+      <div class="sg-route-chips">
+      {% for node in route_nodes %}
+        <span class="sg-route-chip"><i class="fa-solid {{ {'entrance':'fa-door-open','corridor':'fa-location-dot','elevator':'fa-elevator','stairs':'fa-stairs','room':'fa-location-crosshairs','exit':'fa-person-walking-arrow-right'}[node.kind] }}"></i>
+          #{{ node.id }} · {{ node.label }}{% if not node.accessible %} · nicht barrierefrei{% endif %}
+          <form method="post" action="/signage/route/node/{{ node.id }}/delete">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="sg-remove-route" aria-label="Wegepunkt {{ node.label }} entfernen" title="Entfernen">×</button>
+          </form>
+        </span>
+      {% endfor %}
+      </div>
+      <p class="sg-muted">{{ route_edges|length }} Verbindungen im Wegenetz</p>
+      {% if route_edges %}
+      <div class="sg-route-links">
+        {% for edge in route_edges %}
+        <div class="sg-link-row">
+          <span><i class="fa-solid fa-arrow-right-arrow-left me-2"></i>
+            {{ (route_nodes|selectattr('id','equalto',edge.from_node_id)|first).label }}
+            {{ '↔' if edge.bidirectional else '→' }}
+            {{ (route_nodes|selectattr('id','equalto',edge.to_node_id)|first).label }}
+            · {{ edge.distance_m }} m {% if edge.accessible %}· barrierefrei{% endif %}
+          </span>
+          <form method="post" action="/signage/route/edge/{{ edge.id }}/delete">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Verbindung {{ edge.id }} entfernen">Entfernen</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+  <section id="offices" class="sg-panel" aria-labelledby="sg-office-title">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">PERSONEN & BESUCHER</span><h2 id="sg-office-title">Büros zuordnen</h2><p>Nur ausdrücklich freigegebene Personen erscheinen in öffentlichen Besucheranzeigen. Private Profile bleiben privat.</p></div></div>
+    <form method="post" action="/signage/office" class="sg-create-form"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Person<select class="form-select" name="user_id">{% for member in staff %}<option value="{{ member.id }}">{{ member.name }}</option>{% endfor %}</select></label>
+      <label>Büro<select class="form-select" name="room_id">{% for room in rooms %}<option value="{{ room.id }}">{{ room.number }} · {{ room.name }}</option>{% endfor %}</select></label>
+      <label class="sg-check"><input type="checkbox" name="primary" value="1" checked> Hauptbüro</label>
+      <label class="sg-check"><input type="checkbox" name="public" value="1"> Im öffentlichen Wegweiser anzeigen</label>
+      <button class="btn btn-primary" type="submit" {% if not staff or not rooms %}disabled{% endif %}>Zuordnung speichern</button>
+    </form>
+    {% if offices %}<p class="sg-muted">Bestehende Zuordnungen: {{ offices|length }}. Die öffentliche Sichtbarkeit kann durch erneutes Speichern der Zuordnung geändert werden.</p>{% endif %}
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="/static/signage-passive-admin.js" defer></script>{% endblock %}

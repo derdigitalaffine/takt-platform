@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Geräteübersicht · Digital Signage{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-fleet.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-fleet.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
 {% block content %}
 <main class="sg-workspace sg-fleet">
   <div class="sg-page-intro">
@@ -11,6 +11,7 @@
     </div>
     <div class="sg-intro-icon" aria-hidden="true"><i class="fa-solid fa-desktop"></i></div>
   </div>
+  {% set section = 'fleet' %}{% include "_signage_nav.html" %}
   <div class="sg-fleet-summary" aria-label="Geräteübersicht">
     <div><span><i class="fa-solid fa-circle-check"></i> Online</span><strong data-fleet-count="online">{{ counts.online }}</strong></div>
     <div><span><i class="fa-solid fa-hourglass-half"></i> Verzögert</span><strong data-fleet-count="delayed">{{ counts.delayed }}</strong></div>
