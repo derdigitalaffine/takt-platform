@@ -202,6 +202,33 @@ def text_to_html(text: str, frame: dict | None = None, *, kind: str = "") -> str
             f'border:1px solid #e5e7eb"><tr><td style="padding:13px 16px;'
             f'font-size:16px;font-weight:700;color:{foreground}">{html.escape(title)}</td></tr></table>'
         )
+    # Older organizations may have edited their booking templates before the
+    # structured TERMINÜBERSICHT section was introduced. Preserve their text
+    # while providing a readable summary card for recognizable legacy fields.
+    if booking and kind in {
+        "booking_confirm", "booking_requested", "booking_update",
+        "booking_cancelled", "booking_reminder", "booking_declined",
+    } and "TERMINÜBERSICHT" not in text:
+        legacy_rows = []
+        for raw_line in text.splitlines():
+            hit = re.match(r"^\\s*(Termin|Anliegen|Datum|Uhrzeit|Ort|Wann|Wo):\\s*(.+?)\\s*$", raw_line, re.I)
+            if hit and not hit.group(2).startswith(("http://", "https://")):
+                label, value = hit.group(1), hit.group(2)
+                if len(value) <= 300 and len(legacy_rows) < 5:
+                    legacy_rows.append(
+                        f'<tr><td style="padding:7px 12px 7px 0;color:#596579;'
+                        f'width:30%;vertical-align:top">{html.escape(label)}</td>'
+                        f'<td style="padding:7px 0;font-weight:650">{html.escape(value)}</td></tr>'
+                    )
+        if legacy_rows:
+            paragraphs.append(
+                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+                'style="margin:0 0 16px;padding:12px 16px;border:1px solid #dce4ee;'
+                'border-radius:8px;background:#f8fafc"><tr><td>'
+                '<strong style="display:block;color:#27364b;margin-bottom:5px">Ihr Termin</strong>'
+                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+                + "".join(legacy_rows) + '</table></td></tr></table>'
+            )
     labels = ('Umlauf öffnen und entscheiden', 'Umlauf öffnen und Kenntnisnahme bestätigen', 'Information öffnen')
     for part in text.split('\n\n'):
         if not part.strip(): continue
