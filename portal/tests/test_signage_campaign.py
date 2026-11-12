@@ -11,7 +11,7 @@ from app.db import SessionLocal, utcnow, User
 from app.signage_models import (
     SignageBuilding, SignageCampaign, SignageCampaignScreen, SignageFloor,
     SignagePassiveConfig, SignagePublicDestination, SignageRoom, SignageScreen,
-    SignageSpecial, SignageGeneratedScreen,
+    SignageSpecial, SignageGeneratedScreen, SignageWayNode,
 )
 
 
@@ -240,7 +240,7 @@ def test_bulk_generator_is_idempotent_private_and_preserves_existing_displays(pl
     c = _admin()
     building, floor, room, origin = place
     with SessionLocal() as db:
-        node = db.get(__import__("app.signage_models", fromlist=["SignageWayNode"]).SignageWayNode, origin)
+        node = db.get(SignageWayNode, origin)
         node.kind = "entrance"
         db.commit()
     payload = {"building_id": str(building), "building": "1", "floors": "1", "corridors": "1"}
