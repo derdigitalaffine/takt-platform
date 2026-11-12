@@ -144,7 +144,9 @@ def editor_context(db, user, row):
                 editor_data={'items':c['items'], 'users':c['audience']['users'], 'groups':c['audience']['groups'],
                              'bundles':bundle_data, 'group_members':{str(g.id):[u.id for u in g.members if u.active] for g in groups}, 'user_count':len(people)},
                 item_labels={'law':'Rechtstext','form':'Formular','dms':'DMS-Dokument','file':'Datei','markdown':'Markdown'},
-                can_publish=False if isinstance(row,CirculationBundle) else cl.may_publish(db, user, row), date_input=lambda value: to_local(cl.at(value)).strftime('%Y-%m-%dT%H:%M') if value else '')
+                can_publish=False if isinstance(row,CirculationBundle) else cl.may_publish(db, user, row),
+                publication_issues=cl.publication_issues(db, row, user) if isinstance(row, Circulation) and cl.may_publish(db, user, row) else [],
+                date_input=lambda value: to_local(cl.at(value)).strftime('%Y-%m-%dT%H:%M') if value else '')
 
 
 @app.get('/umlaeufe/{cid:int}/edit')
@@ -283,6 +285,14 @@ async def circulation_publish(request: Request, cid: int, user: User = Depends(c
     if str(data.get('revision', '')) != row.updated_at.isoformat(): raise HTTPException(409, 'Bitte den aktuellen Entwurf neu laden.')
     try:
         cl.publish(db, row, user, data.get('reack') != '0'); db.commit()
+    except HTTPException as exc:
+        db.rollback()
+        if exc.status_code != 422:
+            raise
+        # A business validation failure must lead back to the editor with its
+        # actual reason instead of rendering a generic 422 HTML error page.
+        flash(request, f'Veröffentlichung nicht möglich: {exc.detail} Der gespeicherte Entwurf wurde nicht verändert.', 'error')
+        return redirect(f'/umlaeufe/{cid}/edit')
     except IntegrityError:
         db.rollback(); raise HTTPException(409, 'Diese Fassung wurde bereits veröffentlicht. Bitte neu laden.')
     from . import public_nav
