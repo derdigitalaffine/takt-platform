@@ -1,5 +1,7 @@
 """Create and publish a passive sign through the portal, then check the kiosk in Chromium."""
 import os
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import re
 import subprocess
@@ -57,6 +59,35 @@ def exercise():
             assert kiosk.evaluate("document.documentElement.scrollWidth === innerWidth")
             assert kiosk.evaluate("document.documentElement.scrollHeight <= innerHeight")
             kiosk.close()
+
+        # Central building action is configured once and picked up by the
+        # existing passive corridor without editing its individual settings.
+        page.goto(BASE + "/signage/campaigns")
+        campaign = page.locator("#sg-central-form")
+        campaign.locator("[name=preset]").select_option("postal")
+        campaign.locator("[name=building_id]").select_option(label="Rathaus")
+        building_id = campaign.locator("[name=building_id]").input_value()
+        expect(campaign.locator("[name=room_id]")).not_to_have_value("")
+        campaign.locator("[name=title]").fill("Briefwahlstelle heute")
+        local_now = datetime.now(ZoneInfo("Europe/Berlin"))
+        campaign.locator("[name=starts_at]").fill(
+            (local_now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M"))
+        campaign.locator("[name=ends_at]").fill(
+            (local_now + timedelta(minutes=45)).strftime("%Y-%m-%dT%H:%M"))
+        campaign.locator("[name=published]").check()
+        campaign.get_by_role("button", name="Sonderanzeige anlegen").click()
+        expect(page.get_by_text("Briefwahlstelle heute", exact=True)).to_be_visible()
+
+        display = browser.new_page(viewport={"width": 1280, "height": 720})
+        display.goto(f"{BASE}/signage/view/{screen_id}")
+        expect(display.locator(".sd-special").get_by_text("Briefwahlstelle heute")).to_be_visible()
+        expect(display.locator("input, button, select, details")).to_have_count(0)
+        assert not errors, errors
+        display.close()
+
+        simulation_at = local_now.strftime("%Y-%m-%dT%H:%M")
+        page.goto(f"{BASE}/signage/campaigns/simulate?building_id={building_id}&at={simulation_at}")
+        expect(page.get_by_text("Briefwahlstelle heute")).to_be_visible()
         browser.close()
 
 
