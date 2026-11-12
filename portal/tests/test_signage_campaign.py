@@ -247,7 +247,9 @@ def test_bulk_generator_is_idempotent_private_and_preserves_existing_displays(pl
     first = _post(c, "/signage/generate", payload)
     assert first.status_code == 303, first.text
     with SessionLocal() as db:
-        entries = list(db.scalars(select(SignageGeneratedScreen)))
+        entries = list(db.scalars(select(SignageGeneratedScreen).join(
+            SignagePassiveConfig, SignagePassiveConfig.screen_id == SignageGeneratedScreen.screen_id
+        ).where(SignagePassiveConfig.building_id == building)))
         assert len(entries) == 3
         screens = [db.get(SignageScreen, entry.screen_id) for entry in entries]
         assert all(screen.visibility == "private" for screen in screens)
@@ -257,7 +259,9 @@ def test_bulk_generator_is_idempotent_private_and_preserves_existing_displays(pl
     second = _post(c, "/signage/generate", payload)
     assert second.status_code == 303
     with SessionLocal() as db:
-        assert len(list(db.scalars(select(SignageGeneratedScreen)))) == 3
+        assert len(list(db.scalars(select(SignageGeneratedScreen).join(
+            SignagePassiveConfig, SignagePassiveConfig.screen_id == SignageGeneratedScreen.screen_id
+        ).where(SignagePassiveConfig.building_id == building)))) == 3
 
 
 def test_generator_does_not_publish_or_fabricate_directions(place):
@@ -268,7 +272,9 @@ def test_generator_does_not_publish_or_fabricate_directions(place):
     })
     assert response.status_code == 303
     with SessionLocal() as db:
-        generated = list(db.scalars(select(SignageGeneratedScreen)))
+        generated = list(db.scalars(select(SignageGeneratedScreen).join(
+            SignagePassiveConfig, SignagePassiveConfig.screen_id == SignageGeneratedScreen.screen_id
+        ).where(SignagePassiveConfig.building_id == building)))
         assert len(generated) == 2
         for entry in generated:
             screen = db.get(SignageScreen, entry.screen_id)
