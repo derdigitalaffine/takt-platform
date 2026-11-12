@@ -575,7 +575,7 @@ async def signage_structure(request: Request, user: User = Depends(manage_user),
         db.rollback()
         raise HTTPException(409, "Eintrag bereits vorhanden oder Datenkonflikt.")
     flash(request, "Gebäudestammdaten gespeichert.")
-    return redirect("/signage#buildings")
+    return redirect("/signage/buildings")
 
 
 @app.post("/signage/structure/{kind}/{item_id:int}", dependencies=[Depends(check_csrf)])
@@ -605,7 +605,7 @@ async def signage_edit_structure(kind: str, item_id: int, request: Request,
         db.rollback()
         raise HTTPException(409, "Diese Zimmer- oder Geschossnummer ist bereits vergeben.")
     flash(request, "Stammdaten aktualisiert.")
-    return redirect(f"/signage#sg-{kind}-{item_id}")
+    return redirect(f"/signage/buildings?select={kind}:{item_id}")
 
 
 @app.post("/signage/room/{room_id:int}/calendar", dependencies=[Depends(check_csrf)])
@@ -625,7 +625,7 @@ async def signage_update_room_calendar(room_id: int, request: Request,
     room.calendar_id = cid
     db.commit()
     flash(request, "Raumkalender aktualisiert.")
-    return redirect("/signage#buildings")
+    return redirect("/signage/buildings")
 
 
 NODE_KINDS = {"entrance", "corridor", "stairs", "elevator", "room", "exit"}
@@ -655,7 +655,7 @@ async def signage_route_node(request: Request, user: User = Depends(manage_user)
                           accessible=kind != "stairs" and form.get("accessible") == "1"))
     db.commit()
     flash(request, "Wegepunkt gespeichert.")
-    return redirect("/signage#routing")
+    return redirect("/signage/wayfinding#routing")
 
 
 @app.post("/signage/route/edge", dependencies=[Depends(check_csrf)])
@@ -684,7 +684,7 @@ async def signage_route_edge(request: Request, user: User = Depends(manage_user)
                                bidirectional=form.get("bidirectional") == "1"))
     db.commit()
     flash(request, "Wegeverbindung gespeichert.")
-    return redirect("/signage#routing")
+    return redirect("/signage/wayfinding#routing")
 
 
 @app.post("/signage/route/node/{node_id:int}/delete", dependencies=[Depends(check_csrf)])
@@ -699,7 +699,7 @@ def signage_delete_route_node(node_id: int, request: Request,
     db.delete(node)
     db.commit()
     flash(request, "Wegepunkt entfernt. Betroffene Wege und Displaypositionen bitte prüfen.")
-    return redirect("/signage#routing")
+    return redirect("/signage/wayfinding#routing")
 
 
 @app.post("/signage/route/edge/{edge_id:int}/delete", dependencies=[Depends(check_csrf)])
@@ -712,7 +712,7 @@ def signage_delete_route_edge(edge_id: int, request: Request,
     db.delete(edge)
     db.commit()
     flash(request, "Wegeverbindung entfernt.")
-    return redirect("/signage#routing")
+    return redirect("/signage/wayfinding#routing")
 
 
 @app.post("/signage/{sid:int}/anchor", dependencies=[Depends(check_csrf)])
@@ -759,7 +759,7 @@ async def signage_office(request: Request, user: User = Depends(manage_user), db
     row.is_primary = form.get("primary") == "1"
     db.commit()
     flash(request, "Bürozuordnung gespeichert; öffentliche Freigabe wird separat gesteuert.")
-    return redirect("/signage#offices")
+    return redirect("/signage/wayfinding#offices")
 
 
 @app.post("/profile/signage/office/{office_id:int}/visibility",
@@ -878,7 +878,7 @@ async def signage_publish_destination(room_id: int, request: Request, user: User
         db.delete(entry)
     db.commit()
     flash(request, "Raumfreigabe gespeichert.")
-    return redirect("/signage#buildings")
+    return redirect("/signage/buildings")
 
 
 @app.post("/signage/{sid:int}/destination", dependencies=[Depends(check_csrf)])
