@@ -89,10 +89,9 @@ def _render_display(request, db, screen, *, public, viewer=None):
     return response
 
 
-@app.get("/signage")
-def signage_home(request: Request, user: User = Depends(manage_user), db: Session = Depends(get_db)):
-    _enabled()
-    return render(request, "signage_admin.html", user,
+def _signage_context(db: Session, user: User):
+    """Shared read-only data for separate Signage workspaces."""
+    return dict(
         screens=list(db.scalars(select(SignageScreen).order_by(SignageScreen.name))),
         buildings=list(db.scalars(select(SignageBuilding).order_by(SignageBuilding.name))),
         floors=list(db.scalars(select(SignageFloor).order_by(SignageFloor.level))),
@@ -107,7 +106,28 @@ def signage_home(request: Request, user: User = Depends(manage_user), db: Sessio
         published_rooms={row.room_id: row.label for row in db.scalars(select(SignagePublicDestination))},
         calendars=[cal for cal in db.scalars(select(Calendar).where(Calendar.source == "free").order_by(Calendar.title))
                    if calendars.access(db, user, cal)],
-        resources=list(db.scalars(select(Resource).where(Resource.active.is_(True)).order_by(Resource.name))))
+        resources=list(db.scalars(select(Resource).where(Resource.active.is_(True)).order_by(Resource.name)))
+
+
+@app.get("/signage")
+def signage_home(request: Request, user: User = Depends(manage_user),
+                 db: Session = Depends(get_db)):
+    _enabled()
+    return render(request, "signage_home.html", user, **_signage_context(db, user))
+
+
+@app.get("/signage/screens")
+def signage_screens(request: Request, user: User = Depends(manage_user),
+                    db: Session = Depends(get_db)):
+    _enabled()
+    return render(request, "signage_screens.html", user, **_signage_context(db, user))
+
+
+@app.get("/signage/wayfinding")
+def signage_wayfinding(request: Request, user: User = Depends(manage_user),
+                       db: Session = Depends(get_db)):
+    _enabled()
+    return render(request, "signage_wayfinding.html", user, **_signage_context(db, user))
 
 
 @app.post("/signage/new", dependencies=[Depends(check_csrf)])
