@@ -208,6 +208,7 @@ def test_poll_color_matrix_has_web_yes_maybe_no_and_untruncated_csv(reports):
         db.add(PollParticipant(
             poll_id=poll.id, name="Özlem Müller",
             email="ozlem.mueller@example.org", answered_at=utcnow(),
+            edit_token="survey-pdf-color-matrix-ozlem",
             answers_json=json.dumps({
                 str(original.id): "maybe", str(others[0].id): "no",
                 str(others[1].id): "yes",
