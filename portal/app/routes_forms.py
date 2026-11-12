@@ -544,6 +544,12 @@ def form_export(form_id: int, fmt: str, user: User = Depends(current_user), db: 
     if fmt == "json":
         return Response(fm.to_json(form, list(form.responses)), media_type="application/json; charset=utf-8",
                         headers={"Content-Disposition": f'attachment; filename="{slug}-{stamp}.json"'})
+    if fmt == "pdf" and form.kind == "survey":
+        from . import survey_pdf
+        return Response(survey_pdf.form_report(db, form), media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{slug}-{stamp}.pdf"',
+                                 "Cache-Control": "private, no-store",
+                                 "X-Content-Type-Options": "nosniff"})
     raise HTTPException(404)
 
 
