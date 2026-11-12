@@ -173,3 +173,11 @@ def test_workflow_org_mode_and_tasks_are_visible_only_to_members(db, responsibil
     assert wf.who(task).find("Gruppe") >= 0
     assert member.email in wf._addresses(db, None, None, ids["group_node"])
     assert outsider.email not in wf._addresses(db, None, None, ids["group_node"])
+    # Once a responsible person takes this particular step, the other
+    # department members must not be able to complete/approve it.
+    task.assignee_id = ids["admin"]
+    db.flush()
+    assert not wf.can_work(db, member, task)
+    assert task not in wf.my_tasks(db, member)
+    assert wf.can_work(db, db.get(User, ids["admin"]), task)
+
