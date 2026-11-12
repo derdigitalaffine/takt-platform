@@ -351,7 +351,9 @@ def enqueue(db, to_addr: str, subject: str, body: str, kind: str, cfg: dict[str,
 
 
 def _copy_to_substitute(db, to_addr, subject, body, kind, attachments, reply_to) -> None:
-    """Arbeitsbezogene Benachrichtigungen an eine heute abwesende Person gehen in Kopie an ihre Vertretung."""
+    """Optional calendar/leave integration: never forward using disabled leave data."""
+    if get_settings(db).get("module_calendars", "1") != "1":
+        return
     from . import absence
     if kind not in absence.FORWARD_KINDS:
         return
