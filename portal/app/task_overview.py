@@ -3,7 +3,7 @@ from datetime import datetime
 from .db import utcnow, to_local
 
 SCOPES = {'all': 'Alle', 'personal': 'Persönlich', 'proxy': 'Vertretung', 'group': 'Gruppenaufgaben'}
-SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben', 'leave': 'Urlaubsplanung', 'anliegen': 'Interne Anliegen', 'anliegen_process': 'Anliegenprozesse'}
+SOURCES = {'all': 'Alle Bereiche', 'application': 'Anträge', 'circulation': 'Umläufe', 'resource': 'Ressourcenbuchung', 'native': 'Aufgaben', 'leave': 'Urlaubsplanung', 'anliegen': 'Interne Anliegen', 'anliegen_process': 'Anliegenprozesse', 'survey': 'Umfragen'}
 
 
 def collect(db, user, modules, *, now=None):
@@ -11,7 +11,8 @@ def collect(db, user, modules, *, now=None):
     now = now or utcnow()
     ready, pool, waiting, delegated, history, managed, archive = [], [], [], [], [], [], []
     source_modules = {'application': 'applications', 'circulation': 'circulations', 'resource': 'resources', 'native': 'tasks', 'leave': 'calendars', 'anliegen': 'anliegen', 'anliegen_process': 'anliegen'}
-    sources = {key: label for key, label in SOURCES.items() if key == 'all' or source_modules.get(key) in modules}
+    sources = {key: label for key, label in SOURCES.items() if key == 'all' or source_modules.get(key) in modules
+               or (key == 'survey' and bool(modules & {'forms', 'polls'}))}
 
     resource_scopes = {}
 
@@ -163,6 +164,20 @@ def collect(db, user, modules, *, now=None):
                          'Ansehen', request.due_at, detail=f'{response.ref_no} · wartet auf Antragsteller:innen', icon='fa-hourglass-half')
             item['late'] = False
             waiting.append(item)
+    if modules & {'forms', 'polls'}:
+        from . import my_surveys
+        for participation in my_surveys.collect(db, user, modules):
+            # Only genuinely open invitations are actionable; a submitted
+            # answer never appears again in the outstanding task queue.
+            if participation['status'] != 'open' or not participation['url']:
+                continue
+            label = {'form': 'Formularumfrage', 'poll': 'Terminumfrage',
+                     'vote': 'Abstimmung'}[participation['kind']]
+            ready.append(entry('survey', participation['title'], participation['url'],
+                               participation['action'], participation['due'],
+                               detail=label + ' · Persönliche Teilnahme',
+                               icon={'form': 'fa-clipboard-list', 'poll': 'fa-calendar-check',
+                                     'vote': 'fa-check-to-slot'}[participation['kind']]))
     if 'circulations' in modules:
         for task in circulations.pending_tasks(db, user):
             detail = task['action'] + f' · {task["done"]} / {task["required"]} Nachweise'
@@ -182,7 +197,7 @@ def collect(db, user, modules, *, now=None):
     def order(item): return (not item['late'], item['due'] or datetime.max, item['source'], item['title'], item['href'])
     for items in (ready, pool, waiting, delegated, history, managed, archive): items.sort(key=order)
     return dict(ready=ready, pool=pool, waiting=waiting, delegated=delegated, history=history, managed=managed, archive=archive, sources=sources, count=len(ready), overdue=sum(t['late'] for t in ready),
-                group_count=len(pool), waiting_count=len(waiting), now=now, available=bool(modules & {'applications', 'resources', 'circulations', 'tasks', 'anliegen'}))
+                group_count=len(pool), waiting_count=len(waiting), now=now, available=bool(modules & {'applications', 'resources', 'circulations', 'tasks', 'anliegen', 'forms', 'polls'}))
 
 
 PERSPECTIVES = {'all': 'Jetzt bearbeiten', 'today': 'Heute', 'upcoming': 'Demnächst', 'overdue': 'Überfällig',

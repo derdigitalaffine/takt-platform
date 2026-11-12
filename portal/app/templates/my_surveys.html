@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Meine Umfragen{% endblock %}
+{% block content %}
+<div class="survey-workspace">
+  {% call m.page_header('Meine Umfragen', 'Offene Einladungen, erledigte Teilnahmen und Änderungen – unabhängig davon, wo du den Link geöffnet hast.') %}
+    {% if polls_enabled and (user.can('polls') or user.can('votes')) %}<a href="/umfragen" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-square-poll-vertical me-1" aria-hidden="true"></i>Umfragen verwalten</a>{% endif %}
+  {% endcall %}
+
+  <div class="row g-3 mb-4" aria-label="Persönlicher Teilnahmestand">
+    {% for key, label, icon, tone in [('open','Offen','fa-clock','warning'),('done','Abgeschlossen','fa-circle-check','success'),('closed','Beendet','fa-lock','secondary')] %}
+    <div class="col-4"><div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="h3 mb-1">{{ totals[key] }}</div>
+      <div class="small text-secondary"><i class="fa-solid {{ icon }} me-1" aria-hidden="true"></i>{{ label }}</div>
+    </div></div></div>
+    {% endfor %}
+  </div>
+
+  <form method="get" action="/meine-umfragen" class="ds-search-panel mb-4" role="search" aria-label="Meine Umfragen filtern">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-lg"><label class="form-label" for="ms-q">Suchen</label><input class="form-control" type="search" id="ms-q" name="q" maxlength="160" value="{{ q }}" placeholder="Umfragetitel oder Beschreibung"></div>
+      <div class="col-6 col-lg-3"><label class="form-label" for="ms-state">Teilnahmestatus</label>
+        <select class="form-select" id="ms-state" name="status">{% for key, label in [('all','Alle'),('open','Offen'),('done','Abgeschlossen'),('closed','Beendet')] %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </div>
+      <div class="col-6 col-lg-3"><label class="form-label" for="ms-type">Umfrageart</label>
+        <select class="form-select" id="ms-type" name="kind">{% for key, label in [('all','Alle Arten'),('form','Formularumfrage'),('poll','Terminumfrage'),('vote','Abstimmung')] %}<option value="{{ key }}" {% if kind == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      </div>
+      <div class="col-12 col-lg-auto"><button type="submit" class="btn btn-outline-primary w-100"><i class="fa-solid fa-filter me-1" aria-hidden="true"></i>Anzeigen</button></div>
+    </div>
+  </form>
+
+  {% if rows %}
+  <div class="row g-3" aria-label="Persönliche Umfrageteilnahmen">
+    {% for row in rows %}
+    {% set kind_label, kind_icon = {'form':('Formularumfrage','fa-clipboard-list'),'poll':('Terminumfrage','fa-calendar-check'),'vote':('Abstimmung','fa-check-to-slot')}[row.kind] %}
+    <div class="col-12 col-lg-6 col-xxl-4"><article class="card h-100 ds-survey-card">
+      <div class="card-body d-flex flex-column gap-3">
+        <div class="d-flex align-items-start justify-content-between gap-2">
+          <span class="small text-secondary"><i class="fa-solid {{ kind_icon }} me-1" aria-hidden="true"></i>{{ kind_label }}</span>
+          {% if row.status == 'open' %}<span class="badge text-bg-warning">Offen</span>
+          {% elif row.status == 'done' %}<span class="badge text-bg-success">Abgeschlossen</span>
+          {% else %}<span class="badge text-bg-secondary">Beendet</span>{% endif %}
+        </div>
+        <div>
+          <h2 class="h5 mb-2">{{ row.title }}</h2>
+          {% if row.description %}<p class="small text-secondary mb-0 ds-clamp">{{ row.description | striptags | truncate(240) }}</p>{% endif %}
+        </div>
+        <div class="small text-secondary">
+          {% if row.status == 'done' %}<i class="fa-solid fa-check me-1" aria-hidden="true"></i>Teilnahme registriert{% if row.kind != 'vote' and row.date %} · {{ row.date | local('%d.%m.%Y') }}{% endif %}
+          {% elif row.status == 'closed' %}Keine Teilnahme mehr möglich
+          {% else %}Antwort steht noch aus{% endif %}
+          {% if row.due and row.status == 'open' %}<div><i class="fa-regular fa-clock me-1" aria-hidden="true"></i>Frist: {{ row.due | local }}</div>{% endif %}
+          {% if row.note %}<div class="mt-1"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>{{ row.note }}</div>{% endif %}
+        </div>
+        <div class="mt-auto">
+          {% if row.url %}<a class="btn {{ 'btn-primary' if row.status == 'open' else 'btn-outline-secondary' }} btn-sm" href="{{ row.url }}"><i class="fa-solid {{ 'fa-pen' if row.status == 'open' else 'fa-arrow-up-right-from-square' }} me-1" aria-hidden="true"></i>{{ row.action }}</a>
+          {% else %}<span class="small text-secondary"><i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>Keine weitere Aktion erforderlich</span>{% endif %}
+        </div>
+      </div>
+    </article></div>
+    {% endfor %}
+  </div>
+  {% else %}
+    {{ m.empty_state('Keine passenden Umfragen', 'Hier erscheinen persönliche Einladungen und zuordenbare abgeschlossene Teilnahmen. Öffentliche Umfragen ohne persönlichen Nachweis können nicht kontoübergreifend zugeordnet werden.', '/meine-umfragen' if q or status != 'all' or kind != 'all' else '', 'Filter zurücksetzen', 'fa-clipboard-check') }}
+  {% endif %}
+  {% if polls_enabled %}
+  <div class="small text-secondary mt-4"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>
+    Live-Umfragen über QR-Code sind bewusst nicht einer Benutzeridentität zugeordnet. Der Teilnahmestatus bleibt deshalb auf dem jeweiligen Gerät und wird hier nicht personenbezogen angezeigt. Geheime Abstimmungen zeigen ausschließlich den Status deiner Stimmabgabe, niemals den Stimmzettel.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

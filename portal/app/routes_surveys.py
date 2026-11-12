@@ -1,7 +1,7 @@
 """Unified navigation and creation; existing engines retain their protected endpoints."""
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from . import poll_lifecycle, surveys
+from . import my_surveys, poll_lifecycle, surveys
 from .db import User
 from .main import app, current_user, enabled_modules, get_db, render
 
@@ -11,6 +11,29 @@ def _modules():
     if 'polls' not in modules:
         raise HTTPException(404, 'Umfragen sind auf diesem Server nicht eingeschaltet.')
     return modules
+
+
+@app.get('/meine-umfragen')
+def my_surveys_page(request: Request, q: str = '', status: str = 'all', kind: str = 'all',
+                    user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Personal participation is accessible without poll-editor permissions."""
+    modules = enabled_modules()
+    if not modules.intersection({'forms', 'polls'}):
+        raise HTTPException(404, 'Umfragen sind auf diesem Server nicht eingeschaltet.')
+    entries = my_surveys.collect(db, user, modules)
+    totals = my_surveys.summary(entries)
+    status = status if status in ('all', 'open', 'done', 'closed') else 'all'
+    kind = kind if kind in ('all', 'form', 'poll', 'vote') else 'all'
+    q = q.strip()[:160]
+    rows = [row for row in entries if (status == 'all' or row['status'] == status)
+            and (kind == 'all' or row['kind'] == kind)
+            and (not q or q.casefold() in (row['title'] + ' ' + row['description']).casefold())]
+    response = render(request, 'my_surveys.html', user, rows=rows, totals=totals,
+                      status=status, kind=kind, q=q,
+                      forms_enabled='forms' in modules, polls_enabled='polls' in modules)
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
 
 
 @app.get('/umfragen')

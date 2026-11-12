@@ -79,7 +79,42 @@ Seminar-Evaluationsformulare nutzen ihre eigenständige Abschlusslogik; das Inkr
 **Bestandsschutz:** Keine neuen Tabellen oder destruktiven Migrationen; bestehende
 Antworten, persönlicher Einladungscode und öffentliche Links bleiben erhalten.
 
-## Ausstehende Inkremente (nicht in diesem PR)
+## Inkrement 2: persönlicher Umfrage-Arbeitsplatz
+
+Separater, lesender Adapter `my_surveys.py`: `/meine-umfragen` zeigt
+persönliche Formular-Einladungen, identifizierbare eigene Formularantworten,
+Terminumfrage-Einladungen und Einträge im Wählerverzeichnis. Der Adapter
+fragt ausschließlich den **Teilnahmestatus** ab – niemals Ballots,
+Frageantworten oder Live-Gerätehashes. Das ist bewusst kein Ersatz für
+das später geplante gemeinsame transaktionale Berechtigungsmodell.
+
+- Nicht-anonyme Formularteilnahmen werden konto- bzw. persönlich
+  einladungsbasiert zusammengeführt; mehrfach vorhandene Antworten bleiben
+  eine Übersichtskachel je Umfrage. Anonyme Einladung: nur `submitted_at`.
+- Terminumfragen: nur eindeutig zugeordnete `user_id` oder nachweislich
+  durch den Organisator angelegte Einladungen (`invited_at`) mit zur
+  Portalanmeldung passender E-Mail. **Öffentliche** Angaben einer beliebigen
+  E-Mail-Adresse reichen nicht zum Kontozugriff auf einen persönlichen
+  Änderungstoken. Die Startseitenanzeige verwendet dieselbe Einschränkung.
+- Abstimmungen: nur eigene Wählerverzeichniseinträge bzw. echte persönliche
+  Einladungen. Es wird nie auf `VoteBallot` zugegriffen. Bei geheimer Wahl
+  nur der Status „abgegeben“, niemals die eigene Stimmabgabe als Antwort.
+- Live-Umfragen: **nicht** im persönlichen Verlauf; gerätebezogene
+  Teilnahmen sind absichtlich keine Benutzeridentität. Moderator-/Quiz-/
+  QR-Antwortwege bleiben unverändert.
+- Offene persönliche Einladungen werden über die bestehende
+  `task_overview` als Quelle „Umfragen“ in „Meine Aufgaben“ eingebunden
+  und nach Erledigung aus der offenen Liste entfernt.
+- Der Weg ist modulunabhängig: Nur Formularserver, nur Umfrage-/Abstimmungsmodul,
+  beide, oder keines davon aktiv; ohne aktiviertes Modul liefert die Route 404.
+- Kein neues Datenbankschema, keine Änderungen an Live-Endpunkten,
+  keine automatische Erinnerungsflut und keine Rückwirkung auf Anträge.
+
+Regressionssuite: `test_my_surveys.py` sowie die vorhandenen
+`test_live.py`, `test_live_quiz.py` und Browsertests.
+
+## Weitere Ausbaustufen
+
 
 - Einheitliches fachliches Teilnahme-API je Engine mit getrenntem Identitäts-,
   Berechtigungs- und Antwortmodell; Adapter statt globaler Duplikatsperre.
