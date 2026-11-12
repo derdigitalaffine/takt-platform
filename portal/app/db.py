@@ -875,6 +875,7 @@ class Form(Base):
     app_duration: Mapped[str] = mapped_column(String(255), default="")       # übliche Bearbeitungsdauer
     app_assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     app_group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
+    app_org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     app_mailbox: Mapped[str] = mapped_column(String(255), default="")        # Funktionspostfach
     app_routing_json: Mapped[str] = mapped_column(Text, default="[]")        # Regeln je Antwort
     app_deadline_days: Mapped[int] = mapped_column(Integer, default=14)
@@ -970,6 +971,7 @@ class FormResponse(Base):
     status_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True, index=True)
+    responsible_org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     route_email: Mapped[str] = mapped_column(String(255), default="")
     due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     overdue_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -999,6 +1001,7 @@ class FormResponse(Base):
         return data if isinstance(data, dict) else {}
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
     group: Mapped[Group | None] = relationship(foreign_keys=[group_id])
+    responsible_org: Mapped["Organization | None"] = relationship(foreign_keys=[responsible_org_id])
     events: Mapped[list["ApplicationEvent"]] = relationship(back_populates="response", cascade="all, delete-orphan",
                                                             order_by="ApplicationEvent.at", passive_deletes=True)
 
@@ -1080,6 +1083,7 @@ class ApplicationTask(Base):
     outcome: Mapped[str] = mapped_column(String(12), default="")  # done | approved | rejected
     assignee_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     group_id: Mapped[int | None] = mapped_column(ForeignKey("groups.id", ondelete="SET NULL"), nullable=True, index=True)
+    responsible_org_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -1093,6 +1097,7 @@ class ApplicationTask(Base):
     response: Mapped[FormResponse] = relationship(back_populates="tasks")
     assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
     group: Mapped[Group | None] = relationship(foreign_keys=[group_id])
+    responsible_org: Mapped["Organization | None"] = relationship(foreign_keys=[responsible_org_id])
 
     @property
     def data(self) -> dict:
@@ -3032,7 +3037,8 @@ _NEW_COLUMNS = {
     "application_requests": {"prefill_json": "TEXT NOT NULL DEFAULT '{}'"},
     "payments": {"active_refund": "VARCHAR(36) NOT NULL DEFAULT ''"},
     "groups": {"lead_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
-               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
+               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
+               "app_org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
     "booking_pages": {"listed": "BOOLEAN NOT NULL DEFAULT 0", "extended": "BOOLEAN NOT NULL DEFAULT 0",
                       "days_ahead": "INTEGER NOT NULL DEFAULT 60", "step_minutes": "INTEGER NOT NULL DEFAULT 15",
                       "holidays_closed": "BOOLEAN NOT NULL DEFAULT 1",
@@ -3085,9 +3091,11 @@ _NEW_COLUMNS = {
               "dms_area_id": "INTEGER REFERENCES dms_areas(id) ON DELETE SET NULL",
               "fee_json": "TEXT NOT NULL DEFAULT '{}'", "legal_json": "TEXT NOT NULL DEFAULT '[]'",
               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
+    "application_tasks": {"responsible_org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
     "form_responses": {"dms_removed": "BOOLEAN NOT NULL DEFAULT 0","ref_no": "VARCHAR(40)", "status": "VARCHAR(16) NOT NULL DEFAULT ''", "status_at": "DATETIME",
                        "assignee_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
                        "group_id": "INTEGER REFERENCES groups(id) ON DELETE SET NULL",
+                       "responsible_org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
                        "route_email": "VARCHAR(255) NOT NULL DEFAULT ''", "due_at": "DATETIME",
                        "overdue_notified_at": "DATETIME", "closed_at": "DATETIME", "track_token": "VARCHAR(64)",
                        "checksum": "VARCHAR(64) NOT NULL DEFAULT ''",
