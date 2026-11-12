@@ -62,10 +62,11 @@ automatische Modulaktivierung:
 | --- | --- | --- |
 | Bürger-Terminbuchung | Keine harte Abhängigkeit auf Kalender/Urlaub | Buchen, Ändern, E-Mails und ICS funktionieren |
 | Feiertage | Zentrale Feiertagsregeln | Unabhängig vom Kalender-Modul gültig |
-| Org-Schließtage, Urlaubsabwesenheiten | Optional `module_calendars` | Werden nicht als neue Buchungssperre ausgewertet |
-| Persönliche Kalenderkonflikte | Optional `module_calendars` | Prüfung entfällt, gespeicherte Einstellungen bleiben erhalten |
-| Kalendereinbindung von Buchungen | Optional `module_calendars` | Keine Kalender-Links; Buchungsseite funktioniert |
-| Vertretungshinweise/-Mailkopien | Optional Kalender/Urlaub | Ohne das Modul keine Weiterleitung anhand inaktiver Urlaubs-/Vertretungsdaten |
+| Organisations-Schließtage | Optional `module_calendars` | Neu übernommene Org-Sperrtage entfallen; manuelle Buchungsausnahmen bleiben |
+| Bestätigte Abwesenheiten | Bereits persistierte gemeinsame TAKT-Daten | Belegte Zeiten bleiben zur Verhinderung von Doppelbuchungen gesperrt, auch wenn die Kalenderoberfläche abgeschaltet ist |
+| Persönliche Kalenderkonflikte | Optional konfigurierte Quellen | Bereits ausdrücklich ausgewählte Belegungsquellen werden weiter berücksichtigt; bei fehlenden Quellen keine Sperre |
+| Kalendereinbindung von Buchungen | Optional `module_calendars` | Kein Kalender-UI-Link; Buchungsseite und ICS funktionieren |
+| Vertretungshinweise/-Mailkopien | Bereits vorhandene Abwesenheits- und Vertretungsdaten | Bestätigte, gültige Vertretungsregeln bleiben wirksam und werden nicht stillschweigend ignoriert |
 | Organisationszuordnung | Zentrale TAKT-Kerndaten | Ohne Zuordnung kein Organisations-Sperrtag; manuelle Zuweisung bleibt nutzbar |
 
 Architekturvorschlag für weiteren Ausbau: Jedes registrierte Modul deklariert
