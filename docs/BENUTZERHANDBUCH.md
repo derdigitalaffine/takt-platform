@@ -8,7 +8,9 @@ Willkommen im TAKT-Portal. Die Dokumentation ist jetzt **nach Aufgaben geglieder
 
 ## Einstieg: Grundlagen
 
-<a id="1-anmelden"></a><a id="2-die-oberfläche"></a><a id="13-profil-und-sicherheit-zwei-faktor"></a><a id="14-datenschutz-in-der-praxis"></a><a id="15-hilfe-bei-problemen"></a>- **[Grundlagen: Anmeldung, Navigation, Profil & Sicherheit](handbuch/grundlagen.md)**  
+<a id="1-anmelden"></a><a id="2-die-oberfläche"></a><a id="13-profil-und-sicherheit-zwei-faktor"></a><a id="14-datenschutz-in-der-praxis"></a><a id="15-hilfe-bei-problemen"></a>
+
+- **[Grundlagen: Anmeldung, Navigation, Profil & Sicherheit](handbuch/grundlagen.md)**  
   Erste Anmeldung, Menü/Favoriten, Suche, Datenschutz, Personenauswahl, eigenes Profil und Hilfe bei Problemen.
 
 ## Häufige Aufgaben
