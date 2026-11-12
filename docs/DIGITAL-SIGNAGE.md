@@ -123,3 +123,36 @@ Jeder neue Fachbereich benötigt einen expliziten Eintrag in `main.MODULES`, ein
 ### Fachliche Ausbaustufen und bewusste Grenzen
 
 Die nun integrierte Zentrale ermöglicht bereits Freigabe, Zeitsteuerung, Priorität, Gebäudegruppen und sichere Kalenderterminbindung. **Noch nicht vollständig umgesetzt** sind automatische Ereignisvorschläge aus gesonderten Gremien-, Terminbuchungs- oder Fachmodulen ohne explizite Kalenderauswahl, eine echte organisationsweite Vier-Augen-Freigabeworkflow-/Audit-Engine, visuelle SVG-Grundrisse, native Windows/Linux/Android/Raspberry-Pi-Player mit Offlinecache und die ausfallsichere Notfall-/Evakuierungsbeschilderung. Letztere darf erst nach fachlicher Sicherheitsabnahme betrieben werden.
+
+
+## Geräte-Fleet, Schlüsselrotation und sichere Anzeige bei Verbindungsabbruch
+
+### Einfache Einrichtung
+
+1. **Digital Signage → Display bearbeiten → Geräte & Monitoring:** Ein Gerät mit einem sprechenden Namen (z. B. „Empfang EG“) registrieren. TAKT zeigt den Geräte-Identifier und einen neuen Bearer-Schlüssel **genau einmal** an. Der Schlüssel wird serverseitig nur als SHA-256-Hash gespeichert.
+2. Den geheimen Schlüssel **nur in der geschützten Konfiguration des Players** speichern, nie in eine Browser-URL, auf einen QR-Code für Gäste oder in Zugriffsprotokolle schreiben. Für einfache Browserkiosks kann eine öffentliche, ausdrücklich freigegebene Displayansicht ohne Geräte-API verwendet werden.
+3. Ein gekoppelter Player ruft `GET /signage/api/device/<ID>/manifest` mit `Authorization: Bearer <SECRET>` ab und sendet periodisch `POST /signage/api/device/<ID>/heartbeat`. Der Heartbeat funktioniert ohne Inhalt; optional ist ein kleiner JSON-Diagnosebericht erlaubt:
+   ```json
+   {
+     "platform": "linux",
+     "client_version": "1.2.3",
+     "screen_width": 1920,
+     "screen_height": 1080,
+     "reported_screen_version": 2,
+     "diagnostic_code": "ok"
+   }
+   ```
+4. Unter **Digital Signage → Geräte überwachen** sind Online-/Offlinezustand, Displayversion, Auflösung, Plattform und erlaubte Diagnosecodes sichtbar. Der Status aktualisiert sich ohne Verlust der Filtereingabe alle 60 Sekunden. **Online** bedeutet letzter Heartbeat vor höchstens drei Minuten, **verzögert** bis 15 Minuten, danach **offline**.
+5. Mit **Schlüssel erneuern** wird ein neuer einmaliger Bearer erstellt; der vorherige Schlüssel ist **sofort ungültig**. Ein gesperrtes Gerät lässt sich nicht wieder aktivieren; hierfür ein neues Gerät registrieren.
+
+### Ausfallregeln im Browserkiosk
+
+- Die eigenständige Displayseite prüft ihre **eigene, authentifizierte/autorisiert gelieferte HTML-Antwort** vor dem nächsten Nachladen. Nur eine Antwort mit dem serverseitigen Header `X-TAKT-Signage: display` gilt als gültiger Anzeigestand. Zugriffsverlust, unerwartete Weiterleitungen und Netzwerkfehler führen nicht zur Ausspielung veralteter Termine.
+- Bei Browser-Offline-Ereignis oder fehlgeschlagener Aktualisierung **verdeckt ein vollständig undurchsichtiger Hinweis alle bisherigen Daten**. Bei wiederhergestellter Verbindung lädt der Kiosk neu; er zeigt bis dahin keine möglicherweise überholten Raumbelegungen oder Richtungsanweisungen.
+- Diese Sicherheitsanzeige ist bewusst **kein Offline-Cache** und ersetzt keine zugelassene Fluchtweg-/Evakuierungsbeschilderung. Eine unterbrechungsfreie Betriebsart und native Hardware-Player verbleiben in #327.
+- Diagnosen werden ausschließlich als enumerierte, nicht-personenbezogene Werte gespeichert. Keine IP-Adressen, Hostnamen, Seriennummern, Fehler-Freitexte, E-Mail-Adressen oder Gerätestandorte aus Telemetrie; höchstens 2 KiB JSON pro Heartbeat. Authentisierung und CSRF sind voneinander getrennt: Geräte-APIs ausschließlich über getrennte Bearer-Secrets; Flottenansicht und Schlüsselrotation nur mit `signage_manage` und CSRF.
+- **Sicherheitsgrenze:** Der Online-Status bestätigt den API-Heartbeat, nicht, dass ein realer Monitor eingeschaltet oder korrekt angebracht ist. Ein extern vorgeschalteter Reverse-Proxy muss die initialen tokenisierten URLs von geschützten Links weiterhin im Access-Log maskieren.
+
+### Weiter offene Fleet-Funktionen
+
+Geräte-Registrierung mittels zeitlich begrenzter Pairing-Codes, sichere Geräteinstallation/Shell-Skripte, konfigurierbare Betriebszeiten, native Windows-/Linux-/Android-/Raspberry-Pi-Player, signierter Offline-Cache mit ausdrücklich festgelegter Aktualitätszeit und sichere Fernaktionen bleiben getrennte Ausbaustufen. Ohne sichere Abnahme keine Notfallsteuerung.
