@@ -3037,8 +3037,7 @@ _NEW_COLUMNS = {
     "application_requests": {"prefill_json": "TEXT NOT NULL DEFAULT '{}'"},
     "payments": {"active_refund": "VARCHAR(36) NOT NULL DEFAULT ''"},
     "groups": {"lead_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
-               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
-               "app_org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
+               "org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL"},
     "booking_pages": {"listed": "BOOLEAN NOT NULL DEFAULT 0", "extended": "BOOLEAN NOT NULL DEFAULT 0",
                       "days_ahead": "INTEGER NOT NULL DEFAULT 60", "step_minutes": "INTEGER NOT NULL DEFAULT 15",
                       "holidays_closed": "BOOLEAN NOT NULL DEFAULT 1",
@@ -3082,6 +3081,10 @@ _NEW_COLUMNS = {
               "app_fee": "VARCHAR(255) NOT NULL DEFAULT ''", "app_duration": "VARCHAR(255) NOT NULL DEFAULT ''",
               "app_assignee_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
               "app_group_id": "INTEGER REFERENCES groups(id) ON DELETE SET NULL",
+              # Antragsbearbeitung: this FK is on FORMS, never on GROUPS.
+              # Existing installations receive it on next init_db() without
+              # rewriting submitted forms, cases or their group assignments.
+              "app_org_id": "INTEGER REFERENCES organizations(id) ON DELETE SET NULL",
               "app_mailbox": "VARCHAR(255) NOT NULL DEFAULT ''", "app_routing_json": "TEXT NOT NULL DEFAULT '[]'",
               "app_deadline_days": "INTEGER NOT NULL DEFAULT 14", "app_catalog": "BOOLEAN NOT NULL DEFAULT 1",
               "app_pdf": "BOOLEAN NOT NULL DEFAULT 1", "app_seq_year": "INTEGER NOT NULL DEFAULT 0",
