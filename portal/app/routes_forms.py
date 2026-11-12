@@ -840,13 +840,16 @@ def _closed_or_none(request: Request, form: Form | None):
 def form_public_fill(request: Request, token: str, db: Session = Depends(get_db)):
     from .form_access import submitting_user
     form = db.scalar(select(Form).where(Form.public_token == token)) if len(token) > 10 else None
-    blocked = _closed_or_none(request, form)
-    if blocked:
-        return blocked
+    # Previously completed surveys should retain their confirmation page even
+    # after the collection closes, without reopening any submission route.
+    if form is None:
+        return _message(request, None, "invalid", 404)
     submitting_user(request, db, form)
     already, completed_at, device_only = _submission_state(request, db, form)
-    if already and not form.multiple:
+    if already and (not form.multiple or not fm.is_open(form)):
         return _message(request, form, "done", completed_at=completed_at, device_only=device_only)
+    if not fm.is_open(form):
+        return _message(request, form, "closed")
     return _fill_page(request, form, action=f"/f/{token}", previously_submitted=already)
 
 
@@ -872,14 +875,15 @@ def _invite(db: Session, token: str) -> FormInvite | None:
 def form_invite_fill(request: Request, token: str, db: Session = Depends(get_db)):
     inv = _invite(db, token)
     form = inv.form if inv else None
-    blocked = _closed_or_none(request, form)
-    if blocked:
-        return blocked
+    if form is None:
+        return _message(request, None, "invalid", 404)
     from .form_access import submitting_user
     submitting_user(request, db, form)
     already, completed_at, _ = _submission_state(request, db, form, inv)
-    if already and not form.multiple:
+    if already and (not form.multiple or not fm.is_open(form)):
         return _message(request, form, "done", completed_at=completed_at)
+    if not fm.is_open(form):
+        return _message(request, form, "closed")
     return _fill_page(request, form, action=f"/f/i/{token}", invite=inv,
                       previously_submitted=already)
 
