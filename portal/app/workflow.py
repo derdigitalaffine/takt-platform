@@ -20,9 +20,10 @@ import re
 import secrets
 from datetime import timedelta
 
+from fastapi import HTTPException
 from sqlalchemy import or_, select
 
-from . import applications as apps, forms as fm, mailtpl, notify
+from . import application_orgs as ao, applications as apps, forms as fm, mailtpl, notify
 from .config import settings
 from .db import (
     ApplicationDocument, ApplicationRequest, ApplicationTask, Form, FormResponse, Group, Process,
@@ -41,7 +42,7 @@ STEP_TYPES = {
                 "Gebühr (fest oder aus einem internen Feld) anfordern – der Prozess wartet, bis bezahlt ist."),
 }
 EXPIRE_ACTIONS = {"notify": "Zuständige informieren (Vorgang bleibt offen)", "withdraw": "Vorgang beenden (Status „Zurückgezogen“)"}
-ASSIGN_MODES = {"case": "Zuständigkeit des Vorgangs", "user": "Bestimmte Person", "group": "Gruppe",
+ASSIGN_MODES = {"case": "Zuständigkeit des Vorgangs", "user": "Bestimmte Person", "group": "Bisherige Benutzergruppe", "org": "Organisationseinheit / Gruppe",
                 "previous": "Wer den vorigen Schritt erledigt hat"}
 OPS = {"eq": "ist gleich", "ne": "ist nicht", "contains": "enthält", "filled": "ist ausgefüllt",
        "empty": "ist leer", "gt": "ist größer als", "lt": "ist kleiner als"}
@@ -136,7 +137,8 @@ def _clean_actions(raw) -> list[dict]:
             out.append({"type": kind, "title": _s(a.get("title"), 200) or "Bescheid", "body": _s(a.get("body"), 50000),
                         "public": bool(a.get("public")), "send": bool(a.get("send"))})
         elif kind == "assign":
-            out.append({"type": kind, "user_id": _id(a.get("user_id")), "group_id": _id(a.get("group_id"))})
+            out.append({"type": kind, "user_id": _id(a.get("user_id")), "group_id": _id(a.get("group_id")),
+                        "org_id": _id(a.get("org_id"))})
     return out[:20]
 
 
@@ -174,9 +176,11 @@ def clean_definition(raw) -> dict:
         if kind in ("task", "approval") or (kind == "request" and src.get("compose") == "clerk"):
             mode = assign.get("mode") if assign.get("mode") in ASSIGN_MODES else "case"
             step["assign"] = {"mode": mode, "user_id": _id(assign.get("user_id")) if mode == "user" else None,
-                              "group_id": _id(assign.get("group_id")) if mode == "group" else None}
+                              "group_id": _id(assign.get("group_id")) if mode == "group" else None,
+                              "org_id": _id(assign.get("org_id")) if mode == "org" else None}
             step["due_days"] = _days(src.get("due_days"))
             step["escalate"] = {"user_id": _id(escalate.get("user_id")), "group_id": _id(escalate.get("group_id")),
+                                "org_id": _id(escalate.get("org_id")),
                                 "after_days": _days(escalate.get("after_days"), 90),
                                 "reassign": bool(escalate.get("reassign"))}
             step["goto"] = _s(src.get("goto"), 40)
@@ -245,6 +249,13 @@ def check(definition: dict, db=None) -> list[str]:
             hints.append(f"{label}: Es ist keine Person ausgewählt.")
         if assign.get("mode") == "group" and not assign.get("group_id"):
             hints.append(f"{label}: Es ist keine Gruppe ausgewählt.")
+        if assign.get("mode") == "org" and not assign.get("org_id"):
+            hints.append(f"{label}: Es ist keine Organisationseinheit ausgewählt.")
+        if assign.get("mode") == "org" and db is not None and assign.get("org_id"):
+            try:
+                ao.validate(db, assign["org_id"])
+            except HTTPException:
+                hints.append(f"{label}: Die Organisationseinheit ist nicht verfügbar.")
         if s["type"] == "request" and s.get("compose") != "clerk" and not s.get("items") and not s.get("reopen"):
             hints.append(f"{label}: Die Nachforderung fragt nichts ab.")
         if s["type"] == "auto" and not s.get("actions"):
@@ -485,7 +496,9 @@ def _user_ids(db, user: User) -> list[int]:
 def can_work(db, user: User, task: ApplicationTask) -> bool:
     if task.state not in ("open", "waiting"):
         return False
-    if user.is_admin or task.assignee_id in _user_ids(db, user) or (task.group_id and task.group_id in _group_ids(db, user)):
+    if (user.is_admin or task.assignee_id in _user_ids(db, user) or
+        (task.group_id and task.group_id in _group_ids(db, user)) or
+        ao.can_handle(db, user, task.responsible_org_id)):
         return True
     if task.kind != "approval" and not task.assignee_id and not task.group_id:
         return apps.access(db, user, task.response) >= 2
@@ -510,16 +523,28 @@ def _resolve(db, resp: FormResponse, step: dict) -> tuple[int | None, int | None
         return assign["user_id"], None
     if mode == "group" and assign.get("group_id") and db.get(Group, assign["group_id"]):
         return None, assign["group_id"]
+    if mode == "org" and assign.get("org_id"):
+        return None, None
     if mode == "previous":
         done = [t for t in resp.tasks if t.state == "done" and t.completed_by_id]
         if done:
             return done[-1].completed_by_id, None
-    if resp.assignee_id or resp.group_id:
+    if resp.assignee_id or resp.group_id or resp.responsible_org_id:
         return resp.assignee_id, resp.group_id
-    return resp.form.app_assignee_id or resp.form.owner_id, resp.form.app_group_id
+    return resp.form.app_assignee_id or (None if resp.form.app_org_id else resp.form.owner_id), resp.form.app_group_id
 
 
-def _addresses(db, user_id: int | None, group_id: int | None) -> list[str]:
+def _resolve_org(db, resp: FormResponse, step: dict) -> int | None:
+    assign = step.get("assign") or {}
+    mode = assign.get("mode", "case")
+    if mode == "org":
+        return ao.validate(db, assign.get("org_id"))
+    if mode in ("user", "group", "previous"):
+        return None
+    return resp.responsible_org_id or resp.form.app_org_id
+
+
+def _addresses(db, user_id: int | None, group_id: int | None, org_id: int | None = None) -> list[str]:
     out = []
     if user_id:
         u = db.get(User, user_id)
@@ -530,11 +555,15 @@ def _addresses(db, user_id: int | None, group_id: int | None) -> list[str]:
         for m in g.members if g else []:
             if m.active and m.email not in out:
                 out.append(m.email)
+    for email in ao.emails(db, org_id):
+        if email not in out:
+            out.append(email)
     return out
 
 
 def who(task: ApplicationTask) -> str:
-    parts = [task.assignee.name if task.assignee else "", f"Gruppe {task.group.name}" if task.group else ""]
+    parts = [task.assignee.name if task.assignee else "", f"Gruppe {task.group.name}" if task.group else "",
+             task.responsible_org.name if task.responsible_org else ""]
     return ", ".join(p for p in parts if p) or ("Antragsteller:in" if task.kind == "request" else "Zuständige des Vorgangs")
 
 
@@ -640,6 +669,7 @@ def _create_task(db, resp: FormResponse, step: dict) -> ApplicationTask:
     if step["type"] == "confirm":
         task.state = "waiting"
         task.assignee_id, task.group_id = resp.assignee_id, resp.group_id
+        task.responsible_org_id = resp.responsible_org_id
         task.due_at = now + timedelta(days=step.get("due_days") or 7)
         task.data_json = json.dumps({"code": secrets.token_urlsafe(18)})
         resp.tasks.append(task)
@@ -671,6 +701,8 @@ def _create_task(db, resp: FormResponse, step: dict) -> ApplicationTask:
     if step["type"] == "request" and step.get("compose") == "clerk":
         # Die Sachbearbeitung stellt die Nachforderung zusammen (Vorschlag aus dem Prozess), erst dann wartet der Prozess
         task.assignee_id, task.group_id = _resolve(db, resp, step)
+    task.responsible_org_id = _resolve_org(db, resp, step)
+        task.responsible_org_id = _resolve_org(db, resp, step)
         task.due_at = now + timedelta(days=step["compose_days"]) if step.get("compose_days") else None
         task.data_json = json.dumps({"compose": True})
         resp.tasks.append(task)
@@ -710,7 +742,7 @@ def _task_values(resp: FormResponse, task: ApplicationTask, step: dict | None) -
 
 def _notify_task(db, resp, task, step, key: str, extra: dict | None = None, targets: list[str] | None = None) -> int:
     count = 0
-    for addr in targets if targets is not None else _addresses(db, task.assignee_id, task.group_id):
+    for addr in targets if targets is not None else _addresses(db, task.assignee_id, task.group_id, task.responsible_org_id):
         subject, body = mailtpl.render(db, key, {**_task_values(resp, task, step), **(extra or {})})
         if notify.enqueue(db, addr, subject, body, key):
             count += 1
@@ -797,14 +829,16 @@ def claim(db, task: ApplicationTask, user: User) -> None:
     _event(task.response, "task", f"{task.name}: übernommen von {user.name}", user)
 
 
-def reassign(db, task: ApplicationTask, user_id: int | None, group_id: int | None, actor: User) -> None:
+def reassign(db, task: ApplicationTask, user_id: int | None, group_id: int | None, actor: User,
+             org_id: int | None = None) -> None:
     task.assignee_id, task.group_id = user_id, group_id
+    task.responsible_org_id = ao.validate(db, org_id)
     task.reminded_at = task.escalated_at = None
     db.flush()
     db.refresh(task)
     _event(task.response, "task", f"{task.name}: zuständig jetzt {who(task)}", actor)
     _notify_task(db, task.response, task, step_of(task), "app_task",
-                 targets=[a for a in _addresses(db, user_id, group_id) if a != actor.email])
+                 targets=[a for a in _addresses(db, user_id, group_id, org_id) if a != actor.email])
 
 
 def set_task_due(task: ApplicationTask, due, actor: User) -> None:
@@ -850,6 +884,7 @@ def _run_actions(db, resp: FormResponse, step: dict, actor_name: str) -> list[st
             notes.append(f"Status: {apps.status_label(action['status'])}")
         elif kind == "assign":
             resp.assignee_id, resp.group_id = action.get("user_id"), action.get("group_id")
+            resp.responsible_org_id = ao.validate(db, action.get("org_id"))
             db.flush()
             db.refresh(resp)
             _event(resp, "assign", f"Zuständig: {apps._common(resp.form, resp)['zustaendig']}")
@@ -1171,9 +1206,11 @@ def my_tasks(db, user: User) -> list[ApplicationTask]:
     """Offene Schritte für die Person: direkt zugewiesen oder über eine Gruppe (noch nicht übernommen) – während
     einer Vertretung auch die der vertretenen Person."""
     groups = _group_ids(db, user)
+    org_ids = ao.assigned_org_ids(db, _user_ids(db, user))
     q = select(ApplicationTask).join(FormResponse).where(ApplicationTask.state == "open", FormResponse.closed_at.is_(None))
     q = q.where(or_(ApplicationTask.assignee_id.in_(_user_ids(db, user)),
-                    (ApplicationTask.group_id.in_(groups or [-1])) & ApplicationTask.assignee_id.is_(None)))
+                    ((ApplicationTask.group_id.in_(groups or [-1])) & ApplicationTask.assignee_id.is_(None)),
+                     (ApplicationTask.responsible_org_id.in_(org_ids or [-1])) & ApplicationTask.assignee_id.is_(None)))
     tasks = db.scalars(q).all()
     return sorted(tasks, key=lambda t: (t.due_at is None, t.due_at or utcnow(), t.id))
 
@@ -1181,10 +1218,12 @@ def my_tasks(db, user: User) -> list[ApplicationTask]:
 def task_count(db, user: User) -> int:
     from sqlalchemy import func
     groups = _group_ids(db, user)
+    org_ids = ao.assigned_org_ids(db, _user_ids(db, user))
     q = select(func.count(ApplicationTask.id)).join(FormResponse).where(
         ApplicationTask.state == "open", FormResponse.closed_at.is_(None),
         or_(ApplicationTask.assignee_id.in_(_user_ids(db, user)),
-            (ApplicationTask.group_id.in_(groups or [-1])) & ApplicationTask.assignee_id.is_(None)))
+            ((ApplicationTask.group_id.in_(groups or [-1])) & ApplicationTask.assignee_id.is_(None)),
+            (ApplicationTask.responsible_org_id.in_(org_ids or [-1])) & ApplicationTask.assignee_id.is_(None)))
     return db.scalar(q) or 0
 
 
@@ -1280,13 +1319,14 @@ def send_reminders() -> int:
                 count += _notify_task(db, resp, task, step, "app_task_overdue")
                 task.reminded_at = now
             esc = step.get("escalate") or {}
-            if task.escalated_at is None and (esc.get("user_id") or esc.get("group_id")) \
+            if task.escalated_at is None and (esc.get("user_id") or esc.get("group_id") or esc.get("org_id")) \
                     and now >= task.due_at + timedelta(days=esc.get("after_days") or 0):
-                targets = _addresses(db, esc.get("user_id"), esc.get("group_id"))
+                targets = _addresses(db, esc.get("user_id"), esc.get("group_id"), esc.get("org_id"))
                 before = who(task)
                 note = "Sie wurden als Vertretung bzw. Leitung informiert."
                 if esc.get("reassign"):
                     task.assignee_id, task.group_id = esc.get("user_id"), esc.get("group_id")
+                    task.responsible_org_id = esc.get("org_id")
                     note = "Die Aufgabe wurde Ihnen zur Erledigung übertragen."
                 count += _notify_task(db, resp, task, step, "app_task_overdue",
                                       {"bearbeiter": before, "eskalation": note}, targets=targets)
