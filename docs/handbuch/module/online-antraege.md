@@ -99,3 +99,17 @@ Antragsteller:innen sehen auf ihrer Statusseite eine Fortschrittsleiste mit den 
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du möchtest einen Antrag stellen oder bearbeiten?
+
+**Antrag stellen:** Formular öffnen → Angaben eintragen → Unterlagen ergänzen, falls verlangt → prüfen → absenden → Status verfolgen.
+
+**Antrag bearbeiten:**
+1. Vorgang im zuständigen Arbeitsbereich öffnen.
+2. Angaben und Unterlagen prüfen.
+3. Bei Bedarf Informationen nachfordern oder Arbeitsschritte zuweisen.
+4. Bearbeitungsstand dokumentieren und den Vorgang nach den vorgesehenen Regeln abschließen.
+
+**Merksatz:** **Abgesendet** bedeutet noch nicht **genehmigt**.
