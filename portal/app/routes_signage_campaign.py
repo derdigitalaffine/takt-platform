@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import calendars, signage, signage_campaign, signage_passive
+from . import calendars, signage, signage_campaign, signage_passive, signage_suggestions
 from .calendar_models import Calendar, CalendarEvent
 from .db import LOCAL_TZ, User, utcnow
 from .main import app, check_csrf, flash, get_db, redirect, render
@@ -104,11 +104,27 @@ def signage_campaigns_page(request: Request, user: User = Depends(manage_user),
         q = select(CalendarEvent).where(CalendarEvent.calendar_id == calendar_id)
         source_events = [ev for ev in db.scalars(q.order_by(CalendarEvent.starts_at.desc()).limit(150))
                          if signage_passive.source_access(db, user, ev, SimpleNamespace(org_id=None))]
+    suggested_event = None
+    selected_suggestion_id = _int(request.query_params.get("suggest")) if not row else None
+    if selected_suggestion_id and calendar_id in {cal.id for cal in available_calendars}:
+        event = db.get(CalendarEvent, selected_suggestion_id)
+        if (event and event.calendar_id == calendar_id
+                and signage_passive.source_access(db, user, event, SimpleNamespace(org_id=None))):
+            suggested_preset = signage_suggestions.classify_title(event.title)
+            if suggested_preset:
+                suggested_event = {
+                    "id": event.id, "preset": suggested_preset,
+                    "public_title": signage_passive.PRESETS[suggested_preset][0],
+                }
+                if all(item.id != event.id for item in source_events):
+                    source_events.insert(0, event)
+    suggestions = signage_suggestions.suggest(db, user)
     return render(request, "signage_campaigns.html", user,
         buildings=buildings, rooms=rooms, floors=floors, screens=screens,
         campaigns=listed, affected=affected, conflicts=conflicts,
         selected=selected, excluded=excluded, editing=row, calendars=available_calendars,
         source_events=source_events, selected_calendar=calendar_id,
+        suggestions=suggestions, suggested_event=suggested_event,
         scopes=SCOPES, presets=signage_passive.PRESETS, now=utcnow(),
         local_now=datetime.now(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M"),
         start_local=(row.starts_at.replace(tzinfo=timezone.utc).astimezone(LOCAL_TZ).strftime("%Y-%m-%dT%H:%M")
