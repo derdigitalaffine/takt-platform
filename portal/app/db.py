@@ -769,6 +769,7 @@ class Notification(Base):
     reply_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # JSON-Liste von Anhängen: {"filename", "content", "calendar_method"?}
     attachments_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    guard_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # bounded delivery-time authorization metadata
 
 
 class ShortLink(Base):
@@ -2232,6 +2233,7 @@ class Booking(Base):
     cancel_reason: Mapped[str] = mapped_column(Text, default="")
     sequence: Mapped[int] = mapped_column(Integer, default=0)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # one-time pending escalation
     meeting_id: Mapped[int | None] = mapped_column(ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # Erweiterter Umfang: Terminart, zuständige Person, Antworten auf eigene Felder; status auch „requested“
@@ -3031,8 +3033,10 @@ _NEW_COLUMNS = {
                       "integration_json": "TEXT NOT NULL DEFAULT '{}'"},
     "booking_types": {"privacy_mode": "VARCHAR(12) NOT NULL DEFAULT 'inherit'",
                       "routing_json": "TEXT NOT NULL DEFAULT '{}'"},
+    "notifications": {"guard_json": "TEXT"},
     "bookings": {"type_id": "INTEGER REFERENCES booking_types(id) ON DELETE SET NULL",
-                 "provider_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL", "answers_json": "TEXT NOT NULL DEFAULT ''"},
+                 "provider_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL", "answers_json": "TEXT NOT NULL DEFAULT ''",
+                 "escalated_at": "DATETIME"},
     "votes": {"chart": "VARCHAR(8) NOT NULL DEFAULT 'bar'", "archived_at": "DATETIME", "used_at": "DATETIME"},
     "polls": {"published_at": "DATETIME", "archived_at": "DATETIME", "used_at": "DATETIME"},
     "live_polls": {"opened_at": "DATETIME", "archived_at": "DATETIME", "used_at": "DATETIME"},

@@ -87,6 +87,37 @@
           </select></div>
       </div>
       {{ sw('staff_calendar_attachment', 'Kalenderdatei zusätzlich in interne Benachrichtigungen aufnehmen', integration.get('staff_calendar_attachment', False), 'Optional: Mitarbeitende können Termin-ICS-Dateien importieren. Wer den TAKT-Kalender bereits abonniert hat, braucht diese Option nicht.') }}
+      <details class="mt-3 mb-3">
+        <summary class="fw-semibold"><i class="fa-regular fa-envelope me-2" aria-hidden="true"></i>Interne E-Mail-Benachrichtigungen und Eskalationen</summary>
+        <div class="pt-3">
+          <p class="form-text">Die Einstellungen betreffen zusätzliche E-Mails an die verantwortliche Person der Buchungsseite. Zugewiesene Mitarbeitende erhalten weiterhin ihre notwendigen Vorgangsinformationen. Bestätigungen, Änderungen und Absagen an Bürger:innen sind nicht abschaltbar.</p>
+          <fieldset class="mb-3">
+            <legend class="form-label fw-semibold fs-6">Bei welchen Ereignissen soll die Seitenverantwortung eine E-Mail erhalten?</legend>
+            <div class="row g-2">
+            {% for key, label in owner_mail_choices.items() %}
+              <div class="col-12 col-sm-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="owner_mail_events" value="{{ key }}" id="booking-owner-event-{{ key }}" {% if key in integration.get('owner_mail_events', owner_mail_choices.keys() | list) %}checked{% endif %}>
+                  <label class="form-check-label" for="booking-owner-event-{{ key }}">{{ label }}</label>
+                </div>
+              </div>
+            {% endfor %}
+            </div>
+            <div class="form-text">Der Schalter „Mich bei jeder Buchung informieren“ im Abschnitt „Zeiten und Buchungsregeln“ aktiviert die E-Mails insgesamt. Bei unzugeordneten offenen Anfragen erhält die verantwortliche Person immer einen notwendigen Bearbeitungshinweis.</div>
+          </fieldset>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label" for="request-escalation-hours">Offene Terminanfrage erneut melden nach</label>
+              <select class="form-select" id="request-escalation-hours" name="request_escalation_hours">
+                {% for hours, text in [(0, 'Keine automatische Eskalation'), (1, '1 Stunde'), (4, '4 Stunden'), (8, '8 Stunden'), (12, '12 Stunden'), (24, '24 Stunden'), (48, '48 Stunden'), (72, '72 Stunden'), (168, '7 Tagen')] %}
+                <option value="{{ hours }}" {% if integration.get('request_escalation_hours', 0) | int == hours %}selected{% endif %}>{{ text }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Einmaliger Hinweis an die verantwortliche Person, solange die Anfrage offen und der Termin noch zukünftig ist. Ohne Bürgerdaten in der E-Mail.</div>
+            </div>
+          </div>
+        </div>
+      </details>
       <p class="form-text">Kalenderdateien für Bürger werden weiterhin automatisch mit verbindlichen Bestätigungen, Änderungen und Absagen verschickt. Erinnerungen, Vorlagen und Branding bleiben über die zentrale E-Mail-Konfiguration verwaltbar.</p>
       {% if calendar_module_enabled %}<a href="/kalender?ansicht=termine" class="btn btn-sm btn-outline-secondary"><i class="fa-regular fa-calendar me-1"></i>Kalendermodul öffnen</a>{% endif %}
       <a href="/admin/templates" class="btn btn-sm btn-outline-secondary"><i class="fa-regular fa-envelope me-1"></i>E-Mail-Vorlagen</a>
