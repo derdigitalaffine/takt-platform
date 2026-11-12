@@ -5,9 +5,6 @@
 .pp-person-control .ts-dropdown{min-width:100%;z-index:1100}
 .pp-person-control .ts-dropdown .active{background:var(--bs-primary-bg-subtle,#e6f0fb)}
 .pp-person-control .ts-control .item{border-radius:7px}
-.pp-org-filter{margin:7px 0 5px}
-.pp-org-filter label{display:block;font-size:.75rem;color:var(--bs-secondary-color);font-weight:650}
-.pp-org-filter select{max-width:100%;margin-top:4px}
 .pp-person-control:focus-within .ts-control{box-shadow:0 0 0 .18rem color-mix(in srgb, var(--bs-primary) 24%,transparent);border-color:var(--bs-primary)}
 .pp-person-control.ts-wrapper.disabled{opacity:.65}
 @media(max-width:640px){.pp-person-control{min-width:0}.pp-person-control .ts-dropdown{max-height:280px}}
@@ -29,9 +26,6 @@
 .pp-selected-item{font-weight:680;overflow-wrap:anywhere}
 .pp-person-control.pp-multiple .ts-control .item{background:var(--bs-primary-bg-subtle,var(--bs-tertiary-bg));border:1px solid var(--bs-border-color);color:var(--bs-body-color);font-size:.83rem;max-width:100%;padding:5px 7px}
 .pp-person-control.pp-multiple .ts-control .item .remove{border-left:1px solid var(--bs-border-color);padding:0 7px;margin-left:7px;color:var(--bs-secondary-color)}
-.pp-org-filter{margin:10px 0 8px}
-.pp-org-filter label{font-size:.78rem;font-weight:720;margin-bottom:4px;color:var(--bs-body-color)}
-.pp-org-filter select{font-size:.83rem;min-height:36px;border-radius:9px}
 .pp-picker-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:7px 0 8px;max-width:100%;font-size:.75rem;line-height:1.4;color:var(--bs-secondary-color)}
 .pp-picker-count{font-weight:600}
 .pp-picker-clear{background:none;border:0;padding:3px 4px;color:var(--bs-primary);font:inherit;font-weight:720;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
@@ -47,3 +41,42 @@
  .pp-picker-actions{gap:4px}
 }
 @media(prefers-reduced-motion:reduce){.pp-person-control *, .pp-person-control *::before, .pp-person-control *::after{transition:none!important}}
+
+
+/* Unified PersonPicker: organization navigation is INSIDE the one dropdown.
+   The toolbar remains a sibling of the listbox options (no nested controls). */
+.pp-person-control .ts-dropdown {overflow:hidden;max-width:min(92vw,680px)}
+.pp-integrated-toolbar {background:var(--bs-body-bg);border-bottom:1px solid var(--bs-border-color);padding:9px 12px;position:relative;z-index:2}
+.pp-integrated-top {display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pp-org-toggle {display:inline-flex;align-items:center;gap:8px;max-width:75%;border:1px solid var(--bs-border-color);border-radius:999px;padding:7px 12px;background:var(--bs-tertiary-bg);color:var(--bs-body-color);font:inherit;font-size:.78rem;font-weight:710;line-height:1.25;cursor:pointer;overflow-wrap:anywhere}
+.pp-org-toggle::before {content:"⌕";font-size:1.05rem;color:var(--bs-primary);font-weight:900}
+.pp-org-toggle::after {content:"▾";font-size:.73rem;opacity:.7;flex:none}
+.pp-org-toggle[aria-expanded="true"]::after {content:"▴"}
+.pp-org-toggle.pp-org-filter-active {border-color:var(--bs-primary);background:var(--bs-primary-bg-subtle,var(--bs-tertiary-bg));color:var(--bs-primary)}
+.pp-visible-count {font-size:.75rem;white-space:nowrap;color:var(--bs-secondary-color);font-variant-numeric:tabular-nums}
+.pp-org-panel {display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:10px;background:var(--bs-tertiary-bg);border:1px solid var(--bs-border-color);border-radius:10px;max-height:min(36vh,340px);overflow-y:auto;overscroll-behavior:contain}
+.pp-org-panel[hidden],.pp-org-subtree[hidden] {display:none!important}
+.pp-org-hint {margin:0 0 3px;font-size:.74rem;color:var(--bs-secondary-color);line-height:1.5}
+.pp-org-tree,.pp-org-subtree {list-style:none;margin:0;padding:0}
+.pp-org-subtree {padding-left:14px;margin-left:9px;border-left:1px solid var(--bs-border-color)}
+.pp-org-line {display:flex;align-items:center;gap:2px;width:100%;min-width:0}
+.pp-org-choice {display:flex;align-items:center;justify-content:space-between;flex:1;gap:10px;min-width:0;padding:8px 10px;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--bs-body-color);font:inherit;font-size:.8rem;font-weight:630;line-height:1.35;text-align:left;cursor:pointer}
+.pp-org-choice:hover,.pp-org-choice:focus-visible {background:var(--bs-body-bg);border-color:var(--bs-border-color)}
+.pp-org-choice.is-selected {color:var(--bs-primary);background:var(--bs-primary-bg-subtle,var(--bs-body-bg));font-weight:780;border-color:var(--bs-primary)}
+.pp-org-choice:focus-visible,.pp-org-toggle:focus-visible,.pp-org-expand:focus-visible {outline:3px solid var(--bs-primary);outline-offset:2px}
+.pp-org-name {overflow-wrap:anywhere}
+.pp-org-count {background:var(--bs-body-bg);border-radius:999px;min-width:24px;padding:1px 7px;text-align:center;font-size:.7rem;font-variant-numeric:tabular-nums;color:var(--bs-secondary-color)}
+.pp-org-expand,.pp-org-expand-placeholder {flex:none;display:grid;place-items:center;width:28px;height:32px}
+.pp-org-expand {border:0;border-radius:7px;background:transparent;color:var(--bs-primary);font:inherit;font-weight:800;cursor:pointer}
+.pp-org-expand:hover {background:var(--bs-body-bg)}
+.pp-org-no-assignment {border-top:1px solid var(--bs-border-color);border-radius:0;padding-top:13px}
+.pp-person-control .ts-dropdown-content {overscroll-behavior:contain;max-height:min(34vh,360px)}
+.pp-person-control .ts-dropdown .no-results {padding:14px}
+@media(max-width:650px){
+  .pp-person-control .ts-dropdown {max-width:calc(100vw - 24px);min-width:100%}
+  .pp-integrated-toolbar {padding:8px}
+  .pp-org-toggle {font-size:.76rem;padding:8px 9px}
+  .pp-visible-count {font-size:.71rem}
+  .pp-org-panel {max-height:32vh}
+  .pp-person-control .ts-dropdown-content {max-height:33vh}
+}
