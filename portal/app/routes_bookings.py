@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from . import access, bookings as bk, shares as sh, shortlinks as sl, worker
-from .db import Booking, BookingInvite, BookingPage, BookingWindow, Group, User, to_local, utcnow
+from .db import Booking, BookingInvite, BookingPage, BookingWindow, Group, Organization, User, to_local, utcnow
 from .main import (
     app, check_csrf, current_user, home_for, flash, get_db, rate_limit, redirect, render, require, session_user,
 )
@@ -66,6 +66,7 @@ def _apply(page: BookingPage, data) -> None:
         opts = booking_integration.options(page)
         opts.update({
             "calendar_conflicts": flag("calendar_conflicts"),
+            "org_closures": flag("org_closures"),
             "conflict_sources": [key for key in ("personal", "meetings")
                                  if flag("conflict_" + key)],
             "staff_calendar_attachment": flag("staff_calendar_attachment"),
@@ -82,13 +83,18 @@ def _apply(page: BookingPage, data) -> None:
 
 
 
-def _settings_ctx(page: BookingPage | None, user: User) -> dict:
+def _settings_ctx(page: BookingPage | None, user: User, db: Session) -> dict:
     from . import booking_integration
     integration = booking_integration.options(page) if page else {
         "calendar_conflicts": True, "conflict_sources": ["personal", "meetings"],
-        "staff_calendar_attachment": False, "mail_digest": False}
+        "staff_calendar_attachment": False, "mail_digest": False, "org_closures": True}
+    target = page or BookingPage(owner_id=user.id, title="", public_token="")
+    creator_unit_id = booking_integration.creator_org_id(db, target)
+    unit = db.get(Organization, creator_unit_id) if creator_unit_id else None
     return {"page": page, "slot_choices": SLOT_CHOICES, "pause_choices": PAUSE_CHOICES, "durations": DURATIONS,
             "can_video": user.can("video"), "integration": integration,
+            "creator_org_name": unit.name if unit else "",
+            "calendar_module_enabled": booking_integration.calendars_enabled(db),
             "owner_mail_choices": booking_integration.OWNER_MAIL_EVENTS}
 
 
@@ -115,8 +121,8 @@ def bookings_list(request: Request, all: str = "", user: User = Depends(current_
 
 
 @app.get("/bookings/new")
-def booking_new(request: Request, user: User = Depends(booking_user)):
-    return render(request, "booking_settings.html", user, **_settings_ctx(None, user))
+def booking_new(request: Request, user: User = Depends(booking_user), db: Session = Depends(get_db)):
+    return render(request, "booking_settings.html", user, **_settings_ctx(None, user, db))
 
 
 @app.post("/bookings/new", dependencies=[Depends(check_csrf)])
@@ -124,6 +130,13 @@ async def booking_create(request: Request, user: User = Depends(booking_user), d
     data = await request.form()
     page = BookingPage(owner_id=user.id, title="", public_token=new_link_token())
     _apply(page, data)
+    # Fix the creator's organization to the booking page at creation.
+    # Closing days must not silently change when the owner is reassigned.
+    from . import booking_integration
+    import json
+    opts = booking_integration.options(page)
+    opts["creator_org_id"] = booking_integration.creator_org_id(db, page)
+    page.integration_json = json.dumps(opts, ensure_ascii=False)
     if page.online and not user.can("video"):
         page.online = False
     db.add(page)
@@ -167,7 +180,7 @@ def booking_detail(request: Request, page_id: int, user: User = Depends(current_
 
 @app.get("/bookings/{page_id}/settings")
 def booking_settings(request: Request, page_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return render(request, "booking_settings.html", user, **_settings_ctx(_bpage(db, page_id, user, sh.EDIT)[0], user))
+    return render(request, "booking_settings.html", user, **_settings_ctx(_bpage(db, page_id, user, sh.EDIT)[0], user, db))
 
 
 @app.post("/bookings/{page_id}/settings", dependencies=[Depends(check_csrf)])
@@ -416,6 +429,16 @@ def booking_copy(request: Request, page_id: int, user: User = Depends(booking_us
                 "cancel_hours", "max_per_person", "invite_only", "listed", "ask_phone", "online", "notify_owner", "integration_json",
                 "reminder_hours", "confirm_text"):
         setattr(clone, col, getattr(page, col))
+    # A copy is a new booking page with a new creator: retain the user's
+    # chosen calendar switches but rebind organizational closure scope.
+    import json
+    from . import booking_integration
+    opts = booking_integration.options(clone)
+    opts.pop("creator_org_id", None)
+    clone.integration_json = json.dumps(opts, ensure_ascii=False)
+    # Resolve against the new owner's memberships, not the original page.
+    opts["creator_org_id"] = booking_integration.creator_org_id(db, clone)
+    clone.integration_json = json.dumps(opts, ensure_ascii=False)
     db.add(clone)
     db.commit()
     flash(request, "Kopie angelegt – ohne Zeitbereiche, Buchungen und Einladungen.")

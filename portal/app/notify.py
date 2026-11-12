@@ -122,15 +122,18 @@ def _build(cfg: dict[str, str], to_addr: str, subject: str, body: str,
     for att in attachments or []:
         method = att.get("calendar_method")
         if method:
-            # Kalenderteil als dritte Alternative: daraus macht Outlook die Besprechungsanfrage
-            # (Annehmen/Ablehnen). Wichtig: byte-genau mit CRLF-Zeilenenden (RFC 5545); als Text
-            # übergeben würde die Mail-Bibliothek sie in LF umwandeln, und Outlook verwirft die Einladung.
-            # Kopfzeilen wörtlich wie bei Outlook/Google (method=REQUEST ohne Anführungszeichen):
-            # dafür ein einfaches Message-Objekt, dessen Kopfzeilen nicht neu formatiert werden.
+            # CalConnect iMIP interoperability layout:
+            # multipart/mixed [multipart/alternative(plain, branded HTML),
+            #                  text/calendar;method=REQUEST, application/ics].
+            # The calendar is NOT an alternative to the HTML body: otherwise
+            # some clients render a generic invite instead of the styled mail.
+            # Preserve original RFC 5545 CRLF via base64 transfer encoding.
             part = Message()
             part["Content-Type"] = f'text/calendar; charset="UTF-8"; method={method}'
             part["Content-Transfer-Encoding"] = "base64"
             part.set_payload(base64.encodebytes(att["content"].encode("utf-8")).decode("ascii"))
+            if msg.get_content_type() != "multipart/mixed":
+                msg.make_mixed()  # wraps HTML+plain as the first MIME sibling
             msg.attach(part)
     for att in attachments or []:
         if att.get("calendar_method"):
@@ -199,6 +202,33 @@ def text_to_html(text: str, frame: dict | None = None, *, kind: str = "") -> str
             f'border:1px solid #e5e7eb"><tr><td style="padding:13px 16px;'
             f'font-size:16px;font-weight:700;color:{foreground}">{html.escape(title)}</td></tr></table>'
         )
+    # Older organizations may have edited their booking templates before the
+    # structured TERMINÜBERSICHT section was introduced. Preserve their text
+    # while providing a readable summary card for recognizable legacy fields.
+    if booking and kind in {
+        "booking_confirm", "booking_requested", "booking_update",
+        "booking_cancelled", "booking_reminder", "booking_declined",
+    } and "TERMINÜBERSICHT" not in text:
+        legacy_rows = []
+        for raw_line in text.splitlines():
+            hit = re.match(r"^\s*(Termin|Anliegen|Datum|Uhrzeit|Ort|Wann|Wo):\s*(.+?)\s*$", raw_line, re.I)
+            if hit and not hit.group(2).startswith(("http://", "https://")):
+                label, value = hit.group(1), hit.group(2)
+                if len(value) <= 300 and len(legacy_rows) < 5:
+                    legacy_rows.append(
+                        f'<tr><td style="padding:7px 12px 7px 0;color:#596579;'
+                        f'width:30%;vertical-align:top">{html.escape(label)}</td>'
+                        f'<td style="padding:7px 0;font-weight:650">{html.escape(value)}</td></tr>'
+                    )
+        if legacy_rows:
+            paragraphs.append(
+                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+                'style="margin:0 0 16px;padding:12px 16px;border:1px solid #dce4ee;'
+                'border-radius:8px;background:#f8fafc"><tr><td>'
+                '<strong style="display:block;color:#27364b;margin-bottom:5px">Ihr Termin</strong>'
+                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+                + "".join(legacy_rows) + '</table></td></tr></table>'
+            )
     labels = ('Umlauf öffnen und entscheiden', 'Umlauf öffnen und Kenntnisnahme bestätigen', 'Information öffnen')
     for part in text.split('\n\n'):
         if not part.strip(): continue
@@ -349,7 +379,7 @@ def enqueue(db, to_addr: str, subject: str, body: str, kind: str, cfg: dict[str,
 
 
 def _copy_to_substitute(db, to_addr, subject, body, kind, attachments, reply_to) -> None:
-    """Arbeitsbezogene Benachrichtigungen an eine heute abwesende Person gehen in Kopie an ihre Vertretung."""
+    """Use existing authorized deputies; this is independent of the Calendar UI switch."""
     from . import absence
     if kind not in absence.FORWARD_KINDS:
         return

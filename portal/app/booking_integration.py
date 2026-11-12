@@ -12,7 +12,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import select
 
-from .db import LOCAL_TZ, to_local
+from .db import LOCAL_TZ, to_local, get_settings
 
 log = logging.getLogger(__name__)
 PRIVACY = ("inherit", "restricted", "busy")
@@ -30,6 +30,77 @@ def options(page) -> dict:
 def configured(page, flag: str, default=False) -> bool:
     value = options(page).get(flag, default)
     return value is True
+
+
+def calendars_enabled(db) -> bool:
+    """The booking module works without the optional Calendar & Leave module."""
+    return get_settings(db).get("module_calendars", "1") == "1"
+
+
+def creator_org_id(db, page) -> int | None:
+    """Creator's organizational unit, pinned when the page was created.
+
+    Older pages have no snapshot, so fall back to the page owner's primary
+    active membership. Never infer a unit from a booking provider's membership:
+    closures belong to the BOOKING PAGE creator, not the selected provider.
+    """
+    from . import organization
+    from .org_models import OrgMembership
+
+    cfg = options(page)
+    if "creator_org_id" in cfg:
+        try:
+            oid = int(cfg["creator_org_id"])
+        except (ValueError, TypeError):
+            return None
+        return oid if organization.active_path(db, oid) else None
+    if not page.owner_id:
+        return None
+    ids = db.scalars(
+        select(OrgMembership.org_id).where(OrgMembership.user_id == page.owner_id)
+        .order_by(OrgMembership.is_primary.desc(), OrgMembership.id)
+    )
+    for oid in ids:
+        if organization.active_path(db, oid):
+            return oid
+    return None
+
+
+def creator_closure_days(db, page, first: date, last: date) -> set[date]:
+    """Optional organization closure projection, not dependent on an enabled calendar.
+
+    A closure of the creator unit or its *active ancestors* blocks all providers
+    on that page, including providers employed elsewhere. The calendar/leave
+    module being off must never prevent citizen bookings.
+    """
+    if first > last or not calendars_enabled(db):
+        return set()
+    if options(page).get("org_closures", True) is False:
+        return set()
+    oid = creator_org_id(db, page)
+    if oid is None:
+        return set()
+    from . import organization
+    from .leave_extensions import Closure
+    nodes = organization.active_path(db, oid)
+    if not nodes:
+        return set()
+    closed: set[date] = set()
+    for row in db.scalars(select(Closure).where(
+        Closure.org_id.in_(nodes),
+        Closure.starts_on <= last.isoformat(),
+        Closure.ends_on >= first.isoformat(),
+    )):
+        try:
+            d = max(first, date.fromisoformat(row.starts_on))
+            stop = min(last, date.fromisoformat(row.ends_on))
+        except ValueError:
+            log.warning("Ungültige Schließzeit %s ignoriert", row.id)
+            continue
+        while d <= stop:
+            closed.add(d)
+            d += timedelta(days=1)
+    return closed
 
 
 # Only informational messages to the page owner can be reduced; directly assigned
@@ -114,6 +185,8 @@ def internal_busy(db, user_id: int, start: datetime, end: datetime, *, scopes=No
 
     selected = set(SCOPES if scopes is None else scopes).intersection(SCOPES)
     busy = []
+    # Explicitly opted-in busy-time checks remain valid when calendar UI is
+    # disabled: existing calendar data must not suddenly permit double bookings.
     if start >= end or not selected:
         return busy
 

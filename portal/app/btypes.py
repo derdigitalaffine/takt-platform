@@ -139,6 +139,8 @@ def _blocked_days(db, page: BookingPage, user_id: int, first: date, last: date) 
         while d0 <= d1:
             out.add(d0)
             d0 += timedelta(days=1)
+    # Confirmed absences stay authoritative even if the Calendar UI module is
+    # switched off; removing this guard would expose previously blocked slots.
     for a in db.scalars(select(Absence).where(Absence.user_id == user_id, Absence.status == "confirmed",
                                               Absence.starts_on <= last.isoformat(), Absence.ends_on >= first.isoformat())):
         d0, d1 = max(first, date.fromisoformat(a.starts_on)), min(last, date.fromisoformat(a.ends_on))
@@ -179,16 +181,17 @@ def slots(db, page: BookingPage, bt: BookingType, provider_id: int | None = None
     if page.holidays_closed:
         for year in range(first.year, last.year + 1):
             specials |= {d for d in holidays.special_days(db, year)}
+    from . import booking_integration as integration
+    closed_by_org = integration.creator_closure_days(db, page, first, last)
     found: dict[datetime, dict] = {}
     for p in providers:
         hours = [h for h in page.hours if h.user_id == p.id]
         if not hours:
             continue
-        blocked = _blocked_days(db, page, p.id, first, last)
+        blocked = _blocked_days(db, page, p.id, first, last) | closed_by_org
         range_start = _to_utc(datetime.combine(first, time()))
         range_end = _to_utc(datetime.combine(last + timedelta(days=1), time()))
         busy = _busy(db, p.id, range_start, range_end, keep)
-        from . import booking_integration as integration
         if integration.configured(page, "calendar_conflicts"):
             sources = integration.options(page).get("conflict_sources", ["personal", "meetings"])
             if not isinstance(sources, list):

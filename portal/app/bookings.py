@@ -259,9 +259,11 @@ def _send_guest(db, b: Booking, key: str, method: str, extra: dict | None = None
     subject, body = mailtpl.render(db, key, _values(db, b, extra), cfg)
     att = [{"filename": "absage.ics" if method == "CANCEL" else "termin.ics", "content": calendar(db, b, method),
             "calendar_method": method}] if method else None
+    # Existing confirmed absences and substitutions remain valid, even when
+    # the Calendar UI module is disabled; bookings have no hard UI dependency.
     from . import absence
     who = responsible(b)
-    note, deputy = absence.citizen_note(db, who)   # zuständige Person abwesend → Hinweis, Antwort an Vertretung
+    note, deputy = absence.citizen_note(db, who)
     return notify.enqueue(db, b.email, subject, note + body, key, cfg,
                           reply_to=deputy or (who.email if who else None), attachments=att)
 
