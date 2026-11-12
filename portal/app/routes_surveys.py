@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from . import my_surveys, poll_lifecycle, survey_cockpit, surveys
 from .db import User
-from .main import app, current_user, enabled_modules, get_db, render
+from .main import app, current_user, enabled_modules, get_db, redirect, render
 
 
 def _modules():
@@ -31,10 +31,20 @@ def participation_cockpit(request: Request, q: str = '', kind: str = 'all',
     response = render(request, 'survey_cockpit.html', user, rows=rows,
                       totals=survey_cockpit.totals(rows), kind=kind, state=state, q=q,
                       kinds=survey_cockpit.KINDS,
-                      forms_enabled='forms' in modules, polls_enabled='polls' in modules)
+                      forms_enabled='forms' in modules, polls_enabled='polls' in modules,
+                      can_manage=_can_manage(db, user, modules))
     response.headers['Cache-Control'] = 'no-store'
     return response
 
+
+def _can_manage(db: Session, user: User, modules: set[str]) -> bool:
+    """Make the manager tab available only when users can actually manage surveys."""
+    if 'polls' not in modules:
+        return False
+    if user.is_admin or surveys.available(user, modules):
+        return True
+    return bool(surveys.collect(db, user, modules, state='active') or
+                surveys.collect(db, user, modules, state='archive'))
 
 
 @app.get('/meine-umfragen')
@@ -64,6 +74,8 @@ def my_surveys_page(request: Request, q: str = '', status: str = 'all', kind: st
 def survey_list(request: Request, q: str = '', kind: str = '', state: str = 'active', scope: str = 'all',
                 user: User = Depends(current_user), db: Session = Depends(get_db)):
     modules = _modules()
+    if not _can_manage(db, user, modules):
+        return redirect('/meine-umfragen')
     q = q.strip()[:200]
     kind = kind if kind in surveys.KINDS else ''
     state = state if state in ('active', 'archive', 'trash') else 'active'

@@ -6,6 +6,7 @@ or raw free-text answers appear in the default report.
 """
 from __future__ import annotations
 
+import csv
 import io
 import re
 from pathlib import Path
@@ -16,7 +17,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import (Paragraph, SimpleDocTemplate,
+from reportlab.platypus import (PageBreak, Paragraph, SimpleDocTemplate,
                                Spacer, Table, TableStyle)
 
 from . import branding, forms as fm, polls as pl
@@ -92,7 +93,7 @@ def _report(db, title, report_type, description, metadata, story_builder):
         buf, pagesize=A4, leftMargin=19 * mm, rightMargin=19 * mm,
         topMargin=42 * mm, bottomMargin=21 * mm,
         title=f"{report_type} – {title}", author=org_name,
-        subject="Aggregierter Ergebnisbericht ohne personenbezogene Einzelantworten",
+        subject="Vertraulicher Ergebnisbericht mit aggregierter und vollständiger CSV-Detailauswertung",
         pageCompression=1,
     )
     normal = _style(font, size=9.2, leading=13.5, gap=3 * mm)
@@ -132,7 +133,7 @@ def _report(db, title, report_type, description, metadata, story_builder):
         canvas.line(19 * mm, h - 32 * mm, w - 19 * mm, h - 32 * mm)
         canvas.line(19 * mm, 14 * mm, w - 19 * mm, 14 * mm)
         canvas.setFont(font, 7.5)
-        canvas.drawString(19 * mm, 9.5 * mm, "Erstellt am " + now + " · Vertraulicher Verwaltungsbericht")
+        canvas.drawString(19 * mm, 9.5 * mm, "Erstellt am " + now + " · Vertraulich – nur für Berechtigte")
         canvas.drawRightString(w - 19 * mm, 9.5 * mm, f"Seite {pdf.page}")
         canvas.restoreState()
 
@@ -184,8 +185,62 @@ def _chart_table(labels, values, font, *, bar_color=BLUE):
     return table
 
 
+
+def _csv_detail(csv_source: str, font: str, *, form: bool) -> list:
+    """Full, readable CSV-parity detail appendix. Render exactly the exported
+    CSV cells; no selective omission, inferred identity or token correlation.
+
+    Each field becomes a paragraph so even long free text / GeoJSON can span
+    several A4 pages. Never place entire responses in unsplittable table rows.
+    """
+    records = list(csv.reader(io.StringIO(csv_source.lstrip("\ufeff")), delimiter=";"))
+    if not records:
+        return []
+    headings, *records = records
+    title = "Einzelantworten und Teilnehmer" if form else "Teilnehmer und Terminpräferenzen"
+    items = [PageBreak(),
+             Paragraph(_plain(title, 200), _style(font, size=14, leading=19, gap=3 * mm)),
+             Paragraph("Vertraulicher Detailanhang. Alle Spalten und Werte entsprechen dem "
+                       "CSV-Export dieser Auswertung; auch offene Texte und Kommentare "
+                       "werden vollständig wiedergegeben.",
+                       _style(font, size=8.1, color=MUTED, gap=5 * mm))]
+    label_style = _style(font, size=8.5, leading=12.7)
+    header_style = _style(font, size=10.5, leading=14.5, color=DARK, gap=2 * mm)
+    for index, row in enumerate(records, 1):
+        summary = not form and bool(row) and row[0].startswith("Summe ")
+        if summary:
+            heading = row[0]
+        else:
+            person = (row[2] if len(row) > 2 else "") if form else (row[0] if row else "")
+            label = ("Antwort " if form else "Teilnahme ") + str(index)
+            heading = label + (" · " + person if person else "")
+        items.append(Spacer(1, 3.5 * mm))
+        items.append(Paragraph(_plain(heading, 350), header_style))
+        for column, name in enumerate(headings):
+            # Preserve empty CSV cells as a visible dash, including all column
+            # positions. If a CSV writer adds columns, they are included too.
+            raw = row[column] if column < len(row) else ""
+            items.append(Paragraph(
+                '<font color="' + MUTED + '">' + escape(name or f"Spalte {column + 1}") +
+                ':</font> ' + ("–" if not raw else ""),
+                label_style,
+            ) if not raw else Paragraph(
+                '<font color="' + MUTED + '">' + escape(name or f"Spalte {column + 1}") +
+                ':</font>',
+                label_style))
+            if raw:
+                # No truncation; ReportLab paragraphs split correctly across
+                # pages, including very long text fields and serialized geodata.
+                for start in range(0, len(raw), 1600):
+                    chunk = raw[start:start + 1600].replace("\r\n", "\n").replace("\r", "\n")
+                    items.append(Paragraph(escape(chunk).replace("\n", "<br/>"),
+                                           label_style))
+        items.append(Spacer(1, 2 * mm))
+    return items
+
+
 def form_report(db, form) -> bytes:
-    """The web summary is authoritative. Excludes raw free text and geodata."""
+    """Aggregated web summary followed by the complete CSV-equivalent detail appendix."""
     responses = list(form.responses)
     summary = fm.summary(form, responses)
     invites = list(form.invites)
@@ -230,6 +285,7 @@ def form_report(db, form) -> bytes:
                                        ("%.2f" % result["average"]).replace(".", ","),
                                        styles["small"]))
             items.append(Spacer(1, 5 * mm))
+        items.extend(_csv_detail(fm.to_csv(form, responses), font, form=True))
         return items or [Paragraph("Noch keine Antworten.", styles["normal"])]
     return _report(db, form.title, "Ergebnisse der Formularumfrage",
                    form.description, metadata, story)
@@ -288,9 +344,9 @@ def poll_report(db, poll) -> bytes:
         else:
             items.append(Paragraph("Noch keine Terminvorschläge.", styles["normal"]))
         items += [Spacer(1, 7 * mm), Paragraph(
-            "Datenschutz: Dieser Bericht enthält keine Namen, E-Mail-Adressen, "
-            "Kommentare oder einzelnen Stimmabgaben. Er ist nur über "
-            "berechtigte Verwaltungszugänge abrufbar.", styles["small"])]
+            "Vertraulicher Bericht mit personenbezogenen Detailangaben: "
+            "nur für entsprechend berechtigte Auswertende.", styles["small"])]
+        items.extend(_csv_detail(pl.to_csv(poll), font, form=False))
         return items
     return _report(db, poll.title, "Ergebnisse der Terminumfrage",
                    poll.description, metadata, story)

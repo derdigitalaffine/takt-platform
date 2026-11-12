@@ -73,7 +73,7 @@ def _read(data):
     return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
-def test_manager_downloads_branded_form_and_poll_pdf_without_private_answers(reports):
+def test_manager_downloads_branded_form_and_poll_pdf_with_csv_details(reports):
     c = login("admin@example.org", "admin-passwort-123")
     for kind, resource in (("forms", reports["form"]), ("polls", reports["poll"])):
         result = c.get(f"/{kind}/{resource}/export.pdf")
@@ -84,16 +84,55 @@ def test_manager_downloads_branded_form_and_poll_pdf_without_private_answers(rep
         pdftext = _read(result.content)
         assert "ERGEBNISBERICHT" in pdftext
         assert "Seite 1" in pdftext
-        assert "PERSONAL_SECRET_TEXT" not in pdftext
-        assert "Private Person" not in pdftext
-        assert "do-not-print@example.org" not in pdftext
-        assert "DoNotPrintPrivateComment" not in pdftext
+        if kind == "forms":
+            assert "PERSONAL_SECRET_TEXT" in pdftext
+            assert "Private Person" in pdftext
+            assert "person-private@example.org" in pdftext
+            assert "do-not-print@example.org" not in pdftext
+        else:
+            assert "DoNotPrintPerson" in pdftext
+            assert "do-not-print@example.org" in pdftext
+            assert "DoNotPrintPrivateComment" in pdftext
+            assert "PERSONAL_SECRET_TEXT" not in pdftext
     assert "Prüfung digitale Arbeitsmittel" in _read(c.get(
         f'/forms/{reports["form"]}/export.pdf').content)
     assert "Teamtag Terminfindung" in _read(c.get(
         f'/polls/{reports["poll"]}/export.pdf').content)
-    assert "Ergebnisbericht (DIN A4)" in c.get(f'/forms/{reports["form"]}/results').text
-    assert "Ergebnisbericht (DIN A4)" in c.get(f'/polls/{reports["poll"]}').text
+    assert "Ergebnisbericht mit Einzelantworten (DIN A4)" in c.get(f'/forms/{reports["form"]}/results').text
+    assert "Ergebnisbericht mit Teilnehmern (DIN A4)" in c.get(f'/polls/{reports["poll"]}').text
+
+
+
+def test_all_csv_columns_and_response_values_appear_in_pdf(reports):
+    import csv
+    c = login("admin@example.org", "admin-passwort-123")
+    for kind, ident in (("forms", reports["form"]), ("polls", reports["poll"])):
+        csv_response = c.get(f"/{kind}/{ident}/export.csv")
+        assert csv_response.status_code == 200
+        rows = list(csv.reader(io.StringIO(csv_response.text.lstrip("\ufeff")), delimiter=";"))
+        pdftext = _read(c.get(f"/{kind}/{ident}/export.pdf").content)
+        # CSV answers and participant identities are intentionally included in
+        # this manager-only export, never in public attendee views.
+        assert len(rows) >= 2
+        for row in rows:
+            for cell in row:
+                if len(cell) > 2 and not cell.isdigit():
+                    assert cell in pdftext, f"CSV result missing from {kind} PDF: {cell[:70]}"
+
+
+def test_long_text_fields_are_not_truncated_in_confidential_pdf(reports):
+    with SessionLocal() as db:
+        form = db.get(Form, reports["form"])
+        form.responses[0].answers_json = json.dumps({
+            "q1": "Sehr zufrieden",
+            "q2": "START-ANSWER-" + "X" * 4100 + "-END-ANSWER",
+        })
+        db.commit()
+        pdf = survey_pdf.form_report(db, form)
+    text = _read(pdf)
+    assert "START-ANSWER-" in text
+    assert "-END-ANSWER" in text
+    assert len(PdfReader(io.BytesIO(pdf)).pages) >= 2
 
 
 def test_pdf_requires_same_manager_acl_as_csv_and_stays_closed_to_public(reports):

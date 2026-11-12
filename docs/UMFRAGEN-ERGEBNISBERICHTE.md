@@ -24,8 +24,9 @@ Die vollständige Spezifikation umfasst:
    erzwingen; ein direkter Dateilink darf keinen Zugriff erweitern.
 4. **Report-Design:** Organisationsfarben/-logo, wiederholte Kopf- und
    Fußzeilen, Metadaten, Datum und Seitennummer; flexible Diagramme,
-   Terminrankings und barrierearmes Layout. Einzelantworten bleiben im
-   Standardbericht ausgeschlossen.
+   Terminrankings und barrierearmes Layout. Managementberichte enthalten
+   zusätzlich eine vollständige, klar als vertraulich gekennzeichnete
+   CSV-äquivalente Detailauswertung aller Teilnehmer und Antworten.
 5. **Nachbereitung:** persönliche sichere Links, zulässige
    Erinnerungen, Ergebnisveröffentlichung, Terminfestlegung und
    ICS-Download. Nachrichten nur über erlaubte Versandwege, ohne
@@ -49,9 +50,21 @@ Die vollständige Spezifikation umfasst:
   Ergebnisfreigabe wird zuerst eine gemeinsame Policy aus
   Identität/Einladungsnachweis, Veröffentlichung und erlaubten
   Berichtsinhalten benötigt.
-* Die Berichte enthalten **keine Rohantworten, Namen, E-Mail-Adressen,
-  Kommentare, Dateien oder personenbezogene Geodaten**. Nur
-  anonymisierte bzw. fachlich aggregierte Werte.
+* **Vertrauliche Managementberichte** enthalten nach ausdrücklicher
+  Anforderung nun alle bereits im CSV-Export enthaltenen Felder: Namen,
+  E-Mail-Adressen, Abgabezeiten, Freitexte, Kommentare, Terminwünsche,
+  Antwortspalten und ggf. CSV-Geodaten. Die in CSV enthaltenen Werte
+  werden nicht gekürzt oder stillschweigend weggelassen.
+* Es werden **keine** persönlichen Identitäten nachträglich aus
+  anonymen Antwortdatensätzen erschlossen. Die PDF-Detailauswertung
+  übernimmt ausschließlich die bereits durch dieselbe Berechtigung
+  zugänglichen Daten des jeweiligen CSV-Exports.
+* Teilnehmer dürfen den vertraulichen Managementbericht nicht über
+  einen persönlichen oder öffentlichen Umfragelink abrufen. Für
+  freigegebene Teilnehmer-Ergebnisse ist eine getrennte, anonyme
+  Darstellung mit eigener Berechtigungsprüfung vorgesehen.
+* Geheime oder förmliche Stimmabgaben werden durch diese Änderung nicht
+  offengelegt. Live-Quiz-/Abstimmungs-Engines bleiben unverändert.
 
 ### Gestaltung
 
@@ -63,7 +76,9 @@ das Layout vollständig. Wiederholte Kopf-/Fußzeilen und automatisch
 aufteilbare Ergebniszeilen unterstützen längere Umfragen.
 
 * Formularumfrage: Frage-für-Frage-Auswertung mit Balken/Skalen,
-  Rücklauf und Durchschnitt; keine Roh-Freitext-/Geodaten.
+  Rücklauf und Durchschnitt; darunter vollständiger, paginierter
+  Detailanhang mit allen CSV-Spalten pro Antwort inklusive Freitext
+  und dort enthaltenen Geodaten.
 * Terminumfrage: Abgabezahl, Einladungsrücklauf, festgelegter Termin,
   sortiertes Ranking in den Webfarben Grün/Gelb/Rot und Terminhinweise.
 
@@ -111,8 +126,8 @@ für angemeldete Teilnehmende `Meine Umfragen`.
 ## Testplan
 
 `test_survey_pdf.py` prüft A4-Seitenmaße, Textauslesbarkeit,
-Mehrseitigkeit, Nichtoffenlegung der Rohantworten und die
-Gleichheit der bestehenden Exportberechtigungen.
+Mehrseitigkeit, vollständige CSV-Feldabdeckung (inklusive Namen und
+Kommentaren) sowie die Gleichheit der bestehenden Exportberechtigungen.
 
 `test_poll_receipt.py` prüft dauerhafte Bestätigung, eigene
 Terminanzeige nach Ende, kalenderfähigen persönlichen Link und
