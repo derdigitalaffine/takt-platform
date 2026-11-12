@@ -59,15 +59,19 @@
     const id = 'pp-org-' + (++uid);
     let orgFilter = '';
     const search = query => normal(query);
+    const orgPathCache = new Map();
     const orgPathFor = value => {
-      const ids = people[String(value)]?.orgs || [];
-      const owned = orgs.filter(org => ids.includes(org.id));
-      owned.sort((a, b) => (b.path || '').length - (a.path || '').length);
-      return owned[0]?.path || '';
+      const key = String(value);
+      if (orgPathCache.has(key)) return orgPathCache.get(key);
+      const ids = new Set(people[key]?.orgs || []);
+      const path = orgs.filter(org => ids.has(org.id))
+        .sort((a, b) => (b.path || '').length - (a.path || '').length)[0]?.path || '';
+      orgPathCache.set(key, path);
+      return path;
     };
-    const fullLabel = value => String(value || '').replace(/\\s*\\([^)]*@[^)]*\\)\\s*$/, '').trim();
+    const fullLabel = value => String(value || '').replace(/\s*\([^)]*@[^)]*\)\s*$/, '').trim();
     const initials = label => {
-      const chunks = fullLabel(label).split(/[\\s,]+/).filter(Boolean);
+      const chunks = fullLabel(label).split(/[\s,]+/).filter(Boolean);
       return (chunks.length > 1 ? chunks[0][0] + chunks[chunks.length - 1][0]
         : (chunks[0] || '?').slice(0, 2)).toLocaleUpperCase('de-DE');
     };
