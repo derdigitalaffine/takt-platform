@@ -6,7 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from .db import Organization, User, Group, GroupMember
 from .org_models import OrgMembership, OrgRoleGrant, OrgAudit, OrgKind, OrgState
-from . import organization as os, orgs, people_choices
+from . import organization as os, organization_groups as og, orgs, people_choices
 from .main import app, current_user, get_db, check_csrf, render, redirect, flash
 
 
@@ -46,7 +46,8 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
             .order_by(OrgMembership.is_primary.desc())
         )
     if unit is None and group is not None:
-        unit = db.scalar(
+        linked = db.scalar(select(Group.org_id).where(Group.id == group))
+        unit = linked if linked in visible else db.scalar(
             select(OrgRoleGrant.org_id).where(
                 OrgRoleGrant.group_id == group, OrgRoleGrant.org_id.in_(visible)
             )
@@ -54,6 +55,10 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
     if unit is None and visible:
         unit = next(o.id for o, _ in rows if o.id in visible)
     selected = nodes.get(unit)
+    linked_group = og.group_of(db, selected)
+    group_members = list(db.scalars(select(GroupMember).where(
+        GroupMember.group_id == linked_group.id).order_by(GroupMember.user_id)
+    )) if linked_group else []
     caps = access.get(unit, {})
     memberships = list(
         db.scalars(
@@ -152,8 +157,13 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         if g.org_id == unit
     ]
     org_people_count = {}
+    for group_node in db.scalars(select(Group).where(Group.org_id.is_not(None))):
+        org_people_count[group_node.org_id] = db.scalar(
+            select(func.count(GroupMember.user_id)).where(GroupMember.group_id == group_node.id)) or 0
     for membership in memberships:
-        org_people_count[membership.org_id] = org_people_count.get(membership.org_id, 0) + 1
+        if membership.org_id not in org_people_count:
+            org_people_count[membership.org_id] = 0
+        org_people_count[membership.org_id] += 1
     org_role_count = {}
     for grant in all_grants:
         org_role_count[grant.org_id] = org_role_count.get(grant.org_id, 0) + 1
@@ -182,6 +192,9 @@ def view(request, user, db, unit=None, person=None, group=None, error="", form=N
         org_logo_url=orgs.logo_url,
         org_usage=orgs.usage(db, selected) if selected and caps.get("settings") else {},
         memberships=shown,
+        linked_group=linked_group,
+        group_members=group_members,
+        group_member_ids={m.user_id for m in group_members},
         own_memberships=own,
         people=people,
         org_groups=groups,
