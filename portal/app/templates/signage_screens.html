@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Anzeigen · Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-workspace.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace">
+  <div class="sg-page-intro"><div><span class="sg-eyebrow">TAKT · DIGITAL SIGNAGE</span>
+    <h1>Anzeigen verwalten</h1><p>Bildschirme erstellen, gestalten, freigeben und sicher löschen. Alle Gebäude- und Wegeinstellungen liegen in eigenen Bereichen.</p>
+  </div><div class="sg-intro-icon"><i class="fa-solid fa-display" aria-hidden="true"></i></div></div>
+  {% set section = 'screens' %}{% include "_signage_nav.html" %}
+  <div class="sg-screens-toolbar"><span><strong>{{ screens|length }}</strong> Anzeigen eingerichtet</span>
+    <label for="sg-screen-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input id="sg-screen-search" class="form-control" type="search" placeholder="Anzeigen durchsuchen" data-sg-screen-search></label>
+  </div>
+    <div class="sg-heading-row"><div><h2>Deine Anzeigen</h2><p>Wähle einen Bildschirm, um sein Design und seine Inhalte zu bearbeiten.</p></div></div>
+  {% if screens %}
+  <div class="sg-screen-grid">
+  {% for screen in screens %}
+    <a class="sg-screen-card" href="/signage/{{ screen.id }}/edit">
+      <div class="sg-screen-preview" style="--sg-bg:{{ (screen.theme_json|default('')) and '#17283d' or '#17283d' }}">
+        <div class="sg-screen-preview-top"><i class="fa-solid {{ {'agenda':'fa-calendar-days','room':'fa-door-open','directory':'fa-address-book','info':'fa-bullhorn'}.get(screen.kind, 'fa-signs-post') }}"></i><span>TAKT Signage</span></div>
+        <strong>{{ screen.name }}</strong><small>{{ kinds[screen.kind] }}</small>
+      </div>
+      <div class="sg-screen-card-foot"><div><strong>{{ screen.name }}</strong><span>{{ kinds[screen.kind] }}</span></div>
+        <span class="sg-pill {{ 'sg-pill-success' if screen.visibility == 'public' else 'sg-pill-neutral' }}">{{ {'private':'Intern','public':'Öffentlich','link':'Sicherer Link'}[screen.visibility] }}</span></div>
+    </a>
+  {% endfor %}
+  </div>
+  {% else %}
+  <div class="sg-empty"><i class="fa-solid fa-display"></i><h3>Noch keine Anzeigen</h3><p>Erstelle die erste Anzeige. Design und Sichtbarkeit kannst du anschließend festlegen.</p></div>
+  {% endif %}
+  <section class="sg-panel" aria-labelledby="sg-new">
+    <div class="sg-panel-head"><div><span class="sg-eyebrow">SCHNELLSTART</span><h2 id="sg-new">Neue Anzeige erstellen</h2></div></div>
+    <form class="sg-form-stack" data-sg-scope action="/signage/new" method="post">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Name <input class="form-control" name="name" maxlength="180" required placeholder="z. B. Eingang Rathaus oder Raum 1.14"></label>
+      <label>1. Vorlage <select class="form-select" name="kind" data-sg-template>{% for key,label in kinds.items() %}<option value="{{ key }}" {% if key in passive_kinds %}data-passive{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <fieldset data-sg-passive class="sg-form-stack">
+        <legend class="h6">2. Anzeigebereich wählen</legend>
+        {% include "_signage_scope.html" %}
+        {% if not buildings %}<p>Lege zuerst ein <a href="/signage/buildings">Gebäude</a> an.</p>{% endif %}
+      </fieldset>
+      <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus me-1"></i>Anzeige gestalten</button>
+    </form>
+  </section>
+  <section id="sg-auto-generator" class="sg-panel" aria-labelledby="sg-auto-generator-title">
+    <div class="sg-panel-head"><div>
+      <span class="sg-eyebrow">EINMAL KONFIGURIEREN, SOFORT PROFITIEREN</span>
+      <h2 id="sg-auto-generator-title">Gebäudeanzeigen automatisch erzeugen</h2>
+      <p>Ein Klick bereitet die passenden passiven Gebäude- und Geschossübersichten vor. Vorhandene Wegepunkte können zusätzlich zu Flurdisplays werden. Bestehende automatisch erzeugte Displays bleiben bei erneutem Ausführen erhalten.</p>
+    </div></div>
+    <form method="post" action="/signage/generate" class="sg-form-stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Gebäude <select name="building_id" class="form-select" required>
+        <option value="">Gebäude auswählen</option>
+        {% for building in buildings if building.active %}<option value="{{ building.id }}">{{ building.name }}</option>{% endfor %}
+      </select></label>
+      <div class="sg-generator-options">
+        <label class="sg-check"><input type="checkbox" name="building" value="1" checked> Eine Gebäudeübersicht</label>
+        <label class="sg-check"><input type="checkbox" name="floors" value="1" checked> Eine Übersicht pro Geschoss</label>
+        <label class="sg-check"><input type="checkbox" name="corridors" value="1"> Vorbereitete Flurdisplays je hinterlegtem Wegepunkt</label>
+      </div>
+      <p class="sg-muted"><i class="fa-solid fa-shield-halved me-1"></i> Alle neu erzeugten Anzeigen sind zunächst <strong>intern</strong>. Ein Flurdisplay erhält seinen echten Standort, aber noch keine ungeprüfte Blickrichtung. Die öffentliche Freigabe erfolgt erst nach der Kontrolle.</p>
+      <button type="submit" class="btn btn-outline-primary" {% if not buildings %}disabled{% endif %}><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Passende Anzeigen vorbereiten</button>
+    </form>
+  </section>
+
+</main>
+{% endblock %}
+{% block scripts %}<script src="/static/signage-passive-admin.js" defer></script><script src="/static/signage-workspace.js" defer></script>{% endblock %}
