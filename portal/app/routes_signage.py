@@ -11,14 +11,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import branding, links, notify, signage, calendars, signage_passive
+from . import branding, links, notify, signage, calendars, signage_passive, signage_fleet
 from .db import LOCAL_TZ, Organization, PortalLocation, Resource, User, get_settings, utcnow
 from .main import app, check_csrf, current_user, enabled_modules, flash, get_db, rate_limit, redirect, render, require, templates
 from .calendar_models import Calendar, CalendarEvent
 from .signage_models import (SignageBuilding, SignageDevice, SignageFloor, SignageLink,
                              SignageOffice, SignageRoom, SignageScreen, SignageRevision,
                              SignageWayNode, SignageWayEdge, SignageDisplayAnchor, SignagePassiveConfig,
-                             SignagePublicDestination, SignageDestinationOverride, SignageSpecial)
+                             SignagePublicDestination, SignageDestinationOverride, SignageSpecial,
+                             SignageDeviceTelemetry)
 
 class _RedactSignageLinks(logging.Filter):
     """Avoid logging bearer URLs in Uvicorn access logs.
@@ -444,13 +445,38 @@ def _device_access(request: Request, db, device_id: int):
 
 
 @app.post("/signage/api/device/{device_id:int}/heartbeat")
-def signage_heartbeat(device_id: int, request: Request, db: Session = Depends(get_db)):
+async def signage_heartbeat(device_id: int, request: Request, db: Session = Depends(get_db)):
+    """Authentication is device-scoped; accept only minimal allowlisted telemetry."""
     rate_limit(request, "signage-device", limit=90, window=60)
     device, screen = _device_access(request, db, device_id)
-    device.last_seen_at = utcnow()
+    payload = {}
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() == "application/json":
+        if request.headers.get("content-length", "0").isdigit() and int(request.headers["content-length"]) > 2048:
+            raise HTTPException(413, "Diagnosepaket zu groß.")
+        raw = await request.body()
+        if len(raw) > 2048:
+            raise HTTPException(413, "Diagnosepaket zu groß.")
+        try:
+            payload = json.loads(raw) if raw else {}
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(422, "Ungültige Diagnosedaten.")
+    elif request.headers.get("content-type") and request.headers["content-type"].split(";", 1)[0].strip().lower() not in ("", "application/octet-stream"):
+        raise HTTPException(415, "Diagnosepakete müssen JSON sein.")
+    validated = signage_fleet.validate_telemetry(payload)
+    moment = utcnow()
+    device.last_seen_at = moment
+    if validated:
+        telemetry = db.get(SignageDeviceTelemetry, device.id)
+        if telemetry is None:
+            telemetry = SignageDeviceTelemetry(device_id=device.id)
+            db.add(telemetry)
+        for name, value in validated.items():
+            setattr(telemetry, name, value)
+        telemetry.observed_at = moment
     db.commit()
     return JSONResponse({"ok": True, "screen_id": screen.id, "version": screen.version,
-                         "kind": screen.kind}, headers={"Cache-Control": "no-store"})
+                         "kind": screen.kind, "server_time": moment.isoformat()},
+                        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 @app.get("/signage/api/device/{device_id:int}/manifest")
@@ -911,3 +937,7 @@ async def signage_special_save(sid: int, request: Request, user: User = Depends(
 
 # Central campaign management is registered after base signage routes.
 from . import routes_signage_campaign  # noqa: E402,F401
+
+
+# Fleet operations are registered after the existing scoped device routes.
+from . import routes_signage_fleet  # noqa: E402,F401
