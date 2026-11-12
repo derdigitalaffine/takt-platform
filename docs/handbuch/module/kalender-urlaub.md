@@ -68,3 +68,15 @@ Weiterführend: [Organisationsrollen](../../organisationsverwaltung.md) und [Imp
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du willst wissen, wann etwas stattfindet – oder Urlaub planen?
+
+1. Für Termine den **Kalender** öffnen.
+2. Termin auswählen oder anlegen und die Beteiligten prüfen.
+3. Für Urlaub in den **Urlaubsbereich** wechseln.
+4. Zeitraum eintragen und gegebenenfalls die Freigabe abwarten.
+5. Bei Kalender-Abos persönliche Links vertraulich behandeln.
+
+**Merksatz:** Ein Kalendereintrag ist nicht automatisch ein genehmigter Urlaubsantrag.
