@@ -269,6 +269,21 @@ def poll_export(poll_id: int, user: User = Depends(current_user), db: Session = 
                     headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
 
 
+@app.get("/polls/{poll_id}/export.pdf")
+def poll_export_pdf(poll_id: int, user: User = Depends(current_user),
+                    db: Session = Depends(get_db)):
+    """Only the same managers who may export the complete results as CSV."""
+    poll, _ = _poll(db, poll_id, user, sh.VIEW)
+    from . import survey_pdf
+    name = room_slug(poll.title) or "terminumfrage"
+    return Response(
+        survey_pdf.poll_report(db, poll), media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{name}.pdf"',
+                 "Cache-Control": "private, no-store",
+                 "X-Content-Type-Options": "nosniff"})
+
+
+
 @app.get("/polls/{poll_id}/qr.{fmt}")
 def poll_qr(poll_id: int, fmt: str, size: int = 10, dark: str = "#000000", light: str = "#ffffff",
             error: str = "m", border: int = 2, download: str = "", user: User = Depends(current_user),
