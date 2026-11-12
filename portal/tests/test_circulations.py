@@ -149,6 +149,68 @@ def test_editor_save_and_publish_integration(db,actors):
     assert 'Umläufe &amp; Kenntnisnahmen' in recipient.get('/').text
 
 
+
+def test_publication_errors_are_visible_before_submit_and_keep_the_draft(db, actors):
+    """A business rule violation stays in the editor, not on a generic 422 page."""
+    import re
+
+    row = Circulation(owner_id=actors[0].id, draft_json=cl.dumps(cl.default()))
+    db.add(row)
+    db.commit()
+    owner = login(actors[0].email, 'passwort-test-123')
+
+    edit = owner.get(f'/umlaeufe/{row.id}/edit')
+    assert edit.status_code == 200
+    assert 'cl-publication-checks' in edit.text
+    assert 'Bitte einen Titel' in edit.text
+    assert 'mindestens einen aktiven Empfänger' in edit.text
+    assert 'disabled aria-describedby="cl-publication-checks"' in edit.text
+    rev = re.search(r'name="revision" value="([^"]+)"', edit.text).group(1)
+
+    # Direct HTTP clients must get an actionable error too, without publishing.
+    response = owner.post(f'/umlaeufe/{row.id}/publish',
+                          data={'csrf': csrf_of(edit.text), 'revision': rev})
+    assert response.status_code == 303
+    assert response.headers['location'] == f'/umlaeufe/{row.id}/edit'
+    error_page = owner.get(response.headers['location'])
+    assert error_page.status_code == 200
+    assert 'Veröffentlichung nicht möglich' in error_page.text
+    assert 'Titel und mindestens ein Inhalt' in error_page.text
+    db.refresh(row)
+    assert row.current_version == 0
+    assert cl.content(row) == cl.default()
+
+    # Once the actual saved draft is valid, the existing publication route works.
+    saved = cl.content(row)
+    saved.update(title='Dienstliche Info', body='Zur Kenntnis', audience={
+        'users': [actors[1].id], 'groups': [], 'all': False, 'guests': []})
+    row.draft_json = cl.dumps(saved)
+    db.commit()
+    edit = owner.get(f'/umlaeufe/{row.id}/edit')
+    assert 'cl-publication-checks' not in edit.text
+    assert 'erfüllt die überprüfbaren Veröffentlichungsvoraussetzungen' in edit.text
+    rev = re.search(r'name="revision" value="([^"]+)"', edit.text).group(1)
+    published = owner.post(f'/umlaeufe/{row.id}/publish',
+                           data={'csrf': csrf_of(edit.text), 'revision': rev})
+    assert published.status_code == 303
+    db.refresh(row)
+    assert row.current_version == 1
+
+
+def test_publication_preflight_reports_empty_audience_mode_and_expired_due(db, actors):
+    c = cl.default()
+    c.update(title='Anweisung', body='Bitte beachten', dynamic=True, sequential=True,
+             due_on=(utcnow() - timedelta(days=1)).isoformat())
+    row = Circulation(owner_id=actors[0].id, draft_json=cl.dumps(c))
+    db.add(row)
+    db.flush()
+    issues = cl.publication_issues(db, row, actors[0])
+    assert any(section == 'cl-audience' and 'Empfänger' in msg for section, msg in issues)
+    assert any(section == 'cl-flow' and 'Stationsfolge' in msg for section, msg in issues)
+    assert any(section == 'cl-flow' and 'Veröffentlichungszeitpunkt' in msg for section, msg in issues)
+
+
+
 def test_dispatch_worker_dynamic_membership_and_no_proxy_copy(db,actors,monkeypatch):
     row,ver,rec=make(db,actors,dynamic=True,audience={'users':[actors[1].id],'groups':[],'all':False,'guests':[]})
     sent=[]
