@@ -228,7 +228,9 @@ Zusätzliche Modul-Anleitungen: [Kalender und Urlaubsplanung](docs/kalender-urla
 | Für wen | Datei |
 |---|---|
 | Wer den Server **installiert und betreibt** | diese Seite, danach das [Admin-Handbuch](docs/ADMIN-HANDBUCH.md) |
-| Wer das Portal **benutzt** (Konferenzen, Kurzlinks, Formulare) | das [Benutzerhandbuch](docs/BENUTZERHANDBUCH.md) |
+| Wer das Portal **benutzt** | die [Handbuchübersicht mit allen Modulen](docs/BENUTZERHANDBUCH.md) |
+| Wer **Anmeldung, Navigation, Profil und Sicherheit** kennenlernen möchte | die [Grundlagenanleitung](docs/handbuch/grundlagen.md) |
+| Wer eine **bestimmte Modul-Anleitung** sucht | die [Modulanleitungen](docs/BENUTZERHANDBUCH.md#modulanleitungen), z. B. [Formulare](docs/handbuch/module/formulare.md), [Digital Signage](docs/handbuch/module/digital-signage.md) oder [TAKT Agent](docs/handbuch/module/takt-agent.md) |
 
 ## Installation in 11 Schritten
 
