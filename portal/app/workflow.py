@@ -500,7 +500,7 @@ def can_work(db, user: User, task: ApplicationTask) -> bool:
         (task.group_id and task.group_id in _group_ids(db, user)) or
         ao.can_handle(db, user, task.responsible_org_id)):
         return True
-    if task.kind != "approval" and not task.assignee_id and not task.group_id:
+    if task.kind != "approval" and not task.assignee_id and not task.group_id and not task.responsible_org_id:
         return apps.access(db, user, task.response) >= 2
     return False
 
