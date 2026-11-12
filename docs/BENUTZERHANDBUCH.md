@@ -6,7 +6,7 @@ Willkommen im TAKT-Portal. Die Dokumentation ist jetzt **nach Aufgaben geglieder
 
 > **Du siehst einen Menüpunkt nicht?** Nicht alle Module sind in jeder Organisation aktiviert. Zusätzlich entscheiden persönliche und organisatorische Rechte, welche Aufgaben und Informationen du sehen oder bearbeiten darfst.
 
-**Ganz wenig Zeit oder keine Lust auf lange Anleitungen?** [**Für ganz Bblöde oder faule – der Zwei-Minuten-Spickzettel für alle Module**](handbuch/fuer-ganz-bbloede-oder-faule.md).
+**Ganz wenig Zeit oder keine Lust auf lange Anleitungen?** [**Für ganz Blöde oder faule – der Zwei-Minuten-Spickzettel für alle Module**](handbuch/fuer-ganz-bloede-oder-faule.md).
 
 ## Einstieg: Grundlagen
 
