@@ -163,3 +163,79 @@ def test_report_handles_empty_and_long_content_over_multiple_a4_pages(reports):
     pdftext = _read(content)
     assert len(PdfReader(io.BytesIO(content)).pages) >= 2
     assert "Terminvorschlag" in pdftext
+
+
+
+def test_normal_form_and_poll_fit_on_one_a4_page(reports):
+    """No artificial appendix page even when CSV includes identities/answers."""
+    c = login("admin@example.org", "admin-passwort-123")
+    for kind, resource in (("forms", reports["form"]), ("polls", reports["poll"])):
+        response = c.get(f"/{kind}/{resource}/export.pdf")
+        reader = PdfReader(io.BytesIO(response.content))
+        assert len(reader.pages) == 1, f"Compact {kind} result must fit A4"
+        text = reader.pages[0].extract_text()
+        assert "ERGEBNISBERICHT" in text
+        assert "Seite 1" in text
+        if kind == "forms":
+            assert "Private Person" in text
+            assert "person-private@example.org" in text
+            assert "PERSONAL_SECRET_TEXT" in text
+        else:
+            assert "DoNotPrintPerson" in text
+            assert "DoNotPrintPrivateComment" in text
+            assert "Summe Ja" in text
+            assert "Stimmenverteilung" in text
+
+
+def test_poll_color_matrix_has_web_yes_maybe_no_and_untruncated_csv(reports):
+    """The real web palette is green/yellow/red, not a single generic chart."""
+    from app import polls as pl
+
+    with SessionLocal() as db:
+        poll = db.get(Poll, reports["poll"])
+        original = poll.options[0]
+        others = [
+            PollOption(poll_id=poll.id, starts_at=utcnow(), note="Woche zwei"),
+            PollOption(poll_id=poll.id, starts_at=utcnow(), note="Woche drei"),
+        ]
+        db.add_all(others)
+        db.flush()
+        person = next(p for p in poll.participants if p.answered_at)
+        person.answers_json = json.dumps({
+            str(original.id): "yes", str(others[0].id): "maybe",
+            str(others[1].id): "no",
+        })
+        db.add(PollParticipant(
+            poll_id=poll.id, name="Özlem Müller",
+            email="ozlem.mueller@example.org", answered_at=utcnow(),
+            edit_token="survey-pdf-color-matrix-ozlem",
+            answers_json=json.dumps({
+                str(original.id): "maybe", str(others[0].id): "no",
+                str(others[1].id): "yes",
+            }), comment="Drei Möglichkeiten geprüft.",
+        ))
+        db.commit()
+        # The participant collection was loaded above; refresh it after adding
+        # a new participant by poll_id so CSV and PDF see the committed row.
+        db.expire(poll, ["participants", "options"])
+        csv_text = pl.to_csv(poll)
+        pdf = survey_pdf.poll_report(db, poll)
+    reader = PdfReader(io.BytesIO(pdf))
+    assert len(reader.pages) == 1
+    output = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "Özlem Müller" in output
+    assert "Drei Möglichkeiten geprüft." in output
+    assert "Ja" in output and "Wenn nötig" in output and "Nein" in output
+    # All CSV header labels and nontrivial values must still be printable.
+    import csv
+    for row in csv.reader(io.StringIO(csv_text.lstrip("\ufeff")), delimiter=";"):
+        for cell in row:
+            if len(cell) > 2 and not cell.isdigit():
+                assert cell in output, f"Missing poll cell: {cell[:80]}"
+    assert (survey_pdf.GREEN, survey_pdf.YELLOW, survey_pdf.RED) == (
+        "#198754", "#FFC107", "#DC3545")
+    # ReportLab draws real colored vote cells, not merely colored labels.
+    stream = b" ".join(page.get_contents().get_data() for page in reader.pages)
+    assert b".870588" in stream   # #DEF1E6 green fill
+    assert b".945098" in stream   # green fill component
+    assert b".988235" in stream   # #FCE4E7 red fill
