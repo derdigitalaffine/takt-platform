@@ -1,0 +1,13 @@
+/* Takt person selection: multi/single, organization subtree filter, all themes. */
+.pp-person-control{min-width:min(100%,220px);max-width:100%;width:100%}
+.pp-person-control .ts-control{min-height:39px;flex-wrap:wrap;border-radius:9px!important;gap:5px}
+.pp-person-control .ts-control>input{min-width:130px!important;font-size:.9rem}
+.pp-person-control .ts-dropdown{min-width:100%;z-index:1100}
+.pp-person-control .ts-dropdown .active{background:var(--bs-primary-bg-subtle,#e6f0fb)}
+.pp-person-control .ts-control .item{border-radius:7px}
+.pp-org-filter{margin:7px 0 5px}
+.pp-org-filter label{display:block;font-size:.75rem;color:var(--bs-secondary-color);font-weight:650}
+.pp-org-filter select{max-width:100%;margin-top:4px}
+.pp-person-control:focus-within .ts-control{box-shadow:0 0 0 .18rem color-mix(in srgb, var(--bs-primary) 24%,transparent);border-color:var(--bs-primary)}
+.pp-person-control.ts-wrapper.disabled{opacity:.65}
+@media(max-width:640px){.pp-person-control{min-width:0}.pp-person-control .ts-dropdown{max-height:280px}}
