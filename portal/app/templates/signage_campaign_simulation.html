@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Simulation · Signage Sonderbetrieb{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-campaigns.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace sg-campaigns">
+  <div class="sg-page-intro"><div>
+    <a class="sg-back" href="/signage/campaigns"><i class="fa-solid fa-arrow-left"></i> Zur Sonderbetriebszentrale</a>
+    <span class="sg-eyebrow d-block mt-3">VORSCHAU · ZEITSIMULATION</span>
+    <h1>{{ building.name }}</h1>
+    <p>Simulierte Anzeige am {{ at.strftime('%d.%m.%Y') }} um {{ at.strftime('%H:%M') }} UTC. Die wirkliche öffentliche Anzeige wird nicht verändert.</p>
+  </div><div class="sg-intro-icon"><i class="fa-solid fa-eye"></i></div></div>
+  <div class="sg-panel">
+    <h2>Was zeigt jeder Wegweiser?</h2>
+    {% if preview %}
+    <div class="sg-simulation-list">
+      {% for row in preview %}
+      <article class="sg-simulation-item {{ 'is-special' if row.special else '' }}">
+        <span class="sg-eyebrow">{{ 'SONDERBETRIEB AKTIV' if row.special else 'NORMALBETRIEB' }}</span>
+        <h3>{{ row.screen.name }}</h3>
+        {% if row.special %}
+          <strong>{{ row.special.title }}</strong>
+          {% if row.special.target %}<p>{{ row.special.target.arrow[0] if row.special.target.arrow else '' }}
+            {{ row.special.target.label }} · {{ row.special.target.floor }}</p>{% endif %}
+          {% if row.special.message %}<p>{{ row.special.message }}</p>{% endif %}
+        {% else %}
+          <strong>Reguläre Gebäudeübersicht</strong><p>Kein zeitlich wirksamer, freigegebener Sonderbetrieb.</p>
+        {% endif %}
+        <a class="btn btn-sm btn-outline-primary mt-3" href="/signage/{{ row.screen.id }}/edit">Display konfigurieren</a>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<p class="sg-muted">In diesem Gebäude sind noch keine passiven Displays eingerichtet.</p>{% endif %}
+  </div>
+  <p class="sg-muted">Hinweis: Dies ist eine zeitliche Simulation der in TAKT freigegebenen Regeln. Die Anzeige auf einem realen Bildschirm verwendet immer die aktuelle Uhrzeit. Vertrauliche Kalendertexte werden nicht übernommen.</p>
+</main>
+{% endblock %}
