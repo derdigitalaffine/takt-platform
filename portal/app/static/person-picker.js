@@ -66,7 +66,6 @@
       searchField: ['text', 'value'],
       sortField: [{field: '$order', direction: 'asc'}],
       plugins: select.multiple ? ['remove_button'] : [],
-      controlInput: undefined,
       placeholder: select.multiple ? 'Personen auswählen oder suchen …' : 'Person suchen oder auswählen …',
       score: function(query) {
         const needle = search(query);
