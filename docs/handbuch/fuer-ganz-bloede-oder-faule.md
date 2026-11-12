@@ -1,4 +1,4 @@
-# Für ganz Bblöde oder faule
+# Für ganz Blöde oder faule
 
 **Das TAKT-Portal in zwei Minuten.** Du willst einfach nur wissen, wo du klicken musst? Hier ist der Spickzettel. Ohne Amtsdeutsch, ohne Roman.
 
