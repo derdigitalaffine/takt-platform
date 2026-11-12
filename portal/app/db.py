@@ -457,7 +457,6 @@ class CirculationRecipient(Base):
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # optional single pending-request escalation
     escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     decision: Mapped[str] = mapped_column(String(24), default="")
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -2234,6 +2233,7 @@ class Booking(Base):
     cancel_reason: Mapped[str] = mapped_column(Text, default="")
     sequence: Mapped[int] = mapped_column(Integer, default=0)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # one-time pending escalation
     meeting_id: Mapped[int | None] = mapped_column(ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # Erweiterter Umfang: Terminart, zuständige Person, Antworten auf eigene Felder; status auch „requested“
