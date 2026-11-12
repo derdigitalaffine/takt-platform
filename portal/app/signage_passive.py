@@ -183,16 +183,24 @@ def project(db, screen, now):
             regular.append(target(room_id))
         regular.sort(key=lambda point: -point["rank"])
 
+    # Manual per-display assignments win a tie over building campaigns;
+    # neither can bypass explicit public room publication.
+    from . import signage_campaign
     active = []
     for item in specials:
         if item.room_id not in points:
             continue
-        window = active_window(db, item, screen, now)
-        if window:
-            active.append((-item.priority, window[0], item.id, window[1], item))
+        interval = active_window(db, item, screen, now)
+        if interval:
+            active.append((-item.priority, 0, interval[0], item.id, interval[1], item))
+    if passive:
+        for campaign, interval in signage_campaign.candidates(db, screen, now):
+            if campaign.room_id in points:
+                active.append((-campaign.priority, 1, interval[0],
+                               campaign.id, interval[1], campaign))
     if not active:
         return regular, None, manual
-    _, _, _, end, winner = min(active)
+    _, _, _, _, end, winner = min(active)
     expiry = min(end, now.astimezone(timezone.utc) + timedelta(seconds=45))
     return regular, {"title": winner.title, "message": winner.message, "mode": winner.mode,
                      "valid_until": expiry.isoformat(), "target": target(winner.room_id)}, manual
