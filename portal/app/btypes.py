@@ -139,14 +139,14 @@ def _blocked_days(db, page: BookingPage, user_id: int, first: date, last: date) 
         while d0 <= d1:
             out.add(d0)
             d0 += timedelta(days=1)
-    from .booking_integration import calendars_enabled
-    if calendars_enabled(db):
-        for a in db.scalars(select(Absence).where(Absence.user_id == user_id, Absence.status == "confirmed",
-                                                  Absence.starts_on <= last.isoformat(), Absence.ends_on >= first.isoformat())):
-            d0, d1 = max(first, date.fromisoformat(a.starts_on)), min(last, date.fromisoformat(a.ends_on))
-            while d0 <= d1:
-                out.add(d0)
-                d0 += timedelta(days=1)
+    # Confirmed absences stay authoritative even if the Calendar UI module is
+    # switched off; removing this guard would expose previously blocked slots.
+    for a in db.scalars(select(Absence).where(Absence.user_id == user_id, Absence.status == "confirmed",
+                                              Absence.starts_on <= last.isoformat(), Absence.ends_on >= first.isoformat())):
+        d0, d1 = max(first, date.fromisoformat(a.starts_on)), min(last, date.fromisoformat(a.ends_on))
+        while d0 <= d1:
+            out.add(d0)
+            d0 += timedelta(days=1)
     return out
 
 
