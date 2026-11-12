@@ -32,6 +32,47 @@ def configured(page, flag: str, default=False) -> bool:
     return value is True
 
 
+# Only informational messages to the page owner can be reduced; directly assigned
+# providers always receive operational booking events. Guest messages never use
+# this policy.
+OWNER_MAIL_EVENTS = {
+    "new": "Neue verbindliche Buchung",
+    "request": "Neue Anfrage zur Bestätigung",
+    "confirm": "Anfrage bestätigt",
+    "move": "Terminverschiebung",
+    "cancel": "Absage eines Termins",
+    "decline": "Anfrage abgelehnt",
+}
+_EVENT_BY_LABEL = {
+    "Neue Buchung": "new",
+    "Neue Anfrage – bitte bestätigen": "request",
+    "Termin bestätigt": "confirm",
+    "Termin verschoben": "move",
+    "Absage": "cancel",
+    "Anfrage abgelehnt": "decline",
+}
+
+
+def owner_mail_enabled(page, event: str) -> bool:
+    """Legacy settings remain authoritative unless a per-event override exists."""
+    if not page.notify_owner:
+        return False
+    rule = options(page).get("owner_mail_events")
+    if not isinstance(rule, list):
+        return True
+    key = _EVENT_BY_LABEL.get(event)
+    return key is None or key in rule
+
+
+def escalation_hours(page) -> int:
+    """An overdue pending request can escalate once, disabled by default."""
+    try:
+        value = int(options(page).get("request_escalation_hours", 0))
+    except (ValueError, TypeError, OverflowError):
+        return 0
+    return value if 1 <= value <= 168 else 0
+
+
 def calendar_visibility(booking, *, channel="web", can_edit=False, responsible=False) -> str:
     """Whether an event may expose the guest's name in a given calendar channel.
 

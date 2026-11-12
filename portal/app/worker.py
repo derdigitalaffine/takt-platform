@@ -428,7 +428,9 @@ async def run_forever() -> None:
                 if await asyncio.to_thread(circulations.tick):
                     await asyncio.to_thread(notify.process_queue)
                 from . import bookings
-                if await asyncio.to_thread(bookings.send_reminders):
+                booking_reminders = await asyncio.to_thread(bookings.send_reminders)
+                booking_escalations = await asyncio.to_thread(bookings.send_escalations)
+                if booking_reminders or booking_escalations:
                     await asyncio.to_thread(notify.process_queue)
                 from . import applications
                 if await asyncio.to_thread(applications.send_overdue_reminders):

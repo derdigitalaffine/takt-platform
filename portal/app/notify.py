@@ -327,7 +327,7 @@ def test_imap(cfg: dict[str, str]) -> str:
 
 def enqueue(db, to_addr: str, subject: str, body: str, kind: str, cfg: dict[str, str] | None = None,
             *, attachments: list[dict] | None = None, reply_to: str | None = None,
-            per_hour: int | None = None) -> bool:
+            per_hour: int | None = None, guard: dict | None = None) -> bool:
     """Reiht eine Mail ein. Ohne eingerichteten Versand passiert nichts (False).
 
     attachments: [{"filename": "einladung.ics", "content": "...", "calendar_method": "REQUEST"}]
@@ -342,7 +342,8 @@ def enqueue(db, to_addr: str, subject: str, body: str, kind: str, cfg: dict[str,
         log.warning("Mail an %s (%s) übersprungen: Höchstzahl pro Stunde erreicht", to_addr, kind)
         return False
     db.add(Notification(kind=kind, to_addr=to_addr, subject=subject, body=body, reply_to=reply_to,
-                        attachments_json=json.dumps(attachments, ensure_ascii=False) if attachments else None))
+                        attachments_json=json.dumps(attachments, ensure_ascii=False) if attachments else None,
+                        guard_json=json.dumps(guard, ensure_ascii=False) if guard else None))
     _copy_to_substitute(db, to_addr, subject, body, kind, attachments, reply_to)
     return True
 
@@ -369,6 +370,31 @@ def _recent(db, to_addr: str, kind: str) -> int:
         Notification.created_at >= since)) or 0
 
 
+def _booking_delivery_allowed(db, notification: Notification) -> bool:
+    """Reject stale escalations when the request or responsible user changed.
+
+    Legacy messages use no guard. Only escalation mails require this guard;
+    they carry no citizen details even while queued.
+    """
+    if notification.kind != "booking_escalation":
+        return True
+    try:
+        meta = json.loads(notification.guard_json or "{}")
+        if meta.get("type") != "booking_escalation":
+            return False
+        bid, uid = int(meta["booking_id"]), int(meta["owner_id"])
+        from .db import Booking
+        row = db.get(Booking, bid)
+        owner = row.page.owner if row is not None else None
+        return bool(
+            row and row.status == "requested" and row.starts_at > utcnow()
+            and owner and owner.active and owner.id == uid
+            and (owner.email or "").casefold() == (notification.to_addr or "").casefold()
+        )
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return False
+
+
 def process_queue() -> int:
     """Verschickt fällige Mails. Läuft im Worker-Thread, gibt die Zahl der gesendeten zurück."""
     sent = 0
@@ -380,6 +406,11 @@ def process_queue() -> int:
             .order_by(Notification.id).limit(50)
         ).all()
         for n in due:
+            if not _booking_delivery_allowed(db, n):
+                n.status = "failed"
+                n.error = "Eskalation überholt oder Zugriffsberechtigung vor Versand geändert."
+                db.commit()
+                continue
             n.attempts += 1
             try:
                 attachments = json.loads(n.attachments_json) if n.attachments_json else None

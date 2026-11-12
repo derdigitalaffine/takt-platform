@@ -272,7 +272,10 @@ def _notify_owner(db, b: Booking, event: str, *, previous: str = "") -> None:
     targets = []
     if b.provider is not None and b.provider.active:
         targets.append(b.provider)
-    if page.notify_owner and page.owner is not None and page.owner.active and page.owner not in targets:
+    from . import booking_integration
+    owner_must_handle_request = (b.status == "requested" and b.provider not in targets)
+    if (page.owner is not None and page.owner.active and page.owner not in targets
+            and (booking_integration.owner_mail_enabled(page, event) or owner_must_handle_request)):
         targets.append(page.owner)
     if not targets:
         return
@@ -284,7 +287,6 @@ def _notify_owner(db, b: Booking, event: str, *, previous: str = "") -> None:
             "nachricht": "\n\n".join(x for x in (_answers_text(b), b.note or "") if x), "frei": free,
             "link": f"{settings.portal_base_url}/bookings/{page.id}",
             "vorher": previous, "status": "Bestätigung erforderlich" if b.status == "requested" else b.status}), cfg)
-        from . import booking_integration
         opts = booking_integration.options(page)
         method = ("CANCEL" if event == "Absage" else "PUBLISH") if b.status == "booked" or event == "Absage" else ""
         att = ([{"filename": "buergertermin.ics", "content": calendar_staff(db, b, method),
@@ -544,6 +546,72 @@ def parse_guests(text: str) -> tuple[list[tuple[str, str]], list[str]]:
 
 
 # --- Erinnerungen (Worker) und Export ------------------------------------------------------
+
+def escalate_pending_requests(db, *, now: datetime | None = None) -> int:
+    """Raise one action reminder to the active page owner for overdue requests.
+
+    The notification intentionally contains no guest name, email, notes or
+    access token. A recipient must authenticate to view booking details.
+    The existing worker runs this under a shared organizational write lock.
+    """
+    from . import booking_integration
+    now = now or utcnow()
+    requested = db.scalars(select(Booking).where(
+        Booking.status == "requested",
+        Booking.escalated_at.is_(None),
+        Booking.created_at < now,
+        Booking.starts_at > now,
+    )).all()
+    cfg = get_settings(db)
+    count = 0
+    for item in requested:
+        hours = booking_integration.escalation_hours(item.page)
+        if not hours or item.created_at > now - timedelta(hours=hours):
+            continue
+        owner = item.page.owner
+        if owner is None or not owner.active or not owner.email:
+            continue
+        link = f"{settings.portal_base_url}/bookings/{item.page.id}?status=requested"
+        subject = f"Offene Terminanfrage prüfen – {item.page.title}"[:255]
+        body = (
+            f"Guten Tag {owner.name},\n\n"
+            "eine Terminanfrage wartet seit mehr als "
+            f"{hours} Stunden auf eine Entscheidung.\n\n"
+            f"Buchungsseite: {item.page.title}\n"
+            "Bitte prüfen Sie die Anfrage zeitnah oder weisen Sie die Bearbeitung "
+            "einer zuständigen Person zu.\n\n"
+            f"Anfragen in TAKT öffnen:\n{link}\n\n"
+            "Aus Datenschutzgründen enthält diese Erinnerung keine Bürgerdaten.\n\n"
+            + mailtpl.common_vars()["fusszeile"]
+        )
+        guard = {"type": "booking_escalation", "booking_id": item.id, "owner_id": owner.id}
+        if notify.enqueue(db, owner.email, subject, body, "booking_escalation", cfg, guard=guard):
+            item.escalated_at = now
+            count += 1
+    return count
+
+
+def send_escalations() -> int:
+    """Worker entry point; avoid write locks until a request is genuinely overdue."""
+    from .booking_integration import escalation_hours
+    from .leave import lock
+    with SessionLocal() as db:
+        now = utcnow()
+        due = db.scalars(select(Booking).where(
+            Booking.status == "requested",
+            Booking.escalated_at.is_(None),
+            Booking.created_at < now,
+            Booking.starts_at > now,
+        )).all()
+        if not any(escalation_hours(b.page) and
+                   b.created_at <= now - timedelta(hours=escalation_hours(b.page))
+                   and b.page.owner is not None and b.page.owner.active for b in due):
+            return 0
+        lock(db)
+        count = escalate_pending_requests(db, now=now)
+        db.commit()
+    return count
+
 
 def send_reminders() -> int:
     now = utcnow()
