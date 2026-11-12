@@ -4,7 +4,7 @@ und eingeschalteten Modulen. Reihenfolge und Sichtbarkeit lassen sich je Person 
 import json
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 
 from . import planning
 from .db import (
@@ -85,10 +85,13 @@ def _meetings(db, user):
 def _polls(db, user):
     polls = db.scalars(select(Poll).where(Poll.owner_id == user.id, Poll.closed.is_(False), Poll.archived_at.is_(None), Poll.published_at.is_not(None), Poll.final_option_id.is_(None))
                        .order_by(Poll.updated_at.desc()).limit(5)).all()
+    from . import polls as poll_engine
     todo = db.scalars(select(PollParticipant).join(Poll).where(
-        or_(PollParticipant.user_id == user.id, PollParticipant.email == user.email),
-        PollParticipant.answered_at.is_(None), Poll.closed.is_(False), Poll.archived_at.is_(None), Poll.published_at.is_not(None))).all()
-    return {"items": polls, "todo": todo[:5]}
+        or_(PollParticipant.user_id == user.id,
+            and_(PollParticipant.invited_at.is_not(None), PollParticipant.email == user.email)),
+        PollParticipant.answered_at.is_(None), Poll.closed.is_(False),
+        Poll.archived_at.is_(None), Poll.published_at.is_not(None))).all()
+    return {"items": polls, "todo": [p for p in todo if poll_engine.is_open(p.poll)][:5]}
 
 
 def _bookings(db, user):
