@@ -207,3 +207,19 @@ Persönliche Seminarlinks, Dozentenzugänge und Kalenderdateien können vertraul
 - [Alle Modulanleitungen](../../BENUTZERHANDBUCH.md)
 
 > **Hinweis:** Einzelne Funktionen hängen von Modulaktivierung, Rechten, Veranstaltungseinstellungen und verfügbaren Integrationen ab. Die erste Ausbaustufe organisiert kostenlose Veranstaltungen; Gebühren, Prüfungen und Noten gehören nicht zum beschriebenen Funktionsumfang.
+
+## Für blöde erklärt:
+
+Du willst ein Seminar besuchen oder selbst organisieren?
+
+**Teilnehmen:** Seminar suchen → passenden Termin wählen → anmelden → Status prüfen → hingehen.
+
+**Organisieren:**
+1. **Neues Seminar** öffnen und Thema beschreiben.
+2. Termine, Orte und Dozenten festlegen.
+3. Prüfen, ob der Raum **wirklich gebucht** ist.
+4. Plätze, Anmeldung und gegebenenfalls Warteliste einstellen.
+5. **Veröffentlichen**, Einladungen versenden und Anmeldungen betreuen.
+6. Am Termin Anwesenheit erfassen und danach gegebenenfalls Bescheinigungen ausstellen.
+
+**Merksatz:** Eingeladen ist nicht angemeldet. Angemeldet ist nicht automatisch anwesend.
