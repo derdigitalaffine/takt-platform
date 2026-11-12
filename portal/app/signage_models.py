@@ -136,3 +136,94 @@ class SignageDisplayAnchor(Base):
     __tablename__ = "signage_display_anchors"
     screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), primary_key=True)
     node_id: Mapped[int] = mapped_column(ForeignKey("signage_way_nodes.id", ondelete="CASCADE"), index=True)
+
+
+class SignagePassiveConfig(Base):
+    __tablename__ = "signage_passive_configs"
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), primary_key=True)
+    building_id: Mapped[int] = mapped_column(ForeignKey("signage_buildings.id", ondelete="CASCADE"), index=True)
+    floor_id: Mapped[int | None] = mapped_column(ForeignKey("signage_floors.id", ondelete="SET NULL"))
+    facing: Mapped[str] = mapped_column(String(8), default="")
+    radius_m: Mapped[int] = mapped_column(Integer, default=25)
+    barrier_free: Mapped[bool] = mapped_column(Boolean, default=False)
+    manual_arrow: Mapped[str] = mapped_column(String(12), default="")
+    manual_label: Mapped[str] = mapped_column(String(120), default="")
+    manual_only: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SignagePublicDestination(Base):
+    """Explicitly publish a room number and display label on passive signs."""
+    __tablename__ = "signage_public_destinations"
+    room_id: Mapped[int] = mapped_column(ForeignKey("signage_rooms.id", ondelete="CASCADE"), primary_key=True)
+    label: Mapped[str] = mapped_column(String(120), default="")
+
+
+class SignageDestinationOverride(Base):
+    __tablename__ = "signage_destination_overrides"
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), primary_key=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("signage_rooms.id", ondelete="CASCADE"), primary_key=True)
+    label: Mapped[str] = mapped_column(String(120), default="")
+    arrow: Mapped[str] = mapped_column(String(12), default="")
+    rank: Mapped[int] = mapped_column(Integer, default=0)
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SignageSpecial(Base):
+    """Display-specific publication with its own copy and approval provenance."""
+    __tablename__ = "signage_specials"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), index=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("signage_rooms.id", ondelete="CASCADE"))
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("calendar_events.id", ondelete="CASCADE"))
+    preset: Mapped[str] = mapped_column(String(16))
+    title: Mapped[str] = mapped_column(String(120))
+    message: Mapped[str] = mapped_column(String(250), default="")
+    priority: Mapped[int] = mapped_column(Integer)
+    mode: Mapped[str] = mapped_column(String(10))
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime)
+    published: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SignageCampaign(Base):
+    """Approved special signage event with a building-wide or targeted scope.
+
+    No raw calendar titles or user profile fields are copied to public output.
+    """
+    __tablename__ = "signage_campaigns"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    building_id: Mapped[int] = mapped_column(ForeignKey("signage_buildings.id", ondelete="CASCADE"), index=True)
+    floor_id: Mapped[int | None] = mapped_column(ForeignKey("signage_floors.id", ondelete="SET NULL"), nullable=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("signage_rooms.id", ondelete="CASCADE"), index=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("calendar_events.id", ondelete="SET NULL"), nullable=True)
+    scope: Mapped[str] = mapped_column(String(16), default="building")
+    preset: Mapped[str] = mapped_column(String(16), default="event")
+    title: Mapped[str] = mapped_column(String(120))
+    message: Mapped[str] = mapped_column(String(250), default="")
+    priority: Mapped[int] = mapped_column(Integer, default=30)
+    mode: Mapped[str] = mapped_column(String(10), default="overlay")
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    lead_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    tail_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    published: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class SignageCampaignScreen(Base):
+    """Explicit include/exclude override; normal campaigns discover screens live."""
+    __tablename__ = "signage_campaign_screens"
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("signage_campaigns.id", ondelete="CASCADE"), primary_key=True)
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), primary_key=True)
+    included: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class SignageGeneratedScreen(Base):
+    """Idempotency record for bulk-created private screens, not a publication grant."""
+    __tablename__ = "signage_generated_screens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    generator_key: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    screen_id: Mapped[int] = mapped_column(ForeignKey("signage_screens.id", ondelete="CASCADE"), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

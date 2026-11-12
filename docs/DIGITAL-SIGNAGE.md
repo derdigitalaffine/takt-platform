@@ -68,3 +68,58 @@ Stand: 11.11.2026. Verbindliche Interviewentscheidungen **1–7 = D**; weitere E
 ### Erweiterungskontrakt für zukünftige Module
 
 Jeder neue Fachbereich benötigt einen expliziten Eintrag in `main.MODULES`, eine Entscheidung in `modhosts.MODULE_PUBLIC` oder `PORTAL_ONLY`, passende Moduldefault-Settings, Benutzerrechte, Navigation und Modulkarte. `test_domains.py` muss diese Zuordnung CI-seitig erzwingen. Zugang über Proxy-Hosts darf niemals interne `/signage/*/edit`-Pfade freigeben. Eine zentrale Register-Lösung bleibt nach Issue #328 weiterzuentwickeln.
+
+## Passive Wegweiser und Sonderbetrieb
+
+### In Betrieb nehmen
+
+1. In **Standorte, Gebäude und Räume** die Ziele pflegen. Gebäudenamen, Geschossnamen, Ebenen, Zimmernummern, Raumbezeichnungen und die Zugänglichkeit lassen sich an vorhandenen Einträgen korrigieren. Verknüpfte Kalender, Ressourcen und Wegpunkte bleiben dabei erhalten.
+2. Für jedes Besucherziel **Raum freigeben** aktivieren. Ein öffentlicher Anzeigename ist optional. Bleibt er leer, folgt der Wegweiser der aktuellen Raumbezeichnung. Die Freigabe gilt für passive Übersichten und Sonderanzeigen. Ein Widerruf entfernt den Raum aus beiden Projektionen.
+3. Im Schnellstart **Gebäudeübersicht**, **Geschossübersicht**, **Flurübersicht** oder **Passive Richtungsanzeige** wählen und den Standort einstellen. Die Gebäudeübersicht gruppiert Ziele nach Geschoss. Die Geschossübersicht zeigt Ziele auf dem gewählten Geschoss. Die Flurübersicht zeigt Ziele, die vom Display über Wege im selben Geschoss innerhalb der eingestellten Gehstrecke erreichbar sind. Die Richtungsanzeige kann einen statischen Hinweis mit Pfeil allein oder zusammen mit automatisch gefundenen Zielen zeigen.
+4. Für automatische Pfeile den Startpunkt und die Blickrichtung der Besucher vor dem Display im Plan einstellen. Die erste Kante des kürzesten zulässigen Wegs bestimmt die Richtung. Ohne eindeutige erste Richtung erscheint die Ortsangabe allein. Für einzelne Ziele lassen sich Anzeigename, Pfeil, Sortierpriorität und Ausblendung im Normalbetrieb einstellen. Die Option für stufenfreie Wege berücksichtigt die Angaben an Raum, Wegpunkten und Kanten. Eine manuelle Pfeilkorrektur erhält keine automatische Aussage zur Stufenfreiheit.
+5. Vorschau am tatsächlichen Bildschirm kontrollieren. Bei vielen Zielen wechselt die Browseranzeige die Seiten ohne Übergangsanimation. Bei reduzierter Bewegung erscheinen alle Zielseiten untereinander. Sichtbarkeit erst nach der Kontrolle auf **Öffentlich** oder **Sicherer Link** setzen.
+
+### Sonderanzeigen einrichten
+
+- Im Editor des betroffenen Displays **Sonderbetrieb** öffnen. Die Vorlagen **Ratssitzung**, **Wahlraum**, **Briefwahlstelle** und **Veranstaltung** liefern einen öffentlichen Standardtitel und eine Vorgabe für die Priorität. Eigene Titel, Hinweise und Zielräume sind frei konfigurierbar. Über den Freigabehaken geht der Eintrag für dieses Display in Betrieb.
+- Zeitfenster gelten ab Beginn bis unmittelbar vor Ende. Manuelle Termine werden in Berliner Ortszeit eingegeben. Mehrdeutige oder übersprungene Uhrzeiten bei der Sommerzeitumstellung werden abgewiesen. Die Formularschnittstelle akzeptiert zur eindeutigen Angabe auch ISO-Zeitstempel mit UTC-Offset.
+- Alternativ einen berechtigten freien TAKT-Kalender und einen konkreten Termin auswählen. TAKT übernimmt ausschließlich dessen Zeitfenster. Verschiebungen, Serienausnahmen und Löschungen wirken bei der nächsten Abfrage. Eine Serienfreigabe gilt für alle Vorkommen. Beim Abruf werden das Signage-Recht und die Quellberechtigung des freigebenden Kontos erneut geprüft. Kalendertitel, Beschreibungen und Teilnehmende werden aus dieser Quelle nicht veröffentlicht.
+- Pro Display gewinnt der gültige Eintrag mit der höchsten Priorität, dann mit dem früheren Beginn, dann der zuerst angelegte Eintrag. Je nach Einstellung ergänzt oder ersetzt er die normale Anzeige. Nach dem Zeitfenster oder Widerruf übernimmt der nächste gültige Eintrag oder der Normalbetrieb.
+- Browser fragen bei aktivem Sonderbetrieb und auf passiven Displays alle 30 Sekunden neu ab. Ein Sonderhinweis hat zusätzlich eine kurze Gültigkeit im Browser. Bei abgelaufenem Ersatzbetrieb erscheint bis zur nächsten Antwort ein neutraler Aktualisierungshinweis. Externe Player müssen die Prioritätsentscheidung aus `special` und dessen `valid_until` beachten. Das Manifest liefert zusätzlich `destinations` und `manual_direction`.
+
+### Grenzen und weitere Ausbaustufen
+
+- Die Stammdaten bleiben an die vorhandenen TAKT-Orte, Organisationen, Ressourcen und Kalender angebunden. Ein umfassender zentraler Organisations- und Grundrisseditor, Verschieben und Zusammenführen von Gebäudeteilen, Fachbereichs- und Dienstleistungszuordnungen sowie Importe bleiben in #322 und #325. Die bestehende interaktive Wegweiser-Vorlage behält ihre eigenen Freigaberegeln.
+- Sonderanzeigen werden pro Display gepflegt. Displaygruppen, automatische Vorschläge aus separaten Gremien-/Buchungsmodulen, eine Freigabe einzelner Serienvorkommen und ein revisionssicheres Freigabeprotokoll bleiben Ausbaustufen. Die Designhistorie erfasst Gestaltung. Stammdaten, Zielausnahmen und Sonderfreigaben werden separat gepflegt.
+- Die Wegweisung setzt vor Ort geprüfte Plankoordinaten, Blickrichtung und korrekt gepflegte Zugänglichkeit voraus. Sie ist für Besucherinformation ausgelegt. Evakuierung, vorgeschriebene Beschilderung und ausfallsicherer Offline-Betrieb gehören zu #327. Für große Installationen, sehr kleine Displays und formale Barrierefreiheitsprüfungen gilt #328.
+
+## Zentrale Sonderbetriebsverwaltung und Gebäude-Assistent
+
+### Schnell zum einsatzfähigen Anzeigesatz
+
+1. **Digital Signage → Gebäudeanzeigen automatisch erzeugen** öffnen, Gebäude auswählen und Gebäude- sowie Geschossübersichten markieren. Optional vorhandene Eingangs-/Flurknoten als weitere Display-Entwürfe übernehmen.
+2. TAKT erstellt ausschließlich **private** Anzeigen mit Standort-/Geschossbindung und initialer Designversion. Wiederholtes Ausführen überspringt bereits aus diesem Assistenten erzeugte Anzeigen. Manuell gebaute Displays bleiben unberührt.
+3. Die physische Blickrichtung jedes Monitors prüfen und im Studio hinterlegen. **Der Generator errät keine Pfeile**, und automatisch angelegte Anzeigen werden nicht ohne aktive Freigabe öffentlich.
+4. In der Raumverwaltung nur solche Ziele veröffentlichen, die tatsächlich für Besucher sichtbar sein dürfen. Der Entzug einer Freigabe wirkt sofort auf die passiven Übersichten und Sonderaktionen.
+
+### Eine Ratssitzung oder Briefwahlstelle zentral ausschildern
+
+1. Unter **Digital Signage → Sonderbetrieb verwalten** Anlass, Gebäude und ausdrücklich freigegebenen Zielraum wählen; anzeigbaren Titel und optionalen Hinweis festlegen.
+2. Den Gültigkeitszeitraum selbst eingeben (TAKT interpretiert lokale Zeiten mit Sommerzeitprüfung) oder einen **berechtigten** Termin aus einem freien TAKT-Kalender auswählen. Der Kalendertermin ist ausschließlich eine Zeitquelle: ein vertraulicher Kalendertitel wird **nicht** übernommen.
+3. Anzeigebereich wählen: **ganzes Gebäude** (Standard, künftige passende Displays eingeschlossen), **ein Geschoss** (anhand tatsächlicher Displayposition) oder **gezielt ausgewählte Displays**. Bei Gebäude-/Geschossaktionen können einzelne Displays ausgenommen werden.
+4. Vorlauf/Nachlauf (je 0–240 Minuten), Darstellungsmodus (besonders hervorgehoben oder Vollbild), Priorität (0–100) und Veröffentlichung einstellen.
+5. Mit der **Zeitsimulation** die für jedes Display wirksame Aktion zu einem gewählten Zeitpunkt prüfen. Die Ansicht ist nur für Signage-Berechtigte abrufbar und ändert keine öffentlichen Screens.
+6. Bei Ablösung oder Ende des Ereignisses fällt die Anzeige automatisch auf die nächste wirksame Aktion beziehungsweise auf den normalen Gebäude-/Etagenwegweiser zurück.
+
+### Automatische Zuordnung und Sicherheit
+
+- Nur **aktive passive Displays im selben Gebäude** und mit übereinstimmendem Organisationsumfang werden zentral berücksichtigt. Ein Screen mit eigener Sonderanzeige gewinnt bei gleicher Priorität; ansonsten gilt die höchste Priorität.
+- Für eine gefundene öffentliche Aktion muss der Zielraum weiterhin **explizit freigegeben** sein. Ein einmal freigegebener Termin begründet **keinen dauerhaften Kalender-Lesezugriff**. Berechtigungen des verantwortlichen Kontos werden beim Abruf erneut geprüft. Ausgeschaltete Displays bleiben abgeschaltet.
+- Die zugehörige Browser- und Player-Projektion übernimmt nur den ausdrücklich verfassten öffentlichen Titel/Hinweis, Raumziel und Wegpfeil; keine internen Termintexte, Personen- oder E-Mail-Felder.
+- Überlappende **manuelle** Aktionen im selben Gebäude mit gleicher/höherer Priorität erscheinen als Warnung. Für komplexe wiederkehrende Kalendertermine ist eine vollständige grafische Kollisionsmatrix weiterhin eine Ausbaustufe.
+- Für ein noch nicht orientiertes Display wird kein Richtungspfeil geraten. Physische Wegweisung muss vor der öffentlichen Freigabe vor Ort gegen den Gebäudeplan geprüft werden.
+- Geschützte Freigabelinks benötigen **auch am vorgelagerten Reverse-Proxy** eine Maskierung ihrer initialen Token-URL im Zugriffslog. Ein bloßer Uvicorn-Filter genügt dafür nicht.
+
+### Fachliche Ausbaustufen und bewusste Grenzen
+
+Die nun integrierte Zentrale ermöglicht bereits Freigabe, Zeitsteuerung, Priorität, Gebäudegruppen und sichere Kalenderterminbindung. **Noch nicht vollständig umgesetzt** sind automatische Ereignisvorschläge aus gesonderten Gremien-, Terminbuchungs- oder Fachmodulen ohne explizite Kalenderauswahl, eine echte organisationsweite Vier-Augen-Freigabeworkflow-/Audit-Engine, visuelle SVG-Grundrisse, native Windows/Linux/Android/Raspberry-Pi-Player mit Offlinecache und die ausfallsichere Notfall-/Evakuierungsbeschilderung. Letztere darf erst nach fachlicher Sicherheitsabnahme betrieben werden.

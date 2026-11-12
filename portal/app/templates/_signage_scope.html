@@ -1,0 +1,27 @@
+<label>Gebäude
+  <select class="form-select" name="building_id" data-sg-building>
+    <option value="">Gebäude wählen</option>
+    {% for building in buildings if building.active %}<option value="{{ building.id }}" {% if passive_config and passive_config.building_id == building.id %}selected{% endif %}>{{ building.name }}</option>{% endfor %}
+  </select>
+</label>
+<label>Geschoss <span class="sg-muted">(für Geschoss und Flur)</span>
+  <select class="form-select" name="floor_id" data-sg-floor>
+    <option value="">Geschoss wählen</option>
+    {% for floor in floors %}<option value="{{ floor.id }}" data-building="{{ floor.building_id }}" {% if passive_config and passive_config.floor_id == floor.id %}selected{% endif %}>{{ floor.name }}</option>{% endfor %}
+  </select>
+</label>
+<label>Displaystandort <span class="sg-muted">(für Flur erforderlich)</span>
+  <select class="form-select" name="node_id" data-sg-origin>
+    <option value="">Ohne Startpunkt</option>
+    {% for node in route_nodes %}
+      {% set floor = floors|selectattr('id','equalto',node.floor_id)|first %}
+      <option value="{{ node.id }}" data-building="{{ floor.building_id }}" data-floor="{{ node.floor_id }}" {% if anchor and anchor.node_id == node.id %}selected{% endif %}>{{ node.label }} · {{ floor.name }}</option>
+    {% endfor %}
+  </select>
+</label>
+<label>Blickrichtung vor dem Display
+  <select class="form-select" name="facing">
+    <option value="">Ohne automatische Pfeile</option>
+    {% for value, label in facings.items() %}<option value="{{ value }}" {% if passive_config and passive_config.facing == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</label>

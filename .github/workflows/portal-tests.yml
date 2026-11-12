@@ -100,8 +100,8 @@ jobs:
           cache-dependency-path: portal/requirements.txt
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
-      - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+      - name: Install Chromium headless shell (runner already includes browser OS libraries)
+        run: python -m playwright install chromium --only-shell
       - name: Check file-picker feedback
         run: node tests/test_task_create_client.js
       - name: Verify visual knowledge-block Markdown round trips
@@ -112,6 +112,8 @@ jobs:
         run: python tests/browser/task_ui_smoke.py
       - name: Exercise agent confirmation across modules
         run: python tests/browser/agent_ui_smoke.py
+      - name: Exercise passive digital signage in Chromium
+        run: python tests/browser/signage_ui_smoke.py
       - name: Save browser screenshots and server log
         if: always()
         # Screenshot evidence is best-effort; API outage must not fail passing browser tests.
@@ -139,8 +141,8 @@ jobs:
           cache-dependency-path: portal/requirements.txt
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
-      - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+      - name: Install Chromium headless shell (runner already includes browser OS libraries)
+        run: python -m playwright install chromium --only-shell
       - name: Check responsive cloud rendering
         run: node tests/test_live_chart_client.js
       - name: Exercise survey UI in Chromium
@@ -174,8 +176,8 @@ jobs:
           cache-dependency-path: portal/requirements.txt
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
-      - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+      - name: Install Chromium headless shell (runner already includes browser OS libraries)
+        run: python -m playwright install chromium --only-shell
       - name: Check seminar planner client contracts
         run: node tests/test_seminar_planner_client.js
       - name: Check module discovery and responsive navigation
@@ -227,8 +229,8 @@ jobs:
           cache-dependency-path: portal/requirements.txt
       - name: Install browser test dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
-      - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+      - name: Install Chromium headless shell (runner already includes browser OS libraries)
+        run: python -m playwright install chromium --only-shell
       - name: Exercise shared Kanban boards on desktop and touch mobile
         run: python tests/browser/board_ui_smoke.py
       - name: Save Kanban screenshots and server log
@@ -256,8 +258,8 @@ jobs:
           cache-dependency-path: portal/requirements.txt
       - name: Install dependencies
         run: python -m pip install -r requirements.txt playwright==1.62.0
-      - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+      - name: Install Chromium headless shell (runner already includes browser OS libraries)
+        run: python -m playwright install chromium --only-shell
       - name: Check person timeline, keyboard, mobile and 150-person annual view
         run: python tests/browser/person_timeline_smoke.py
       - name: Check integrated leave and calendar forms

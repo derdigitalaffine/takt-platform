@@ -1,0 +1,54 @@
+/* Central Signage campaign console: consistent with TAKT workspace and Mantine-inspired surfaces. */
+.sg-campaigns {--sg-line:var(--bs-border-color,#dfe5ed)}
+.sg-campaign-steps {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0 24px}
+.sg-campaign-steps div {display:flex;gap:12px;align-items:center;background:var(--bs-tertiary-bg,#f3f5f9);border:1px solid var(--sg-line);border-radius:14px;padding:15px;font-size:.84rem;font-weight:650}
+.sg-campaign-steps strong {display:inline-grid;place-items:center;flex:none;width:30px;height:30px;background:var(--bs-primary,#286dbe);color:white;border-radius:50%;font-size:.85rem}
+.sg-campaign-layout {display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:22px;align-items:start}
+.sg-campaign-layout .sg-panel {margin:0 0 22px}
+.sg-campaign-form label {min-width:0}
+.sg-campaign-field-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.sg-campaign-field-grid label {min-width:0}
+.sg-campaign-calendar {border:1px solid var(--sg-line);border-radius:12px;padding:13px;margin-bottom:17px}
+.sg-campaign-calendar summary {font-size:.88rem;font-weight:650;cursor:pointer}
+.sg-campaign-calendar-form {display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin-top:14px}
+.sg-campaign-calendar-form label {flex:1;min-width:220px}
+.sg-campaign-fieldset {display:grid;gap:9px;border:1px solid var(--sg-line);border-radius:14px;padding:13px}
+.sg-campaign-fieldset legend {float:none;font-size:.95rem;font-weight:750;width:auto;margin:0 0 8px;padding:0 4px}
+.sg-campaign-fieldset label {display:grid;grid-template-columns:22px auto;column-gap:9px;align-items:start;padding:8px 10px;border-radius:9px;cursor:pointer}
+.sg-campaign-fieldset label:hover {background:var(--bs-tertiary-bg)}
+.sg-campaign-fieldset input {margin-top:5px;accent-color:var(--bs-primary)}
+.sg-campaign-fieldset small {display:block;grid-column:2;font-size:.77rem;color:var(--bs-secondary-color);margin-top:3px}
+.sg-campaign-screen-list {border:1px solid var(--sg-line);border-radius:14px;padding:14px;max-height:310px;overflow-y:auto}
+.sg-campaign-screen-list>strong {display:block;margin-bottom:4px}
+.sg-campaign-screen-list>p {font-size:.8rem;line-height:1.6}
+.sg-campaign-screen {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 5px;border-top:1px solid var(--sg-line)}
+.sg-campaign-screen div {display:grid;gap:3px;min-width:0}
+.sg-campaign-screen small {font-size:.73rem;color:var(--bs-secondary-color)}
+.sg-campaign-screen label {display:inline-flex;gap:6px;align-items:center;font-size:.8rem;white-space:nowrap;cursor:pointer}
+.sg-campaign-publish {display:flex;gap:11px;border-radius:12px;padding:14px!important;background:var(--bs-tertiary-bg);border:1px solid var(--sg-line)}
+.sg-campaign-publish span {display:grid;gap:4px}
+.sg-campaign-publish small {font-size:.77rem;color:var(--bs-secondary-color);line-height:1.5}
+.sg-campaign-list {display:grid;gap:13px}
+.sg-campaign-item {border:1px solid var(--sg-line);border-radius:15px;padding:17px;background:var(--bs-body-bg)}
+.sg-campaign-item-top {display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:7px;font-size:.77rem}
+.sg-campaign-type {color:var(--bs-secondary-color);font-weight:650}
+.sg-campaign-status {background:var(--bs-tertiary-bg);border:1px solid var(--sg-line);border-radius:40px;padding:4px 8px}
+.sg-campaign-status.is-live {background:#e6f7ef;color:#15744d;border-color:#abdfc5}
+.sg-campaign-item h3 {font-size:1.04rem;letter-spacing:-.02em;font-weight:750;margin:13px 0 5px}
+.sg-campaign-item p {font-size:.82rem;color:var(--bs-secondary-color);line-height:1.5}
+.sg-campaign-chips {display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+.sg-campaign-chips span {font-size:.73rem;background:var(--bs-tertiary-bg);border-radius:8px;padding:5px 8px}
+.sg-campaign-chips i {opacity:.7;margin-right:4px}
+.sg-campaign-conflict {color:#9a5420!important;border:1px solid #efcd8b;border-radius:9px;background:#fff6de;padding:8px 11px}
+.sg-campaign-actions {display:flex;gap:7px;flex-wrap:wrap}
+.sg-campaign-actions form {margin:0}
+.sg-campaign-tip {margin-top:18px;display:flex;gap:10px;align-items:start;border-radius:12px;padding:14px;background:var(--bs-tertiary-bg);font-size:.78rem;line-height:1.6}
+.sg-campaign-tip i {margin-top:3px;font-size:1.1rem;color:var(--bs-primary)}
+.sg-simulation-list {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.sg-simulation-item {background:var(--bs-tertiary-bg);border:1px solid var(--sg-line);border-radius:14px;padding:17px}
+.sg-simulation-item h3 {font-size:1.03rem;margin:0 0 8px}
+.sg-simulation-item strong {display:block;font-size:1.13rem;line-height:1.25}
+.sg-simulation-item p {margin:8px 0 0;color:var(--bs-secondary-color);font-size:.82rem}
+.sg-simulation-item.is-special {border-color:#84b5d7;background:var(--bs-primary-bg-subtle,var(--bs-tertiary-bg))}
+@media(max-width:950px){.sg-campaign-layout{grid-template-columns:1fr}}
+@media(max-width:580px){.sg-campaign-steps{grid-template-columns:1fr}.sg-campaign-field-grid{grid-template-columns:1fr}.sg-campaign-screen{flex-wrap:wrap}.sg-campaign-screen div{flex-basis:100%}}

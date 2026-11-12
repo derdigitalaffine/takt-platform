@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Sonderbetrieb · Digital Signage{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/signage.css"><link rel="stylesheet" href="/static/signage-campaigns.css">{% endblock %}
+{% block content %}
+<main class="sg-workspace sg-campaigns">
+  <div class="sg-page-intro">
+    <div><a href="/signage" class="sg-back"><i class="fa-solid fa-arrow-left"></i> Zur Displayübersicht</a>
+      <span class="sg-eyebrow d-block mt-2">TAKT · ZENTRALER SONDERBETRIEB</span>
+      <h1>Eine Veranstaltung, alle passenden Wegweiser</h1>
+      <p>Ratssitzung, Briefwahlstelle oder Veranstaltung einmal planen. TAKT ordnet Gebäudeanzeigen selbst zu, berechnet die Richtung und zeigt nach Ablauf wieder den Normalbetrieb.</p>
+    </div>
+    <div class="sg-intro-icon" aria-hidden="true"><i class="fa-solid fa-calendar-check"></i></div>
+  </div>
+  <div class="sg-campaign-steps" aria-label="So funktioniert die Einrichtung">
+    <div><strong>1</strong><span>Gebäude und Zielraum wählen</span></div>
+    <div><strong>2</strong><span>Zeitraum und passende Displays bestimmen</span></div>
+    <div><strong>3</strong><span>Prüfen und freigeben</span></div>
+  </div>
+  <div class="sg-campaign-layout">
+    <section class="sg-panel sg-campaign-form" id="campaign-form">
+      <div class="sg-panel-head"><div><span class="sg-eyebrow">SCHNELL EINRICHTEN</span>
+        <h2>{{ 'Sonderanzeige bearbeiten' if editing else 'Neue Sonderanzeige' }}</h2>
+        <p>Vier Startvorlagen machen die Einrichtung einfach. Alle Einstellungen bleiben anschließend veränderbar.</p>
+      </div></div>
+      {% if not rooms %}<div class="alert alert-warning">Zuerst mindestens einen Raum unter <a href="/signage#buildings">Standorte und Räume</a> für öffentliche Richtungsanzeigen freigeben.</div>{% endif %}
+      {% if calendars %}
+      <details class="sg-campaign-calendar" {% if selected_calendar %}open{% endif %}>
+        <summary>Optional: aus einem bestehenden TAKT-Termin übernehmen</summary>
+        <form method="get" action="/signage/campaigns" class="sg-campaign-calendar-form">
+          {% if editing %}<input type="hidden" name="edit" value="{{ editing.id }}">{% endif %}
+          <label>Kalender auswählen <select class="form-select" name="calendar">
+            <option value="">Zeitraum selbst festlegen</option>
+            {% for cal in calendars %}<option value="{{ cal.id }}" {% if cal.id == selected_calendar %}selected{% endif %}>{{ cal.title }}</option>{% endfor %}
+          </select></label>
+          <button class="btn btn-outline-secondary" type="submit">Termine laden</button>
+        </form>
+      </details>
+      {% endif %}
+      <form id="sg-central-form" method="post" action="/signage/campaigns/save" class="sg-form-stack" data-sg-central-form>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        {% if editing %}<input type="hidden" name="campaign_id" value="{{ editing.id }}">{% endif %}
+        <div class="sg-campaign-field-grid">
+          <label>1. Anlass <select class="form-select" name="preset" data-sg-campaign-preset>
+            {% for key, data in presets.items() %}<option value="{{ key }}" data-priority="{{ data[1] }}"
+              {% if (editing and editing.preset == key) or (not editing and key == 'council') %}selected{% endif %}>{{ data[0] }}</option>{% endfor %}
+          </select></label>
+          <label>Zielgebäude <select class="form-select" name="building_id" required data-sg-campaign-building>
+            <option value="">Gebäude auswählen</option>
+            {% for building in buildings %}<option value="{{ building.id }}" {% if editing and editing.building_id == building.id %}selected{% endif %}>{{ building.name }}</option>{% endfor %}
+          </select></label>
+        </div>
+        <label>Zielraum <select name="room_id" class="form-select" required data-sg-campaign-room>
+          <option value="">Zuerst ein Gebäude auswählen</option>
+          {% for room, floor, building in rooms %}
+          <option value="{{ room.id }}" data-building="{{ building.id }}" {% if editing and editing.room_id == room.id %}selected{% endif %}>{{ room.number }} · {{ room.name or 'Raum' }} · {{ floor.name }}</option>
+          {% endfor %}
+        </select></label>
+        <label>Was sollen Besucher lesen? <input class="form-control" name="title" maxlength="120" value="{{ editing.title if editing else '' }}" placeholder="z. B. Sitzung des Gemeinderats" data-sg-campaign-title></label>
+        <label>Zusätzlicher Hinweis (optional) <input class="form-control" name="message" maxlength="250" value="{{ editing.message if editing else '' }}" placeholder="z. B. Sitzung öffentlich · Beginn 18:00 Uhr"></label>
+        {% if source_events %}
+        <label>Termin aus TAKT <select class="form-select" name="event_id" data-sg-campaign-event>
+          <option value="">Eigenen Zeitraum verwenden</option>
+          {% for event in source_events %}<option value="{{ event.id }}" {% if editing and editing.event_id == event.id %}selected{% endif %}>{{ event.title }} · {{ event.starts_at[:16] }}</option>{% endfor %}
+        </select></label>
+        {% elif editing and editing.event_id %}
+        <input type="hidden" name="event_id" value="{{ editing.event_id }}">
+        <p class="sg-muted">Mit TAKT-Kalendertermin verknüpft. Das Terminfenster und die Rechte werden beim Anzeigen geprüft.</p>
+        {% endif %}
+        <div class="sg-campaign-field-grid" data-sg-manual-window>
+          <label>2. Beginn <input class="form-control" type="datetime-local" name="starts_at" value="{{ start_local }}" required></label>
+          <label>Ende <input class="form-control" type="datetime-local" name="ends_at" value="{{ end_local }}" required></label>
+        </div>
+        <div class="sg-campaign-field-grid">
+          <label>Vorlauf (Minuten) <input class="form-control" type="number" name="lead_minutes" min="0" max="240" value="{{ editing.lead_minutes if editing else 30 }}"></label>
+          <label>Nachlauf (Minuten) <input class="form-control" type="number" name="tail_minutes" min="0" max="240" value="{{ editing.tail_minutes if editing else 0 }}"></label>
+        </div>
+        <fieldset class="sg-campaign-fieldset">
+          <legend>3. Wo soll TAKT den Hinweis anzeigen?</legend>
+          <label><input type="radio" name="scope" value="building" {% if not editing or editing.scope == 'building' %}checked{% endif %}> <strong>Ganzes Gebäude</strong><small>Auch neu hinzukommende passive Displays werden automatisch berücksichtigt.</small></label>
+          <label><input type="radio" name="scope" value="floor" {% if editing and editing.scope == 'floor' %}checked{% endif %}> <strong>Ein Geschoss</strong><small>Nur dort installierte Wegweiser verwenden.</small></label>
+          <label><input type="radio" name="scope" value="selected" {% if editing and editing.scope == 'selected' %}checked{% endif %}> <strong>Gezielte Auswahl</strong><small>Bestimmte Displays ausdrücklich zuordnen.</small></label>
+        </fieldset>
+        <label data-sg-campaign-floor>Geschoss <select name="floor_id" class="form-select">
+          <option value="">Geschoss auswählen</option>
+          {% for floor in floors %}<option value="{{ floor.id }}" data-building="{{ floor.building_id }}" {% if editing and editing.floor_id == floor.id %}selected{% endif %}>{{ floor.name }}</option>{% endfor %}
+        </select></label>
+        <div class="sg-campaign-screen-list" data-sg-campaign-displays>
+          <strong>Verfügbare Wegweiser</strong>
+          <p class="sg-muted">TAKT wählt bei Gebäude- und Geschossaktionen selbst. Einzelne Displays kannst du für diese Aktion ausnehmen.</p>
+          {% for screen, building in screens %}
+          <div class="sg-campaign-screen" data-building="{{ building.id }}">
+            <div><strong>{{ screen.name }}</strong><small>{{ screen.kind|replace('sign_', '') }} · {{ building.name }}</small></div>
+            <label data-sg-select><input type="checkbox" name="screen_ids" value="{{ screen.id }}" {% if screen.id in selected %}checked{% endif %}> Auswählen</label>
+            <label data-sg-exclude><input type="checkbox" name="excluded_ids" value="{{ screen.id }}" {% if screen.id in excluded %}checked{% endif %}> Ausnehmen</label>
+          </div>{% endfor %}
+          {% if not screens %}<p class="sg-muted">Noch keine passiven Displays vorhanden. Über den <a href="/signage">Schnellstart</a> anlegen.</p>{% endif %}
+        </div>
+        <div class="sg-campaign-field-grid">
+          <label>Darstellung <select class="form-select" name="mode">
+            <option value="overlay" {% if not editing or editing.mode == 'overlay' %}selected{% endif %}>Hervorgehobener Hinweis zusätzlich zur Normalanzeige</option>
+            <option value="replace" {% if editing and editing.mode == 'replace' %}selected{% endif %}>Vollbild statt Normalanzeige</option>
+          </select></label>
+          <label>Priorität <input class="form-control" type="number" name="priority" min="0" max="100" value="{{ editing.priority if editing else 50 }}" data-sg-campaign-priority></label>
+        </div>
+        <label class="sg-check sg-campaign-publish"><input type="checkbox" name="published" value="1" {% if editing and editing.published %}checked{% endif %}>
+          <span><strong>Für Besucher freigeben</strong><small>Nur ausdrücklich veröffentlichte Einträge werden angezeigt. Interne Kalendertitel werden niemals übernommen.</small></span>
+        </label>
+        <button class="btn btn-primary" type="submit" {% if not rooms or not buildings %}disabled{% endif %}>
+          <i class="fa-solid fa-floppy-disk me-1"></i>{{ 'Änderungen speichern' if editing else 'Sonderanzeige anlegen' }}
+        </button>
+        {% if editing %}<a class="sg-back" href="/signage/campaigns">Neue Anzeige statt Bearbeitung</a>{% endif %}
+      </form>
+    </section>
+
+    <div class="sg-campaign-side">
+      <section class="sg-panel">
+        <div class="sg-panel-head"><div><span class="sg-eyebrow">LIVE-ÜBERSICHT</span><h2>Sonderbetrieb</h2><p>Zentrale Aktionen, Prioritäten und betroffene Displays.</p></div></div>
+        {% if campaigns %}
+        <div class="sg-campaign-list">
+        {% for c in campaigns %}
+          <article class="sg-campaign-item">
+            <div class="sg-campaign-item-top">
+              <span class="sg-campaign-type"><i class="fa-solid fa-location-arrow"></i> {{ presets[c.preset][0] }}</span>
+              <span class="sg-campaign-status {{ 'is-live' if c.published else '' }}">{{ 'Freigegeben' if c.published else 'Entwurf' }}</span>
+            </div>
+            <h3>{{ c.title }}</h3>
+            {% if c.message %}<p>{{ c.message }}</p>{% endif %}
+            <div class="sg-campaign-chips">
+              <span><i class="fa-solid fa-display"></i> {{ affected[c.id]|length }} Displays</span>
+              <span><i class="fa-solid fa-bolt"></i> Priorität {{ c.priority }}</span>
+              <span><i class="fa-solid fa-globe"></i> {{ scopes[c.scope] }}</span>
+            </div>
+            {% if conflicts.get(c.id) %}<p class="sg-campaign-conflict"><i class="fa-solid fa-triangle-exclamation"></i> Überlappung mit: {{ conflicts[c.id]|join(', ') }}</p>{% endif %}
+            <div class="sg-campaign-actions">
+              <a class="btn btn-sm btn-outline-primary" href="/signage/campaigns?edit={{ c.id }}#campaign-form">Bearbeiten</a>
+              <form method="post" action="/signage/campaigns/{{ c.id }}/status">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                {% if c.published %}<button class="btn btn-sm btn-outline-secondary" name="action" value="withdraw">Zurücknehmen</button>
+                {% else %}<button class="btn btn-sm btn-outline-success" name="action" value="publish">Veröffentlichen</button>{% endif %}
+              </form>
+              {% if not c.published %}<form method="post" action="/signage/campaigns/{{ c.id }}/status">
+                <input type="hidden" name="csrf" value="{{ csrf }}">
+                <button class="btn btn-sm btn-outline-danger" name="action" value="delete" data-confirm="Diese Sonderanzeige endgültig löschen?">Löschen</button>
+              </form>{% endif %}
+            </div>
+          </article>
+        {% endfor %}
+        </div>
+        {% else %}<div class="sg-empty"><i class="fa-solid fa-calendar-plus"></i><h3>Noch keine Sonderanzeigen</h3><p>Starte mit einer Vorlage. Die normalen Wegweiser bleiben währenddessen verfügbar.</p></div>{% endif %}
+      </section>
+      <section class="sg-panel">
+        <span class="sg-eyebrow">VORSCHAU & KONTROLLE</span>
+        <h2>Was zeigen die Displays?</h2>
+        <p>Simuliere einen Zeitpunkt, bevor die ersten Besucher eintreffen. TAKT zeigt die wirksame Priorität je Wegweiser.</p>
+        <form method="get" action="/signage/campaigns/simulate" class="sg-form-stack">
+          <label>Gebäude<select class="form-select" name="building_id" required>{% for b in buildings %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}</select></label>
+          <label>Zeitpunkt <input class="form-control" type="datetime-local" name="at" value="{{ local_now }}" required></label>
+          <button class="btn btn-outline-primary" type="submit" {% if not buildings %}disabled{% endif %}><i class="fa-solid fa-eye me-1"></i>Anzeigen simulieren</button>
+        </form>
+        <div class="sg-campaign-tip"><i class="fa-solid fa-shield-halved"></i><span>Für Wahlen sind die Vorlagen bewusst neutral. Die Pfeile werden aus geprüften Wegen berechnet; ohne verlässlichen Weg wird keine Richtung erfunden.</span></div>
+      </section>
+    </div>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}<script src="/static/signage-campaigns.js" defer></script>{% endblock %}
