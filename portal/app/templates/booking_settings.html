@@ -66,7 +66,7 @@
       <p class="form-text ms-2 mb-3">
         {% if creator_org_name %}<i class="fa-solid fa-sitemap me-1" aria-hidden="true"></i>Zugeordneter Bereich: <strong>{{ creator_org_name }}</strong>.
         {% else %}<i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>Der erstellenden Person ist keine aktive Organisationseinheit zugeordnet. Ohne Zuordnung werden keine zusätzlichen Schließtage gesperrt.{% endif %}
-        {% if not calendar_module_enabled %}<span class="d-block mt-1">Das Modul „Kalender &amp; Urlaub“ ist deaktiviert. Die Schließtags- und Kalenderkonfliktprüfung wird bis zur Aktivierung übersprungen, die Einstellung bleibt gespeichert.</span>{% endif %}
+        {% if not calendar_module_enabled %}<span class="d-block mt-1">Das Modul „Kalender &amp; Urlaub“ ist deaktiviert. Neue Organisations-Schließtage werden nicht übernommen. Bereits hinterlegte Abwesenheiten und ausdrücklich ausgewählte Belegtzeiten bleiben zum Schutz vor Doppelbuchungen wirksam; die Buchungsfunktion selbst bleibt unabhängig.</span>{% endif %}
       </p>
       {{ sw('calendar_conflicts', 'Termine aus persönlichen TAKT-Kalendern bei der Buchbarkeit berücksichtigen', integration.get('calendar_conflicts', False), 'Nur die für die zuständige Person ausgewählten Kalenderquellen zählen als belegte Zeiten. Bestehende Buchungen werden nicht verändert.') }}
       <div class="ps-3 mb-3">
