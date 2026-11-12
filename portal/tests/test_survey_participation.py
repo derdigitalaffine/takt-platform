@@ -146,6 +146,7 @@ def test_online_application_remains_repeatable_even_with_prior_response(survey):
 
 def test_completed_surveys_remain_recognizable_after_they_close(survey):
     user = login("admin@example.org", "admin-passwort-123")
+    token = csrf_of(user.get(f"/f/{TOKEN}").text)
     assert _post(user, f"/f/{TOKEN}").status_code == 200
     with SessionLocal() as db:
         db.get(Form, survey).active = False
@@ -156,7 +157,7 @@ def test_completed_surveys_remain_recognizable_after_they_close(survey):
         assert "bereits ausgefüllt" in page.text
         assert "ausgefüllt" in page.text
         assert "noch einmal" not in page.text
-    post = user.post(f"/f/{TOKEN}", data={"csrf": csrf_of(user.get(f"/f/{TOKEN}").text)})
+    post = user.post(f"/f/{TOKEN}", data={"csrf": token})
     assert post.status_code == 200
     assert _count(survey) == 1
 
