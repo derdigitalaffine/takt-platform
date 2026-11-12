@@ -133,3 +133,15 @@ Die Stufe lässt sich in der Liste jederzeit ändern, das ✕ entfernt die Freig
 - Für administrative Einstellungen: [Admin-Handbuch](../../ADMIN-HANDBUCH.md)
 
 > **Hinweis:** Alle Funktionen hängen von den aktivierten Modulen, deiner Rolle und den einzelnen Freigaben ab. Für externe Gäste gelten nur die ausdrücklich angebotenen Zugangswege.
+
+## Für blöde erklärt:
+
+Du willst, dass andere einen freien Gesprächstermin bei dir buchen können?
+
+1. **Terminbuchung** öffnen und eine Buchungsseite anlegen.
+2. Dauer und verfügbare Zeitfenster festlegen.
+3. Buchungsregeln und Angaben prüfen.
+4. Buchungslink teilen.
+5. Eingehende Buchungen in der Terminliste ansehen und Änderungen rechtzeitig mitteilen.
+
+**Merksatz:** Nur Zeiten freigeben, in denen du wirklich Zeit hast.
