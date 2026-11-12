@@ -388,36 +388,28 @@ def form_report(db, form) -> bytes:
         ("Status", "Offen" if fm.is_open(form) else "Abgeschlossen"),
     ]
     def story(styles, font):
-        items = []
+        items = [Paragraph("Ergebnisse nach Frage", styles["section"])]
         for index, result in enumerate(summary, 1):
             question = result["q"]
             title = question.get("title") or fm.TYPES[question["type"]][0]
-            items.append(Paragraph(f"{index}. {_plain(title, 260)}", styles["section"]))
             items.append(Paragraph(
-                f"{result['count']} von {result['total']} Antworten · {fm.TYPES[question['type']][0]}",
-                styles["small"]))
+                f'{index}. {_plain(title, 260)}'
+                f' <font color="{MUTED}">· {result["count"]}/{result["total"]} Antworten</font>',
+                _style(font, size=8.1, leading=10.3, color=DARK, gap=1.1 * mm)))
             chart = result.get("chart")
             if chart:
-                chart_table = _chart_table(chart.get("labels", []), chart.get("values", []), font)
+                chart_table = _chart_table(chart.get("labels", []),
+                                           chart.get("values", []), font)
                 if chart_table is not None:
                     items.append(chart_table)
-            elif result.get("average") is not None:
-                items.append(Paragraph("Durchschnitt: " +
-                                       ("%.2f" % result["average"]).replace(".", ","),
-                                       styles["normal"]))
-            elif result.get("points") is not None:
-                items.append(Paragraph(
-                    "Geografische Einzelangaben sind nur in der berechtigten Webansicht verfügbar.",
-                    styles["small"]))
-            else:
-                items.append(Paragraph(
-                    "Freitext- und Einzelantworten sind aus Datenschutzgründen nicht in diesem Bericht enthalten.",
-                    styles["small"]))
-            if result.get("average") is not None and chart:
+            if result.get("average") is not None:
                 items.append(Paragraph("Durchschnitt: " +
                                        ("%.2f" % result["average"]).replace(".", ","),
                                        styles["small"]))
-            items.append(Spacer(1, 5 * mm))
+            if not chart and result.get("average") is None:
+                items.append(Paragraph("Vollständige Einzelwerte in der Tabelle unten.",
+                                       styles["small"]))
+            items.append(Spacer(1, 1.4 * mm))
         items.extend(_csv_detail(fm.to_csv(form, responses), font, form=True))
         return items or [Paragraph("Noch keine Antworten.", styles["normal"])]
     return _report(db, form.title, "Ergebnisse der Formularumfrage",
@@ -443,42 +435,64 @@ def poll_report(db, poll) -> bytes:
         ("Festgelegter Termin", final_label or "Noch nicht festgelegt"),
     ]
     def story(styles, font):
-        items = [Paragraph("Terminpräferenzen", styles["section"]),
-                 Paragraph("Grün = Ja · Gelb = Wenn nötig · Rot = Nein. "
-                           "Die Balken spiegeln die Webauswertung wider.", styles["small"]),
-                 Spacer(1, 3 * mm)]
-        rows = []
-        for option in sorted(
-                poll.options,
-                key=lambda o: (counts[o.id]["yes"], counts[o.id]["maybe"], -o.id),
-                reverse=True):
-            count = counts[option.id]
+        items = [
+            Paragraph("Terminübersicht", styles["section"]),
+            Paragraph('<font color="' + GREEN + '"><b>Ja</b></font>  ·  '
+                      '<font color="#896300"><b>Wenn nötig</b></font>  ·  '
+                      '<font color="' + RED + '"><b>Nein</b></font>  '
+                      '– dieselben Kategorien wie in der Webansicht.',
+                      _style(font, size=7, leading=9.2, gap=1.5 * mm)),
+        ]
+        index_by_id = {option.id: index for index, option in enumerate(poll.options, 1)}
+        rows = [[
+            _detail_cell("Nr.", font, size=6.8),
+            _detail_cell("Terminvorschlag", font, size=6.8),
+            _detail_cell("Stimmenverteilung", font, size=6.8),
+            _detail_cell("Ja / ? / Nein", font, size=6.8),
+        ]]
+        ranked = sorted(
+            poll.options,
+            key=lambda option: (counts[option.id]["yes"],
+                                counts[option.id]["maybe"], -option.id),
+            reverse=True,
+        )
+        final_rows = []
+        for option in ranked:
+            votes = counts[option.id]
             label = pl.option_parts(option)["label"]
             if option.note:
-                label += " · " + str(option.note)[:120]
+                label += " · " + str(option.note)
             if option.id == poll.final_option_id:
-                label += " (festgelegt)"
+                label += " · FESTGELEGT"
+                final_rows.append(len(rows))
             rows.append([
-                Paragraph(_plain(label, 230), _style(font, size=8.4, leading=12)),
-                _bar([(count["yes"], GREEN), (count["maybe"], YELLOW),
-                      (count["no"], RED)], width=72 * mm),
-                Paragraph(f'{count["yes"]} / {count["maybe"]} / {count["no"]}',
-                          _style(font, size=8.1)),
+                _detail_cell(index_by_id[option.id], font, size=7.4),
+                _detail_cell(label, font, size=7.1),
+                _bar([(votes["yes"], GREEN), (votes["maybe"], YELLOW),
+                      (votes["no"], RED)], width=51 * mm, height=4.4 * mm),
+                _detail_cell(f'{votes["yes"]} / {votes["maybe"]} / {votes["no"]}',
+                             font, size=7),
             ])
-        if rows:
-            table = Table(rows, colWidths=[75 * mm, 72 * mm, 18 * mm], hAlign="LEFT", splitByRow=1)
-            table.setStyle(TableStyle([
+        if len(rows) > 1:
+            table = Table(rows, colWidths=[10 * mm, 85 * mm, 53 * mm, 26 * mm],
+                          repeatRows=1, hAlign="LEFT", splitByRow=1)
+            rules = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8F1F7")),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LINEBELOW", (0, 0), (-1, -2), .4, colors.HexColor(GREY)),
-                ("TOPPADDING", (0, 0), (-1, -1), 7),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-            ]))
+                ("LINEBELOW", (0, 0), (-1, -2), .35, colors.HexColor(GREY)),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]
+            for row in final_rows:
+                rules.append(("BACKGROUND", (0, row), (-1, row),
+                              colors.HexColor("#E3F3EA")))
+            table.setStyle(TableStyle(rules))
             items.append(table)
         else:
-            items.append(Paragraph("Noch keine Terminvorschläge.", styles["normal"]))
-        items += [Spacer(1, 7 * mm), Paragraph(
-            "Vertraulicher Bericht mit personenbezogenen Detailangaben: "
-            "nur für entsprechend berechtigte Auswertende.", styles["small"])]
+            items.append(Paragraph("Noch keine Terminvorschläge.", styles["small"]))
+        items.append(Spacer(1, 3 * mm))
         items.extend(_csv_detail(pl.to_csv(poll), font, form=False))
         return items
     return _report(db, poll.title, "Ergebnisse der Terminumfrage",
