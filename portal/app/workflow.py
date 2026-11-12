@@ -531,7 +531,7 @@ def _resolve(db, resp: FormResponse, step: dict) -> tuple[int | None, int | None
             return done[-1].completed_by_id, None
     if resp.assignee_id or resp.group_id or resp.responsible_org_id:
         return resp.assignee_id, resp.group_id
-    return resp.form.app_assignee_id or (None if resp.form.app_org_id else resp.form.owner_id), resp.form.app_group_id
+    return resp.form.app_assignee_id or resp.form.owner_id, resp.form.app_group_id
 
 
 def _resolve_org(db, resp: FormResponse, step: dict) -> int | None:
@@ -541,7 +541,9 @@ def _resolve_org(db, resp: FormResponse, step: dict) -> int | None:
         return ao.validate(db, assign.get("org_id"))
     if mode in ("user", "group", "previous"):
         return None
-    return resp.responsible_org_id or resp.form.app_org_id
+    # Running cases keep their accepted responsibility snapshot. Editing a
+    # form default must never silently reassign historical process steps.
+    return resp.responsible_org_id
 
 
 def _addresses(db, user_id: int | None, group_id: int | None, org_id: int | None = None) -> list[str]:
