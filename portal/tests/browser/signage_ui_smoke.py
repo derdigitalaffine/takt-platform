@@ -104,7 +104,7 @@ def exercise():
         registration.locator('[name=name]').fill("Empfangsmonitor Probelauf")
         registration.get_by_role("button", name="Geräteschlüssel erstellen").click()
         secret_text = page.locator("#sg-secret").inner_text()
-        found = re.search(r"Gerät-ID: (\\d+)\\s+Bearer: ([\\w-]+)", secret_text)
+        found = re.search(r"Gerät-ID: (\d+)\s+Bearer: ([\w-]+)", secret_text)
         assert found, "One-time pairing secret must be visible"
         device_id, device_token = found.group(1), found.group(2)
         pulse = httpx.post(
