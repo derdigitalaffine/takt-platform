@@ -297,6 +297,13 @@ def _person_editor_entries(db, actor, person, focus=None):
             select(OrgMembership).where(OrgMembership.user_id == person.id)
         )
     }
+    group_nodes = {org_id: (gid, manual)
+                   for org_id, gid, manual in db.execute(
+                       select(Group.org_id, Group.id, GroupMember.manual)
+                       .join(GroupMember, GroupMember.group_id == Group.id)
+                       .where(GroupMember.user_id == person.id,
+                              Group.org_id.is_not(None))
+                   )}
     direct = {}
     for grant in db.scalars(
         select(OrgRoleGrant).where(OrgRoleGrant.user_id == person.id)
@@ -308,13 +315,16 @@ def _person_editor_entries(db, actor, person, focus=None):
             continue
         members = os.allows(db, actor, node.id, "members")
         roles = os.allows(db, actor, node.id, "roles")
-        if not (members or roles or node.id in assigned or node.id in direct):
+        if not (members or roles or node.id in assigned or node.id in direct or node.id in group_nodes):
             continue
         entries.append(dict(
             node=node, membership=assigned.get(node.id),
+            group_member=node.id in group_nodes,
+            group_managed=node.id in group_nodes and not group_nodes[node.id][1],
             grants=direct.get(node.id, {}),
             can_members=members, can_roles=roles,
-            focused=node.id == focus or (focus is None and node.id in assigned),
+            focused=node.id == focus or (focus is None and
+                     (node.id in assigned or node.id in group_nodes)),
         ))
     return entries
 
@@ -366,8 +376,9 @@ async def organization_person_save(
     primary_raw = form.get("primary_unit")
     primary_unit = os.number(primary_raw) if primary_raw else None
     if primary_unit and not any(
-        e["node"].id == primary_unit and e["can_members"]
-        and form.get(f"member_{primary_unit}") == "1" for e in entries
+        e["node"].id == primary_unit and e["node"].kind != og.KIND and
+        e["can_members"] and form.get(f"member_{primary_unit}") == "1"
+        for e in entries
     ):
         raise HTTPException(422, "Hauptzuordnung muss aktiv und bearbeitbar sein.")
     # Move the primary association first, then update other associations,
@@ -380,6 +391,12 @@ async def organization_person_save(
     for entry in member_entries:
         oid = entry["node"].id
         member = entry["membership"]
+        if entry["node"].kind == og.KIND:
+            if not entry["group_member"]:
+                os.set_membership(db, user, dict(
+                    org_id=oid, user_id=person_id, is_primary="0"
+                ))
+            continue
         want_primary = oid == primary_unit if primary_unit else bool(
             member and member.is_primary
         )
@@ -420,6 +437,20 @@ async def organization_person_save(
                     os.delete_role(db, user, dict(grant=grant.id))
     for entry in editable:
         if not entry["can_members"]:
+            continue
+        if entry["node"].kind == og.KIND:
+            if entry["group_member"] and not entry["group_managed"] and (
+                form.get(f'member_{entry["node"].id}') != "1"
+            ):
+                group = og.group_of(db, entry["node"])
+                if group and db.get(GroupMember, (group.id, person_id)):
+                    if os.protected_group(db, group.id) and not (
+                        user.is_admin or user.can("org_roles")
+                    ):
+                        raise HTTPException(403, "Geschützte Gruppe benötigt Organisationsrollen-Rechte.")
+                    db.delete(db.get(GroupMember, (group.id, person_id)))
+                    os.audit(db, user, entry["node"].id, "group_member_remove",
+                             group=group.id, user=person_id)
             continue
         old = entry["membership"]
         if old and form.get(f'member_{entry["node"].id}') != "1":
