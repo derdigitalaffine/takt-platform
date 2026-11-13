@@ -197,3 +197,14 @@
 .pr-proposal-body .btn{margin-top:.3rem}
 @media(max-width:880px){.pr-proposal-grid{grid-template-columns:1fr}}
 @media(max-width:500px){.pr-proposal-card{flex-direction:column}.pr-proposal-date{min-width:0}}
+
+/* Actionable, non-binding consistency checks for statutory calendar suggestions. */
+.pr-calendar-audit-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:.7rem;margin-bottom:1rem}
+.pr-calendar-audit-item{display:flex;gap:.75rem;padding:.85rem 1rem;border:1px solid var(--pr-stroke);border-radius:.8rem;background:var(--pr-subtle)}
+.pr-calendar-audit-item>i{color:var(--bs-primary);flex-shrink:0;margin-top:.2rem}
+.pr-calendar-audit-item strong{font-size:.89rem;display:block}
+.pr-calendar-audit-item p{font-size:.81rem;color:var(--bs-secondary-color);margin:.3rem 0 0;line-height:1.55}
+.pr-calendar-audit-warning{border-color:color-mix(in srgb,var(--bs-warning) 48%,var(--pr-stroke));background:color-mix(in srgb,var(--bs-warning-bg-subtle) 40%,var(--pr-card))}
+.pr-calendar-audit-warning>i{color:var(--bs-warning-text-emphasis,var(--bs-body-color))}
+.pr-proposal-planned{display:flex;gap:.35rem;align-items:center;font-size:.78rem;line-height:1.5;color:var(--bs-secondary-color);margin:.5rem 0}
+.pr-proposal-planned i{color:var(--bs-primary)}
