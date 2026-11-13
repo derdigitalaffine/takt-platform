@@ -91,3 +91,18 @@ def test_unsupported_llm_result_quotes_do_not_enter_combined_proposals():
     combined = coverage.aggregate("law_verify", [(section, result, False)], source, "advanced")
     assert combined["findings"] == []
     assert combined["coverage"]["proposals_omitted"] == 1
+
+
+
+def test_duplicate_citation_is_flagged_as_ambiguous():
+    source = "§ 1 Die Gebühr beträgt 10 €.\n" * 3
+    section = coverage.sections(source)[0]
+    quote = "Die Gebühr beträgt 10 €."
+    result = {"schema": 1, "findings": [{
+        "severity": "high", "quote": quote, "reason": "Original prüfen",
+    }], "warnings": []}
+    assembled = coverage.aggregate("law_verify", [(section, result, False)],
+                                   source, "advanced")
+    finding = assembled["findings"][0]
+    assert finding["quote_occurrences"] == 3
+    assert source[finding["source_start"]:finding["source_end"]] == quote
