@@ -199,3 +199,21 @@ def test_admin_has_no_implicit_health_access(aid_env):
     assert admin.get("/verbandbuch/fall/" + case_id).status_code == 404
     assert admin.get("/verbandbuch/beleg/" + case_id).status_code == 404
     assert "js-qr-open" in admin.get("/verbandbuch/standorte").text
+
+
+def test_deactivation_revokes_qr_and_existing_grants(aid_env):
+    site_id, email, _, _ = fixture_site()
+    creator = login(email, PASSWORD)
+    assert creator.get("/verbandbuch/neu?s=" + aid.qr_token(site_id)).status_code == 200
+    admin = login("admin@example.org", "admin-passwort-123")
+    token = csrf_of(admin.get("/verbandbuch/standorte").text)
+    response = admin.post("/verbandbuch/standorte/" + str(site_id) + "/status",
+                          data={"csrf": token, "active": "0"})
+    assert response.status_code == 303
+    with SessionLocal() as db:
+        with pytest.raises(HTTPException) as error:
+            aid.qr_site(db, aid.qr_token(site_id))
+        assert error.value.status_code == 404
+        user = db.scalar(select(User).where(User.email == email))
+        assert not aid.may(db, user, site_id, "capture")
+    assert creator.get("/verbandbuch/neu?s=" + aid.qr_token(site_id)).status_code == 404

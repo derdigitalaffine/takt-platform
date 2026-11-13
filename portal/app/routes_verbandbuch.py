@@ -251,6 +251,23 @@ async def verbandbuch_site_create(
     return redirect("/verbandbuch/standorte")
 
 
+@app.post("/verbandbuch/standorte/{site_id}/status", dependencies=[Depends(check_csrf)])
+async def verbandbuch_site_status(request: Request, site_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not user.is_admin:
+        raise HTTPException(403)
+    site = db.get(FirstAidSite, site_id)
+    if site is None:
+        raise HTTPException(404)
+    form = await request.form()
+    if str(form.get("active") or "") not in {"0", "1"}:
+        raise HTTPException(422)
+    site.active = str(form.get("active")) == "1"
+    aid.log_access(db, user.id, "site_activate" if site.active else "site_deactivate")
+    db.commit()
+    flash(request, "Standort aktiviert." if site.active else "Standort und QR-Zugang deaktiviert.")
+    return redirect("/verbandbuch/standorte")
+
+
 @app.post("/verbandbuch/standorte/{site_id}/berechtigungen", dependencies=[Depends(check_csrf)])
 async def verbandbuch_grant(
     request: Request, site_id: int,
