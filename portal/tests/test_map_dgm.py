@@ -55,6 +55,14 @@ def test_missing_dgm_cells_are_not_interpolated():
     assert model["triangles"] > 0
 
 
+def test_missing_complete_dgm_grid_column_is_not_bridged():
+    subset = xyz(nx=4, ny=4).decode().splitlines()
+    subset = [line for line in subset if not line.startswith("410005 ")]
+    model = dgm.convert_xyz("\n".join(subset).encode(), building())
+    assert model["skipped_cells"] >= 3
+    assert model["triangles"] == 6
+
+
 @pytest.mark.parametrize("input_data,pattern", [
     (b"", "12 MiB"),
     (b"\x00\x01\x02", "ASCII"),
