@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% import "_res_macros.html" as rm with context %}
+{% block title %}Interner Gerätepool{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/internal-assets.css">{% endblock %}
+{% block content %}
+{% call rm.head('internal', [('Interner Gerätepool', '')], 'Interner Gerätepool', 'Material, Technik, Mobiliar und Fahrzeuge für den Dienstbetrieb planen.') %}
+  <a href="/resources/planner" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-calendar-days me-1"></i>Raumplaner</a>
+{% endcall %}
+<div class="res-pool">
+  <div class="res-pool-intro d-flex align-items-start gap-3 mb-4">
+    <i class="fa-solid fa-warehouse fs-4" aria-hidden="true"></i>
+    <div><strong>Interne Materialplanung statt Vermietung</strong>
+      <div class="small mt-1">Bestände und Lagerorte finden, dienstlich reservieren und Ausgabe/Rückgabe nachvollziehen. Diese Daten sind nicht im öffentlichen Buchungskatalog sichtbar.</div>
+    </div>
+  </div>
+  <nav class="res-pool-tabs mb-4" aria-label="Abschnitte des Gerätepools">
+    <a href="#katalog"><i class="fa-solid fa-layer-group me-1"></i>Katalog</a>
+    <a href="#reservierungen"><i class="fa-solid fa-calendar-check me-1"></i>Reservierungen</a>
+    {% if manager %}<a href="#lagerorte"><i class="fa-solid fa-location-dot me-1"></i>Lager &amp; Inventar</a>
+    <a href="#wartungen"><i class="fa-solid fa-screwdriver-wrench me-1"></i>Wartungen</a>{% endif %}
+  </nav>
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3"><div class="card res-pool-stat h-100"><div class="card-body"><span class="text-secondary small">Materialpositionen</span><div class="fs-3 fw-semibold">{{ assets|length }}</div><span class="text-secondary small">im aktuellen Filter</span></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card res-pool-stat h-100"><div class="card-body"><span class="text-secondary small">Aktive Reservierungen</span><div class="fs-3 fw-semibold">{{ bookings|selectattr('status', 'equalto', 'reserved')|list|length }}</div><span class="text-secondary small">{{ 'alle sichtbaren Vorgänge' if manager else 'meine Reservierungen' }}</span></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card res-pool-stat h-100"><div class="card-body"><span class="text-secondary small">Noch ausgegeben</span><div class="fs-3 fw-semibold">{{ bookings|selectattr('status', 'equalto', 'issued')|list|length }}</div><span class="text-secondary small">bis zur Rückgabe gebunden</span></div></div></div>
+    <div class="col-sm-6 col-xl-3"><div class="card res-pool-stat h-100"><div class="card-body"><span class="text-secondary small">Lagerorte</span><div class="fs-3 fw-semibold">{{ locations|length }}</div><span class="text-secondary small">zentral gepflegt</span></div></div></div>
+  </div>
+  <section id="katalog" class="mb-5">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <div><h2 class="h4 mb-1">Materialkatalog</h2><p class="text-secondary small mb-0">Wähle einen Gegenstand und prüfe die Menge direkt für deinen Zeitraum.</p></div>
+    </div>
+    <form method="get" action="/resources/intern" class="card res-pool-filter mb-3" role="search">
+      <div class="card-body row g-2 align-items-end">
+        <div class="col-lg-7"><label class="form-label small" for="pool-search">Suche nach Gegenstand, Inventarnummer oder Lagerort</label>
+          <input class="form-control" id="pool-search" name="q" value="{{ q }}" placeholder="Beamer, Pavillon, Lager A …"></div>
+        <div class="col-lg-3"><label class="form-label small" for="pool-category">Kategorie</label>
+          <select class="form-select" id="pool-category" name="kategorie"><option value="">Alle Kategorien</option>{% for c in categories %}<option value="{{c}}" {% if category==c %}selected{% endif %}>{{c}}</option>{% endfor %}</select></div>
+        <div class="col-lg-2"><button class="btn btn-primary w-100" type="submit"><i class="fa-solid fa-magnifying-glass me-1"></i>Filtern</button></div>
+      </div>
+    </form>
+    <div class="row g-3">
+      {% for a in assets %}
+      <div class="col-lg-6 col-xxl-4">
+        <article class="card res-pool-item h-100">
+          <div class="card-body">
+            <div class="d-flex align-items-start gap-3 mb-3">
+              <span class="res-pool-icon" aria-hidden="true"><i class="fa-solid {{ 'fa-car-side' if a.category == 'Fahrzeuge' else 'fa-person-shelter' if a.category == 'Zelte & Pavillons' else 'fa-video' if a.category == 'Präsentation' else 'fa-chair' if a.category == 'Mobiliar' else 'fa-box' }}"></i></span>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center flex-wrap gap-2"><h3 class="h6 mb-0">{{a.name}}</h3>
+                  {% if not a.active %}<span class="badge text-bg-secondary">Deaktiviert</span>{% elif available_now[a.id] == 0 %}<span class="badge text-bg-warning">Aktuell belegt</span>{% else %}<span class="badge text-bg-success">Verfügbar</span>{% endif %}
+                </div>
+                <div class="text-secondary small mt-1">{{a.category}}</div>
+              </div>
+            </div>
+            <dl class="res-pool-facts">
+              <div><dt>Bestand</dt><dd>{{a.quantity}} Stück <span class="text-secondary small">({{available_now[a.id]}} aktuell frei)</span></dd></div>
+              <div><dt>Lagerort</dt><dd>{{a.storage_location.name if a.storage_location else (a.location or 'Nicht zugeordnet') }}</dd></div>
+              {% if a.inventory_code %}<div><dt>Inventar</dt><dd>{{a.inventory_code}}</dd></div>{% endif %}
+              {% if a.vehicle_plate %}<div><dt>Kennzeichen</dt><dd>{{a.vehicle_plate}}</dd></div>{% endif %}
+            </dl>
+            {% if a.notes %}<p class="small text-secondary mb-3">{{a.notes|truncate(180)}}</p>{% endif %}
+            <details class="res-pool-details" {% if not a.active %}aria-disabled="true"{% endif %}>
+              <summary class="btn btn-primary w-100 {{ 'disabled' if not a.active }}" {% if not a.active %}aria-disabled="true"{% endif %}>
+                <i class="fa-solid fa-calendar-plus me-1"></i>Zeitraum reservieren
+              </summary>
+              {% if a.active %}
+              <form method="post" action="/resources/intern/{{a.id}}/reservieren" class="row g-2 pt-3" data-pool-availability>
+                <input type="hidden" name="csrf" value="{{csrf}}">
+                <input type="hidden" name="asset_id" value="{{a.id}}">
+                <div class="col-6"><label class="form-label small" for="pool-from-{{a.id}}">Von</label><input type="datetime-local" class="form-control form-control-sm" name="start" id="pool-from-{{a.id}}" min="{{today}}" required></div>
+                <div class="col-6"><label class="form-label small" for="pool-to-{{a.id}}">Bis</label><input type="datetime-local" class="form-control form-control-sm" name="end" id="pool-to-{{a.id}}" min="{{today}}" required></div>
+                <div class="col-4"><label class="form-label small" for="pool-qty-{{a.id}}">Menge</label><input type="number" class="form-control form-control-sm" name="quantity" id="pool-qty-{{a.id}}" min="1" max="{{a.quantity}}" value="1" required></div>
+                <div class="col-8"><label class="form-label small" for="pool-purpose-{{a.id}}">Verwendung</label><input type="text" class="form-control form-control-sm" name="purpose" id="pool-purpose-{{a.id}}" maxlength="255" placeholder="Sitzung, Veranstaltung …" required></div>
+                <div class="col-12"><p class="res-pool-availability small mb-1" aria-live="polite">Zeitraum auswählen, um die Verfügbarkeit zu prüfen.</p></div>
+                <div class="col-12"><button class="btn btn-primary w-100" type="submit">Verbindlich reservieren</button></div>
+              </form>
+              {% endif %}
+            </details>
+            {% if manager %}
+            <details class="res-pool-details mt-2">
+              <summary class="btn btn-outline-secondary btn-sm w-100"><i class="fa-solid fa-pen me-1"></i>Inventar pflegen</summary>
+              <form method="post" action="/resources/intern/{{a.id}}/bearbeiten" class="row g-2 pt-3">
+                <input type="hidden" name="csrf" value="{{csrf}}">
+                <div class="col-12"><label class="form-label small" for="pool-name-{{a.id}}">Bezeichnung</label><input name="name" id="pool-name-{{a.id}}" class="form-control form-control-sm" value="{{a.name}}" maxlength="200" required></div>
+                <div class="col-6"><label class="form-label small" for="pool-class-{{a.id}}">Kategorie</label><select name="category" id="pool-class-{{a.id}}" class="form-select form-select-sm">{% for c in categories %}<option value="{{c}}" {% if a.category==c %}selected{% endif %}>{{c}}</option>{% endfor %}</select></div>
+                <div class="col-6"><label class="form-label small" for="pool-stock-{{a.id}}">Bestand</label><input type="number" name="quantity" id="pool-stock-{{a.id}}" min="1" max="100000" class="form-control form-control-sm" value="{{a.quantity}}" required></div>
+                <div class="col-12"><label class="form-label small" for="pool-loc-{{a.id}}">Lagerort</label><select name="location_id" id="pool-loc-{{a.id}}" class="form-select form-select-sm"><option value="0">Freitext verwenden</option>{% for loc in locations %}<option value="{{loc.id}}" {% if a.location_id==loc.id %}selected{% endif %}>{{loc.name}} · {{loc.building}}</option>{% endfor %}</select></div>
+                <div class="col-12"><label class="form-label small" for="pool-legacy-{{a.id}}">Freier Lagerhinweis</label><input class="form-control form-control-sm" name="location" id="pool-legacy-{{a.id}}" value="{{a.location}}" maxlength="200"></div>
+                <div class="col-6"><label class="form-label small" for="pool-inv-{{a.id}}">Inventarnummer</label><input name="inventory_code" id="pool-inv-{{a.id}}" class="form-control form-control-sm" value="{{a.inventory_code}}" maxlength="80"></div>
+                <div class="col-6"><label class="form-label small" for="pool-plate-{{a.id}}">Kennzeichen</label><input name="vehicle_plate" id="pool-plate-{{a.id}}" class="form-control form-control-sm" value="{{a.vehicle_plate}}" maxlength="30"></div>
+                <div class="col-12"><label class="form-label small" for="pool-notes-{{a.id}}">Hinweise</label><textarea class="form-control form-control-sm" name="notes" id="pool-notes-{{a.id}}" rows="2" maxlength="3000">{{a.notes}}</textarea></div>
+                <div class="col-12 form-check ms-2"><input type="checkbox" class="form-check-input" name="active" id="pool-active-{{a.id}}" value="1" {% if a.active %}checked{% endif %}><label class="form-check-label small" for="pool-active-{{a.id}}">Für Buchungen aktiv</label></div>
+                <div class="col-12"><button class="btn btn-outline-primary btn-sm w-100" type="submit">Änderungen speichern</button></div>
+              </form>
+            </details>
+            <details class="res-pool-details mt-2">
+              <summary class="btn btn-outline-secondary btn-sm w-100"><i class="fa-solid fa-screwdriver-wrench me-1"></i>Wartungszeit sperren</summary>
+              <form method="post" action="/resources/intern/{{a.id}}/wartung" class="row g-2 pt-3">
+                <input type="hidden" name="csrf" value="{{csrf}}">
+                <div class="col-6"><label class="form-label small" for="pool-mfrom-{{a.id}}">Von</label><input type="datetime-local" class="form-control form-control-sm" name="start" id="pool-mfrom-{{a.id}}" min="{{today}}" required></div>
+                <div class="col-6"><label class="form-label small" for="pool-mto-{{a.id}}">Bis</label><input type="datetime-local" class="form-control form-control-sm" name="end" id="pool-mto-{{a.id}}" min="{{today}}" required></div>
+                <div class="col-4"><label class="form-label small" for="pool-mqty-{{a.id}}">Menge</label><input type="number" class="form-control form-control-sm" name="quantity" id="pool-mqty-{{a.id}}" min="1" max="{{a.quantity}}" value="1" required></div>
+                <div class="col-8"><label class="form-label small" for="pool-reason-{{a.id}}">Grund</label><input name="reason" id="pool-reason-{{a.id}}" class="form-control form-control-sm" placeholder="Prüfung, Reparatur …" maxlength="255" required></div>
+                <div class="col-12"><button class="btn btn-outline-warning w-100" type="submit">Bestand sperren</button></div>
+              </form>
+            </details>
+            {% endif %}
+          </div>
+        </article>
+      </div>
+      {% else %}
+      <div class="col-12"><div class="card"><div class="card-body text-center py-5"><i class="fa-solid fa-box-open fs-2 text-secondary"></i>
+        <h3 class="h6 mt-3">Keine Gegenstände gefunden</h3><p class="text-secondary small">Versuche einen anderen Filter oder lege als Gerätepool-Verantwortlicher Material an.</p>
+        {% if q or category %}<a href="/resources/intern" class="btn btn-outline-primary btn-sm">Alle Gegenstände anzeigen</a>{% endif %}
+      </div></div></div>
+      {% endfor %}
+    </div>
+  </section>
+  <section id="reservierungen" class="mb-5">
+    <h2 class="h4 mb-3">{{'Ausgabe- und Reservierungsübersicht' if manager else 'Meine Reservierungen'}}</h2>
+    <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Gegenstand</th>{% if manager %}<th>Buchende Person</th>{% endif %}<th>Zeitraum</th><th>Menge</th><th>Status</th><th>Aktionen</th></tr></thead>
+      <tbody>{% for b in bookings %}<tr>
+        <td><strong>{{b.asset.name}}</strong><div class="small text-secondary">{{b.purpose}}</div></td>
+        {% if manager %}<td>{{b.user.name}}</td>{% endif %}
+        <td class="small">{{b.starts_at|local}} <span class="text-secondary">bis</span> {{b.ends_at|local}}</td>
+        <td>{{b.quantity}}</td>
+        <td><span class="badge {{'text-bg-primary' if b.status=='issued' else 'text-bg-warning'}}">{{status_labels[b.status]}}</span></td>
+        <td class="res-pool-actions">
+          {% if manager and b.status == 'reserved' %}
+          <form method="post" action="/resources/intern/buchungen/{{b.id}}/issue"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-hand-holding me-1"></i>Ausgeben</button></form>
+          {% elif manager and b.status == 'issued' %}
+          <form method="post" action="/resources/intern/buchungen/{{b.id}}/return"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Rückgabehinweis" placeholder="Zustand / Rückgabehinweis"><button class="btn btn-sm btn-success" type="submit">Rücknahme</button></form>
+          {% endif %}
+          {% if b.status == 'reserved' and (manager or b.user_id == user.id) %}
+          <form method="post" action="/resources/intern/buchungen/{{b.id}}/cancel"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-outline-secondary" type="submit">Stornieren</button></form>
+          {% endif %}
+        </td>
+      </tr>{% else %}<tr><td colspan="{{6 if manager else 5}}" class="text-center text-secondary py-4">Keine offenen Vorgänge vorhanden.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+    {% if not manager %}<p class="small text-secondary mt-2">Ausgabe und Rückgabe bestätigt die zuständige Gerätepool-Verwaltung.</p>{% endif %}
+  </section>
+  {% if manager %}
+  <div class="row g-4 mb-5">
+    <section id="lagerorte" class="col-xl-5">
+      <h2 class="h4 mb-3">Lagerorte</h2>
+      <div class="card"><div class="card-body">
+        <form action="/resources/intern/lagerorte" method="post" class="row g-2">
+          <input type="hidden" name="csrf" value="{{csrf}}">
+          <div class="col-12"><label class="form-label small" for="pool-lname">Lagerort</label><input id="pool-lname" name="name" class="form-control" placeholder="Lagerraum 01" maxlength="160" required></div>
+          <div class="col-sm-6"><label class="form-label small" for="pool-building">Gebäude</label><input id="pool-building" name="building" class="form-control" placeholder="Rathaus" maxlength="160"></div>
+          <div class="col-sm-6"><label class="form-label small" for="pool-detail">Fach / Regal</label><input id="pool-detail" name="detail" class="form-control" placeholder="Regal B, Fach 4" maxlength="160"></div>
+          <div class="col-12"><button class="btn btn-outline-primary" type="submit"><i class="fa-solid fa-plus me-1"></i>Lagerort hinzufügen</button></div>
+        </form>
+        <hr>{% for loc in locations %}<div class="res-pool-location"><i class="fa-solid fa-location-dot text-secondary"></i><div><strong>{{loc.name}}</strong><div class="small text-secondary">{{loc.building}} {{loc.detail}}</div></div></div>{% else %}<p class="text-secondary small">Noch keine Lagerorte erfasst.</p>{% endfor %}
+      </div></div>
+    </section>
+    <section class="col-xl-7">
+      <h2 class="h4 mb-3">Gegenstand hinzufügen</h2>
+      <div class="card"><div class="card-body">
+        <form action="/resources/intern/gegenstaende" method="post" class="row g-3">
+          <input type="hidden" name="csrf" value="{{csrf}}">
+          <div class="col-sm-8"><label for="pool-new-name" class="form-label small">Bezeichnung</label><input id="pool-new-name" name="name" class="form-control" maxlength="200" placeholder="Leinwand mobil, Pavillon 3×3 m …" required></div>
+          <div class="col-sm-4"><label for="pool-new-stock" class="form-label small">Bestand</label><input type="number" min="1" max="100000" value="1" id="pool-new-stock" name="quantity" class="form-control" required></div>
+          <div class="col-sm-6"><label for="pool-new-type" class="form-label small">Kategorie</label><select id="pool-new-type" name="category" class="form-select">{% for c in categories %}<option>{{c}}</option>{% endfor %}</select></div>
+          <div class="col-sm-6"><label for="pool-new-location" class="form-label small">Lagerort</label><select id="pool-new-location" name="location_id" class="form-select"><option value="0">Noch nicht zugeordnet</option>{% for loc in locations %}<option value="{{loc.id}}">{{loc.name}} · {{loc.building}}</option>{% endfor %}</select></div>
+          <div class="col-sm-6"><label for="pool-new-number" class="form-label small">Inventarnummer</label><input id="pool-new-number" name="inventory_code" class="form-control" maxlength="80"></div>
+          <div class="col-sm-6"><label for="pool-new-plate" class="form-label small">Kennzeichen (Fahrzeuge)</label><input id="pool-new-plate" name="vehicle_plate" class="form-control" maxlength="30"></div>
+          <div class="col-12"><label for="pool-new-notes" class="form-label small">Hinweise</label><textarea id="pool-new-notes" name="notes" class="form-control" rows="2" maxlength="3000" placeholder="Zubehör, Abholhinweise, interne Hinweise"></textarea></div>
+          <div class="col-12"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus me-1"></i>Inventar erfassen</button></div>
+        </form>
+      </div></div>
+    </section>
+  </div>
+  <section id="wartungen" class="mb-5"><h2 class="h4 mb-3">Wartung &amp; Sperrzeiten</h2>
+    <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Gegenstand</th><th>Zeitraum</th><th>Menge</th><th>Grund</th><th>Aktion</th></tr></thead>
+      <tbody>{% for m in maintenance %}<tr><td>{{assets|selectattr('id', 'equalto', m.asset_id)|map(attribute='name')|first|default('Inventar #' ~ m.asset_id)}}</td><td>{{m.starts_at|local}} – {{m.ends_at|local}}</td><td>{{m.quantity}}</td><td>{{m.reason}}</td>
+      <td><form method="post" action="/resources/intern/wartungen/{{m.id}}/loeschen"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-outline-secondary" type="submit">Sperre aufheben</button></form></td></tr>
+      {% else %}<tr><td colspan="5" class="text-center text-secondary py-4">Keine aktiven Sperrzeiten.</td></tr>{% endfor %}</tbody></table></div></div>
+  </section>
+  <section id="verlauf" class="mb-4"><h2 class="h4 mb-3">Änderungsjournal</h2><div class="card"><div class="table-responsive">
+    <table class="table table-sm align-middle mb-0"><thead><tr><th>Zeitpunkt</th><th>Inventar</th><th>Aktion</th><th>Notiz</th></tr></thead>
+    <tbody>{% for e in events %}<tr><td>{{e.at|local}}</td><td>#{{e.asset_id}}</td><td>{{e.action}}</td><td>{{e.detail}}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-secondary py-3">Noch keine Aktionen protokolliert.</td></tr>{% endfor %}</tbody></table>
+  </div></div></section>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}{{ super() }}<script defer src="/static/internal-assets.js"></script>{% endblock %}
