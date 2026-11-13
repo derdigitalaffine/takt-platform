@@ -1,49 +1,103 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Ortsrecht-Assistent{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/law-ai-workspace.css">{% endblock %}
 {% block content %}
 {% call m.page_head('Ortsrecht-Assistent', 'Dokumente sicher vorbereiten und rechtlich unverändert zur manuellen Prüfung bereitstellen.') %}
 <a href="/laws" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Rechtstexte</a>
 <a href="/laws/new" class="btn btn-outline-secondary">Manuell anlegen</a>
 {% endcall %}
 
-<div class="alert alert-info" role="note">
-  <i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>
-  <strong>Nur redaktionelle Vorbereitung:</strong>
-  Das Original wird unverändert mit SHA-256-Nachweis archiviert. KI- oder OCR-Text ist kein amtlicher Text.
-  Kein Import führt automatisch zu einer Veröffentlichung oder zum Inkrafttreten.
-  Das <strong>optionale OCR-Profil</strong> nutzt MarkItDown 0.1.9 für PDF/DOCX und Tesseract für Scanseiten/Bilder. OCR läuft ausschließlich im offline isolierten Worker, niemals im Portalprozess. Die mehrstufige KI-Auswertung ist ein nachfolgender, gesondert freizugebender Schritt.
-</div>
-<div class="row g-3">
-  <div class="col-12 col-xl-4">
-    <div class="card mb-3">
-      <div class="card-header"><i class="fa-solid fa-file-arrow-up me-2" aria-hidden="true"></i>Original hochladen</div>
-      <div class="card-body">
-        <form method="post" action="/laws-assistant/import" enctype="multipart/form-data">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <label class="form-label" for="law-ai-file">Rechtstext-Datei</label>
-          <input class="form-control" type="file" name="file" id="law-ai-file" required
-                 accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.tif,.tiff,.webp">
-          <p class="form-text">Höchstens 25 MB. Markdown und UTF-8-Text stehen sofort als Vorschlag bereit. PDF, Word und Bilder bleiben bis zur ausdrücklich beauftragten Offline-Texterkennung als Originale vorgemerkt.</p>
-          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Sicher vorbereiten</button>
-        </form>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">Meine Arbeitsentwürfe</div>
-      <div class="list-group list-group-flush">
-        {% for item in drafts %}
-          <a href="/laws-assistant/{{ item.id }}" class="list-group-item list-group-item-action {% if selected and selected.id == item.id %}active{% endif %}">
-            <span class="d-block fw-semibold text-break">{{ item.original_filename }}</span>
-            <span class="small">{{ {'staged': 'Zur Prüfung', 'needs_ocr': 'OCR möglich', 'ocr_queued': 'OCR beauftragt', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') }}</span>
-          </a>
-        {% else %}
-          <p class="text-secondary small p-3 mb-0">Noch keine Importentwürfe vorhanden.</p>
-        {% endfor %}
-      </div>
+<div class="law-workspace">
+  <div class="law-trust mb-3" role="note">
+    <i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i>
+    <div class="flex-grow-1">
+      <strong>Geschützter Redaktionsbereich – keine automatische Veröffentlichung.</strong>
+      <div class="small text-secondary mt-1">Originale bleiben unverändert. OCR und KI liefern Vorschläge, die du selbst mit der Quelle abgleichen musst.</div>
+      <details class="small mt-2">
+        <summary>Verarbeitung und Sicherheit im Detail</summary>
+        <p class="mb-0 mt-2">Das Original wird mit SHA-256-Nachweis archiviert. Das optionale, netzwerkisolierte OCR-Profil verwendet MarkItDown 0.1.9 und Tesseract. Die KI erhält nur den extrahierten Text und startet erst nach gesonderter Übermittlungsbestätigung. Weder die OCR noch die KI stellen amtliche Richtigkeit oder Inkrafttreten fest.</p>
+      </details>
     </div>
   </div>
-  <div class="col-12 col-xl-8">
+  {% if selected %}
+  {% set law_has_text = (selected.proposed_md or '')|length > 0 %}
+  {% set law_analysis_done = analysis and analysis.status == 'done' and analysis_current %}
+  <nav aria-label="Bearbeitungsschritte">
+    <ol class="law-steps">
+      <li class="is-done"><span class="law-step-number"><i class="fa-solid fa-check" aria-hidden="true"></i></span><div><div class="law-step-title">Original</div><div class="law-step-note">Gesichert</div></div></li>
+      <li class="{{ 'is-done' if law_has_text else 'is-active' }}"><span class="law-step-number">{{ '✓' if law_has_text else '2' }}</span><div><div class="law-step-title">Text erfassen</div><div class="law-step-note">{{ 'Text liegt vor' if law_has_text else 'OCR oder manuell' }}</div></div></li>
+      <li class="{{ 'is-done' if law_analysis_done else 'is-active' if analysis and analysis.status in ('queued','running') else '' }}"><span class="law-step-number">{{ '✓' if law_analysis_done else '3' }}</span><div><div class="law-step-title">KI-Prüfung</div><div class="law-step-note">{{ 'Ergebnisse vorhanden' if law_analysis_done else 'Optional' }}</div></div></li>
+      <li class="{{ 'is-done' if selected.status == 'accepted' else 'is-active' if law_has_text else '' }}"><span class="law-step-number">{{ '✓' if selected.status == 'accepted' else '4' }}</span><div><div class="law-step-title">Übernehmen</div><div class="law-step-note">{{ 'Unveröffentlicht' if selected.status == 'accepted' else 'Nur manuell' }}</div></div></li>
+    </ol>
+  </nav>
+  {% endif %}
+  <div class="row g-3">
+  <div class="col-12 col-xl-3">
+    <section class="law-surface mb-3" aria-labelledby="law-upload-title">
+      <div class="law-card-head">
+        <h2 class="h6" id="law-upload-title"><i class="fa-solid fa-file-circle-plus me-2 text-primary" aria-hidden="true"></i>Neues Dokument</h2>
+      </div>
+      <div class="law-card-body">
+        <form method="post" action="/laws-assistant/import" enctype="multipart/form-data" data-law-upload-form>
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="law-drop" data-law-upload-zone>
+            <label class="form-label fw-semibold" for="law-ai-file">Originaldatei auswählen</label>
+            <input class="form-control" type="file" name="file" id="law-ai-file" required
+                   accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.tif,.tiff,.webp">
+            <p class="small text-secondary mt-2 mb-0" data-law-upload-feedback>PDF, Word, Bild oder Textdatei hier ablegen oder auswählen.</p>
+          </div>
+          <p class="form-text">Maximal 25 MB. Text/Markdown ist sofort bearbeitbar; PDF, DOCX und Bilder benötigen den OCR-Schritt.</p>
+          <button class="btn btn-primary w-100" type="submit" data-law-upload-submit><i class="fa-solid fa-lock me-2" aria-hidden="true"></i>Original sicher importieren</button>
+        </form>
+      </div>
+    </section>
+    <section class="law-surface" aria-labelledby="law-drafts-title">
+      <div class="law-card-head">
+        <h2 class="h6" id="law-drafts-title">Meine Arbeitsentwürfe</h2>
+        <span class="badge text-bg-secondary">{{ drafts|length }}</span>
+      </div>
+      {% if drafts %}
+      <div class="px-3 pt-3 pb-2">
+        <label class="visually-hidden" for="law-drafts-search">Entwürfe durchsuchen</label>
+        <div class="input-group input-group-sm mb-2">
+          <span class="input-group-text"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>
+          <input class="form-control" type="search" id="law-drafts-search" data-law-drafts-search placeholder="Datei suchen …" autocomplete="off">
+        </div>
+        <label class="visually-hidden" for="law-drafts-filter">Arbeitsstatus filtern</label>
+        <select class="form-select form-select-sm" id="law-drafts-filter" data-law-drafts-filter>
+          <option value="all">Alle Arbeitsstände</option>
+          <option value="review">Zur Bearbeitung</option>
+          <option value="processing">OCR / KI in Bearbeitung</option>
+          <option value="accepted">Bereits übernommen</option>
+        </select>
+      </div>
+      <div class="law-draft-list" data-law-draft-list>
+        {% for item in drafts %}
+          {% set draft_status = {'staged': 'Text bereit', 'needs_ocr': 'OCR erforderlich', 'ocr_queued': 'OCR läuft', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') %}
+          <a href="/laws-assistant/{{ item.id }}" class="law-draft {{ 'is-selected' if selected and selected.id == item.id else '' }}"
+             data-law-draft data-law-draft-name="{{ item.original_filename|lower }}" data-law-draft-status="{{ item.status }}"
+             {% if selected and selected.id == item.id %}aria-current="page"{% endif %}>
+            <span class="law-draft-icon"><i class="fa-solid {{ 'fa-file-pdf' if item.original_filename|lower|endswith('.pdf') else 'fa-file-word' if item.original_filename|lower|endswith('.docx') else 'fa-file-lines' }}" aria-hidden="true"></i></span>
+            <span class="law-draft-meta">
+              <span class="law-draft-name">{{ item.original_filename }}</span>
+              <span class="law-draft-date">{{ item.created_at|local }}</span>
+              <span class="d-block mt-1"><span class="badge text-bg-{{ 'success' if item.status == 'accepted' else 'warning' if item.status in ('ocr_failed', 'needs_ocr') else 'secondary' }}">{{ draft_status }}</span></span>
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+      <div class="p-3 border-top small text-secondary" data-law-drafts-count aria-live="polite">{{ drafts|length }} Entwürfe angezeigt</div>
+      <p class="p-3 small text-secondary mb-0" data-law-drafts-empty hidden>Keine passenden Arbeitsentwürfe gefunden.</p>
+      {% else %}
+      <div class="p-4 text-center text-secondary small">
+        <i class="fa-regular fa-folder-open fa-xl d-block mb-3" aria-hidden="true"></i>
+        Noch kein Import vorhanden. Lade oben ein Dokument hoch, um zu beginnen.
+      </div>
+      {% endif %}
+    </section>
+  </div>
+  <div class="col-12 col-xl-9">
     {% if selected %}
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between gap-2">
@@ -356,6 +410,7 @@
     </div></div>
     {% endif %}
   </div>
+</div>
 </div>
 {% block scripts %}
 {% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}
