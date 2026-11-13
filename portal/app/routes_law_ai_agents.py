@@ -55,9 +55,11 @@ def start_law_ai_agents(
         raise HTTPException(413, str(exc)) from exc
     if transmission_confirmed != "1":
         raise HTTPException(422, "Bitte die Übermittlung an die ausgewählten KI-Server bestätigen.")
-    selected = law_ai_agent_jobs.configured_routes(db)
-    if len(selected) != len(law_ai_agents.STAGES):
-        raise HTTPException(503, "Bitte zuerst alle drei Ortsrecht-KI-Profile in der Administration konfigurieren.")
+    required = ([stage] if stage != "all" else
+                [task for task, _ in law_ai_agents.STAGES])
+    selected = law_ai_agent_jobs.configured_routes(db, required)
+    if len(selected) != len(required):
+        raise HTTPException(503, "Bitte das benötigte Ortsrecht-KI-Profil in der Administration konfigurieren.")
     if db.scalar(select(LawAiAnalysis.id).where(
             LawAiAnalysis.draft_id == draft_id,
             LawAiAnalysis.status.in_(("queued", "running"))).limit(1)) is not None:
