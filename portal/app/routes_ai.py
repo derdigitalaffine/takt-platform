@@ -219,10 +219,11 @@ def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
 
 @app.get("/admin/ai/provider/{provider_id:int}/models")
 async def admin_ai_model_catalog(
-    provider_id: int, user: User = Depends(admin_user),
+    request: Request, provider_id: int, user: User = Depends(admin_user),
     db: Session = Depends(get_db),
 ):
     """Browser-facing catalog: credentials never leave this server."""
+    rate_limit(request, "ai-model-catalog", limit=24, window=60, key=str(user.id))
     provider = _provider(db, provider_id, active=True)
     # GET only; a bounded model listing does not modify provider configuration.
     try:
