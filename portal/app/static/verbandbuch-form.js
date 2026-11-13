@@ -28,7 +28,7 @@
     if (focus) {
       const heading = steps[index].querySelector("h2");
       if (heading) { heading.tabIndex = -1; heading.focus({preventScroll:true}); }
-      steps[index].scrollIntoView({block:"start",behavior:"instant"});
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) steps[index].scrollIntoView({block:"start",behavior:"smooth"});
     }
   }
   function validateStep(i) {
@@ -51,11 +51,13 @@
       if (!validateStep(i)) { event.preventDefault(); return; }
     }
     submit.disabled = true;
+    submit.setAttribute("aria-busy", "true");
     submit.textContent = "Wird geschützt gespeichert …";
   });
   // Server-side validation errors must remain visible after a failed submission.
   const serverErrors = document.querySelector(".alert-danger[role=alert]");
   if (serverErrors) {
+    serverErrors.focus();
     form.dataset.vbEnhanced = "true";
     steps.forEach(step => { step.hidden = false; });
     next.hidden = true; prev.hidden = true; submit.hidden = false;
