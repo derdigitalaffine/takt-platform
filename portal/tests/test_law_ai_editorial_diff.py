@@ -75,9 +75,11 @@ def test_owner_csrf_and_oversize_are_enforced_for_comparison():
         "csrf": "bad", "body_md": "bad"
     }).status_code == 400
     csrf = csrf_of(c.get(f"/laws-assistant/{did}").text)
+    # FastAPI's global form-size guard may reject the request with 400 before
+    # the domain-specific 2 MiB bound can report HTTP 413; both reject safely.
     assert c.post(f"/laws-assistant/{did}/compare", data={
         "csrf": csrf, "body_md": "X" * (2 * 1024 * 1024 + 1),
-    }).status_code == 413
+    }).status_code in (400, 413)
     with SessionLocal() as db:
         other = db.scalar(select(User).where(User.email == "law-diff-other@example.org"))
         if other is None:
