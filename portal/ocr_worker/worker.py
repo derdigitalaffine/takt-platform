@@ -67,17 +67,22 @@ def _check_input(job: dict, job_key: str, originals: Path) -> tuple[Path, str]:
 
 
 def _markdown(path: Path) -> str:
-    """MarkItDown with no plugins, no LLM client and no remote conversion."""
+    """Bounded MarkItDown CLI: plugins disabled by default, no LLM/network."""
     try:
-        from markitdown import MarkItDown
-        engine = MarkItDown(enable_plugins=False)
-        result = engine.convert_local(str(path))
-        text = result.text_content or ""
-    except Exception as exc:
-        raise OcrFailure("MarkItDown konnte das Dokument nicht umwandeln.") from exc
-    if len(text.encode("utf-8")) > MAX_TEXT:
+        completed = subprocess.run(
+            ["/usr/local/bin/markitdown", str(path)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=90, check=False,
+            env={"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": "/tmp",
+                 "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        raise OcrFailure("MarkItDown ist nicht verfügbar oder hat das Zeitlimit überschritten.") from exc
+    if completed.returncode:
+        raise OcrFailure("MarkItDown konnte das Dokument nicht umwandeln.")
+    if len(completed.stdout) > MAX_TEXT:
         raise OcrFailure("Die MarkItDown-Ausgabe ist zu umfangreich.")
-    return text.strip()
+    return completed.stdout.decode("utf-8", "replace").strip()
 
 
 def _tsv_words(tsv: str) -> tuple[str, float | None, list[dict]]:
@@ -265,7 +270,9 @@ def process(job_path: Path) -> None:
         output = extract(original, suffix, job.get("language", "deu"))
         result.update({"status": "done", **output})
         result.pop("message", None)
-    except (OcrFailure, ValueError, OSError, KeyError, TypeError) as exc:
+    except Exception as exc:
+        # Converter failures and malformed content must not crash/requeue
+        # this worker indefinitely. Never expose raw document text/errors.
         # Do not log source text, raw converter output or other personal data.
         if isinstance(exc, OcrFailure):
             result["message"] = str(exc)[:180]
