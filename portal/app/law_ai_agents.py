@@ -205,7 +205,7 @@ def _verified_quote(quote: object, source: str) -> str | None:
     return quote
 
 
-def validate(stage: str, answer: str, source: str, *, with_hints: bool = False) -> dict:
+def validate(stage: str, answer: str, source: str, *, with_hints: bool = False, allow_header: bool = True) -> dict:
     """Reject invented quotes/fields. Never return raw model output to templates."""
     result = _json_object(answer, stage)
     warnings = _warnings(result.get("warnings"))
@@ -298,7 +298,7 @@ def validate(stage: str, answer: str, source: str, *, with_hints: bool = False) 
             out.append({"field": field, "value": value, "evidence": evidence})
         if with_hints:
             already = {entry["field"] for entry in out}
-            for hint in law_ai_metadata_hints.hints(source):
+            for hint in law_ai_metadata_hints.hints(source, allow_header=allow_header):
                 field, value, evidence = hint["field"], hint["value"], hint["evidence"]
                 if field in already or field not in FIELDS or len(value) > FIELDS[field]:
                     continue
