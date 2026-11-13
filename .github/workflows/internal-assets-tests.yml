@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   internal-assets:
-    name: Gerätepool: Import, Datenbank und Buchungs-Integration
+    name: "Gerätepool: Import, Datenbank und Buchungs-Integration"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -42,5 +42,5 @@ jobs:
         run: |
           python -m compileall -q app/internal_asset_models.py app/routes_internal_assets.py app/main.py
           python -m compileall -q tests/test_internal_assets.py
-      - name: Gerätepool: Integrations- und Sicherheitstests
+      - name: "Gerätepool: Integrations- und Sicherheitstests"
         run: python -m pytest -q tests/test_internal_assets.py
