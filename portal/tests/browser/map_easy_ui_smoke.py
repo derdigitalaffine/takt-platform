@@ -72,6 +72,7 @@ background:var(--bs-body-bg);display:flex;flex-direction:column}
             <div class="map-discovery-shortcuts">
               <button data-discovery-topic="" type="button">Alle</button>
               <button data-discovery-topic="3D-Gebäude" type="button">3D-Gebäude</button>
+              <button data-discovery-topic="Gelände" type="button">Gelände</button>
             </div>
             <div><select id="map-discovery-region"><option value="">Alle Gebiete</option>
               <option value="Rheinland-Pfalz">Rheinland-Pfalz</option></select>
@@ -119,6 +120,14 @@ background:var(--bs-body-bg);display:flex;flex-direction:column}
   });
   document.querySelector("#map-discovery-topic").addEventListener("change",e=>{
     window.__selectedTopic=e.target.value;
+  });
+  // Existing map-browser.js binds topic chips already on the source markup.
+  document.querySelectorAll("[data-discovery-topic]").forEach(button=>{
+    button.addEventListener("click",()=>{
+      const select=document.querySelector("#map-discovery-topic");
+      select.value=button.dataset.discoveryTopic;
+      select.dispatchEvent(new Event("change",{bubbles:true}));
+    });
   });
 </script>
 </body></html>"""
