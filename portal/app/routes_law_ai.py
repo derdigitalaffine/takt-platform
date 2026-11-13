@@ -459,6 +459,8 @@ def law_ai_accept(
         raise HTTPException(422, "Bitte zuerst die geprüfte Übernahme ausdrücklich bestätigen.")
     if doc_type not in lx.DOC_TYPES:
         raise HTTPException(422, "Unbekannter Rechtstexttyp.")
+    if outline not in lx.OUTLINE_MODES:
+        raise HTTPException(422, "Unbekannte Untergliederung für Rechtstexte.")
     if not title.strip() or len(title.strip()) > 400:
         raise HTTPException(422, "Bitte einen Titel mit maximal 400 Zeichen eingeben.")
     if not body_md.strip() or len(body_md.encode("utf-8")) > TEXT_LIMIT:
