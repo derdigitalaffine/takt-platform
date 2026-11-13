@@ -511,3 +511,111 @@ def test_stream_status_and_events_require_job_owner_and_ai_right(agent_routes):
     client_other = login("law-stream-other@example.org", "law-stream-other-pass")
     assert client_other.get(f"/laws-assistant/{did}/agents/status").status_code == 404
     assert client_other.get(f"/laws-assistant/{did}/agents/{jid}/events").status_code == 404
+
+
+
+def test_agent_json_accepts_markdown_fence_and_plain_explanation_but_not_partial():
+    fence = chr(96) * 3
+    wrapped = ("Hier die belegten Ergebnisse:\n" + fence + "json\n" +
+               json.dumps({"headings": [{"quote": "§ 1 Geltungsbereich", "level": 2}]}) +
+               "\n" + fence + "\nBitte prüfen.")
+    out = law_ai_agents.validate("law_structure", wrapped, SOURCE)
+    assert len(out["headings"]) == 1
+    assert out["headings"][0]["quote"] == "§ 1 Geltungsbereich"
+    with pytest.raises(law_ai_agents.InvalidAgentJSON):
+        law_ai_agents.validate("law_structure", '{"headings":[{"quote":', SOURCE)
+    with pytest.raises(law_ai_agents.InvalidAgentJSON):
+        law_ai_agents.validate("law_structure",
+                               '{"headings":[]}\n{"headings":[]}', SOURCE)
+
+
+def test_advanced_review_bisects_invalid_response_with_same_approved_model(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("§ 1 Nicht mehr als 10 € Gebühr.\n" * 190)
+    did = _upload_long_md(admin, source)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
+    }).status_code == 303
+    jid = law_ai_agent_jobs._claim_next()
+    assert jid
+    requests = []
+
+    async def fake_complete(provider, messages, *, max_tokens=1024, **kwargs):
+        excerpt = _model_context(messages)
+        requests.append((provider.model_id, excerpt))
+        if provider.model_id == "model-step-1":
+            if len(excerpt) > 4000:
+                return '{"headings":[{"quote":"truncated'
+            return '{"headings":[]}'
+        if provider.model_id == "model-step-2":
+            return '{"fields":[]}'
+        return '{"findings":[]}'
+    monkeypatch.setattr(ai_provider, "complete", fake_complete)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    with SessionLocal() as db:
+        row = db.get(LawAiAnalysis, jid)
+        assert row.status == "done", row.failure
+        assert row.progress_done == 4
+        assert row.progress_total == 4
+        assert row.retry_attempts == 1
+        assert json.loads(row.outline_json)["coverage"]["mode"] == "full_text_submitted"
+        assert db.get(LawAiDraft, did).proposed_md == source
+        assert db.get(LawAiDraft, did).accepted_law_id is None
+    assert len(requests) == 5
+    assert requests[0][0] == requests[1][0] == requests[2][0] == "model-step-1"
+    assert requests[1][1] + requests[2][1] == source
+    assert admin.get(f"/laws-assistant/{did}/agents/status").json()["retry_attempts"] == 1
+
+
+def test_invalid_json_after_one_lossless_split_fails_closed(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("§ 2 Gebühr 20 €; keine Ausnahme.\n" * 200)
+    did = _upload_long_md(admin, source)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
+    }).status_code == 303
+    jid = law_ai_agent_jobs._claim_next()
+    requests = []
+
+    async def broken(provider, messages, *, max_tokens=1024, **kwargs):
+        requests.append(provider.model_id)
+        return "Als KI empfehle ich: nicht JSON. {}"
+    monkeypatch.setattr(ai_provider, "complete", broken)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    assert requests == ["model-step-1"] * 2  # fail first half; no further requests
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "failed"
+        assert "Modell" in job.failure or "JSON" in job.failure
+        assert job.retry_attempts == 1
+        assert job.outline_json == "{}"
+        assert db.get(LawAiDraft, did).accepted_law_id is None
+
+
+def test_output_truncation_triggers_safe_section_cascade(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("§ 4 Satzung; Betrag 20 €.\n" * 230)
+    did = _upload_long_md(admin, source)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
+    }).status_code == 303
+    jid = law_ai_agent_jobs._claim_next()
+    calls = []
+
+    async def fake(provider, messages, *, max_tokens=1024, **kwargs):
+        excerpt = _model_context(messages)
+        calls.append((provider.model_id, excerpt))
+        if provider.model_id == "model-step-1" and len(excerpt) > 4000:
+            raise ai_provider.AIOutputTruncated("Tokenlimit erreicht")
+        return {"model-step-1": '{"headings":[]}', "model-step-2": '{"fields":[]}',
+                "model-step-3": '{"findings":[]}'}[provider.model_id]
+    monkeypatch.setattr(ai_provider, "complete", fake)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "done", job.failure
+        assert job.retry_attempts == 1
+    assert len(calls) == 5
