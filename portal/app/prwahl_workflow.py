@@ -114,6 +114,27 @@ def parse_entries(raw: str):
         raise HTTPException(422, "Bitte zwischen 1 und 150 Listen oder Personen erfassen.")
     return entries
 
+def _validated_entries(entries):
+    """Validate and normalize manually recorded aggregate vote entries."""
+    if not isinstance(entries, (list, tuple)) or not 1 <= len(entries) <= 150:
+        raise HTTPException(422, "Bitte zwischen 1 und 150 Listen oder Personen erfassen.")
+    normalized, seen = [], set()
+    for item in entries:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            raise HTTPException(422, "Ungültiger Stimmen-Eintrag.")
+        name, votes = item
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 180:
+            raise HTTPException(422, "Ungültige Listen-/Personenbezeichnung.")
+        name = name.strip()
+        if name.casefold() in seen:
+            raise HTTPException(422, "Bezeichnungen müssen eindeutig sein.")
+        seen.add(name.casefold())
+        if not isinstance(votes, int) or isinstance(votes, bool) or not 0 <= votes <= 10000000:
+            raise HTTPException(422, "Stimmen müssen ganze Zahlen zwischen 0 und 10000000 sein.")
+        normalized.append((name, votes))
+    return normalized
+
+
 def dhondt(entries, seats):
     """Exact integer comparison; ties are flagged, NEVER resolved automatically.
 
@@ -123,26 +144,7 @@ def dhondt(entries, seats):
     seats = _integer(seats, "Sitze", minimum=1, maximum=200)
     if not entries:
         raise HTTPException(422, "Für die Berechnung sind gültige Stimmen erforderlich.")
-    # Direct callers must not bypass the same count limits as the form parser.
-    # A list of malformed pairs must produce 422, never an unhandled 500.
-    if not isinstance(entries, (list, tuple)) or len(entries) > 150:
-        raise HTTPException(422, "Bitte zwischen 1 und 150 Listen erfassen.")
-    normalized = []
-    seen = set()
-    for item in entries:
-        if not isinstance(item, (list, tuple)) or len(item) != 2:
-            raise HTTPException(422, "Ungültiger Listeneintrag.")
-        name, votes = item
-        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 180:
-            raise HTTPException(422, "Ungültige Listenbezeichnung.")
-        name = name.strip()
-        if name.casefold() in seen:
-            raise HTTPException(422, "Listenbezeichnungen müssen eindeutig sein.")
-        seen.add(name.casefold())
-        if not isinstance(votes, int) or isinstance(votes, bool) or not 0 <= votes <= 10000000:
-            raise HTTPException(422, "Stimmen müssen ganze Zahlen zwischen 0 und 10000000 sein.")
-        normalized.append((name, votes))
-    entries = normalized
+    entries = _validated_entries(entries)
     if sum(votes for _, votes in entries) == 0:
         raise HTTPException(422, "Für die Berechnung sind gültige Stimmen erforderlich.")
     assigned = {name: 0 for name,_ in entries}
@@ -172,15 +174,23 @@ def check_count(mode, seats, ballots_cast, invalid_ballots, abstentions, entries
     if mode not in {"list", "person"}:
         raise HTTPException(422, "Unbekanntes Zählverfahren.")
     seats = _integer(seats, "Sitze", minimum=1, maximum=200)
+    ballots_cast = _integer(ballots_cast, "Stimmzettel")
+    invalid_ballots = _integer(invalid_ballots, "Ungültige Stimmzettel")
+    abstentions = _integer(abstentions, "Ohne gültige Stimmabgabe")
+    if invalid_ballots > ballots_cast:
+        raise HTTPException(422, "Ungültige Stimmzettel dürfen die abgegebenen Stimmzettel nicht übersteigen.")
     valid_ballots = ballots_cast - invalid_ballots
-    total = sum(v for _,v in entries)
+    if abstentions > valid_ballots:
+        raise HTTPException(422, "Stimmzettel ohne gültige Stimmabgabe übersteigen die gültigen Stimmzettel.")
+    entries = _validated_entries(entries)
+    total = sum(v for _, v in entries)
     if mode == "list":
         if total + abstentions != valid_ballots:
             raise HTTPException(422, "Listenstimmen plus Stimmzettel ohne gültige Stimmabgabe stimmen nicht mit den gültigen Stimmzetteln überein.")
         return dhondt(entries, seats)
     # A person ballot can carry multiple candidate votes: never equate candidate
     # votes with ballots or silently apply a list-election seat formula.
-    if total > valid_ballots * seats:
+    if total > (valid_ballots - abstentions) * seats:
         raise HTTPException(422, "Es wurden mehr Personenstimmen als maximal mögliche Stimmen erfasst.")
     return {"assigned": {}, "rows": [], "tie": None, "complete": False,
             "note": "Personenwahl: Kandidatenstimmen erfasst. Mandatsfeststellung und gesetzliche Sonderregeln müssen durch den Wahlvorstand geprüft werden."}
