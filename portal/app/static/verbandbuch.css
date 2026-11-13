@@ -167,3 +167,11 @@
 .vb-filter-empty {margin:1rem 1.35rem;padding:1.2rem;border:1px dashed var(--vb-line);border-radius:.75rem;background:var(--vb-tint);color:var(--vb-muted);text-align:center}
 .vb-root [hidden] {display:none!important}
 @media (max-width:640px) {.vb-list-tools {align-items:stretch}.vb-list-tools .btn {width:100%}}
+
+/* Administration: schnell erfassbare Einrichtungsschritte und gut erkennbare Standortkarten */
+.vb-admin-nav{display:flex;flex-wrap:wrap;gap:.55rem;margin:0 0 1rem}
+.vb-admin-nav a{display:inline-flex;align-items:center;min-height:2.6rem;padding:.55rem .85rem;border:1px solid var(--vb-line);border-radius:.75rem;background:var(--vb-paper);color:var(--vb-ink);font-size:.86rem;font-weight:650;text-decoration:none}
+.vb-admin-nav a:hover,.vb-admin-nav a:focus-visible{border-color:var(--vb-primary);color:var(--vb-primary);background:var(--vb-tint)}
+.vb-site{scroll-margin-top:5rem}
+.vb-site:focus-within{border-color:color-mix(in srgb,var(--vb-primary) 45%,var(--vb-line))}
+@media(max-width:640px){.vb-admin-nav{display:grid;grid-template-columns:1fr}.vb-admin-nav a{width:100%}}
