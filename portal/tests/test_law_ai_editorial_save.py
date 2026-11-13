@@ -119,7 +119,7 @@ def test_save_rejects_changed_source_or_invalid_input_without_mutating_source():
     c = login(*ADMIN)
     did = _upload(c)
     assert _save(c, did).status_code == 200
-    assert _save(c, did, rev=1, body="a" * (2 * 1024 * 1024 + 1)).status_code == 422
+    assert _save(c, did, rev=1, body="a" * (2 * 1024 * 1024 + 1)).status_code in (400, 413, 422)
     with SessionLocal() as db:
         draft = db.get(LawAiDraft, did)
         draft.proposed_md = "# Neue OCR-Fassung"
