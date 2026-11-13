@@ -38,12 +38,14 @@ def configured_routes(db) -> dict:
             "provider_id": provider.id, "name": provider.name,
             "destination": provider.base_url,
             "model_id": assignment.model_id or provider.model_id,
+            "stream_enabled": bool(provider.stream_enabled),
         }
     return result
 
 
 def _fail(db, job: LawAiAnalysis, message: str) -> None:
     job.status, job.step, job.failure = "failed", "failed", message[:240]
+    job.stream_active = False
     job.updated_at = utcnow()
     db.commit()
 
@@ -65,6 +67,62 @@ def _allowed(db, job: LawAiAnalysis, draft: LawAiDraft | None) -> str:
         raise ValueError("Der Import ist für die KI-Analyse zu groß.")
     return source
 
+
+
+
+def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) -> None:
+    """Short transaction, no text or tokens stored; cancellation stops updates."""
+    with SessionLocal() as db:
+        db.execute(update(LawAiAnalysis).where(
+            LawAiAnalysis.id == job_id,
+            LawAiAnalysis.status == "running",
+            LawAiAnalysis.step == step,
+        ).values(stream_characters=char_count, stream_chunks=chunk_count,
+                 updated_at=utcnow()))
+        db.commit()
+
+
+async def _answer(provider, messages: list[dict], job_id: int, step: str,
+                  *, remaining: float) -> str:
+    """Use server SSE only when explicitly enabled; never resend on stream error.
+
+    Raw chunks are kept inside the worker and validated as a complete JSON
+    object before being persisted. Browser gets progress counters, not legal
+    prose or partial/possibly malicious output.
+    """
+    if not provider.stream_enabled:
+        return await asyncio.wait_for(
+            ai_provider.complete(provider, messages, max_tokens=3072),
+            timeout=min(STAGE_TIMEOUT, remaining),
+        )
+
+    async def receive() -> str:
+        parts: list[str] = []
+        size = 0
+        count = 0
+        last = time.monotonic()
+        async for fragment in ai_provider.stream_completion(
+            provider, messages, max_tokens=3072,
+        ):
+            if not isinstance(fragment, str):
+                raise ValueError("Der Modellstream hat ein ungültiges Format.")
+            size += len(fragment)
+            count += 1
+            if size > 40_000:
+                raise ValueError("Das Streaming-Ergebnis ist zu groß.")
+            parts.append(fragment)
+            # At most about one DB heartbeat/second; protects SQLite against
+            # excessive writes from token-by-token local LLM streams.
+            now = time.monotonic()
+            if now - last >= 1.0:
+                _stream_progress(job_id, step, size, count)
+                last = now
+        _stream_progress(job_id, step, size, count)
+        if not parts:
+            raise ValueError("Der Modellserver lieferte keine Textantwort.")
+        return "".join(parts)
+
+    return await asyncio.wait_for(receive(), timeout=min(STAGE_TIMEOUT, remaining))
 
 async def process_one(job_id: int) -> None:
     """Run read-only agents against complete sections only in advanced mode.
@@ -89,6 +147,14 @@ async def process_one(job_id: int) -> None:
             else:
                 raise ValueError("Unbekannter KI-Analysemodus.")
             mode = job.mode
+            job.progress_total = len(sections) * len(law_ai_agents.STAGES)
+            job.progress_done = 0
+            job.stream_characters = 0
+            job.stream_chunks = 0
+            job.stream_active = False
+            job.validated_items = 0
+            job.updated_at = utcnow()
+            db.commit()
         except (ValueError, TypeError) as exc:
             _fail(db, job, str(exc))
             return
@@ -116,13 +182,15 @@ async def process_one(job_id: int) -> None:
                     if mode == "advanced" and sampled:
                         raise ValueError("Mindestens ein Textabschnitt würde unvollständig übertragen.")
                     job.step = f"{task}:{section.number}/{len(sections)}"
+                    job.stream_active = bool(provider.stream_enabled)
+                    job.stream_characters = 0
+                    job.stream_chunks = 0
                     job.updated_at = utcnow()
                     db.commit()
+                    step = job.step
 
-                answer = await asyncio.wait_for(
-                    ai_provider.complete(provider, messages, max_tokens=3072),
-                    timeout=min(STAGE_TIMEOUT, remaining),
-                )
+                answer = await _answer(provider, messages, job_id, step,
+                                       remaining=remaining)
                 result = law_ai_agents.validate(task, answer, section.text)
                 stage_parts.append((section, result, sampled))
                 with SessionLocal() as db:
@@ -132,7 +200,13 @@ async def process_one(job_id: int) -> None:
                     _allowed(db, job, db.get(LawAiDraft, job.draft_id))
                     if json.loads(job.provider_map_json) != configured_routes(db):
                         raise ValueError("Das KI-Profil wurde während der Analyse verändert.")
-                    job.updated_at = utcnow()  # heartbeat; no unvalidated outputs persisted
+                    job.progress_done += 1
+                    field_key = {"law_structure": "headings",
+                                 "law_metadata": "fields",
+                                 "law_verify": "findings"}[task]
+                    job.validated_items += len(result.get(field_key, []))
+                    job.stream_active = False
+                    job.updated_at = utcnow()  # no unvalidated output persisted
                     db.commit()
 
             except (ai_provider.AIProviderError, ValueError, TypeError, KeyError,
@@ -185,6 +259,7 @@ async def process_one(job_id: int) -> None:
             _fail(db, job, str(exc))
             return
         job.status, job.step, job.failure = "done", "done", ""
+        job.stream_active = False
         job.updated_at = utcnow()
         db.commit()
 
@@ -210,7 +285,7 @@ def mark_interrupted() -> None:
         db.execute(update(LawAiAnalysis).where(
             LawAiAnalysis.status == "running",
             LawAiAnalysis.updated_at < utcnow() - timedelta(minutes=15),
-        ).values(status="failed", step="failed",
+        ).values(status="failed", step="failed", stream_active=False,
                  failure="KI-Auftrag unterbrochen. Bitte nach Prüfung erneut starten.",
                  updated_at=utcnow()))
         db.commit()
