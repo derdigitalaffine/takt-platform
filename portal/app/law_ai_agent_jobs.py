@@ -169,6 +169,7 @@ async def process_one(job_id: int) -> None:
             routes = json.loads(job.provider_map_json)
             tasks = parse_tasks(job.selected_tasks_json)
             quality_profile = job.quality_profile
+            json_mode_enabled = bool(job.json_mode)
             if quality_profile not in ("standard", "local_24b"):
                 raise ValueError("Ungültiges Modellprofil.")
             if routes != configured_routes(db, tasks=tasks):
@@ -245,7 +246,7 @@ async def process_one(job_id: int) -> None:
                                else (4096 if depth else 3072),
                     stage_timeout=(law_ai_coverage.LOCAL_MODEL_TIMEOUT
                                    if quality_profile == "local_24b" else STAGE_TIMEOUT),
-                    json_mode=bool(job.json_mode),
+                    json_mode=json_mode_enabled,
                 )
                 result = law_ai_agents.validate(task, answer, section.text)
                 # Number only *successfully* validated sections, in document
