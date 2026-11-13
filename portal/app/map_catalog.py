@@ -190,6 +190,7 @@ DATASETS = {
         'provider': 'LVermGeo Rheinland-Pfalz',
         'source_url': 'https://lvermgeo.rlp.de/produktinformationen/geotopografie/3d-geodaten/3d-gebaeudemodell',
         'download_url': 'https://geoshop.rlp.de/opendata-geb3dlo.html',
+        'viewer_url': 'https://rlp.plexmap.de/v/RLP-in-3D-neu/',
         'license': 'DL-DE BY 2.0', 'license_url': BY,
         'format': 'CityGML', 'kind': 'download',
         'note': 'Amtliches LoD1: Gebäude als Blockmodell mit Flachdach. '
@@ -201,6 +202,7 @@ DATASETS = {
         'provider': 'LVermGeo Rheinland-Pfalz',
         'source_url': 'https://lvermgeo.rlp.de/produktinformationen/geotopografie/3d-geodaten/3d-gebaeudemodell',
         'download_url': 'https://geoshop.rlp.de/opendata-geb3dlo.html',
+        'viewer_url': 'https://rlp.plexmap.de/v/RLP-in-3D-neu/',
         'license': 'DL-DE BY 2.0', 'license_url': BY,
         'format': 'CityGML', 'kind': 'download',
         'note': 'Amtliches LoD2 mit standardisierten Dachformen. Für eine '
