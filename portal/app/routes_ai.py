@@ -298,7 +298,7 @@ def admin_ai_provider_save(
     provider.active = active == "1"
     provider.stream_enabled = stream_enabled == "1"
     provider.allow_private = allow_private == "1"
-    provider.timeout_seconds = max(5, min(timeout_seconds, 180))
+    provider.timeout_seconds = max(5, min(timeout_seconds, 1800))
     if text_key.strip():
         provider.text_key_enc = encrypt(text_key.strip())
     if image_key.strip():
