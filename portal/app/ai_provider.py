@@ -107,8 +107,10 @@ async def list_models(provider, *, image: bool = False) -> list[str]:
     data = result.get("data")
     if not isinstance(data, list):
         raise AIProviderError("Der Modellkatalog hat ein unerwartetes Format.")
-    return [item["id"] for item in data[:200] if isinstance(item, dict)
-            and isinstance(item.get("id"), str) and len(item["id"]) < 200]
+    if len(data) > 5000:
+        raise AIProviderError("Der Modellserver meldet mehr als 5.000 Modelle; bitte Katalog eingrenzen.")
+    return [item["id"] for item in data if isinstance(item, dict)
+            and isinstance(item.get("id"), str) and 1 <= len(item["id"]) <= 200]
 
 
 async def list_model_details(provider) -> list[dict]:
@@ -123,9 +125,13 @@ async def list_model_details(provider) -> list[dict]:
     if not isinstance(data, list):
         raise AIProviderError("Der Modellkatalog hat ein unerwartetes Format.")
 
+    # Show the complete returned catalog instead of silently truncating at
+    # 200 entries. The upstream response is already bounded to 2 MB.
+    if len(data) > 5000:
+        raise AIProviderError("Der Modellserver meldet mehr als 5.000 Modelle; bitte Katalog eingrenzen.")
     models = []
     seen = set()
-    for row in data[:200]:
+    for row in data:
         if not isinstance(row, dict):
             continue
         identifier = row.get("id")
