@@ -131,15 +131,15 @@
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <fieldset class="mb-2"><legend class="form-label fw-semibold fs-6">Analyseumfang</legend>
                       <div class="d-flex flex-wrap gap-3">
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="simple" checked><span class="form-check-label">Einfach – kompakte Hinweise</span></label>
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="advanced"><span class="form-check-label">Erweitert – ausführliche Fundstellen</span></label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="simple" checked><span class="form-check-label">Einfach – 3 Modellaufrufe, bei langen Texten Stichproben</span></label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}><span class="form-check-label">Erweitert – alle {{ advanced_sections }} Textabschnitte mit 3 Agenten ({{ max_model_calls }} Modellaufrufe)</span></label>
                       </div>
                     </fieldset>
                     <label class="form-check small mb-2">
                       <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
                       <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
                     </label>
-                    <p class="small text-secondary">Für längere Dokumente verwendet die KI ausdrücklich gekennzeichnete Auszüge. Sie führt <strong>keine vollständige juristische Prüfung</strong> aus. Maximal {{ ai_source_limit }} Zeichen. Bestehende OCR-/MarkItDown-Vorschläge bleiben unverändert.</p>
+                    <p class="small text-secondary">Im einfachen Modus werden bei langen Texten Auszüge analysiert. Im erweiterten Modus werden alle Zeichen des importierten Textes einmal pro Agent in {{ advanced_sections }} überprüfbaren Abschnitten übertragen – insgesamt bis zu {{ max_model_calls }} Modellaufrufe. Das erhöht Laufzeit und mögliche API-Kosten. <strong>Vollständige Textübermittlung ist keine vollständige juristische Prüfung</strong> und garantiert keine OCR-Texttreue. Maximal {{ ai_source_limit }} Zeichen; keine Änderung an MarkItDown-/Tesseract-Originalen.</p>
                     <button class="btn btn-outline-primary btn-sm" type="submit"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Drei KI-Prüfagenten starten</button>
                   </form>
                 {% endif %}
@@ -149,7 +149,7 @@
                 <div class="alert alert-info mb-2" data-law-ai-analysis-pending data-draft-id="{{ selected.id }}">
                   <i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>
                   <span role="status" aria-live="polite">KI-Auswertung läuft · {{ analysis.step }}.</span>
-                  <p class="small mb-1">Die drei Schritte werden nacheinander ausgeführt; das Dokument wird nicht gespeichert oder veröffentlicht.</p>
+                  <p class="small mb-1">Die drei Schritte werden nacheinander ausgeführt, im erweiterten Modus abschnittsweise. Die LLM-Befunde sind getrennte interne Prüfprotokolle; der Rechtstext wird nicht gespeichert oder veröffentlicht.</p>
                   <form action="/laws-assistant/{{ selected.id }}/agents/{{ analysis.id }}/cancel" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <button class="btn btn-outline-danger btn-sm" type="submit">KI-Analyse abbrechen</button>
@@ -168,6 +168,12 @@
                   {% set structure = analysis_results.get('structure', {}) %}
                   {% set metadata = analysis_results.get('metadata', {}) %}
                   {% set verification = analysis_results.get('verification', {}) %}
+                  {% set coverage = verification.get('coverage', {}) %}
+                  <p class="small text-secondary">Textabdeckung der Gegenprüfung: 
+                    <strong>{{ 'Gesamter importierter Text wurde abschnittsweise an das Modell übermittelt' if coverage.get('mode') == 'full_text_submitted' else 'Nur Auszüge / Stichprobe' }}</strong>.
+                    {{ coverage.get('sections_analyzed', 0) }} von {{ coverage.get('sections_total', '?') }} Abschnitt(en), {{ coverage.get('source_chars', 0) }} Quellzeichen.
+                    Fundstellen sind Zeichenpositionen des OCR-/MarkItDown-Textes, keine amtlichen PDF-Seitenbelege.
+                  </p>
                   <div class="accordion mb-2" id="law-agent-results-{{ analysis.id }}">
                     <div class="accordion-item">
                       <h4 class="accordion-header"><button class="accordion-button {{ '' if analysis.mode == 'advanced' else 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="{{ 'true' if analysis.mode == 'advanced' else 'false' }}">Stammdaten-Vorschläge · {{ metadata.get('fields', [])|length }} Fundstellen</button></h4>
@@ -181,6 +187,7 @@
                                 <button type="button" class="btn btn-outline-primary btn-sm" data-law-ai-apply-field="{{ entry.field }}" data-law-ai-value="{{ entry.value }}" title="Vorschlag manuell ins Formular übertragen">Ins Formular übernehmen</button>
                               </div>
                               <blockquote class="border-start ps-2 small text-secondary mt-1 mb-0">{{ entry.evidence }}</blockquote>
+                              {% if entry.source_start is defined %}<div class="small text-secondary">Textabschnitt {{ entry.section }} · Zeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}</div>{% endif %}
                             </div>
                           {% else %}<p class="small text-secondary">Keine ausreichend belegten Stammdaten gefunden.</p>{% endfor %}
                           {% for warn in metadata.get('warnings', []) %}<p class="small text-warning mt-2 mb-0">{{ warn }}</p>{% endfor %}
@@ -196,6 +203,7 @@
                             <div class="py-2 border-bottom"><span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
                               <code class="d-block text-break mt-1">{{ entry.markdown_suggestion }}</code>
                               <div class="small text-secondary">Original: {{ entry.quote }}</div>
+                              {% if entry.source_start is defined %}<div class="small text-secondary">Textabschnitt {{ entry.section }} · Zeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}</div>{% endif %}
                               <button class="btn btn-outline-secondary btn-sm mt-1" type="button"
                                       data-law-ai-apply-heading="{{ entry.quote }}"
                                       data-law-ai-heading-level="{{ entry.level }}">Überschrift gezielt im Entwurf formatieren</button>
@@ -215,6 +223,7 @@
                             <div class="border-start border-warning ps-3 py-2 mb-2">
                               <span class="badge text-bg-{{ 'danger' if finding.severity in ('critical', 'high') else 'warning' }}">{{ finding.severity }}</span>
                               <blockquote class="small mt-1 mb-1 text-break">{{ finding.quote }}</blockquote>
+                              {% if finding.source_start is defined %}<div class="small text-secondary">Textabschnitt {{ finding.section }} · Zeichen {{ finding.source_start + 1 }}–{{ finding.source_end }}</div>{% endif %}
                               <button type="button" class="btn btn-link btn-sm p-0"
                                       data-law-ai-locate="{{ finding.quote }}">Fundstelle im Entwurf markieren</button>
                               <div class="small">{{ finding.reason }}</div>
