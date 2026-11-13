@@ -130,6 +130,7 @@ PERMISSIONS = {
     "processes": ("Prozesse", "fa-diagram-project", "Bearbeitungsprozesse für Online-Anträge im Prozesseditor gestalten und veröffentlichen"),
     "app_create": ("Online-Anträge einrichten", "fa-file-signature", "Formulare zu Online-Anträgen machen (Aktenzeichen, Frist, Zuständigkeit) und wieder zurückstellen"),
     "maps_admin": ("Kartenlayer & Geocoding", "fa-layer-group", "Kartenlayer, Kartenstandard und die Adresssuche (Nominatim) einrichten"),
+    "prwahl_setup": ("Personalratswahlen einrichten", "fa-check-to-slot", "Neue Wahl-Arbeitsbereiche anlegen; Einsicht in Wahlakten ausschließlich mit eigener Wahl-Fachrolle"),
     "knowledge_read": ("Wissen lesen", "fa-book-open", "Berechtigte interne Wissensräume und freigegebene Beiträge lesen"),
     "knowledge_edit": ("Wissen bearbeiten", "fa-pen", "In berechtigten Bereichen Wissensentwürfe erstellen und bearbeiten"),
     "knowledge_publish": ("Wissen fachlich freigeben", "fa-clipboard-check", "Zur Prüfung eingereichte Beiträge nach Vier-Augen-Prinzip freigeben"),
@@ -2801,6 +2802,7 @@ DEFAULT_SETTINGS = {
     "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
     "module_knowledge": "0",  # Organizational knowledge: disabled until explicitly activated.
+    "module_prwahl": "0",  # Elections: no legal approval; protected opt-in workspace only.
     "module_signage": "0",  # Digital signage disabled until explicitly activated.
     "ai_knowledge_enabled": "0",
     "ai_laws_include_all": "0",
@@ -3217,6 +3219,7 @@ def init_db() -> None:
     from . import law_ai_models  # noqa: F401 – isolated, unpublished law-import drafts
     from . import law_ai_agent_models  # noqa: F401 – versioned read-only agent reviews
     from . import knowledge_models  # noqa: F401 – register additive knowledge tables
+    from . import prwahl_models  # noqa: F401 – scoped RLP paper-election workspace tables
     from . import signage_models  # noqa: F401 – additive signage models
     from . import anliegen_models  # noqa: F401 – register additive internal request tables
     from . import anliegen_process_models  # noqa: F401 – register opt-in process binding tables
