@@ -41,7 +41,7 @@ def suggestions(election, *, notice_effective_on=None):
     return sorted(rows, key=lambda row: (row["on"], row["code"]))
 
 
-def diagnose(election, *, notice_effective_on=None, planned_events=()):
+def diagnose(election, *, notice_effective_on=None):
     """Non-binding, actionable consistency hints for the protected calendar.
 
     Returns only facts that can be grounded in the election's own data. The
@@ -75,3 +75,13 @@ def diagnose(election, *, notice_effective_on=None, planned_events=()):
             problems.append({"kind": "warning", "title": "Vorschlagsfrist reicht bis an die Stimmabgabe",
                              "detail": "Die rechnerische Standardfrist und den Wahltermin unabhängig überprüfen; Sonderfälle und Fristbeginn-Verschiebung bleiben offen."})
     return problems
+
+
+def mark_existing(proposals, events):
+    """Identify already planned events on the proposal's local calendar day."""
+    from datetime import timezone
+    from .prwahl_schedule import TZ
+    candidates = {(event.kind, event.starts_at.replace(tzinfo=timezone.utc).astimezone(TZ).date())
+                  for event in events if event.status == "planned"}
+    return [{**row, "already_planned": (row["kind"], row["on"]) in candidates}
+            for row in proposals]
