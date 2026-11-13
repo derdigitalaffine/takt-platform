@@ -78,7 +78,7 @@
           <a href="/laws-assistant/{{ item.id }}" class="law-draft {{ 'is-selected' if selected and selected.id == item.id else '' }}"
              data-law-draft data-law-draft-name="{{ item.original_filename|lower }}" data-law-draft-status="{{ item.status }}"
              {% if selected and selected.id == item.id %}aria-current="page"{% endif %}>
-            <span class="law-draft-icon"><i class="fa-solid {{ 'fa-file-pdf' if item.original_filename|lower|endswith('.pdf') else 'fa-file-word' if item.original_filename|lower|endswith('.docx') else 'fa-file-lines' }}" aria-hidden="true"></i></span>
+            <span class="law-draft-icon"><i class="fa-solid {{ 'fa-file-pdf' if item.original_filename.lower().endswith('.pdf') else 'fa-file-word' if item.original_filename.lower().endswith('.docx') else 'fa-file-lines' }}" aria-hidden="true"></i></span>
             <span class="law-draft-meta">
               <span class="law-draft-name">{{ item.original_filename }}</span>
               <span class="law-draft-date">{{ item.created_at|local }}</span>
@@ -99,20 +99,48 @@
   </div>
   <div class="col-12 col-xl-9">
     {% if selected %}
-    <div class="card">
-      <div class="card-header d-flex align-items-center justify-content-between gap-2">
-        <span><i class="fa-solid fa-clipboard-check me-2" aria-hidden="true"></i>Original überprüfen</span>
-        <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status == 'needs_ocr' else 'secondary' }}">{{ {'staged': 'Prüfung offen', 'needs_ocr': 'OCR möglich', 'ocr_queued': 'OCR beauftragt', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
-      </div>
-      <div class="card-body">
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-          <a class="btn btn-outline-secondary btn-sm" href="/laws-assistant/{{ selected.id }}/original"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Unverändertes Original</a>
-          <span class="small text-secondary">{{ (selected.original_size / 1024) | round(1) }} KB · {{ selected.original_mime }}</span>
+    <article class="law-surface" aria-labelledby="law-review-title">
+      <header class="law-card-head">
+        <div>
+          <div class="law-kicker mb-1">Geschützter Arbeitsbereich · Import #{{ selected.id }}</div>
+          <h2 class="h5 text-break" id="law-review-title">{{ selected.original_filename }}</h2>
         </div>
-        <dl class="row small">
-          <dt class="col-sm-3">Datei</dt><dd class="col-sm-9 text-break">{{ selected.original_filename }}</dd>
-          <dt class="col-sm-3">SHA-256</dt><dd class="col-sm-9 text-break font-monospace">{{ selected.original_sha256 }}</dd>
-        </dl>
+        <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status in ('needs_ocr', 'ocr_failed') else 'secondary' }}">{{ {'staged': 'Text zur Prüfung', 'needs_ocr': 'Texterkennung nötig', 'ocr_queued': 'OCR läuft', 'ocr_review': 'OCR-Vorschlag prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
+      </header>
+      <div class="law-card-body">
+        <div class="law-action-hint mb-3">
+          <div class="small text-secondary fw-semibold mb-1">Nächster sinnvoller Schritt</div>
+          {% if selected.status == 'accepted' %}
+            <strong>Unveröffentlichten Rechtstextentwurf öffnen und fachlich weiterbearbeiten.</strong>
+          {% elif selected.status in ('needs_ocr', 'ocr_failed') %}
+            <strong>Originaltext erkennen lassen oder manuell im Editor erfassen.</strong>
+          {% elif selected.status == 'ocr_queued' %}
+            <strong>Offline-Texterkennung läuft. Bearbeitung nach Abschluss fortsetzen.</strong>
+          {% elif analysis and analysis.status in ('queued', 'running') %}
+            <strong>KI-Prüfung läuft. Den Originaltext kannst du währenddessen weiter prüfen.</strong>
+          {% elif analysis and analysis.status == 'done' and analysis_current %}
+            <strong>KI-Hinweise mit dem Original vergleichen und einzelne Vorschläge prüfen.</strong>
+          {% else %}
+            <strong>Text und Stammdaten am Original prüfen. Die KI-Prüfung ist optional.</strong>
+          {% endif %}
+          <div class="law-actions mt-2">
+            <a class="btn btn-sm btn-outline-primary" href="/laws-assistant/{{ selected.id }}/original"><i class="fa-solid fa-file-arrow-down me-1" aria-hidden="true"></i>Original herunterladen</a>
+            {% if selected.status in ('staged', 'ocr_review', 'needs_ocr', 'ocr_failed') %}
+              <a class="btn btn-sm btn-outline-secondary" href="#law-editor"><i class="fa-solid fa-pen-to-square me-1" aria-hidden="true"></i>Zum Texteditor</a>
+            {% endif %}
+            {% if ai_enabled and selected.status in ('staged', 'ocr_review') %}
+              <a class="btn btn-sm btn-outline-secondary" href="#law-agent-heading"><i class="fa-solid fa-brain me-1" aria-hidden="true"></i>Zur KI-Prüfung</a>
+            {% endif %}
+          </div>
+        </div>
+        <details class="small mb-3">
+          <summary class="text-secondary">Originaldetails und SHA-256-Prüfsumme</summary>
+          <dl class="row mt-2 mb-0">
+            <dt class="col-sm-3">Datei</dt><dd class="col-sm-9 text-break">{{ selected.original_filename }}</dd>
+            <dt class="col-sm-3">Umfang</dt><dd class="col-sm-9">{{ (selected.original_size / 1024)|round(1) }} KB · {{ selected.original_mime }}</dd>
+            <dt class="col-sm-3">SHA-256</dt><dd class="col-sm-9 text-break font-monospace">{{ selected.original_sha256 }}</dd>
+          </dl>
+        </details>
         {% if selected.status == 'accepted' %}
           <div class="alert alert-success">Dieser Import wurde durch eine menschliche Entscheidung als <strong>unveröffentlichter Rechtstext</strong> übernommen.
             {% if selected.accepted_law_id %}<a href="/laws/{{ selected.accepted_law_id }}/edit">Rechtstextentwurf öffnen</a>{% endif %}
@@ -401,7 +429,7 @@
           </form>
         {% endif %}
       </div>
-    </div>
+    </article>
     {% else %}
     <div class="card"><div class="card-body text-center p-5">
       <i class="fa-solid fa-scale-balanced fa-2x text-secondary mb-3" aria-hidden="true"></i>
