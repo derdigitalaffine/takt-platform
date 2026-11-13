@@ -207,3 +207,17 @@
 .pr-quality-missing ul{font-size:.8rem;line-height:1.6;color:var(--bs-secondary-color);margin:.6rem 0 0;padding-left:1.2rem}
 .pr-quality-good{font-size:.82rem;margin:0;color:var(--bs-secondary-color)}
 .pr-quality-disclaimer{font-size:.76rem;line-height:1.55;margin:.6rem 0 0;color:var(--bs-secondary-color)}
+
+/* Election overview: structured, prioritized actions instead of endless task lists. */
+.pr-next-actions{margin:1rem 0}
+.pr-next-action-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.pr-next-action{min-width:0;display:flex;gap:.8rem;padding:1rem;background:var(--pr-subtle);border:1px solid var(--pr-stroke);border-radius:.85rem}
+.pr-next-action-icon{width:2.55rem;height:2.55rem;flex-shrink:0;border-radius:.65rem;display:grid;place-items:center;background:var(--pr-card);color:var(--bs-primary)}
+.pr-next-action-content{min-width:0;flex:1}
+.pr-next-action-content strong{display:block;font-size:.92rem;line-height:1.4}
+.pr-next-action-content p{font-size:.81rem;line-height:1.55;color:var(--bs-secondary-color);margin:.4rem 0 .65rem}
+.pr-next-action-caption{display:block;color:var(--bs-secondary-color);font-size:.77rem;line-height:1.4;font-weight:600}
+.pr-next-action-warning .pr-next-action-icon{color:var(--bs-warning-text-emphasis,var(--bs-primary))}
+.pr-more-tasks{display:inline-flex;align-items:center;gap:.3rem;font-size:.84rem;font-weight:650;margin-top:1rem}
+#pr-data-form{scroll-margin-top:1rem}
+@media(max-width:820px){.pr-next-action-grid{grid-template-columns:1fr}}
