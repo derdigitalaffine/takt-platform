@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from . import laws as lx, law_ai_agents, law_ai_agent_jobs, law_ai_coverage
+from . import laws as lx, law_ai_agents, law_ai_agent_jobs, law_ai_coverage, law_ai_markdown
 from .config import settings
 from .db import LawText, User, utcnow, get_settings
 from .law_ai_models import LawAiDraft
@@ -306,6 +306,32 @@ def law_ai_ocr_status(
         "failure": row.ocr_failure if row.status == "ocr_failed" else "",
         **_ocr_phase(row),
     }, headers={"Cache-Control": "private, no-store"})
+
+@app.post("/laws-assistant/{draft_id:int}/markdown/preview",
+          dependencies=[Depends(check_csrf)])
+def law_ai_canonical_markdown(
+    request: Request, draft_id: int,
+    user: User = Depends(law_user), db: Session = Depends(get_db),
+):
+    """Read-only full-source heading proposal using the actual TAKT law parser.
+
+    No external model call, no persistence, no application without review.
+    """
+    from fastapi.responses import JSONResponse
+    rate_limit(request, "law-ai-markdown-preview", limit=40, window=3600,
+               key=str(user.id))
+    draft = _own(db, draft_id, user)
+    if draft.status not in ("staged", "ocr_review"):
+        raise HTTPException(409, "Zuerst den Text importieren bzw. OCR abschließen.")
+    try:
+        result = law_ai_markdown.outline_preview(draft.proposed_md or "")
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    return JSONResponse(result, headers={
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
+
 
 @app.get("/laws-assistant")
 def law_ai_home(request: Request, user: User = Depends(law_user),
