@@ -9,6 +9,10 @@ from . import law_ai_agents
 MAX_CHUNK_CHARS = 14_000
 MIN_CHUNK_CHARS = 12_000
 MAX_CHUNKS = 10
+LOCAL_CHUNK_CHARS = 6_000
+LOCAL_MIN_CHARS = 4_500
+LOCAL_MAX_CHUNKS = 30
+LOCAL_MODEL_TIMEOUT = 130
 MAX_COMBINED_ITEMS = 100
 MAX_WARNINGS = 20
 MAX_CALLS = MAX_CHUNKS * len(law_ai_agents.STAGES)
@@ -23,27 +27,32 @@ class Section:
     split_line: bool = False
 
 
-def sections(source: str) -> list[Section]:
+def sections(source: str, *, profile: str = "standard") -> list[Section]:
     """Cover the entire source with no inserted labels or missed characters."""
     if not isinstance(source, str) or not 0 < len(source) <= law_ai_agents.MAX_SOURCE_CHARS:
         raise ValueError("Für die vollständige Analyse sind 1 bis 120.000 Zeichen zulässig.")
+    if profile not in ("standard", "local_24b"):
+        raise ValueError("Unbekanntes Modellprofil.")
+    max_size = LOCAL_CHUNK_CHARS if profile == "local_24b" else MAX_CHUNK_CHARS
+    min_size = LOCAL_MIN_CHARS if profile == "local_24b" else MIN_CHUNK_CHARS
+    max_chunks = LOCAL_MAX_CHUNKS if profile == "local_24b" else MAX_CHUNKS
     pieces: list[Section] = []
     pos = 0
     while pos < len(source):
-        end = min(len(source), pos + MAX_CHUNK_CHARS)
+        end = min(len(source), pos + max_size)
         split_line = False
         if end < len(source):
             # Find the last line ending near the chosen boundary. Do not split
             # well-behaved paragraphs, but still bound pathological long lines.
-            newline = source.rfind("\n", pos + MIN_CHUNK_CHARS, end)
+            newline = source.rfind("\n", pos + min_size, end)
             if newline >= 0:
                 end = newline + 1
             else:
                 split_line = True
         piece = source[pos:end]
         pieces.append(Section(len(pieces) + 1, pos, end, piece, split_line))
-        if len(pieces) > MAX_CHUNKS:
-            raise ValueError("Der Text benötigt mehr als 10 Modellabschnitte; bitte fachlich aufteilen.")
+        if len(pieces) > max_chunks:
+            raise ValueError(f"Der Text benötigt mehr als {max_chunks} Modellabschnitte; bitte fachlich aufteilen.")
         pos = end
     if "".join(chunk.text for chunk in pieces) != source:
         raise ValueError("Die vollständige Übertragung kann nicht nachgewiesen werden.")
@@ -86,11 +95,14 @@ def bisect(section: Section) -> tuple[Section, Section] | None:
     return left, right
 
 
-def count_calls(source: str, mode: str) -> int:
+def count_calls(source: str, mode: str, *, profile: str = "standard",
+                tasks: int = 3) -> int:
+    if not 1 <= tasks <= len(law_ai_agents.STAGES):
+        raise ValueError("Bitte mindestens einen KI-Prüfschritt wählen.")
     if mode == "advanced":
-        return len(sections(source)) * len(law_ai_agents.STAGES)
+        return len(sections(source, profile=profile)) * tasks
     if mode == "simple":
-        return len(law_ai_agents.STAGES)
+        return tasks
     raise ValueError("Unbekannter KI-Analysemodus.")
 
 
