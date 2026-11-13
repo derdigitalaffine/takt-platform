@@ -2993,6 +2993,16 @@ _NEW_COLUMNS = {
         "ocr_warnings_json": "TEXT NOT NULL DEFAULT '[]'",
         "ocr_failure": "VARCHAR(180) NOT NULL DEFAULT ''",
     },
+    # Existing law_ai_analyses from earlier releases must gain these columns;
+    # create_all() does not alter an existing table.
+    "law_ai_analyses": {
+        "progress_total": "INTEGER NOT NULL DEFAULT 0",
+        "progress_done": "INTEGER NOT NULL DEFAULT 0",
+        "stream_characters": "INTEGER NOT NULL DEFAULT 0",
+        "stream_chunks": "INTEGER NOT NULL DEFAULT 0",
+        "stream_active": "BOOLEAN NOT NULL DEFAULT 0",
+        "validated_items": "INTEGER NOT NULL DEFAULT 0",
+    },
     "knowledge_articles": {
         "authority": "VARCHAR(20) NOT NULL DEFAULT 'unconfirmed'",
         "review_due_on": "DATE",
