@@ -108,6 +108,7 @@ def prwahl_detail(request: Request, election_id: int, tab: str = "overview",
                   users=users, documents=documents, audit=audit,
                   roles=pw.ROLES, bodies=pw.BODY_TYPES, kinds=pw.FORM_KINDS,
                   done=sum(1 for t in tasks if t.completed_at),
+                  progress=round(100 * sum(1 for t in tasks if t.completed_at) / len(tasks)) if tasks else 0,
                   can_edit=role in pw.EDIT_ROLES,
                   can_manage=role in {"coordinator", "chair"})
 
@@ -228,7 +229,7 @@ def prwahl_document_new(request: Request, election_id: int, kind: str,
     if kind not in pw.FORM_KINDS:
         raise HTTPException(404)
     return render(request, "prwahl_document.html", user, election=election,
-                  form_kind=kind, form_def=pw.FORM_KINDS[kind],
+                  role=role, versions=[], form_kind=kind, form_def=pw.FORM_KINDS[kind],
                   values={}, document=None, mode="new")
 
 
@@ -236,8 +237,12 @@ def prwahl_document_new(request: Request, election_id: int, kind: str,
 def prwahl_document_edit(request: Request, election_id: int, document_id: int,
                          user: User = Depends(current_user), db: Session = Depends(get_db)):
     election, role, doc = _doc(db, election_id, document_id, user)
+    versions = db.scalars(select(PRDocument).where(
+        PRDocument.election_id == election.id,
+        PRDocument.document_key == doc.document_key,
+    ).order_by(PRDocument.revision.desc())).all()
     return render(request, "prwahl_document.html", user, election=election,
-                  form_kind=doc.kind, form_def=pw.FORM_KINDS[doc.kind],
+                  role=role, versions=versions, form_kind=doc.kind, form_def=pw.FORM_KINDS[doc.kind],
                   values=pw.document_values(doc), document=doc,
                   mode="edit" if role in pw.EDIT_ROLES and doc.current else "readonly")
 
