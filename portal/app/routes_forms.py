@@ -198,8 +198,10 @@ async def form_ai_draft(
         provider = db.get(AIProvider, provider_id)
     else:
         from . import ai_task_routing
+        legacy = db.scalar(select(AIProvider).where(
+            AIProvider.active.is_(True), AIProvider.text_key_enc != "").order_by(AIProvider.id))
         try:
-            provider = ai_task_routing.select_provider(db, "form_draft")
+            provider = ai_task_routing.select_provider(db, "form_draft", fallback=legacy)
         except ai_provider.AIProviderError as exc:
             raise HTTPException(503, str(exc)) from exc
     if provider is None or not provider.active or not provider.text_key_enc:
