@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from .db import User, Organization
+from .organization import active_path
 from .prwahl_models import PRElection, PRMandate, PRTask, PRDocument, PRAudit
 from .security import encrypt, decrypt
 
@@ -196,6 +197,10 @@ def parse_date(value: str):
 
 def scope(db, election_id: int, user: User, capability: str = "read"):
     election = db.get(PRElection, election_id)
+    if not user.active:
+        raise HTTPException(403, "Dieses Benutzerkonto ist nicht aktiv.")
+    if election is not None and not active_path(db, election.org_id):
+        raise HTTPException(403, "Die zugeordnete Organisationseinheit ist nicht mehr aktiv.")
     if election is None:
         raise HTTPException(404, "Diese Wahl existiert nicht.")
     role = db.scalar(select(PRMandate.role).where(PRMandate.election_id == election_id,
