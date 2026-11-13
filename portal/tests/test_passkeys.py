@@ -30,7 +30,7 @@ def test_passkey_login_and_profile_security_ui_present():
     security = user_client.get("/profile/security")
     assert security.status_code == 200
     assert "Passkey einrichten" in security.text
-    assert "/profile/passkeys" in security.text
+    assert "data-passkey-enroll" in security.text
     admin = user_client.get("/admin/users")
     assert "Passkey-Verwaltung" in admin.text
 
