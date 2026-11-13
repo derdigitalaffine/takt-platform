@@ -309,3 +309,5 @@
 .law-workspace .law-draft-item .law-draft-delete {flex-shrink:0}
 .law-workspace .law-draft-item .law-draft-delete button {min-height:2.5rem}
 @media(max-width:575px){.law-workspace .law-draft-item{flex-wrap:wrap;padding:.3rem}.law-workspace .law-draft-item .law-draft {flex-basis:100%}.law-workspace .law-draft-item .law-draft-delete {margin-left:auto}}
+
+.law-workspace .law-draft-item[hidden] { display:none!important; }
