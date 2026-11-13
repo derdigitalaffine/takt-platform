@@ -28,7 +28,7 @@
   <div class="pr-two-columns">
     <section class="pr-panel">
       <div class="pr-panel-head"><div><span class="pr-eyebrow">Dein nächster Schritt</span><h2>Wahlvorbereitung im Blick</h2><p>Schritt für Schritt, mit Nachweisen statt automatischer Rechtsentscheidungen.</p></div></div>
-      <div class="pr-progress" role="progressbar" aria-valuenow="{{done}}" aria-valuemin="0" aria-valuemax="{{tasks|length}}" aria-label="Erledigte Prüfpunkte"><span style="width:{{(100*done/tasks|length)|round|int if tasks|length else 0}}%"></span></div>
+      <div class="pr-progress" role="progressbar" aria-valuenow="{{done}}" aria-valuemin="0" aria-valuemax="{{tasks|length}}" aria-label="Erledigte Prüfpunkte"><span style="width:{{progress}}%"></span></div>
       <div class="pr-step-list">
         {% for item in tasks if not item.completed_at %}
         <a href="/personalratswahl/{{election.id}}?tab=tasks"><span class="pr-step-number">{{loop.index}}</span><span><strong>{{item.title}}</strong><small>{{item.legal_reference or 'Manueller Prüfpunkt'}}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
