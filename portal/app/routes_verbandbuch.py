@@ -182,6 +182,13 @@ async def verbandbuch_correct(
     if not reason or len(reason) > 600:
         errors.append("Für jede Berichtigung ist eine Begründung (max. 600 Zeichen) erforderlich.")
     current, versions = aid.snapshot(db, entry)
+    current_revision = versions[0].revision if versions else 0
+    try:
+        expected_revision = int(raw.get("expected_revision", ""))
+    except (ValueError, TypeError):
+        raise HTTPException(409, "Die Aktenversion fehlt. Bitte die aktuelle Fachakte erneut öffnen.") from None
+    if expected_revision != current_revision:
+        raise HTTPException(409, "Die Fachakte wurde zwischenzeitlich berichtigt. Bitte neu laden und die Änderungen erneut prüfen.")
     if values == current:
         errors.append("Es wurden keine Angaben geändert.")
     if errors:
