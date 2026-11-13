@@ -174,10 +174,9 @@ def _pdf(path: Path, language: str) -> tuple[str, list[dict], list[str]]:
         if len(markdown) < 20:
             markdown = "\n\n".join(p["text"] for p in pages)
     else:
-        markdown = "\n\n".join(
-            f"<!-- OCR-Quelle: Seite {p['page']}, Verfahren {p['engine']} -->\n\n{p['text']}"
-            for p in pages
-        )
+        # Source page numbers belong in structured evidence, not embedded in
+        # normative Markdown where they could be mistaken for law text.
+        markdown = "\n\n".join(p["text"] for p in pages)
         if any(p["engine"] == "native-pdf" for p in pages):
             warnings.append("Gemischtes PDF: Struktur aus nativen Seiten und OCR-Seiten manuell vergleichen.")
     return markdown, pages, warnings
