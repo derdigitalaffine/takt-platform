@@ -349,3 +349,34 @@ def test_simple_agents_explicitly_keep_sampling_on_long_text(monkeypatch, agent_
         result = json.loads(db.get(LawAiAnalysis, job_id).verification_json)
         assert result["coverage"]["mode"] == "excerpts_only"
         assert result["sampled"] is True
+
+
+
+def test_full_section_run_rechecks_provider_after_every_request(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("# Rechtsverordnung\n§ 7 Eine Gebühr gilt nicht.\n" * 570)
+    assert len(law_ai_coverage.sections(source)) > 1
+    did = _upload_long_md(admin, source)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    result = admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
+    })
+    assert result.status_code == 303, result.text
+    jid = law_ai_agent_jobs._claim_next()
+    assert jid is not None
+    call_count = 0
+
+    async def changes_mid_call(provider, messages, *, max_tokens=1024, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        with SessionLocal() as db:
+            db.get(AITaskProfile, "law_structure").model_id = "unapproved-replacement"
+            db.commit()
+        return '{"headings":[]}'
+    monkeypatch.setattr(ai_provider, "complete", changes_mid_call)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    assert call_count == 1, "Never send a second section after changing the approved recipient"
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "failed"
+        assert db.get(LawAiDraft, did).accepted_law_id is None
