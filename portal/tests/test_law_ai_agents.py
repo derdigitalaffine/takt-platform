@@ -649,3 +649,50 @@ def test_short_ortrecht_text_gets_one_compact_retry_not_an_unnecessary_split(mon
         assert job.retry_attempts == 1
         assert db.get(LawAiDraft, did).accepted_law_id is None
     assert len(attempts) == 4
+
+
+
+def test_recovery_prompt_really_shrinks_simple_mode_context():
+    source = SOURCE * 360
+    assert 19_000 < len(source) < law_ai_agents.MAX_SOURCE_CHARS
+    for task, _ in law_ai_agents.STAGES:
+        normal, sampled = law_ai_agents.prompt(task, source)
+        compact, compact_sampled = law_ai_agents.prompt(
+            task, source, context_limit=6000,
+        )
+        assert sampled and compact_sampled
+        assert len(_model_context(normal)) <= law_ai_agents.MAX_CONTEXT_CHARS
+        assert len(_model_context(compact)) <= 6000
+        assert len(_model_context(compact)) < len(_model_context(normal))
+        assert "AUSZÜGE" in compact[1]["content"]
+
+
+def test_explicit_context_limit_is_recovered_without_switching_model(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("§ 5 Keine Gebühr ohne Beschluss.\n" * 190)
+    did = _upload_long_md(admin, source)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
+    }).status_code == 303
+    jid = law_ai_agent_jobs._claim_next()
+    calls = []
+
+    async def provider_reply(provider, messages, *, max_tokens=1024, **kwargs):
+        excerpt = _model_context(messages)
+        calls.append((provider.model_id, excerpt))
+        if provider.model_id == "model-step-1" and len(excerpt) > 4000:
+            raise ai_provider.AIContextLimit("Eingabekontextlimit")
+        return {"model-step-1": '{"headings":[]}', "model-step-2": '{"fields":[]}',
+                "model-step-3": '{"findings":[]}'}[provider.model_id]
+    monkeypatch.setattr(ai_provider, "complete", provider_reply)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "done", job.failure
+        assert job.retry_attempts == 1
+        assert json.loads(job.outline_json)["coverage"]["mode"] == "full_text_submitted"
+        assert db.get(LawAiDraft, did).accepted_law_id is None
+    assert len(calls) == 5
+    assert calls[0][0] == calls[1][0] == calls[2][0] == "model-step-1"
+    assert calls[1][1] + calls[2][1] == source
