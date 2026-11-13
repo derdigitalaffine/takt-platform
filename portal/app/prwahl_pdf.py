@@ -41,12 +41,11 @@ def _clean(value, size=3200):
     txt = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", txt)
     return xml_escape(txt).replace("\n", "<br/>")
 
-def build(db, election, doc) -> bytes:
+def build(db, election, doc, *, values_override=None, demo=False) -> bytes:
     name, statute, fields = FORM_KINDS[doc.kind]
-    values = document_values(doc)
+    values = values_override if values_override is not None else document_values(doc)
     font = _font()
-    settings = get_settings(db)
-    brand = branding.build(settings)
+    brand = {"primary": ACCENT, "name": "Stadtverwaltung Sonnenfels · FIKTIV"} if demo else branding.build(get_settings(db))
     primary = brand.get("primary") or ACCENT
     if not re.fullmatch("#[0-9a-fA-F]{6}", primary):
         primary = ACCENT
@@ -56,8 +55,8 @@ def build(db, election, doc) -> bytes:
     document = SimpleDocTemplate(
         buf, pagesize=A4, rightMargin=19*mm, leftMargin=19*mm,
         topMargin=28*mm, bottomMargin=22*mm,
-        title=f"Prüfentwurf – {name}", author=str(org)[:100],
-        subject="Ungeprüfter Vordruck zur Personalratswahl – keine digitale Stimmabgabe",
+        title=f'{"MUSTER – " if demo else "Prüfentwurf – "}{name}', author=str(org)[:100],
+        subject="Fiktives Muster – nicht rechtsverbindlich" if demo else "Ungeprüfter Vordruck zur Personalratswahl – keine digitale Stimmabgabe",
         pageCompression=1,
     )
     styles = {
@@ -70,7 +69,7 @@ def build(db, election, doc) -> bytes:
         "note": ParagraphStyle("pn", fontName=font, fontSize=8.2, leading=12, textColor=colors.HexColor(MUTED)),
     }
     story = [
-        Paragraph("PERSONALRATSWAHL  /  ARBEITSUNTERLAGE", styles["eyebrow"]),
+        Paragraph("MUSTER / FIKTIVE PERSONALRATSWAHL / NICHT RECHTSVERBINDLICH" if demo else "PERSONALRATSWAHL / ARBEITSUNTERLAGE", styles["eyebrow"]),
         Paragraph(_clean(name), styles["title"]),
         Paragraph(_clean(statute) + " · Dokumentversion " + str(doc.revision), styles["subtitle"]),
     ]
@@ -119,7 +118,7 @@ def build(db, election, doc) -> bytes:
         canvas.setFont(font,10.5)
         canvas.saveState()
         canvas.translate(w/2,11*mm)
-        canvas.drawCentredString(0,0,"PRÜFENTWURF · NICHT ZUR UNGEPRÜFTEN BEKANNTGABE")
+        canvas.drawCentredString(0,0, "MUSTER / FIKTIVE DATEN / KEIN AMTLICHES DOKUMENT" if demo else "PRÜFENTWURF · NICHT ZUR UNGEPRÜFTEN BEKANNTGABE")
         canvas.restoreState()
         canvas.restoreState()
     document.build(story,onFirstPage=page,onLaterPages=page)

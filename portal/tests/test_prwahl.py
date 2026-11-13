@@ -220,3 +220,40 @@ def test_board_staff_picker_includes_descendants_but_excludes_siblings_and_disab
         assert people[1].id in _eligible_staff_ids(db, child.id)
         assert people[0].id not in _eligible_staff_ids(db, grandchild.id)
         db.rollback()
+
+
+def test_fictional_demo_has_all_forms_and_is_separate_from_production():
+    from app.prwahl import FORM_KINDS
+    from app.prwahl_demo import sample_values
+    from sqlalchemy import func
+
+    settings(module_prwahl="1")
+    admin = login("admin@example.org", "admin-passwort-123")
+    with SessionLocal() as db:
+        before = db.scalar(select(func.count()).select_from(PRElection))
+    catalog = admin.get("/personalratswahl/demo")
+    assert catalog.status_code == 200
+    assert "Musterwahl 2027" in catalog.text
+    for kind, (_, _, fields) in FORM_KINDS.items():
+        values = sample_values(kind)
+        assert set(values) == {name for name, _, _ in fields}
+        assert all(values.values())
+        assert f"/personalratswahl/demo/dokumente/{kind}/pdf" in catalog.text
+        assert f"/personalratswahl/demo/dokumente/{kind}/docx" in catalog.text
+        preview = admin.get(f"/personalratswahl/demo/dokumente/{kind}")
+        assert preview.status_code == 200
+        assert "MUSTER" in preview.text
+    for kind in ("board_notice", "election_notice", "count_protocol", "archive_handover"):
+        pdf = admin.get(f"/personalratswahl/demo/dokumente/{kind}/pdf")
+        assert pdf.status_code == 200, pdf.text[:400] if not pdf.content.startswith(b"%PDF") else ""
+        assert pdf.content.startswith(b"%PDF")
+        assert "no-store" in pdf.headers["cache-control"]
+        docx = admin.get(f"/personalratswahl/demo/dokumente/{kind}/docx")
+        assert docx.status_code == 200
+        with ZipFile(io.BytesIO(docx.content)) as archive:
+            text = archive.read("word/document.xml").decode("utf-8")
+            assert "MUSTER" in text and "Sonnenfels" in text
+    assert admin.get("/personalratswahl/demo/dokumente/unknown/pdf").status_code == 404
+    assert admin.get("/personalratswahl/demo/dokumente/board_notice/exe").status_code == 404
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count()).select_from(PRElection)) == before

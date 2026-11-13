@@ -162,3 +162,19 @@
 .pr-demo-timeline strong{font-size:.88rem}.pr-demo-timeline span{font-size:.77rem;color:var(--bs-secondary-color);margin-top:.35rem}
 @media(max-width:950px){.pr-demo-timeline{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.pr-demo-timeline{grid-template-columns:1fr}}
+
+/* Fiktive Dokumentenbibliothek: responsiv, vollständig und ohne Schreibaktionen. */
+.pr-demo-document-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}
+.pr-demo-document{display:flex;min-width:0;flex-direction:column;justify-content:space-between;gap:1rem;padding:1rem;border:1px solid var(--pr-stroke);border-radius:.9rem;background:var(--pr-subtle)}
+.pr-demo-document-title{display:flex;align-items:flex-start;gap:.7rem;min-width:0}
+.pr-demo-document-title>i{color:var(--bs-primary);font-size:1.25rem;margin-top:.15rem}
+.pr-demo-document-title>div{min-width:0}
+.pr-demo-document-title h3{font-size:.94rem;font-weight:700;line-height:1.35;margin:0 0 .2rem;overflow-wrap:anywhere}
+.pr-demo-document-title small{font-size:.77rem;color:var(--bs-secondary-color);line-height:1.4}
+.pr-demo-document-actions{display:flex;gap:.45rem;flex-wrap:wrap}
+.pr-demo-document-actions .btn{min-height:2.15rem}
+.pr-demo-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem;margin:0}
+.pr-demo-fields>div{padding:1rem;border-radius:.8rem;border:1px solid var(--pr-stroke);background:var(--pr-subtle);min-width:0}
+.pr-demo-fields dt{font-size:.8rem;font-weight:700;color:var(--bs-secondary-color);margin-bottom:.45rem}
+.pr-demo-fields dd{font-size:.92rem;line-height:1.55;white-space:pre-line;overflow-wrap:anywhere;margin:0}
+@media(max-width:700px){.pr-demo-document-grid,.pr-demo-fields{grid-template-columns:1fr}}
