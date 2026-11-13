@@ -67,7 +67,42 @@ def _doc(db: Session, election_id: int, document_id: int, user: User, capability
 @app.get("/personalratswahl/demo")
 def prwahl_demo(request: Request, user: User = Depends(current_user)):
     """Read-only fictional demonstration, completely separate from election data."""
-    return render(request, "prwahl_demo.html", user, demo=True)
+    return render(request, "prwahl_demo.html", user, demo=True, form_kinds=pw.FORM_KINDS)
+
+
+@app.get("/personalratswahl/demo/dokumente/{kind}")
+def prwahl_demo_document(request: Request, kind: str, user: User = Depends(current_user)):
+    if kind not in pw.FORM_KINDS:
+        raise HTTPException(404)
+    from .prwahl_demo import sample_values
+    return render(request, "prwahl_demo_document.html", user, demo=True, kind=kind,
+                  form_def=pw.FORM_KINDS[kind], values=sample_values(kind))
+
+
+@app.get("/personalratswahl/demo/dokumente/{kind}/{filetype}")
+def prwahl_demo_download(kind: str, filetype: str,
+                         user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if kind not in pw.FORM_KINDS or filetype not in {"pdf", "docx"}:
+        raise HTTPException(404)
+    from types import SimpleNamespace
+    from .prwahl_demo import election, sample_values
+    demo_doc = SimpleNamespace(kind=kind, revision=1)
+    demo_election = election()
+    demo_values = sample_values(kind)
+    if filetype == "pdf":
+        from .prwahl_pdf import build
+        content = build(db, demo_election, demo_doc, values_override=demo_values, demo=True)
+        media_type = "application/pdf"
+    else:
+        from .prwahl_docx import build
+        content = build(demo_election, demo_doc, values_override=demo_values, demo=True)
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return Response(content, media_type=media_type, headers={
+        "Cache-Control": "private, no-store, max-age=0",
+        "Pragma": "no-cache",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": f'attachment; filename="MUSTER-prwahl-{kind}.{filetype}"',
+    })
 
 
 @app.get("/personalratswahl")
