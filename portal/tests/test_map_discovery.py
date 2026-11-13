@@ -73,6 +73,22 @@ def test_rp_survey_catalog_contains_attributed_ogc_and_citygml():
     assert "CC BY-SA 2.0" in map_catalog.CATALOG["orm-standard"]["license"]
 
 
+def test_additional_official_rlp_services_are_curated():
+    for key in ("rp-afis-fixedpoints", "rp-properties-wms"):
+        spec = map_catalog.CATALOG[key]
+        assert spec["kind"] == "wms"
+        assert spec["url"].startswith("https://www.geoportal.rlp.de/mapbender/php/wms.php")
+        assert spec["license"] == "DL-DE BY 2.0"
+    for key, suffix in (("rp-alkis-points-wfs", "/669"),
+                        ("rp-alkis-simplified-wfs", "/519"),
+                        ("rp-soil-wfs", "/571")):
+        spec = map_catalog.CATALOG[key]
+        assert spec["kind"] == "wfs"
+        assert spec["url"].endswith(suffix)
+        assert spec["region"] == "Rheinland-Pfalz"
+        assert spec["license_url"] == map_catalog.BY
+
+
 def test_public_railway_activation_limited_to_curated_xyz_only(db, monkeypatch):
     settings(module_maps="1")
     monkeypatch.setattr(mp, "query_service", lambda *args, **kw:
