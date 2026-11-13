@@ -31,6 +31,24 @@ class FirstAidGrant(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class FirstAidOrgGrant(Base):
+    """Explicitly assigned medical-file review right for an organization subtree.
+
+    An organization membership, an org admin grant, and a global platform admin
+    permission never confer case access by themselves.
+    """
+    __tablename__ = "first_aid_org_grants"
+    __table_args__ = (UniqueConstraint("org_id", "user_id", "role", name="uq_first_aid_org_grant"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    org_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(16), default="review")
+    include_children: Mapped[bool] = mapped_column(Boolean, default=True)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class FirstAidCase(Base):
     __tablename__ = "first_aid_cases"
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: uuid.uuid4().hex)

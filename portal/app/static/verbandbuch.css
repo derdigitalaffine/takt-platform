@@ -167,3 +167,13 @@
 .vb-filter-empty {margin:1rem 1.35rem;padding:1.2rem;border:1px dashed var(--vb-line);border-radius:.75rem;background:var(--vb-tint);color:var(--vb-muted);text-align:center}
 .vb-root [hidden] {display:none!important}
 @media (max-width:640px) {.vb-list-tools {align-items:stretch}.vb-list-tools .btn {width:100%}}
+
+/* Explicit health-file review grants, never implied by general org membership. */
+.vb-org-grants{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;padding:1.25rem}
+.vb-org-grant-form{align-content:start}
+.vb-org-grant-list h3{font-size:.96rem;font-weight:750;margin:0 0 .9rem}
+.vb-org-scope-label{display:flex;align-items:flex-start;gap:.75rem;cursor:pointer;padding:.8rem;border:1px solid var(--vb-line);border-radius:.8rem;background:var(--vb-tint)}
+.vb-org-scope-label input{width:1.15rem;height:1.15rem;accent-color:var(--vb-primary);margin-top:.2rem;flex-shrink:0}
+.vb-org-scope-label span{display:flex;flex-direction:column;gap:.2rem}
+.vb-org-scope-label small{color:var(--vb-muted);font-weight:400;line-height:1.45}
+@media(max-width:900px){.vb-org-grants{grid-template-columns:1fr}}

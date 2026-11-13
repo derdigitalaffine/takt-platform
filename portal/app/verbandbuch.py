@@ -15,7 +15,7 @@ from .db import LOCAL_TZ, SessionLocal, Organization, User, utcnow
 from .organization import active_path
 from .verbandbuch_models import (
     FirstAidAudit, FirstAidCase, FirstAidCorrection, FirstAidDeletionProof,
-    FirstAidGrant, FirstAidSite,
+    FirstAidGrant, FirstAidOrgGrant, FirstAidSite,
 )
 
 log = logging.getLogger("portal.verbandbuch")
@@ -194,17 +194,36 @@ def sites_for(db, user, role: str) -> list[FirstAidSite]:
     perm = "verbandbuch_capture" if role == "capture" else "verbandbuch_review"
     if not user.active or perm not in user.perms:
         return []
-    allowed = select(FirstAidGrant.site_id).where(
+    now = utcnow()
+    direct_ids = set(db.scalars(select(FirstAidGrant.site_id).where(
         FirstAidGrant.user_id == user.id, FirstAidGrant.role == role,
-        (FirstAidGrant.valid_until.is_(None)) | (FirstAidGrant.valid_until > utcnow()),
-    )
-    candidates = db.scalars(select(FirstAidSite).where(
-        FirstAidSite.id.in_(allowed), FirstAidSite.active.is_(True),
-    ).order_by(FirstAidSite.title)).all()
-    # A site must cease granting access when ANY ancestor organization is
-    # disabled or detached. The same rule applies to QR, capture and review.
+        (FirstAidGrant.valid_until.is_(None)) | (FirstAidGrant.valid_until > now),
+    )))
+    inherited = db.scalars(select(FirstAidOrgGrant).where(
+        FirstAidOrgGrant.user_id == user.id, FirstAidOrgGrant.role == role,
+        (FirstAidOrgGrant.valid_until.is_(None)) | (FirstAidOrgGrant.valid_until > now),
+    )).all() if role == "review" else []
+    if not direct_ids and not inherited:
+        return []
     nodes = {node.id: node for node in db.scalars(select(Organization))}
-    return [site for site in candidates if active_path(db, site.org_id, nodes)]
+    # Organization ancestry is checked for every candidate; this prevents
+    # disabled parent units from silently preserving medical-data access.
+    valid_grants = [(grant.org_id, grant.include_children) for grant in inherited
+                    if active_path(db, grant.org_id, nodes)]
+    candidates = db.scalars(select(FirstAidSite).where(
+        FirstAidSite.active.is_(True),
+    ).order_by(FirstAidSite.title)).all()
+    result = []
+    for site in candidates:
+        path = active_path(db, site.org_id, nodes)
+        if not path:
+            continue
+        if site.id in direct_ids or any(
+            org_id == site.org_id or (include_children and org_id in path)
+            for org_id, include_children in valid_grants
+        ):
+            result.append(site)
+    return result
 
 
 def may(db, user, site_id: int, role: str) -> bool:
