@@ -86,6 +86,18 @@ Quellen und Nachweise:
 - https://www.geoportal.rlp.de/mapbender/php/mod_showMetadata.php?id=86762&resource=layer
 - https://www.geoportal.rlp.de/spatial-objects/606
 
+**Weitere amtliche RLP-Quellen:** Die Open-Data-Seite verlinkt
+zusätzlich den WMS **AFIS RP Festpunktübersicht**, WMS
+**Liegenschaften RP**, WFS **ALKIS Punkte**, WFS **ALKIS vereinfacht**
+und WFS **Bodenschätzung**. Als kuratierte Einträge sind sie im Browser
+verfügbar; die Auswahl lädt die Anbieter-Capabilities erst bei
+Nutzeraktion. Die WFS liefern nicht zwingend EPSG:3857 und können bei
+ungeeignetem Referenzsystem bewusst als nicht kompatibel abgewiesen
+werden; sie sind keine unmittelbare Aussage über Eigentumsverhältnisse.
+
+Quelle: https://lvermgeo.rlp.de/geodaten-geoshop/open-data/
+(Amtliche Capabilities-Verweise unter Kataster/Vermessung.)
+
 **3D-Gebäudedaten:** Amtliche LoD1/LoD2-Gebäudemodelle werden
 als **CityGML-Download** dokumentiert und direkt mit der amtlichen
 3D-Onlineansicht verlinkt. LoD1 sind Blockmodelle, LoD2 enthält
