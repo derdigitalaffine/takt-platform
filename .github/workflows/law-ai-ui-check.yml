@@ -5,6 +5,9 @@ on:
     paths:
       - "portal/app/static/law-ai-agents.js"
       - "portal/app/static/law-ai-workspace.js"
+      - "portal/app/static/law-ai-report.js"
+      - "portal/app/templates/law_ai_agent_report.html"
+      - "portal/tests/test_law_ai_report.py"
       - "portal/app/static/law-ai-workspace.css"
       - "portal/app/static/law-ai-ocr-progress.js"
       - "portal/tests/test_law_ai_workspace_ux.py"
@@ -28,4 +31,5 @@ jobs:
         run: |
           node --check portal/app/static/law-ai-agents.js
           node --check portal/app/static/law-ai-workspace.js
+          node --check portal/app/static/law-ai-report.js
           node --check portal/app/static/law-ai-ocr-progress.js
