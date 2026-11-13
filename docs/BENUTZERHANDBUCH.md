@@ -18,7 +18,8 @@ Willkommen im TAKT-Portal. Die Dokumentation ist jetzt **nach Aufgaben geglieder
 ## Häufige Aufgaben
 
 - **Einen Termin mit mehreren Personen abstimmen:** [Umfragen & Abstimmungen](handbuch/module/umfragen-abstimmungen.md)
-- **Einen Raum buchen:** [Ressourcen & Belegung](handbuch/module/ressourcen.md)
+- **Einen Raum extern buchen:** [Räume & Vermietung](handbuch/module/ressourcen.md)
+- **Intern einen Beamer, Pavillon oder ein Fahrzeug reservieren:** [Interne Ressourcen](handbuch/module/interne-ressourcen.md)
 - **Ein Formular erstellen oder auswerten:** [Formulare](handbuch/module/formulare.md)
 - **Eine Aufgabe bearbeiten oder Kolleg:innen zuweisen:** [Aufgaben & Zusammenarbeit](handbuch/module/aufgaben.md)
 - **Büros zuordnen oder digitale Wegweiser erstellen:** [Digital Signage](handbuch/module/digital-signage.md)
@@ -26,7 +27,7 @@ Willkommen im TAKT-Portal. Die Dokumentation ist jetzt **nach Aufgaben geglieder
 
 ## Modulanleitungen
 
-Alle **19 konfigurierbaren Module** aus dem aktuellen Portal sowie zusätzlich die übergreifenden Arbeitsbereiche Meetings, Abwesenheiten und Zahlungen haben eine eigene Anleitung. Die Reihenfolge entspricht typischen Arbeitsaufgaben, nicht technischen Modulkennungen.
+Alle **21 konfigurierbaren Module** aus dem aktuellen Portal sowie zusätzlich die übergreifenden Arbeitsbereiche Meetings, Abwesenheiten und Zahlungen haben eine eigene Anleitung. Die Reihenfolge entspricht typischen Arbeitsaufgaben, nicht technischen Modulkennungen.
 
 ### Mein Arbeitsplatz
 
@@ -44,7 +45,8 @@ Alle **19 konfigurierbaren Module** aus dem aktuellen Portal sowie zusätzlich d
 | <a id="12e-kalender--urlaubsplanung"></a><a id="12e-kalender-und-urlaub-–-getrennte-arbeitsbereiche"></a>[**Kalender & Urlaub**](handbuch/module/kalender-urlaub.md) | Termine, Freigaben und Urlaubsplanung |
 | <a id="seminare-und-lehrgänge"></a>[**Seminare & Lehrgänge**](handbuch/module/seminare.md) | Angebote, Anmeldungen und Lehrgangsplanung |
 | <a id="6b-terminbuchung-z-b-vorstellungsgespräche"></a>[**Terminbuchung**](handbuch/module/terminbuchung.md) | Sprechzeiten und öffentliche Buchungsseiten |
-| <a id="6g-räume-plätze-und-geräte-buchen-ressourcen"></a>[**Ressourcen & Belegung**](handbuch/module/ressourcen.md) | Räume, Geräte und Nutzungszeiten buchen |
+| <a id="6g-räume-plätze-und-geräte-buchen-ressourcen"></a>[**Räume & Vermietung**](handbuch/module/ressourcen.md) | Extern buchbare Räume, Plätze und Ausstattung |
+| [**Interne Ressourcen**](handbuch/module/interne-ressourcen.md) | Dienstliches Inventar, Lagerorte und Materialreservierungen |
 | [**Digital Signage**](handbuch/module/digital-signage.md) | Displays, Gebäudebrowser, Raumzuordnung und Sonderbetrieb |
 | <a id="6h-bezahlen-und-zahlungen"></a>[**Zahlungen & Gebühren**](handbuch/module/zahlungen.md) | Gebührenpflichtige Buchungen und Zahlungsstatus |
 

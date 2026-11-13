@@ -316,10 +316,6 @@ Ob darüber hinaus Führerscheinprüfung, Fahrtenbuch oder Fahrzeugübergabe vor
 Und wenn etwas nicht klappt: Erst den **Status** prüfen, dann die **Fristen**, dann die **Berechtigungen**. Meist steckt die Lösung genau dort.
 
 
-## Interner Gerätepool
+## Interne dienstliche Materialien
 
-Der **interne Gerätepool** unter **Ressourcen → Gerätepool** ist vom öffentlichen Katalog und der kostenpflichtigen Vermietung getrennt. Beschäftigte mit dem Recht „Gerätepool: buchen“ können die freigegebenen Gegenstände (z. B. Beamer, Leinwände, Pavillons, Mobiliar und Fahrzeuge) zeitlich reservieren. Die Ansicht zeigt den Bestand, Lagerort und Verfügbarkeit; Buchungen werden auf Überschneidungen und Reservierungsmengen geprüft.
-
-Mit „Gerätepool: verwalten“ (oder dem bestehenden umfassenden Ressourcenrecht) können zuständige Personen Lagerorte und Inventar anlegen, Mengen und Standort korrigieren, Geräte vorübergehend für Wartung sperren, Gegenstände ausgeben und nach Rückgabe wieder freigeben. Alle relevanten Aktionen werden protokolliert. Noch nicht zurückgegebene Geräte gelten auch nach dem geplanten Rückgabezeitpunkt als ausgegeben. Bei Fahrzeugen ist die Fahrerlaubnis und Einsatzberechtigung vor Ausgabe separat organisatorisch zu prüfen.
-
-Der Gerätepool ist **keine** Bestandsbuchhaltung mit Anschaffungswerten und **keine** Abrechnungs-/Verkaufsplattform.
+Beamer, Leinwände, Biertischgarnituren, Pavillons, Dienstfahrzeuge und sonstiges dienstliches Inventar werden im **separaten Modul [Interne Ressourcen](interne-ressourcen.md)** geplant. Dort gibt es keine Mietpreise oder Bürgerbuchungen. Der Bereich besitzt einen eigenen Menüpunkt, eigene Aktivierung und gesonderte Zugriffsrechte.

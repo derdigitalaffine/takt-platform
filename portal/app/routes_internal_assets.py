@@ -430,7 +430,7 @@ def internal_legacy_links(request: Request, legacy_path: str = "",
     import re
     from fastapi.responses import RedirectResponse
     allowed = legacy_path in ("", "plan", "verfuegbarkeit") or bool(
-        re.fullmatch(r"buchungen/\\d+/termin\\.ics", legacy_path))
+        re.fullmatch(r"buchungen/\d+/termin\.ics", legacy_path))
     if not allowed:
         raise HTTPException(404)
     new_url = "/interne-ressourcen" + ("/" + legacy_path if legacy_path else "")
