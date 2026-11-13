@@ -254,7 +254,8 @@ async def passkey_register_verify(request: Request, user: User = Depends(current
             expected_rp_id=flow.rp_id, expected_origin=flow.origin,
             require_user_verification=True,
         )
-    except (ValueError, TypeError, KeyError):
+    except (WebAuthnException, InvalidRegistrationResponse,
+            InvalidAuthenticationResponse, ValueError, TypeError, KeyError):
         raise HTTPException(400, "Passkey konnte nicht verifiziert werden.") from None
     if _b64(verified.credential_id) != credential["id"]:
         raise HTTPException(400, "Passkey-Kennung widerspricht der Attestierung.")
