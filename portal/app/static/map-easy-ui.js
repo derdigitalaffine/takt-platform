@@ -215,8 +215,12 @@
       if (input && input.checked) {
         input.checked = false;
         input.dispatchEvent(new Event('change', {bubbles: true}));
-        update();
+      } else {
+        // The full layer list may be filtered to a different name/category.
+        // The overview must still be able to hide every active layer.
+        api.kit.setVisible(hide.dataset.mapHide, false);
       }
+      update();
     }
   });
   easyBase.addEventListener('change', function () {
