@@ -121,6 +121,7 @@
   const calls = panel.querySelector("[data-law-ai-call-count]");
   const stats = panel.querySelector("[data-law-ai-stream-stats]");
   const validated = panel.querySelector("[data-law-ai-validated]");
+  const retries = panel.querySelector("[data-law-ai-retries]");
   const bar = panel.querySelector("[data-law-ai-progress]");
   const fill = panel.querySelector("[data-law-ai-progress-bar]");
   const names = {
