@@ -4,6 +4,7 @@ This deliberately has NO LLM execution, OCR, external fetch, or publication path
 Untrusted binary PDFs/DOCX/images are staged for the future isolated worker.
 """
 import hashlib
+import json
 import os
 import re
 import secrets
@@ -24,6 +25,8 @@ law_user = require("laws")
 MAX_UPLOAD = 25 * 1024 * 1024
 TEXT_LIMIT = 2 * 1024 * 1024
 ORIGINAL_DIR = settings.data_dir / "law-ai-originals"
+OCR_QUEUE = settings.data_dir / "law-ai-ocr-queue"
+OCR_RESULTS = settings.data_dir / "law-ai-ocr-results"
 
 MIME = {
     ".pdf": "application/pdf",
@@ -89,12 +92,150 @@ def _own(db: Session, draft_id: int, user: User) -> LawAiDraft:
 def _render(request, db, user, selected=None):
     rows = list(db.scalars(select(LawAiDraft).where(
         LawAiDraft.owner_id == user.id).order_by(LawAiDraft.created_at.desc()).limit(40)))
+    try:
+        ocr_pages = json.loads(selected.ocr_pages_json or "[]") if selected else []
+        ocr_warnings = json.loads(selected.ocr_warnings_json or "[]") if selected else []
+    except (ValueError, TypeError):
+        ocr_pages, ocr_warnings = [], []
     response = render(request, "law_ai_workspace.html", user,
                       drafts=rows, selected=selected, doc_types=lx.DOC_TYPES,
+                      ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
+                      ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
                       level_options=lx.level_options(db))
     response.headers["Cache-Control"] = "private, no-store"
     return response
 
+
+
+def _safe_job_key(key: str) -> bool:
+    return bool(re.fullmatch(r"[a-f0-9]{48}", key or ""))
+
+
+def _apply_ocr_result(db: Session, draft: LawAiDraft) -> bool:
+    """Import a completed worker result, never modify or publish LawText."""
+    if draft.status != "ocr_queued" or not _safe_job_key(draft.ocr_job_key):
+        return False
+    path = OCR_RESULTS / (draft.ocr_job_key + ".result.json")
+    if not path.is_file():
+        return False
+    if path.stat().st_size > 15 * 1024 * 1024:
+        raise HTTPException(502, "Das OCR-Ergebnis ist zu groß.")
+    try:
+        result = json.loads(path.read_text("utf-8"))
+    except (ValueError, UnicodeError):
+        raise HTTPException(502, "Das OCR-Ergebnis ist beschädigt.") from None
+    if (not isinstance(result, dict) or result.get("schema") != 1
+            or result.get("job_key") != draft.ocr_job_key
+            or result.get("sha256") != draft.original_sha256
+            or result.get("status") not in ("done", "failed")):
+        raise HTTPException(502, "OCR-Ergebnis stimmt nicht mit dem Original überein.")
+    changes = {"updated_at": utcnow()}
+    if result["status"] == "done":
+        text = result.get("markdown")
+        pages = result.get("pages")
+        warnings = result.get("warnings")
+        if (not isinstance(text, str) or not 0 < len(text.encode("utf-8")) <= TEXT_LIMIT
+                or not isinstance(pages, list) or len(pages) > 120
+                or not isinstance(warnings, list) or len(warnings) > 150):
+            raise HTTPException(502, "Das OCR-Ergebnis enthält ungültige Daten.")
+        # Only human-readable evidence, and a bounded selection of word boxes.
+        summary = []
+        for page in pages:
+            if not isinstance(page, dict):
+                raise HTTPException(502, "OCR-Seitendaten haben ein ungültiges Format.")
+            boxes = page.get("words", [])
+            summary.append({
+                "page": page.get("page"),
+                "engine": str(page.get("engine", ""))[:30],
+                "confidence": page.get("confidence"),
+                "text_excerpt": str(page.get("text", ""))[:300],
+                "words": boxes[:200] if isinstance(boxes, list) else [],
+            })
+        changes.update(status="ocr_review", proposed_md=text,
+                       ocr_pages_json=json.dumps(summary, ensure_ascii=False),
+                       ocr_warnings_json=json.dumps([str(w)[:200] for w in warnings],
+                                                    ensure_ascii=False),
+                       ocr_failure="")
+    else:
+        changes.update(status="ocr_failed",
+                       ocr_failure=str(result.get("message") or
+                                       "Texterkennung fehlgeschlagen.")[:180])
+    # CAS protects a pending manual action from overwriting a reviewed result.
+    updated = db.execute(update(LawAiDraft).where(
+        LawAiDraft.id == draft.id, LawAiDraft.status == "ocr_queued",
+        LawAiDraft.ocr_job_key == draft.ocr_job_key,
+    ).values(**changes))
+    if updated.rowcount != 1:
+        db.rollback()
+        return False
+    db.commit()
+    db.refresh(draft)
+    path.unlink(missing_ok=True)
+    return True
+
+
+@app.post("/laws-assistant/{draft_id:int}/ocr", dependencies=[Depends(check_csrf)])
+def law_ai_queue_ocr(
+    request: Request, draft_id: int,
+    language: str = Form("deu"),
+    user: User = Depends(law_user), db: Session = Depends(get_db),
+):
+    """Explicit request; the web app never parses untrusted binary documents."""
+    rate_limit(request, "law-ai-ocr-queue", limit=6, window=3600, key=str(user.id))
+    row = _own(db, draft_id, user)
+    if row.status not in ("needs_ocr", "ocr_failed"):
+        raise HTTPException(409, "Der Entwurf ist nicht für eine neue OCR vorgesehen.")
+    if language not in ("deu", "deu+eng"):
+        raise HTTPException(422, "Nicht unterstützte OCR-Sprache.")
+    extension = Path(row.original_filename).suffix.lower()
+    if extension not in {".pdf", ".docx", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}:
+        raise HTTPException(415, "Für dieses Format ist keine Texterkennung vorgesehen.")
+    if not _original_path(row).is_file():
+        raise HTTPException(404, "Originaldatei fehlt.")
+    job_key = secrets.token_hex(24)
+    job = {
+        "job_key": job_key,
+        "storage_key": row.original_storage_key,
+        "extension": extension, "sha256": row.original_sha256,
+        "size": row.original_size, "language": language,
+    }
+    acquired = db.execute(update(LawAiDraft).where(
+        LawAiDraft.id == row.id, LawAiDraft.owner_id == user.id,
+        LawAiDraft.status.in_(("needs_ocr", "ocr_failed")),
+    ).values(status="ocr_queued", ocr_job_key=job_key, ocr_failure="",
+             updated_at=utcnow()))
+    if acquired.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "Der Entwurf wird bereits verarbeitet.")
+    OCR_QUEUE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    temporary = OCR_QUEUE / (job_key + ".tmp")
+    submitted = OCR_QUEUE / (job_key + ".job.json")
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as output:
+            json.dump(job, output, ensure_ascii=False)
+        os.replace(temporary, submitted)
+        db.commit()
+    except Exception:
+        db.rollback()
+        temporary.unlink(missing_ok=True)
+        submitted.unlink(missing_ok=True)
+        raise
+    return redirect(f"/laws-assistant/{row.id}")
+
+
+@app.get("/laws-assistant/{draft_id:int}/ocr/status")
+def law_ai_ocr_status(
+    draft_id: int, user: User = Depends(law_user), db: Session = Depends(get_db),
+):
+    from fastapi.responses import JSONResponse
+    row = _own(db, draft_id, user)
+    _apply_ocr_result(db, row)
+    return JSONResponse({
+        "status": row.status,
+        "ready": row.status in ("ocr_review", "ocr_failed"),
+        "failure": row.ocr_failure if row.status == "ocr_failed" else "",
+    }, headers={"Cache-Control": "private, no-store"})
 
 @app.get("/laws-assistant")
 def law_ai_home(request: Request, user: User = Depends(law_user),
@@ -142,7 +283,9 @@ async def law_ai_import(request: Request, file: UploadFile = File(...),
 @app.get("/laws-assistant/{draft_id:int}")
 def law_ai_review(request: Request, draft_id: int,
                   user: User = Depends(law_user), db: Session = Depends(get_db)):
-    return _render(request, db, user, _own(db, draft_id, user))
+    row = _own(db, draft_id, user)
+    _apply_ocr_result(db, row)
+    return _render(request, db, user, row)
 
 
 @app.get("/laws-assistant/{draft_id:int}/original")
@@ -186,7 +329,7 @@ def law_ai_accept(
     acquired = db.execute(update(LawAiDraft).where(
         LawAiDraft.id == draft_id,
         LawAiDraft.owner_id == user.id,
-        LawAiDraft.status.in_(("staged", "needs_ocr")),
+        LawAiDraft.status.in_(("staged", "needs_ocr", "ocr_review", "ocr_failed")),
     ).values(status="accepting", updated_at=utcnow()))
     if acquired.rowcount != 1:
         db.rollback()
@@ -226,6 +369,8 @@ def law_ai_discard(
     row = _own(db, draft_id, user)
     if row.status == "accepted":
         raise HTTPException(409, "Ein bereits übernommener Originalnachweis darf nicht entfernt werden.")
+    if row.status == "ocr_queued":
+        raise HTTPException(409, "OCR-Auftrag läuft noch. Nach Abschluss kann der Entwurf verworfen werden.")
     path = _original_path(row)
     db.delete(row)
     db.commit()

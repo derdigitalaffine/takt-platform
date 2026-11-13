@@ -1,0 +1,64 @@
+name: Ortsrecht OCR worker smoke
+
+on:
+  pull_request:
+    paths:
+      - "portal/ocr_worker/**"
+      - "portal/app/routes_law_ai.py"
+      - "portal/app/law_ai_models.py"
+      - "docker-compose.yml"
+      - ".github/workflows/ocr-worker-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  offline-ocr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated MarkItDown/Tesseract worker
+        run: docker build -t takt-law-ocr:ci ./portal/ocr_worker
+      - name: Verify offline OCR dependencies, PDF conversion and source evidence
+        run: |
+          docker run --rm \
+            --network=none --read-only --cap-drop=ALL \
+            --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,size=134217728,mode=1777 \
+            --entrypoint sh takt-law-ocr:ci -ec '
+              tesseract --list-langs 2>&1 | grep -q deu
+              python - << "PY"
+          import fitz
+          import sys
+          from pathlib import Path
+          from markitdown import MarkItDown
+          from PIL import Image, ImageDraw, ImageFont
+          sys.path.insert(0, "/app")
+          from worker import extract
+
+          pdf = fitz.open()
+          page = pdf.new_page()
+          for index in range(5):
+              page.insert_text((72, 72 + 24 * index),
+                               "Satzung der Mustergemeinde: Paragraphen, Fristen und Zahlen in Originalfassung.",
+                               fontsize=10)
+          filename = Path("/tmp/synthetic_ortsrecht.pdf")
+          pdf.save(filename)
+          pdf.close()
+          md = MarkItDown(enable_plugins=False).convert_local(str(filename)).text_content
+          assert "Satzung" in md
+          result = extract(filename, ".pdf")
+          assert "Satzung" in result["markdown"]
+          assert result["pages"][0]["engine"] == "native-pdf"
+          assert result["pages"][0]["page"] == 1
+          # Real scanned-image OCR, without any external API.
+          image = Image.new("RGB", (1450, 250), "white")
+          font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 52)
+          ImageDraw.Draw(image).text((40, 55), "Satzung der Ortsgemeinde", fill="black", font=font)
+          scan = Path("/tmp/synthetic_scan.png")
+          image.save(scan)
+          scan_result = extract(scan, ".png")
+          assert "satzung" in scan_result["markdown"].lower(), scan_result["markdown"]
+          assert scan_result["pages"][0]["engine"] == "tesseract"
+          print("Offline OCR smoke successful: MarkItDown 0.1.9, PyMuPDF, Tesseract deu")
+          PY
+            '

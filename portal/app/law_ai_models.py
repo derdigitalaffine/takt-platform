@@ -24,6 +24,11 @@ class LawAiDraft(Base):
     proposed_md: Mapped[str] = mapped_column(Text, default="")
     proposed_title: Mapped[str] = mapped_column(String(400), default="")
     status: Mapped[str] = mapped_column(String(24), default="staged")
+    # Immutable job identity for isolated offline OCR; no worker ever accesses DB.
+    ocr_job_key: Mapped[str] = mapped_column(String(48), default="")
+    ocr_pages_json: Mapped[str] = mapped_column(Text, default="[]")
+    ocr_warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    ocr_failure: Mapped[str] = mapped_column(String(180), default="")
     accepted_law_id: Mapped[int | None] = mapped_column(
         ForeignKey("law_texts.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)

@@ -211,6 +211,34 @@ services:
     networks:
       search_private:
       search_egress:
+  # Optional offline OCR for Ortsrecht imports:
+  # docker compose --profile ocr up -d --build law-ocr
+  # No network, no portal DB/secrets, no published legal text access.
+  law-ocr:
+    build: ./portal/ocr_worker
+    image: ${LAW_OCR_IMAGE:-takt-law-ocr:local}
+    profiles: ["ocr"]
+    restart: ${RESTART_POLICY:-unless-stopped}
+    network_mode: "none"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: 2.0
+    pids_limit: 128
+    tmpfs:
+      - /tmp:size=134217728,mode=1777
+    environment:
+      - LAW_OCR_ORIGINALS=/work/originals
+      - LAW_OCR_QUEUE=/work/queue
+      - LAW_OCR_RESULTS=/work/results
+    volumes:
+      - ${CONFIG}/portal/law-ai-originals:/work/originals:ro
+      - ${CONFIG}/portal/law-ai-ocr-queue:/work/queue
+      - ${CONFIG}/portal/law-ai-ocr-results:/work/results
+
   portal:
     build: ./portal
     image: ${PORTAL_IMAGE:-jitsi-speechmind-portal:local}
