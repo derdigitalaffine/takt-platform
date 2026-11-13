@@ -20,14 +20,31 @@ sind damit nicht mehr ausschließlich über die Adminoberfläche zu finden.
 |---|---|---|
 | Layerkatalog, Themen, Gebiet, Suche | Öffentliche, durchsuchbare Quellen mit Themen-/Gebietsfilter, Favoriten, Metadaten und Lizenzen | Weitere Anbieter kuratieren |
 | Aktivierbare Ebenen | On-demand Capabilities-Abfrage, unterstützte benannte WMS-/WFS-/WMTS-Layer, Mehrfachauswahl | Anbieter muss kompatiblen und erreichbaren Dienst anbieten |
-| Aktive Layer, Reihenfolge, Transparenz | Suche, Zähler, aktiver Filter, Sortierung, Deckkraft, Zeit, Legenden, Speichern | Kein nativer Layer-Swipe |
+| Aktive Layer, Reihenfolge, Transparenz | Suche, Zähler, aktiver Filter, Sortierung, Deckkraft, Zeit, Legenden, Speichern | Individueller Layer-Swipe weiterhin offen |
 | Vektor-Sachinformation, Messung, Zeichnen | Bereits vorhanden, unverändert | Ausbau von Pufferanalyse und Höhenprofilen separat |
+| Grundkarten vergleichen | Opt-in Swipe mit synchronisierten MapLibre-Karten, einstellbarer Trennlinie und anderer Grundkarte rechts; kein permanenter zweiter Renderer | Vergleiche beliebiger Fachebenen oder Kartenstände noch offen |
 | 3D-Ansicht | 3D-Kameraneigung und optionale Höhen-Extrusion aus vorhandenen GeoJSON/WFS-Gebäudeattributen | Für amtliche LoD2-Dächer zusätzlich CityGML-Konvertierung/3D-Tiles |
 | Speichern, Teilen, Export | Bestehende persönliche Karten, sichere Layer-Pfade und Druck bleiben erhalten | Kein hochauflösender serverseitiger Kartenatlas |
 | Offene Daten | Erweiterte RLP-Quellen, bundeseinheitliche und länderübergreifende Dienste; OpenRailwayMap | Externe Verfügbarkeit und Lizenzbedingungen gelten |
 
 Vergleichsquelle:
 https://www.masterportal.org/en/features/features
+
+### Ergänzung: schnelle Themenwahl und Grundkartenvergleich
+
+- Ein-Tap-Themen (Luftbilder, Kataster, Hochwasser, Umwelt, Bahn, 3D-Gebäude)
+  setzen Suche, Region und Favoritenfilter zurück, damit der Nutzer auch mobil
+  sofort zu relevanten Quellen gelangt. Auf jeder Quellendetailseite sind
+  Originalangebot und Lizenzbedingungen sichtbar.
+- Die Vergleichsansicht wird erst auf ausdrücklichen Klick erzeugt. Sie nutzt
+  eine zweite MapLibre-Ansicht für eine alternative **Grundkarte**, synchronisiert
+  Mittelpunkt, Zoom, Drehung und Neigung mit der Hauptkarte und schneidet die
+  rechte Ansicht per Schieberegler zu. Beim Beenden wird der Renderer entfernt.
+- Der Kartenvergleich stellt **keinen** vollständigen Masterportal-Layer-Swipe
+  dar: die rechte Seite zeigt nur die ausgewählte Grundkarte, während links
+  bestehende Fachebenen sichtbar bleiben. Die Funktion benötigt mindestens
+  zwei vorhandene kompatible Grundkarten. Ein Extrusions- oder LoD2-Vergleich
+  ist nicht Bestandteil dieser Funktion.
 
 ### Fachliche Bedienung
 
