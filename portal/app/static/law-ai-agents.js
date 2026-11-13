@@ -121,6 +121,7 @@
   const calls = panel.querySelector("[data-law-ai-call-count]");
   const stats = panel.querySelector("[data-law-ai-stream-stats]");
   const validated = panel.querySelector("[data-law-ai-validated]");
+  const retries = panel.querySelector("[data-law-ai-retries]");
   const bar = panel.querySelector("[data-law-ai-progress]");
   const fill = panel.querySelector("[data-law-ai-progress-bar]");
   const names = {
@@ -156,7 +157,7 @@
       ? value.progress_total : 0;
     const done = Number.isSafeInteger(value.progress_done) && value.progress_done >= 0
       ? Math.min(value.progress_done, total) : 0;
-    if (calls) calls.textContent = done + " von " + (total || "…") + " Modellaufrufen abgeschlossen";
+    if (calls) calls.textContent = done + " von " + (total || "…") + " Prüfabschnitten abgeschlossen";
     const percent = total ? Math.min(100, Math.round(done / total * 100)) : 0;
     if (bar) bar.setAttribute("aria-valuenow", String(percent));
     if (fill) fill.style.width = percent + "%";
@@ -164,6 +165,11 @@
       const items = Number.isSafeInteger(value.validated_items)
         ? Math.max(0, value.validated_items) : 0;
       validated.textContent = items + " fundstellengeprüfte Vorschläge";
+    }
+    if (retries) {
+      const count = Number.isSafeInteger(value.retry_attempts)
+        ? Math.max(0, value.retry_attempts) : 0;
+      retries.textContent = count + " automatische Abschnittsverkleinerungen";
     }
     if (value.stream_active === true) {
       const chars = Number.isSafeInteger(value.stream_characters)

@@ -79,12 +79,14 @@ def _progress_payload(job: LawAiAnalysis | None) -> dict:
         return {"status": "none", "step": "none", "ready": False,
                 "failure": "", "progress_done": 0, "progress_total": 0,
                 "stream_active": False, "stream_characters": 0,
-                "stream_chunks": 0, "validated_items": 0}
+                "stream_chunks": 0, "validated_items": 0,
+                "retry_attempts": 0}
     return {
         "status": job.status, "step": job.step,
         "ready": job.status in ("done", "failed", "cancelled"),
         "failure": job.failure if job.status == "failed" else "",
         "progress_done": job.progress_done,
+        "retry_attempts": job.retry_attempts,
         "progress_total": job.progress_total,
         "stream_active": bool(job.stream_active and job.status == "running"),
         "stream_characters": job.stream_characters,

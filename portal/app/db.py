@@ -2998,6 +2998,7 @@ _NEW_COLUMNS = {
     "law_ai_analyses": {
         "progress_total": "INTEGER NOT NULL DEFAULT 0",
         "progress_done": "INTEGER NOT NULL DEFAULT 0",
+        "retry_attempts": "INTEGER NOT NULL DEFAULT 0",
         "stream_characters": "INTEGER NOT NULL DEFAULT 0",
         "stream_chunks": "INTEGER NOT NULL DEFAULT 0",
         "stream_active": "BOOLEAN NOT NULL DEFAULT 0",

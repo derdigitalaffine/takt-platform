@@ -106,3 +106,18 @@ def test_duplicate_citation_is_flagged_as_ambiguous():
     finding = assembled["findings"][0]
     assert finding["quote_occurrences"] == 3
     assert source[finding["source_start"]:finding["source_end"]] == quote
+
+
+
+def test_context_recovery_picks_nearest_paragraph_boundary_not_end_of_window():
+    source = "§ 5 Keine Gebühr ohne Beschluss.\n" * 190
+    whole = coverage.sections(source)[0]
+    result = coverage.bisect(whole)
+    assert result is not None
+    left, right = result
+    assert left.text + right.text == source
+    assert left.end == right.start
+    # A trailing break towards 2/3 of the allowed window would leave the
+    # first request too large for a model with a 4000-char context ceiling.
+    assert max(len(left.text), len(right.text)) < 4000
+    assert abs(len(left.text) - len(right.text)) < 100
