@@ -137,7 +137,8 @@ def _render(request, db, user, selected=None, *, view: str = "all"):
                       ai_enabled=ai_enabled,
                       agent_routes=agent_routes, agent_stages=law_ai_agents.STAGES,
                       ai_source_limit=law_ai_agents.MAX_SOURCE_CHARS,
-                      level_options=lx.level_options(db))
+                      level_options=lx.level_options(db),
+                      outline_modes=lx.OUTLINE_MODES)
     response.headers["Cache-Control"] = "private, no-store"
     return response
 
