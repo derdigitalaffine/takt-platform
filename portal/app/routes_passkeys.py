@@ -19,7 +19,9 @@ from webauthn import (
     base64url_to_bytes, generate_authentication_options, generate_registration_options,
     options_to_json, verify_authentication_response, verify_registration_response,
 )
-from webauthn.helpers.exceptions import WebAuthnException
+from webauthn.helpers.exceptions import (
+    WebAuthnException, InvalidRegistrationResponse, InvalidAuthenticationResponse,
+)
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria, PublicKeyCredentialDescriptor,
     ResidentKeyRequirement, UserVerificationRequirement,
@@ -185,7 +187,8 @@ async def passkey_login_verify(request: Request, db: Session = Depends(get_db)):
             credential_current_sign_count=stored.sign_count,
             require_user_verification=True,
         )
-    except (WebAuthnException, ValueError, TypeError, KeyError):
+    except (WebAuthnException, InvalidRegistrationResponse,
+            InvalidAuthenticationResponse, ValueError, TypeError, KeyError):
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.") from None
     if _b64(verified.credential_id) != stored.credential_id or not verified.user_verified:
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.")
