@@ -144,6 +144,8 @@ PERMISSIONS = {
     "ai_web": ("KI-Websuche", "fa-globe", "Öffentliche Webquellen auf ausdrücklichen Wunsch recherchieren"),
     "maps": ("Karten", "fa-map-location-dot", "Im Kartenbrowser eigene WMS/WFS-Layer hinzufügen, Karten speichern und teilen"),
     "payments": ("Zahlungen", "fa-euro-sign", "Zahlungsübersicht und Export, Zahlungen als bezahlt markieren, erstatten und stornieren"),
+    "internal_assets_book": ("Gerätepool: buchen", "fa-box-open", "Interne Gegenstände sehen und für eigene dienstliche Zwecke reservieren"),
+    "internal_assets_manage": ("Gerätepool: verwalten", "fa-warehouse", "Inventar, Lagerorte, Aus-/Rückgaben und Wartungen verwalten"),
     "resources": ("Ressourcen", "fa-building", "Bürgerhäuser, Räume, Grillplätze, Geräte anlegen, Buchungen bearbeiten, Belegungskalender teilen"),
     "signage_manage": ("Digital Signage gestalten", "fa-display", "Gebäude, Räume, Displays, Freigaben und Geräte verwalten"),
     "krank": ("Krankmeldungen", "fa-notes-medical", "Krankmeldungen der Arbeitgeber bearbeiten, für die man (oder die eigene Gruppe) zuständig ist"),
@@ -3219,7 +3221,7 @@ def _migrate() -> None:
 def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import verbandbuch_models  # noqa: F401 – isolierte Erste-Hilfe-Fachtabellen
-    from . import internal_asset_models  # noqa: F401 – interne Materialplanung
+    from . import internal_asset_models  # noqa: F401 – separater interner Gerätepool
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
     from . import law_ai_models  # noqa: F401 – isolated, unpublished law-import drafts

@@ -12,6 +12,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 from sqlalchemy import delete, select
 from .config import settings
 from .db import LOCAL_TZ, SessionLocal, Organization, User, utcnow
+from .organization import active_path
 from .verbandbuch_models import (
     FirstAidAudit, FirstAidCase, FirstAidCorrection, FirstAidDeletionProof,
     FirstAidGrant, FirstAidSite,
@@ -183,7 +184,7 @@ def qr_site(db, token: str) -> FirstAidSite:
     except (BadSignature, ValueError, TypeError, KeyError):
         raise HTTPException(404, "Dieser Standort-QR-Code ist ungültig.") from None
     site = db.get(FirstAidSite, sid)
-    if site is None or not site.active or not (org := db.get(Organization, site.org_id)) or not org.active:
+    if site is None or not site.active or not active_path(db, site.org_id):
         raise HTTPException(404, "Standort nicht verfügbar.")
     return site
 
@@ -197,12 +198,13 @@ def sites_for(db, user, role: str) -> list[FirstAidSite]:
         FirstAidGrant.user_id == user.id, FirstAidGrant.role == role,
         (FirstAidGrant.valid_until.is_(None)) | (FirstAidGrant.valid_until > utcnow()),
     )
-    return db.scalars(select(FirstAidSite).join(
-        Organization, Organization.id == FirstAidSite.org_id
-    ).where(
+    candidates = db.scalars(select(FirstAidSite).where(
         FirstAidSite.id.in_(allowed), FirstAidSite.active.is_(True),
-        Organization.active.is_(True),
     ).order_by(FirstAidSite.title)).all()
+    # A site must cease granting access when ANY ancestor organization is
+    # disabled or detached. The same rule applies to QR, capture and review.
+    nodes = {node.id: node for node in db.scalars(select(Organization))}
+    return [site for site in candidates if active_path(db, site.org_id, nodes)]
 
 
 def may(db, user, site_id: int, role: str) -> bool:
