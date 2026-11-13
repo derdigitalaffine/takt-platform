@@ -950,10 +950,72 @@ def admin_map_catalog(request: Request, key: str, user: User = Depends(maps_admi
     db.add(row);db.commit();flash(request,'Amtliche Ebene ergänzt. Vorhandene Layer und Startgrundkarte bleiben erhalten.');return redirect(f'/admin/maps/{row.id}')
 
 
+
+@app.get('/maps/library')
+def map_library_public(q: str = '', region: str = '', topic: str = ''):
+    """Public, metadata-only discovery. No external call or internal layer
+    is exposed, and neither service secrets nor saved private maps are read.
+    """
+    if 'maps' not in enabled_modules():
+        raise HTTPException(404)
+    result = catalog_library.discover(q[:160], region[:100], topic[:100])
+    return JSONResponse(result, headers={'Cache-Control': 'public, max-age=1800'})
+
+
+@app.post('/maps/library/{key}/layers', dependencies=[Depends(check_csrf)])
+async def map_library_layers(request: Request, key: str,
+                             user: User = Depends(map_user)):
+    """Discover exact live OGC identifiers only after user interaction.
+
+    No arbitrary URL is accepted here. Every source is a curated public
+    service; all tile access still uses the existing signed, SSRF-protected
+    layer proxy. A failed service never breaks the GIS browser.
+    """
+    if 'maps' not in enabled_modules():
+        raise HTTPException(404)
+    rate_limit(request, 'map-library-discovery', limit=25, window=60)
+    spec = catalog_library.CATALOG.get(key)
+    if not spec:
+        raise HTTPException(404)
+    if spec['kind'] == 'xyz':
+        return JSONResponse({
+            'ok': True, 'type': 'xyz', 'url': spec['url'],
+            'title': spec['name'], 'version': '',
+            'layers': [{
+                'name': key, 'title': spec['name'], 'template': spec['url'],
+                'supported': True,
+                'service': {'tile_size': spec.get('tile_size', 256)},
+            }],
+            'source': {'key': key, **spec},
+        })
+    try:
+        result = await run_in_threadpool(
+            mp.query_service, spec['url'], spec['kind'], True)
+        layers = catalog_library.choices(spec, result)
+    except (ValueError, httpx.HTTPError, mp.ET.ParseError, mp.BlockedAddress):
+        return JSONResponse(
+            {'ok': False, 'error': 'Der externe Dienst ist momentan nicht verfügbar. '
+             'Bitte später erneut versuchen oder die Quelle beim Anbieter öffnen.'},
+            status_code=502)
+    if not layers:
+        return JSONResponse(
+            {'ok': False, 'error': 'Der Dienst bietet aktuell keine mit TAKT '
+             'kompatiblen Ebenen im unterstützten Koordinatensystem.'},
+            status_code=422)
+    return JSONResponse({
+        'ok': True, **result, 'layers': layers, 'source': {'key': key, **spec},
+    })
+
+
 def _library_choices(key):
     spec = catalog_library.CATALOG.get(key)
     if not spec:
         raise HTTPException(404)
+    if spec['kind'] == 'xyz':
+        layer = {'name': key, 'title': spec['name'], 'template': spec['url'],
+                 'supported': True, 'service': {'tile_size': spec.get('tile_size', 256)}}
+        return spec, {'type': 'xyz', 'url': spec['url'],
+                      'version': '', 'layers': [layer]}, [layer]
     result = mp.query_service(spec['url'], spec['kind'], True)
     return spec, result, catalog_library.choices(spec, result)
 
@@ -1005,7 +1067,8 @@ async def admin_map_library_import(request: Request, key: str, user: User = Depe
             attribution=spec['attribution'], category=(spec['region']+' · '+spec['topic'])[:100],
             description='\n'.join(filter(None, [chosen.get('abstract', ''), spec['note'], 'Quelle: '+spec['source_url'], 'Nutzung: '+spec['license']+' – '+spec['license_url']])),
             role=spec['role'], default_visible=False, enabled=False, public=False, in_forms=False,
-            position=position+added, proxy=True)
+            position=position+added, proxy=True,
+            tile_size=spec.get('tile_size', 256) if result['type'] == 'xyz' else 256)
         db.add(row)
         added += 1
     db.commit()
