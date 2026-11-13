@@ -10,7 +10,7 @@ from app.security import hash_password
 from conftest import csrf_of, login, settings
 
 ADMIN = ("admin@example.org", "admin-passwort-123")
-SAMPLE = b"# Hausordnung Testort\\n\\n### \xc2\xa7 1 Allgemeines\\n\\nDiese Hausordnung ist ein Test.\\n"
+SAMPLE = b"# Hausordnung Testort\n\n### \xc2\xa7 1 Allgemeines\n\nDiese Hausordnung ist ein Test.\n"
 
 
 def _upload(c, *, name="import-test.md", content=SAMPLE):
