@@ -69,3 +69,25 @@
 /* Compact, paper-friendly evidence overview; not an official signed protocol. */
 .pr-count-print-meta {padding: .65rem .85rem; margin: .5rem 0 1rem; border-radius: .6rem; background: var(--bs-tertiary-bg, #f5f6f8);}
 @media print { .pr-count-page .pr-header .ds-page-actions, .pr-count-page form, .pr-count-page .ds-back-link, .pr-count-page .pr-alert {display:none!important;} .pr-count-page .pr-count-result {break-inside:avoid; border:1px solid #bbb; margin-bottom:12mm; padding:5mm;} .pr-count-page .pr-count-print-meta {background:transparent; border:1px solid #ddd;} }
+
+/* Mantine-aligned TAKT surface rhythm. These are server-rendered screens; no false React mount. */
+.pr-page {--pr-radius:var(--mantine-radius-lg, 12px);--pr-control-radius:var(--mantine-radius-md, 8px);--pr-focus:var(--bs-primary);line-height:1.5}
+.pr-page .pr-panel,.pr-page .pr-election-card,.pr-page .pr-count-result {border-radius:var(--pr-radius)}
+.pr-page .btn,.pr-page .form-control,.pr-page .form-select {border-radius:var(--pr-control-radius);min-height:2.45rem}
+.pr-page .btn {display:inline-flex;align-items:center;justify-content:center;gap:.3rem;font-weight:600;white-space:normal}
+.pr-page .form-label {font-size:.86rem;font-weight:650;margin-bottom:.35rem}
+.pr-page .form-text {font-size:.78rem;line-height:1.45}
+.pr-page :is(a,button,input,select,textarea,summary):focus-visible {outline:3px solid var(--pr-focus);outline-offset:3px;box-shadow:none}
+.pr-page .pr-panel-head h2 {font-size:clamp(1.05rem,1.6vw,1.25rem);line-height:1.3}
+.pr-page .pr-panel-head h3 {font-size:1.05rem;line-height:1.35}
+.pr-page .table {--bs-table-bg:transparent;vertical-align:middle}
+.pr-page .table th {font-size:.8rem;font-weight:700;color:var(--bs-secondary-color);white-space:normal}
+.pr-page .pr-count-result {border:1px solid var(--pr-stroke);padding:clamp(.9rem,2vw,1.2rem);margin-bottom:.8rem}
+.pr-page .pr-count-result:last-child {margin-bottom:0}
+.pr-page .pr-tabs a {min-height:2.75rem;align-items:center}
+.pr-page .pr-alert {border-radius:var(--pr-radius)}
+.pr-page .pr-election-card:focus-visible {transform:none}
+.pr-page .pr-panel :is(input,select,textarea):disabled {opacity:.7}
+@media(max-width:640px){.pr-page .ds-page-actions{display:flex;flex-wrap:wrap;gap:.5rem;width:100%}.pr-page .ds-page-actions .btn{flex:1 1 100%}.pr-page .pr-panel{padding:1rem}.pr-page .pr-count-result{padding:.85rem}.pr-page .pr-header h1{overflow-wrap:anywhere}.pr-page .pr-tabs{scroll-snap-type:x proximity}.pr-page .pr-tabs a{scroll-snap-align:start}}
+@media(prefers-reduced-motion:reduce){.pr-page *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
+@media print {.pr-page .pr-panel,.pr-page .pr-count-result {box-shadow:none!important;break-inside:avoid}.pr-page .pr-tabs,.pr-page .ds-page-actions {display:none!important}}
