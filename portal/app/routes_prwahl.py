@@ -321,9 +321,21 @@ def prwahl_document_new(request: Request, election_id: int, kind: str,
     election, role = _member(db, election_id, user, "edit")
     if kind not in pw.FORM_KINDS:
         raise HTTPException(404)
+    from .prwahl_prefill import prefill_fields
+    from .prwahl_schedule import PRScheduleEvent
+    from .prwahl_workflow import PRCountRound
+    mandates = db.execute(select(PRMandate, User).join(
+        User, PRMandate.user_id == User.id).where(
+        PRMandate.election_id == election.id)).all()
+    events = db.scalars(select(PRScheduleEvent).where(
+        PRScheduleEvent.election_id == election.id).order_by(PRScheduleEvent.starts_at)).all()
+    rounds = db.scalars(select(PRCountRound).where(
+        PRCountRound.election_id == election.id)).all() if kind in {
+            "count_protocol", "count_reconciliation"} else []
+    values, sources = prefill_fields(election, kind, mandates=mandates, events=events, rounds=rounds)
     return render(request, "prwahl_document.html", user, election=election,
                   role=role, versions=[], form_kind=kind, form_def=pw.FORM_KINDS[kind],
-                  values={}, document=None, mode="new")
+                  values=values, prefill_sources=sources, document=None, mode="new")
 
 
 @app.get("/personalratswahl/{election_id:int}/dokumente/{document_id:int}")
@@ -336,7 +348,7 @@ def prwahl_document_edit(request: Request, election_id: int, document_id: int,
     ).order_by(PRDocument.revision.desc())).all()
     return render(request, "prwahl_document.html", user, election=election,
                   role=role, versions=versions, form_kind=doc.kind, form_def=pw.FORM_KINDS[doc.kind],
-                  values=pw.document_values(doc), document=doc,
+                  values=pw.document_values(doc), prefill_sources={}, document=doc,
                   mode="edit" if role in pw.EDIT_ROLES and doc.current else "readonly")
 
 
