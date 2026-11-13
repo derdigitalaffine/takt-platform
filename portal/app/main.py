@@ -765,7 +765,7 @@ def readyz():
         },
         "law_ai_analyses": {
             "id", "draft_id", "source_sha256",
-            "provider_map_json", "status",
+            "provider_map_json", "status", "retry_attempts",
         },
     }
     try:
