@@ -157,7 +157,7 @@
       ? value.progress_total : 0;
     const done = Number.isSafeInteger(value.progress_done) && value.progress_done >= 0
       ? Math.min(value.progress_done, total) : 0;
-    if (calls) calls.textContent = done + " von " + (total || "…") + " Modellaufrufen abgeschlossen";
+    if (calls) calls.textContent = done + " von " + (total || "…") + " Prüfabschnitten abgeschlossen";
     const percent = total ? Math.min(100, Math.round(done / total * 100)) : 0;
     if (bar) bar.setAttribute("aria-valuenow", String(percent));
     if (fill) fill.style.width = percent + "%";
