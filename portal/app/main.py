@@ -2297,6 +2297,11 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
         select(User).options(joinedload(User.groups))
         .where(*conditions).order_by(*order).offset((page - 1) * per_page).limit(per_page)
     ).unique().all()
+    from .passkey_models import PasskeyCredential
+    passkey_counts = dict(db.execute(
+        select(PasskeyCredential.user_id, func.count(PasskeyCredential.id))
+        .where(PasskeyCredential.user_id.in_([u.id for u in users]))
+        .group_by(PasskeyCredential.user_id)).all()) if users else {}
     org_user_roles = organization.role_directory(db)
     counts = {
         "total": total,
@@ -2307,7 +2312,7 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
     }
     filters = {"q": q, "status": status, "role": role, "group": group,
                "sort": sort, "per_page": per_page}
-    return render(request, "admin_users.html", user, users=users, groups=groups,
+    return render(request, "admin_users.html", user, users=users, passkey_counts=passkey_counts, groups=groups,
                   org_directory=organization.directory(db), org_user_roles=org_user_roles,
                   org_group_roles=set(db.scalars(select(organization.OrgRoleGrant.group_id)
                                      .where(organization.OrgRoleGrant.group_id.is_not(None)))),
