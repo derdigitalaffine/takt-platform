@@ -90,7 +90,9 @@ def _own(db: Session, draft_id: int, user: User) -> LawAiDraft:
     return row
 
 
-def _render(request, db, user, selected=None):
+def _render(request, db, user, selected=None, bereich="uebersicht"):
+    if bereich not in ("uebersicht", "import", "ki", "editor"):
+        bereich = "uebersicht"
     rows = list(db.scalars(select(LawAiDraft).where(
         LawAiDraft.owner_id == user.id).order_by(LawAiDraft.created_at.desc()).limit(40)))
     try:
@@ -125,7 +127,8 @@ def _render(request, db, user, selected=None):
             except ValueError:
                 analysis_results[key] = {}
     response = render(request, "law_ai_workspace.html", user,
-                      drafts=rows, selected=selected, doc_types=lx.DOC_TYPES,
+                      drafts=rows, selected=selected, bereich=bereich,
+                      doc_types=lx.DOC_TYPES,
                       ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
                       ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
                       analysis=analysis, analysis_current=analysis_current,
@@ -308,9 +311,9 @@ def law_ai_ocr_status(
     }, headers={"Cache-Control": "private, no-store"})
 
 @app.get("/laws-assistant")
-def law_ai_home(request: Request, user: User = Depends(law_user),
+def law_ai_home(request: Request, bereich: str = "uebersicht", user: User = Depends(law_user),
                 db: Session = Depends(get_db)):
-    return _render(request, db, user)
+    return _render(request, db, user, bereich=bereich)
 
 
 @app.post("/laws-assistant/import", dependencies=[Depends(check_csrf)])
@@ -351,11 +354,11 @@ async def law_ai_import(request: Request, file: UploadFile = File(...),
 
 
 @app.get("/laws-assistant/{draft_id:int}")
-def law_ai_review(request: Request, draft_id: int,
+def law_ai_review(request: Request, draft_id: int, bereich: str = "uebersicht",
                   user: User = Depends(law_user), db: Session = Depends(get_db)):
     row = _own(db, draft_id, user)
     _apply_ocr_result(db, row)
-    return _render(request, db, user, row)
+    return _render(request, db, user, row, bereich=bereich)
 
 
 @app.get("/laws-assistant/{draft_id:int}/original")
