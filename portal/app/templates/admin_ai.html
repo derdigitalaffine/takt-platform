@@ -79,7 +79,8 @@
             <input class="form-control" type="password" id="ai-image-key" name="image_key" autocomplete="new-password" placeholder="{{ masked_image or 'Optionaler separater Schlüssel' }}">
             <div class="form-text">Wird nur für die Bildanalyse verwendet.</div></div>
           <div class="col-md-4"><label class="form-label" for="ai-timeout">Timeout in Sekunden</label>
-            <input class="form-control" id="ai-timeout" type="number" min="5" max="180" name="timeout_seconds" value="{{ selected.timeout_seconds if selected else 180 }}"></div>
+            <input class="form-control" id="ai-timeout" type="number" min="5" max="1800" name="timeout_seconds" value="{{ selected.timeout_seconds if selected else 180 }}">
+            <div class="form-text">Bis 1.800 Sekunden (30 Minuten) für langsame lokale Modelle. Ortsrechts-Agenten erlauben mindestens 600 Sekunden je Modellaufruf; längere Werte gelten nach Provider-Einstellung.</div></div>
           <div class="col-md-8 d-flex flex-column justify-content-end gap-2">
             <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="ai-active" name="active" value="1" {% if selected and selected.active %}checked{% endif %}>
               <label class="form-check-label" for="ai-active">Provider aktivieren</label></div>

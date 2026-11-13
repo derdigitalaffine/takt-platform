@@ -21,8 +21,9 @@ from .law_ai_models import LawAiDraft
 
 logger = logging.getLogger("portal.law_ai_agents")
 POLL_SECONDS = 4
-STAGE_TIMEOUT = 70
-MAX_JOB_SECONDS = 18 * 60  # bounded recovery for slow/verbose models; fail closed
+MIN_STAGE_TIMEOUT = 10 * 60  # baseline for local 24–30B models
+MAX_STAGE_TIMEOUT = 30 * 60  # bounded per-call limit
+MAX_JOB_SECONDS = 8 * 60 * 60  # multiple stages, sections and bounded retries
 
 
 def configured_routes(db, required_tasks=None) -> dict:
@@ -105,10 +106,18 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
     object before being persisted. Browser gets progress counters, not legal
     prose or partial/possibly malicious output.
     """
+    # The provider's configured timeout may be raised to 30 minutes. For
+    # Ortsrecht, at least 10 minutes are allowed even for legacy 180s profiles.
+    # Both the HTTP adapter and the job's outer watchdog use the same bound.
+    stage_timeout = min(
+        remaining, max(MIN_STAGE_TIMEOUT,
+                       min(int(provider.timeout_seconds or 180), MAX_STAGE_TIMEOUT)),
+    )
     if not provider.stream_enabled:
         return await asyncio.wait_for(
-            ai_provider.complete(provider, messages, max_tokens=max_tokens),
-            timeout=min(STAGE_TIMEOUT, remaining),
+            ai_provider.complete(provider, messages, max_tokens=max_tokens,
+                                 timeout_seconds=int(stage_timeout)),
+            timeout=stage_timeout,
         )
 
     async def receive() -> str:
@@ -118,6 +127,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
         last = time.monotonic()
         async for fragment in ai_provider.stream_completion(
             provider, messages, max_tokens=max_tokens,
+            timeout_seconds=int(stage_timeout),
         ):
             if not isinstance(fragment, str):
                 raise ValueError("Der Modellstream hat ein ungültiges Format.")
@@ -137,7 +147,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
             raise ValueError("Der Modellserver lieferte keine Textantwort.")
         return "".join(parts)
 
-    return await asyncio.wait_for(receive(), timeout=min(STAGE_TIMEOUT, remaining))
+    return await asyncio.wait_for(receive(), timeout=stage_timeout)
 
 async def process_one(job_id: int) -> None:
     """Run read-only agents against complete sections only in advanced mode.
@@ -373,7 +383,7 @@ def mark_interrupted() -> None:
     with SessionLocal() as db:
         db.execute(update(LawAiAnalysis).where(
             LawAiAnalysis.status == "running",
-            LawAiAnalysis.updated_at < utcnow() - timedelta(minutes=15),
+            LawAiAnalysis.updated_at < utcnow() - timedelta(minutes=40),
         ).values(status="failed", step="failed", stream_active=False,
                  failure="KI-Auftrag unterbrochen. Bitte nach Prüfung erneut starten.",
                  updated_at=utcnow()))
