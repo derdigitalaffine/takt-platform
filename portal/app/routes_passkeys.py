@@ -95,11 +95,12 @@ def _consume(db: Session, request: Request, session_key: str,
 
 def _create(db: Session, request: Request, key: str, purpose: str,
             challenge: bytes, rp_id: str, origin: str,
-            user: User | None = None) -> None:
+            user: User | None = None, user_handle: str | None = None) -> None:
     request.session.pop(key, None)
     token = secrets.token_urlsafe(32)
     db.add(PasskeyCeremony(
         id=token, purpose=purpose, challenge=_b64(challenge),
+        user_handle=user_handle,
         rp_id=rp_id, origin=origin,
         user_id=user.id if user else None,
         session_sid_hash=sessions.current_hash(request) if user else None,
@@ -173,7 +174,7 @@ async def passkey_login_verify(request: Request, db: Session = Depends(get_db)):
     if not isinstance(response, dict):
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.")
     handle = response.get("userHandle")
-    if handle is not None and handle != _b64(user.id.to_bytes(8, "big")):
+    if handle is not None and handle != stored.user_handle:
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.")
     try:
         verified = verify_authentication_response(
@@ -216,9 +217,10 @@ async def passkey_register_options(request: Request, user: User = Depends(curren
     credentials = list(db.scalars(select(PasskeyCredential).where(PasskeyCredential.user_id == user.id)))
     if len(credentials) >= MAX_KEYS_PER_USER:
         raise HTTPException(409, "Maximal 15 Passkeys pro Benutzerkonto.")
+    user_handle = credentials[0].user_handle if credentials else _b64(secrets.token_bytes(32))
     opts = generate_registration_options(
         rp_id=rp_id, rp_name="TAKT Portal",
-        user_id=user.id.to_bytes(8, "big"),
+        user_id=base64url_to_bytes(user_handle),
         user_name=user.email, user_display_name=user.name,
         exclude_credentials=[PublicKeyCredentialDescriptor(id=base64url_to_bytes(k.credential_id))
                              for k in credentials],
@@ -228,7 +230,8 @@ async def passkey_register_options(request: Request, user: User = Depends(curren
         ),
         timeout=120000,
     )
-    _create(db, request, "passkey_register", "register", opts.challenge, rp_id, origin, user)
+    _create(db, request, "passkey_register", "register", opts.challenge, rp_id, origin,
+            user, user_handle=user_handle)
     return JSONResponse(json.loads(options_to_json(opts)), headers=HEADERS)
 
 
@@ -257,6 +260,7 @@ async def passkey_register_verify(request: Request, user: User = Depends(current
         transports = []
     db.add(PasskeyCredential(
         user_id=user.id, credential_id=_b64(verified.credential_id),
+        user_handle=flow.user_handle,
         public_key=_b64(verified.credential_public_key),
         sign_count=verified.sign_count, name=name,
         backed_up=bool(verified.credential_backed_up),
