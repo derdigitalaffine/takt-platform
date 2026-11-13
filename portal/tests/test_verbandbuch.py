@@ -157,7 +157,7 @@ def test_correction_preserves_immutable_original_and_audits(aid_env):
     token = csrf_of(page.text)
     result = reviewer.post(
         "/verbandbuch/fall/" + case_id + "/korrektur",
-        data=dict(FORM, injury="Weitere Schürfwunde", reason="Nachträgliche Präzisierung", csrf=token),
+        data=dict(FORM, injury="Weitere Schürfwunde", reason="Nachträgliche Präzisierung", expected_revision="0", csrf=token),
     )
     assert result.status_code == 303
     with SessionLocal() as db:
