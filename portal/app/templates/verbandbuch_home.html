@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Digitales Verbandbuch{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/mantine/styles.css"><link rel="stylesheet" href="/static/verbandbuch.css">{% endblock %}
+{% block content %}
+<div class="vb-root">
+  <header class="vb-hero">
+    <div><div class="vb-eyebrow"><i class="fa-solid fa-kit-medical" aria-hidden="true"></i> Arbeitsschutz · Vertrauliche Fachdokumentation</div>
+      <h1>Digitales Verbandbuch</h1><p>Erste-Hilfe-Leistungen sicher erfassen, geschützt nachweisen und nachvollziehbar bearbeiten.</p></div>
+    <div class="vb-hero-actions">
+      {% if capture %}<a class="btn btn-primary" href="/verbandbuch/neu"><i class="fa-solid fa-plus me-2"></i>Erste Hilfe dokumentieren</a>{% endif %}
+      {% if user.is_admin %}<a class="btn btn-outline-secondary" href="/verbandbuch/standorte"><i class="fa-solid fa-gear me-2"></i>Standorte & Zugriffe</a>{% endif %}
+    </div>
+  </header>
+  {% if not ready %}<div class="alert alert-warning" role="alert"><strong>Fachschlüssel fehlt.</strong> Vor der Erfassung muss ein eigener Verschlüsselungsschlüssel eingerichtet werden. Es werden keine Gesundheitsdaten unverschlüsselt übernommen.</div>{% endif %}
+  {% if not approved %}<div class="alert alert-info" role="status"><strong>Produktivfreigabe ausstehend.</strong> Das Modul bleibt für echte Meldungen gesperrt, bis die Fach-/Datenschutzfreigaben dokumentiert und die Betriebsfreigabe gesetzt sind.</div>{% endif %}
+  <div class="vb-grid vb-tiles">
+    <section class="vb-card vb-metric"><span class="vb-icon"><i class="fa-solid fa-pen-to-square"></i></span><strong>{{ capture|length }}</strong><span>Meine freigegebenen Standorte zum Erfassen</span></section>
+    <section class="vb-card vb-metric"><span class="vb-icon"><i class="fa-regular fa-file-lines"></i></span><strong>{{ my_rows|length }}</strong><span>Meine letzten Dokumentationen (max. 40)</span></section>
+    <section class="vb-card vb-metric"><span class="vb-icon"><i class="fa-solid fa-shield-halved"></i></span><strong>{{ review|length }}</strong><span>Standorte mit eigener Fach-Einsicht</span></section>
+  </div>
+  <div class="vb-grid vb-main-grid">
+    <section class="vb-card" aria-labelledby="vb-receipts-title">
+      <div class="vb-card-head"><div><h2 id="vb-receipts-title">Meine Eingänge</h2><p>Nur Nachweise der Erfassung – ohne medizinische Angaben.</p></div></div>
+      {% if my_rows %}
+      <div class="table-responsive"><table class="table vb-table"><thead><tr><th scope="col">Aktenzeichen</th><th scope="col">Erfasst</th><th scope="col">Standort</th><th scope="col">Nachweis</th></tr></thead>
+      <tbody>{% for entry in my_rows %}<tr><td><code>EH-{{ entry.id[:8]|upper }}</code></td><td>{{ entry.created_at|local }}</td><td>{{ sites[entry.site_id].title if entry.site_id in sites else "–" }}</td><td><a href="/verbandbuch/beleg/{{ entry.id }}" class="btn btn-sm btn-outline-primary">Beleg öffnen</a></td></tr>{% endfor %}</tbody></table></div>
+      {% else %}<div class="vb-empty"><i class="fa-regular fa-file-lines"></i><strong>Noch keine Dokumentation</strong><p>Erste Hilfe geleistet? Erstelle den geschützten Eintrag über einen freigegebenen Standort.</p></div>{% endif %}
+    </section>
+    <aside class="vb-card"><div class="vb-card-head"><div><h2>So funktioniert es</h2><p>Verständlich und sicher – auch am Smartphone.</p></div></div>
+      <ol class="vb-steps"><li><span>1</span><div><strong>Standort auswählen</strong><small>Oder QR-Code am Verbandskasten scannen.</small></div></li>
+      <li><span>2</span><div><strong>Erste Hilfe dokumentieren</strong><small>Unfallhergang, Verletzung und Maßnahme erfassen.</small></div></li>
+      <li><span>3</span><div><strong>Geschützten Nachweis erhalten</strong><small>Einsehen dürfen nur ausdrücklich fachlich Berechtigte.</small></div></li></ol>
+      <div class="vb-note"><i class="fa-solid fa-lock"></i><span>Gesundheitsangaben erscheinen nicht in der allgemeinen Suche, in Aufgaben, KI-Chat oder Benachrichtigungen.</span></div>
+    </aside>
+  </div>
+  {% if review %}<section class="vb-card mt-3" aria-labelledby="vb-review-title">
+    <div class="vb-card-head"><div><h2 id="vb-review-title">Vertrauliche Fachablage</h2><p>Nur ausdrücklich zugewiesene Standorte. Jeder Fallaufruf wird protokolliert.</p></div><span class="vb-chip"><i class="fa-solid fa-user-shield"></i> Fachzugriff</span></div>
+    {% if cases %}<div class="table-responsive"><table class="table vb-table"><thead><tr><th>Aktenzeichen</th><th>Erfasst</th><th>Standort</th><th>Aufbewahrung bis</th><th>Vorgang</th></tr></thead><tbody>
+    {% for entry in cases %}<tr><td><code>EH-{{ entry.id[:8]|upper }}</code></td><td>{{ entry.created_at|local }}</td><td>{{ sites[entry.site_id].title if entry.site_id in sites else "–" }}</td><td>{{ entry.retention_due_at|local('%d.%m.%Y') }}{% if entry.legal_hold %} <span class="vb-chip">Löschsperre</span>{% endif %}</td><td><a class="btn btn-sm btn-outline-primary" href="/verbandbuch/fall/{{ entry.id }}">Geschützt öffnen</a></td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<div class="vb-empty">Für deine Fachstandorte liegen noch keine Einträge vor.</div>{% endif %}
+  </section>{% endif %}
+</div>
+{% endblock %}

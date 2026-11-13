@@ -39,6 +39,7 @@ PORTAL_ONLY = {
     "shortlinks": "Kurzlinks verwalten ihre eigene Domain separat.",
     "circulations": "Umläufe und Aushänge werden im Portal verwaltet.",
     "dms": "Die Ablage enthält geschützte Dokumente.",
+    "verbandbuch": "Vertrauliche Erste-Hilfe-Dokumentation ausschließlich über Portal-Anmeldung und Fachrechte.",
 }
 
 

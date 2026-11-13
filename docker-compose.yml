@@ -256,6 +256,9 @@ services:
       - PORTAL_BASE_URL=https://${PORTAL_DOMAIN}
       - MEET_BASE_URL=https://${MEET_DOMAIN}
       - PORTAL_SECRET_KEY
+      # Eigenständige Fachverschlüsselung + manuell dokumentierte Betriebsfreigabe.
+      - VERBANDBUCH_ENCRYPTION_KEY
+      - VERBANDBUCH_PRODUCTION_APPROVED=${VERBANDBUCH_PRODUCTION_APPROVED:-0}
       - PORTAL_ADMIN_EMAIL
       - PORTAL_ADMIN_PASSWORD
       - BRAND_NAME=${BRAND_NAME:-Verbandsgemeinde Otterbach-Otterberg}
