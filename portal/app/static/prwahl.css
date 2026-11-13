@@ -113,3 +113,12 @@
 .pr-life-action form{margin-top:.45rem}
 .pr-life-evidence{overflow-wrap:anywhere;border-left:3px solid var(--ds-success-fg);padding:.65rem .85rem;background:var(--pr-subtle);border-radius:.25rem .65rem .65rem .25rem}
 @media print{.pr-life-action,.pr-header .ds-page-actions,.pr-quick-nav,.pr-tabs{display:none!important}.pr-life-step{break-inside:avoid}.pr-page{max-width:none}.pr-panel{box-shadow:none}}
+
+/* Wahltermine: readable event cards with wrapped, touch-friendly actions. */
+.pr-schedule-card{border:1px solid var(--pr-stroke);background:var(--pr-card);border-radius:1rem;padding:1.1rem;margin:.85rem 0;min-width:0}
+.pr-schedule-card h3{font-size:1.05rem;line-height:1.4;overflow-wrap:anywhere;margin:.3rem 0}
+.pr-schedule-card .pr-panel-head{margin-bottom:.65rem}
+.pr-schedule-actions{display:flex;align-items:center;flex-wrap:wrap;gap:.55rem}
+.pr-schedule-actions form{margin:0}
+.pr-schedule-actions .btn{min-height:2.5rem;white-space:normal;text-align:center}
+@media(max-width:650px){.pr-schedule-actions{display:grid;grid-template-columns:1fr}.pr-schedule-actions form,.pr-schedule-actions .btn{width:100%}.pr-schedule-card{padding:.85rem}}
