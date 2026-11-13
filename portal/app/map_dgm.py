@@ -150,10 +150,14 @@ def convert_xyz(raw: bytes, building: dict) -> dict:
 
     for ia, ib in zip(x_indices, x_indices[1:]):
         for ja, jb in zip(y_indices, y_indices[1:]):
-            # Do not bridge NoData gaps, including interior samples skipped by
-            # decimation. Missing cells remain actual holes, never fake slopes.
-            if any((xs[i], ys[j]) not in samples
-                   for i in range(ia, ib+1) for j in range(ja, jb+1)):
+            # Do not bridge NoData gaps, even if a *complete* grid line is
+            # missing from XYZ (otherwise there is no matching xs/ys index).
+            if (any(xs[i+1] - xs[i] > step_x + GRID_TOLERANCE_M
+                    for i in range(ia, ib)) or
+                any(ys[j+1] - ys[j] > step_y + GRID_TOLERANCE_M
+                    for j in range(ja, jb)) or
+                any((xs[i], ys[j]) not in samples
+                    for i in range(ia, ib+1) for j in range(ja, jb+1))):
                 skipped += 1
                 continue
             p00 = vertex(xs[ia], ys[ja])
