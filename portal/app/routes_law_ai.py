@@ -90,7 +90,9 @@ def _own(db: Session, draft_id: int, user: User) -> LawAiDraft:
     return row
 
 
-def _render(request, db, user, selected=None):
+def _render(request, db, user, selected=None, *, view: str = "all"):
+    if view not in {"all", "import", "drafts", "editor", "ai", "ocr"}:
+        raise ValueError("Unbekannte Ansicht im Ortsrecht-Assistenten.")
     rows = list(db.scalars(select(LawAiDraft).where(
         LawAiDraft.owner_id == user.id).order_by(LawAiDraft.created_at.desc()).limit(40)))
     try:
@@ -125,6 +127,7 @@ def _render(request, db, user, selected=None):
             except ValueError:
                 analysis_results[key] = {}
     response = render(request, "law_ai_workspace.html", user,
+                      workspace_view=view,
                       drafts=rows, selected=selected, doc_types=lx.DOC_TYPES,
                       ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
                       ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
@@ -331,6 +334,42 @@ def law_ai_canonical_markdown(
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
     })
+
+
+@app.get("/laws-assistant/import")
+def law_ai_import_page(request: Request, user: User = Depends(law_user),
+                       db: Session = Depends(get_db)):
+    return _render(request, db, user, view="import")
+
+
+@app.get("/laws-assistant/drafts")
+def law_ai_drafts_page(request: Request, user: User = Depends(law_user),
+                       db: Session = Depends(get_db)):
+    return _render(request, db, user, view="drafts")
+
+
+@app.get("/laws-assistant/{draft_id:int}/editor")
+def law_ai_editor_page(request: Request, draft_id: int,
+                       user: User = Depends(law_user), db: Session = Depends(get_db)):
+    draft = _own(db, draft_id, user)
+    _apply_ocr_result(db, draft)
+    return _render(request, db, user, draft, view="editor")
+
+
+@app.get("/laws-assistant/{draft_id:int}/ai")
+def law_ai_agent_page(request: Request, draft_id: int,
+                      user: User = Depends(law_user), db: Session = Depends(get_db)):
+    draft = _own(db, draft_id, user)
+    _apply_ocr_result(db, draft)
+    return _render(request, db, user, draft, view="ai")
+
+
+@app.get("/laws-assistant/{draft_id:int}/ocr")
+def law_ai_ocr_page(request: Request, draft_id: int,
+                    user: User = Depends(law_user), db: Session = Depends(get_db)):
+    draft = _own(db, draft_id, user)
+    _apply_ocr_result(db, draft)
+    return _render(request, db, user, draft, view="ocr")
 
 
 @app.get("/laws-assistant")
