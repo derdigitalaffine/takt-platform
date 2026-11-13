@@ -369,6 +369,8 @@ def law_ai_discard(
     row = _own(db, draft_id, user)
     if row.status == "accepted":
         raise HTTPException(409, "Ein bereits übernommener Originalnachweis darf nicht entfernt werden.")
+    if row.status == "ocr_queued":
+        raise HTTPException(409, "OCR-Auftrag läuft noch. Nach Abschluss kann der Entwurf verworfen werden.")
     path = _original_path(row)
     db.delete(row)
     db.commit()
