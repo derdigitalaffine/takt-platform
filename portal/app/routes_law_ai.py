@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from . import laws as lx, law_ai_agents, law_ai_agent_jobs
+from . import laws as lx, law_ai_agents, law_ai_agent_jobs, law_ai_coverage
 from .config import settings
 from .db import LawText, User, utcnow, get_settings
 from .law_ai_models import LawAiDraft
@@ -110,6 +110,12 @@ def _render(request, db, user, selected=None):
         analysis.source_sha256 == law_ai_agents.source_hash(selected.proposed_md or "")
     )
     analysis_results = {}
+    advanced_sections = 0
+    if selected and selected.status in ("staged", "ocr_review") and selected.proposed_md:
+        try:
+            advanced_sections = len(law_ai_coverage.sections(selected.proposed_md))
+        except ValueError:
+            pass
     if analysis and analysis.status == "done" and analysis_current:
         for key, field in (("structure", "outline_json"), ("metadata", "metadata_json"),
                            ("verification", "verification_json")):
@@ -123,7 +129,9 @@ def _render(request, db, user, selected=None):
                       ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
                       ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
                       analysis=analysis, analysis_current=analysis_current,
-                      analysis_results=analysis_results, ai_enabled=ai_enabled,
+                      analysis_results=analysis_results, advanced_sections=advanced_sections,
+                      max_model_calls=advanced_sections * len(law_ai_agents.STAGES),
+                      ai_enabled=ai_enabled,
                       agent_routes=agent_routes, agent_stages=law_ai_agents.STAGES,
                       ai_source_limit=law_ai_agents.MAX_SOURCE_CHARS,
                       level_options=lx.level_options(db))
