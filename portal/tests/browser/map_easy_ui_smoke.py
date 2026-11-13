@@ -190,7 +190,7 @@ with sync_playwright() as pw:
     assert page.locator("#map-discovery-results").count() == 1
     tabs.get_by_role("tab", name="Daten finden").press("Home")
     expect(page.locator("#map-easy-overview")).to_be_visible()
-    page.locator("#map-easy-special summary").click()
+    page.locator("#map-easy-special > summary").click()
     expect(page.locator("#map-lod2-toggle")).to_be_visible()
     expect(page.locator("#map-3d-view")).to_be_visible()
     expect(page.locator("#map-compare-toggle")).to_be_visible()
