@@ -178,3 +178,9 @@
 .pr-demo-fields dt{font-size:.8rem;font-weight:700;color:var(--bs-secondary-color);margin-bottom:.45rem}
 .pr-demo-fields dd{font-size:.92rem;line-height:1.55;white-space:pre-line;overflow-wrap:anywhere;margin:0}
 @media(max-width:700px){.pr-demo-document-grid,.pr-demo-fields{grid-template-columns:1fr}}
+
+/* Draft prefill is always visibly sourced, editable and never a legal approval. */
+.pr-autofill-note{display:flex;gap:.65rem;align-items:flex-start;padding:.85rem 1rem;border-radius:.8rem;background:var(--pr-subtle);border:1px solid var(--pr-stroke);font-size:.85rem;line-height:1.55;margin-bottom:1rem}
+.pr-autofill-note>i{color:var(--bs-primary);margin-top:.18rem;font-size:1.1rem}
+.pr-autofill-tag{display:inline-block;margin-left:.3rem;vertical-align:middle;font-size:.7rem;font-weight:700;color:var(--bs-primary);padding:.15rem .5rem;background:var(--pr-subtle);border-radius:100px}
+.pr-autofill-source{font-size:.76rem;color:var(--bs-secondary-color);line-height:1.45;margin:-.2rem 0 .45rem}
