@@ -12,7 +12,7 @@
   <strong>Nur redaktionelle Vorbereitung:</strong>
   Das Original wird unverändert mit SHA-256-Nachweis archiviert. KI- oder OCR-Text ist kein amtlicher Text.
   Kein Import führt automatisch zu einer Veröffentlichung oder zum Inkrafttreten.
-  Die isolierte PDF-/Bild-OCR und die mehrstufige KI-Auswertung werden in den nächsten Entwicklungsabschnitten ergänzt.
+  Das <strong>optionale OCR-Profil</strong> nutzt MarkItDown 0.1.9 für PDF/DOCX und Tesseract für Scanseiten/Bilder. OCR läuft ausschließlich im offline isolierten Worker, niemals im Portalprozess. Die mehrstufige KI-Auswertung ist ein nachfolgender, gesondert freizugebender Schritt.
 </div>
 <div class="row g-3">
   <div class="col-12 col-xl-4">
@@ -24,7 +24,7 @@
           <label class="form-label" for="law-ai-file">Rechtstext-Datei</label>
           <input class="form-control" type="file" name="file" id="law-ai-file" required
                  accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.tif,.tiff,.webp">
-          <p class="form-text">Höchstens 25 MB. Markdown und UTF-8-Text stehen sofort als Vorschlag bereit. PDF, Word und Bilder bleiben bis zur isolierten Texterkennung als Originale vorgemerkt.</p>
+          <p class="form-text">Höchstens 25 MB. Markdown und UTF-8-Text stehen sofort als Vorschlag bereit. PDF, Word und Bilder bleiben bis zur ausdrücklich beauftragten Offline-Texterkennung als Originale vorgemerkt.</p>
           <button class="btn btn-primary" type="submit"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Sicher vorbereiten</button>
         </form>
       </div>
@@ -35,7 +35,7 @@
         {% for item in drafts %}
           <a href="/laws-assistant/{{ item.id }}" class="list-group-item list-group-item-action {% if selected and selected.id == item.id %}active{% endif %}">
             <span class="d-block fw-semibold text-break">{{ item.original_filename }}</span>
-            <span class="small">{{ {'staged': 'Zur Prüfung', 'needs_ocr': 'OCR ausstehend', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') }}</span>
+            <span class="small">{{ {'staged': 'Zur Prüfung', 'needs_ocr': 'OCR möglich', 'ocr_queued': 'OCR beauftragt', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') }}</span>
           </a>
         {% else %}
           <p class="text-secondary small p-3 mb-0">Noch keine Importentwürfe vorhanden.</p>
@@ -48,7 +48,7 @@
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between gap-2">
         <span><i class="fa-solid fa-clipboard-check me-2" aria-hidden="true"></i>Original überprüfen</span>
-        <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status == 'needs_ocr' else 'secondary' }}">{{ {'staged': 'Prüfung offen', 'needs_ocr': 'OCR ausstehend', 'accepted': 'Übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
+        <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status == 'needs_ocr' else 'secondary' }}">{{ {'staged': 'Prüfung offen', 'needs_ocr': 'OCR möglich', 'ocr_queued': 'OCR beauftragt', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
       </div>
       <div class="card-body">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
@@ -64,11 +64,44 @@
             {% if selected.accepted_law_id %}<a href="/laws/{{ selected.accepted_law_id }}/edit">Rechtstextentwurf öffnen</a>{% endif %}
           </div>
         {% else %}
-          {% if selected.status == 'needs_ocr' %}
-          <div class="alert alert-warning"><strong>Texterkennung steht noch aus.</strong>
-            PDF, Word und Bilddateien werden in diesem ersten sicheren Ausbauschritt nicht innerhalb des Portalprozesses ausgewertet.
-            Sie können den Originaltext zunächst selbst als Markdown übertragen; automatisches OCR folgt mit einem isolierten Worker.
-          </div>
+          {% if selected.status in ('needs_ocr', 'ocr_failed') %}
+          <section class="border rounded-3 p-3 mb-3" aria-label="Texterkennung">
+            <h3 class="h6"><i class="fa-solid fa-file-magnifying-glass me-1" aria-hidden="true"></i>Texterkennung mit MarkItDown und Tesseract</h3>
+            {% if selected.status == 'ocr_failed' %}
+              <p class="small text-danger" role="alert">Letzte OCR fehlgeschlagen: {{ selected.ocr_failure }}. Du kannst erneut starten oder den Text manuell prüfen.</p>
+            {% else %}
+              <p class="small text-secondary">PDF/DOCX werden durch MarkItDown strukturiert; gescannte PDF-Seiten und Bilder werden lokal mit Tesseract erkannt. Der Text wird anschließend nur als prüfbedürftiger Vorschlag gespeichert.</p>
+            {% endif %}
+            <form method="post" action="/laws-assistant/{{ selected.id }}/ocr" class="d-flex gap-2 align-items-end flex-wrap">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <div><label for="ocr-language-{{ selected.id }}" class="form-label small">OCR-Sprache</label>
+                <select class="form-select form-select-sm" id="ocr-language-{{ selected.id }}" name="language"><option value="deu">Deutsch</option><option value="deu+eng">Deutsch und Englisch</option></select></div>
+              <button class="btn btn-outline-primary" type="submit"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Lokale Texterkennung starten</button>
+            </form>
+            <p class="form-text mb-0">Benötigt den optionalen Compose-Dienst <code>law-ocr</code> (Profil <code>ocr</code>). Bei inaktivem Dienst bleibt der Auftrag in der Warteschlange.</p>
+          </section>
+          {% elif selected.status == 'ocr_queued' %}
+            <div class="alert alert-info" role="status" data-law-ocr-pending data-draft-id="{{ selected.id }}">
+              <i class="fa-solid fa-hourglass-half me-1" aria-hidden="true"></i>
+              Texterkennung beauftragt. Der Offline-Worker bearbeitet das Original; diese Seite aktualisiert sich nach Abschluss automatisch.
+              <a class="alert-link" href="/laws-assistant/{{ selected.id }}">Status neu laden</a>
+            </div>
+          {% elif selected.status == 'ocr_review' %}
+            <div class="alert alert-warning"><strong>Automatisch erkannter Vorschlag – noch ungeprüft.</strong> MarkItDown und Tesseract können Inhalte falsch erkennen. Besonders Zahlen, Fristen, Verneinungen, Paragraphen und Tabellen am Original prüfen.</div>
+            {% if ocr_warnings %}
+              <details class="mb-3"><summary class="fw-semibold">Hinweise zur Textqualität ({{ ocr_warnings|length }})</summary>
+                <ul class="small mt-2">{% for w in ocr_warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+              </details>
+            {% endif %}
+            {% if ocr_pages %}
+              <details class="mb-3"><summary class="fw-semibold">Quellseiten und OCR-Verfahren ({{ ocr_pages|length }})</summary>
+                <div class="table-responsive"><table class="table table-sm mt-2">
+                  <thead><tr><th scope="col">Seite</th><th scope="col">Verfahren</th><th scope="col">Konfidenz</th><th scope="col">Textauszug</th></tr></thead>
+                  <tbody>{% for p in ocr_pages %}<tr><th scope="row">{{ p.page }}</th><td>{{ p.engine }}</td>
+                    <td>{{ p.confidence if p.confidence is not none else 'Nicht verfügbar' }}</td><td class="text-break">{{ p.text_excerpt }}</td></tr>{% endfor %}</tbody>
+                </table></div>
+              </details>
+            {% endif %}
           {% endif %}
           <form method="post" action="/laws-assistant/{{ selected.id }}/accept">
             <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -127,4 +160,5 @@
     {% endif %}
   </div>
 </div>
+{% block scripts %}{% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}{% endblock %}
 {% endblock %}
