@@ -372,6 +372,26 @@ def law_ai_original(draft_id: int, user: User = Depends(law_user),
     )
 
 
+@app.post("/laws-assistant/markdown/review", dependencies=[Depends(check_csrf)])
+def law_ai_review_markdown(
+    body_md: str = Form(""),
+    user: User = Depends(law_user),
+):
+    """Read-only, permission-checked validation of the current editor buffer.
+
+    The response is a suggested heading-only transformation. No original,
+    import draft, or published law is ever changed by this endpoint.
+    """
+    from fastapi.responses import JSONResponse
+    from .law_ai_markdown import review
+
+    try:
+        result = review(body_md)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
 @app.post("/laws-assistant/{draft_id:int}/accept",
           dependencies=[Depends(check_csrf)])
 def law_ai_accept(
