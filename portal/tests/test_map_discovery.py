@@ -171,3 +171,38 @@ def test_browser_discovery_and_3d_controls_remain_in_read_only_view(admin):
     assert 'id="map-discovery-activate" type="button" disabled' in public_page.text
     assert 'id="map-discovery-activate" type="button" disabled' not in private_page.text
     # Actual public XYZ activation is allowed client-side only after click.
+
+
+def test_3d_perspective_and_extrusion_settings_are_saved_safely():
+    from app.routes_maps import _clean_state
+    from app import maps as mp
+
+    restored = _clean_state({
+        "center": [7.77, 49.49], "zoom": 14, "pitch": 55,
+        "base": "s1",
+        "layers": [{"id": "s1", "visible": True, "opacity": 0.55,
+                    "time": "", "extrude": True}],
+        "custom": [{
+            "def": {"kind": "wfs",
+                    "url": "https://gis.example.org/wfs",
+                    "layers": "building",
+                    "name": "Gebäudekörper",
+                    "category": "3D · Rheinland-Pfalz",
+                    "extrude": True},
+            "opacity": 0.72,
+        }],
+    })
+    assert restored["pitch"] == 55
+    assert restored["layers"][0]["extrude"] is True
+    assert restored["custom"][0]["def"]["extrude"] is True
+    assert restored["custom"][0]["def"]["category"] == "3D · Rheinland-Pfalz"
+    cfg = mp.custom_config(restored["custom"][0]["def"],
+                           mp.sign(restored["custom"][0]["def"]))
+    assert cfg["extrude"] is True
+    assert cfg["category"] == "3D · Rheinland-Pfalz"
+    # No arbitrary client-side URI or HTML gets injected into metadata.
+    malicious = mp.clean_custom({"kind": "wfs",
+        "url": "https://gis.example.org/wfs", "layers": "buildings",
+        "category": "<script>bad</script>"})
+    assert "<" not in malicious["category"]
+    assert malicious["extrude"] is False
