@@ -4,6 +4,29 @@
   const forms = document.querySelectorAll("[data-ai-task-form]");
   if (!forms.length) return;
 
+  // The same provider is often used for all eight agent profiles. Share the
+  // in-flight request and loaded catalog to avoid unnecessary API traffic.
+  const catalogRequests = new Map();
+  async function catalog(providerId) {
+    if (!catalogRequests.has(providerId)) {
+      const request = fetch("/admin/ai/provider/" + encodeURIComponent(providerId) + "/models", {
+        credentials: "same-origin", cache: "no-store",
+        headers: { Accept: "application/json" },
+      }).then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(
+          typeof data.detail === "string" ? data.detail : "Modellkatalog nicht erreichbar"
+        );
+        return Array.isArray(data.models) ? data.models : [];
+      }).catch((error) => {
+        catalogRequests.delete(providerId);
+        throw error;
+      });
+      catalogRequests.set(providerId, request);
+    }
+    return catalogRequests.get(providerId);
+  }
+
   const featureLabels = { vision: "Bildanalyse", tools: "Tools", json: "JSON", streaming: "Streaming" };
   const stateLabels = {
     reported: "vom Provider gemeldet",
@@ -73,16 +96,8 @@
       }
       status.textContent = "Modelle werden vom ausgewählten Server geladen …";
       try {
-        const res = await fetch("/admin/ai/provider/" + encodeURIComponent(id) + "/models", {
-          credentials: "same-origin", cache: "no-store",
-          headers: { Accept: "application/json" },
-        });
-        const payload = await res.json();
-        if (!res.ok) throw new Error(
-          typeof payload.detail === "string" ? payload.detail : "Modellkatalog nicht erreichbar"
-        );
+        const options = await catalog(id);
         if (serial !== requestNo) return;
-        const options = Array.isArray(payload.models) ? payload.models : [];
         for (const entry of options) {
           if (!entry || typeof entry.id !== "string") continue;
           models.set(entry.id, entry);

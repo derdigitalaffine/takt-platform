@@ -59,8 +59,16 @@
           <input type="hidden" name="provider_id" value="{{ selected.id if selected else 0 }}">
           <div class="col-md-6"><label class="form-label" for="ai-name">Bezeichnung</label>
             <input class="form-control" id="ai-name" name="name" maxlength="120" value="{{ selected.name if selected else '' }}" placeholder="Interner LLM-Server" required></div>
-          <div class="col-md-6"><label class="form-label" for="ai-model">Modell-ID / Alias</label>
-            <input class="form-control" id="ai-model" name="model_id" maxlength="200" value="{{ selected.model_id if selected else '' }}" placeholder="mein-modell" required></div>
+          <div class="col-md-6" data-ai-default-model-picker data-provider-id="{{ selected.id if selected else 0 }}">
+            <label class="form-label" for="ai-model">Standardmodell des Providers</label>
+            <div class="input-group">
+              <input class="form-control" id="ai-model" name="model_id" maxlength="200" value="{{ selected.model_id if selected else '' }}" placeholder="Modell wählen oder ID eingeben" required autocomplete="off" data-ai-catalog-model>
+              <button class="btn btn-outline-secondary" type="button" data-ai-refresh-models title="Modelle vom verbundenen Server neu laden" aria-label="Modellliste neu laden" {% if not selected %}disabled{% endif %}><i class="fa-solid fa-rotate" aria-hidden="true"></i></button>
+            </div>
+            <div class="form-text" data-ai-catalog-status role="status" aria-live="polite">
+              {% if selected %}Verfügbare Modelle werden vom gespeicherten Provider abgerufen.{% else %}Zuerst Provider speichern, anschließend Modelle vom Server laden.{% endif %}
+            </div>
+          </div>
           <div class="col-12"><label class="form-label" for="ai-base">OpenAI-kompatible Basis-URL</label>
             <input class="form-control" type="url" id="ai-base" name="base_url" maxlength="500" value="{{ selected.base_url if selected else '' }}" placeholder="https://llm.example.org/api" required>
             <div class="form-text">Den tatsächlichen API-Basispfad eingeben, auch <code>/api</code> möglich. TAKT ergänzt <code>/models</code> und <code>/chat/completions</code>; kein erzwungenes <code>/v1</code>.</div></div>
@@ -253,7 +261,8 @@
             {% for provider in providers if provider.active %}<option value="{{ provider.id }}" {% if cfg.ai_vector_provider_id == provider.id|string %}selected{% endif %}>{{ provider.name }}</option>{% endfor %}
           </select></div>
         <div class="col-md-4"><label class="form-label" for="vector-model">Embedding-Modell-ID</label>
-          <input class="form-control" name="model_id" id="vector-model" maxlength="200" value="{{ cfg.ai_vector_model_id }}" placeholder="text-embedding-3-small"></div>
+          <input class="form-control" name="model_id" id="vector-model" maxlength="200" value="{{ cfg.ai_vector_model_id }}" placeholder="Embedding-Modell auswählen" data-ai-catalog-model autocomplete="off">
+          <div class="form-text" data-ai-catalog-status role="status" aria-live="polite">Embedding-Modelle des ausgewählten Providers laden; Funktionen nur bei bestätigter Serverangabe.</div></div>
         <div class="col-md-4">
           <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="enabled" value="1" {% if cfg.ai_vector_enabled == '1' %}checked{% endif %}> <span class="form-check-label">Semantische Suche aktivieren</span></label>
           <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="auto_index" value="1" {% if cfg.ai_vector_auto_index == '1' %}checked{% endif %}> <span class="form-check-label">Neue und geänderte Einträge automatisch indizieren</span></label>
@@ -278,7 +287,8 @@
             {% for provider in providers if provider.active %}<option value="{{ provider.id }}" {% if cfg.ai_vector_provider_id == provider.id|string %}selected{% endif %}>{{ provider.name }}</option>{% endfor %}
           </select></div>
         <div class="col-md-5"><label for="ai-embedding-test-model" class="form-label small">Embedding-Modell-ID</label>
-          <input id="ai-embedding-test-model" name="model_id" class="form-control form-control-sm" maxlength="200" value="{{ cfg.ai_vector_model_id }}" placeholder="text-embedding-3-small" required></div>
+          <input id="ai-embedding-test-model" name="model_id" class="form-control form-control-sm" maxlength="200" value="{{ cfg.ai_vector_model_id }}" placeholder="Embedding-Modell auswählen" data-ai-catalog-model autocomplete="off" required>
+          <div class="form-text" data-ai-catalog-status role="status" aria-live="polite">Modellliste vom Testprovider abrufen.</div></div>
         <div class="col-md-2"><button class="btn btn-sm btn-outline-primary w-100" type="submit">Embeddings testen</button></div>
         <div class="col-12 small" data-ai-diagnostic-result="embedding" role="status" aria-live="polite" aria-atomic="true">Noch nicht getestet.</div>
       </form>
@@ -517,4 +527,4 @@
   </details>
 </section>
 {% endblock %}
-{% block scripts %}<script src="/static/ai-admin-knowledge.js" defer></script><script src="/static/ai-task-profiles.js" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/ai-admin-knowledge.js" defer></script><script src="/static/ai-task-profiles.js" defer></script><script src="/static/ai-model-catalog.js" defer></script>{% endblock %}
