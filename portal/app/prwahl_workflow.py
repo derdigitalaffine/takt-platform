@@ -11,13 +11,13 @@ from fastapi import HTTPException
 from .db import Base, utcnow
 
 STAGES = (
-    ("appointment", "Wahlvorstand bestellen", "Bestellung, Bekanntgabe und Zusammensetzung dokumentieren"),
-    ("preparation", "Wahl vorbereiten", "Wahlkörper, Verzeichnis, Gruppen, Sitzverteilung und Wahlart prüfen"),
-    ("announcement", "Wahl einleiten", "Wahlausschreiben und Bekanntgaben rechtskonform erstellen"),
-    ("nominations", "Wahlvorschläge prüfen", "Vorschläge, Zustimmungen, Fristen und Zulassung dokumentieren"),
+    ("appointment", "Wahlvorstand bestellen", "§ 16 LPersVG: Bestellung, Vorsitz, Vertretung und Gruppenrepräsentation dokumentieren"),
+    ("preparation", "Wahl vorbereiten", "§§ 2–5 WOLPersVG: Wahlberechtigtenverzeichnis, Einsprüche, Gruppen und Sitze prüfen"),
+    ("announcement", "Wahl einleiten", "§§ 1, 6 WOLPersVG: Beschluss, Unterschriften und Bekanntgabe des Wahlausschreibens nachweisen"),
+    ("nominations", "Wahlvorschläge prüfen", "§§ 7–13 WOLPersVG: Einreichung, Zulassung, Nachfrist und Bekanntgabe prüfen"),
     ("ballots", "Papierwahl organisieren", "Stimmzettel, Wahllokal, schriftliche Stimmabgabe und Helfende"),
-    ("counting", "Öffentlich auszählen", "Papierstimmen erfassen, Zahlen unabhängig gegenprüfen"),
-    ("determination", "Ergebnis feststellen", "Wahlvorstandsbeschluss, Niederschrift und Bekanntgabe"),
+    ("counting", "Öffentlich auszählen", "§§ 20–21 WOLPersVG: Öffentliche Auszählung und Wahlniederschrift dokumentieren"),
+    ("determination", "Ergebnis feststellen", "§§ 20–23 WOLPersVG: Beschluss, Benachrichtigung und Bekanntgabe prüfen"),
     ("constitution", "Konstituierende Sitzung", "Einladung, Vorsitzwahl und Übergabe der Wahlakten"),
     ("archive", "Wahlakten übergeben", "Aufbewahrung, Nachweise und Abschluss"),
 )
