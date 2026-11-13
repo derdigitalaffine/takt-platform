@@ -375,7 +375,17 @@
         || aa.name.localeCompare(bb.name,'de');
     });
   }
+  function syncCatalogShortcuts(){
+    var selected=document.getElementById('map-discovery-topic').value;
+    discovery.querySelectorAll('[data-discovery-topic]').forEach(function(button){
+      var active=button.dataset.discoveryTopic===selected;
+      button.setAttribute('aria-pressed',active?'true':'false');
+      button.classList.toggle('btn-primary',active);
+      button.classList.toggle('btn-outline-secondary',!active);
+    });
+  }
   function renderCatalog(){
+    syncCatalogShortcuts();
     var keys=currentCatalog();
     document.getElementById('map-discovery-count').textContent=keys.length+' Quellen';
     catalogStatus.textContent=keys.length?'Quelle wählen, um verfügbare Layer zu prüfen.':'Keine Treffer. Such- oder Themenfilter anpassen.';
@@ -408,6 +418,16 @@
   }).catch(function(){catalogStatus.textContent='Geodatenverzeichnis momentan nicht verfügbar. Vorhandene Ebenen können weiterhin genutzt werden.';});
   ['map-discovery-search','map-discovery-region','map-discovery-topic','map-discovery-favorites-only'].forEach(function(id){
     document.getElementById(id).addEventListener(id==='map-discovery-search'?'input':'change',renderCatalog);
+  });
+  discovery.querySelectorAll('[data-discovery-topic]').forEach(function(button){
+    button.addEventListener('click',function(){
+      if(!Object.keys(catalogEntries).length)return;
+      document.getElementById('map-discovery-search').value='';
+      document.getElementById('map-discovery-region').value='';
+      document.getElementById('map-discovery-favorites-only').checked=false;
+      document.getElementById('map-discovery-topic').value=button.dataset.discoveryTopic;
+      renderCatalog();
+    });
   });
   document.getElementById('map-discovery-reset').addEventListener('click',function(){
     ['map-discovery-search','map-discovery-region','map-discovery-topic'].forEach(function(id){document.getElementById(id).value='';});
@@ -443,6 +463,19 @@
     document.getElementById('map-discovery-preview-title').textContent=spec.name;
     document.getElementById('map-discovery-preview-info').textContent=spec.provider+' · '+spec.license+
       (spec.note?' · '+spec.note:'');
+    // Every selectable source has traceable provider and licence metadata.
+    // Links are drawn only from the curated public directory, never from
+    // user-entered remote GetCapabilities descriptions.
+    var links=document.getElementById('map-discovery-source-links');
+    links.replaceChildren();
+    [['Originalquelle',spec.source_url],['Nutzungsbedingungen',spec.license_url]].forEach(function(item){
+      if(!/^https:\/\//i.test(item[1]||''))return;
+      var a=document.createElement('a');
+      a.className='map-discovery-source-link';
+      a.href=item[1];a.target='_blank';a.rel='noopener noreferrer';
+      a.textContent=item[0]+' ↗';
+      links.append(a);
+    });
     catalogResults.hidden=true;catalogPreview.hidden=false;
     catalogActivation.textContent='';
     var button=document.getElementById('map-discovery-activate');
