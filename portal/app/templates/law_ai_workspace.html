@@ -84,7 +84,8 @@
       <div class="law-draft-list" data-law-draft-list>
         {% for item in drafts %}
           {% set draft_status = {'staged': 'Text bereit', 'needs_ocr': 'OCR erforderlich', 'ocr_queued': 'OCR läuft', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') %}
-          <a href="/laws-assistant/{{ item.id }}" class="law-draft {{ 'is-selected' if selected and selected.id == item.id else '' }}"
+          <div class="law-draft-item">
+          <a href="/laws-assistant/{{ item.id }}?bereich={{ 'import' if item.status in ('needs_ocr','ocr_queued','ocr_failed') else 'ki' if item.status != 'accepted' else 'uebersicht' }}" class="law-draft {{ 'is-selected' if selected and selected.id == item.id else '' }}"
              data-law-draft data-law-draft-name="{{ item.original_filename|lower }}" data-law-draft-status="{{ item.status }}"
              {% if selected and selected.id == item.id %}aria-current="page"{% endif %}>
             <span class="law-draft-icon"><i class="fa-solid {{ 'fa-file-pdf' if item.original_filename.lower().endswith('.pdf') else 'fa-file-word' if item.original_filename.lower().endswith('.docx') else 'fa-file-lines' }}" aria-hidden="true"></i></span>
@@ -94,6 +95,19 @@
               <span class="d-block mt-1"><span class="badge text-bg-{{ 'success' if item.status == 'accepted' else 'warning' if item.status in ('ocr_failed', 'needs_ocr') else 'secondary' }}">{{ draft_status }}</span></span>
             </span>
           </a>
+          {% if item.status not in ('accepted', 'ocr_queued') %}
+          <form method="post" action="/laws-assistant/{{ item.id }}/discard" class="law-draft-delete">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="discard_confirmed" value="1">
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    data-confirm="Arbeitsentwurf „{{ item.original_filename }}“ und das gespeicherte Original endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+                    data-confirm-button="Endgültig löschen"
+                    title="Nicht übernommene Arbeitsvorlage löschen">
+              <i class="fa-solid fa-trash-can me-1" aria-hidden="true"></i>Löschen
+            </button>
+          </form>
+          {% endif %}
+          </div>
         {% endfor %}
       </div>
       <div class="p-3 border-top small text-secondary" data-law-drafts-count aria-live="polite">{{ drafts|length }} Entwürfe angezeigt</div>
