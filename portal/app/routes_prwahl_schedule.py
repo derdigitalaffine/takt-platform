@@ -76,6 +76,10 @@ def prwahl_schedule_notify(request: Request, election_id: int, event_id: int,
     members = db.execute(select(User).join(PRMandate,PRMandate.user_id==User.id).where(
         PRMandate.election_id==election.id,PRMandate.role.in_(["chair","member","clerk"]),
         User.active.is_(True))).scalars().all()
+    already = db.scalar(select(Notification.id).where(Notification.kind == "prwahl",
+        Notification.subject == f"TAKT · Wahltermin #{event.id} · Einladung").limit(1))
+    if already:
+        raise HTTPException(409, "Für diesen Termin wurden bereits Benachrichtigungen vorgemerkt. Bitte Versandstatus in der Benachrichtigungsverwaltung prüfen.")
     queued = 0
     for member in members:
         address = getattr(member,"email",None)
@@ -87,7 +91,7 @@ def prwahl_schedule_notify(request: Request, election_id: int, event_id: int,
                 f"Ende: {display_local(event.ends_at)} (Europe/Berlin)\n"
                 "Bitte melde dich im TAKT-Portal an, um die Einzelheiten zu prüfen.\n"
                 "Eine Kalendereinladung ersetzt keine rechtlich vorgeschriebene Zustellung oder Bekanntmachung.")
-        db.add(Notification(kind="prwahl",to_addr=address,subject="TAKT · Termin des Wahlvorstands",
+        db.add(Notification(kind="prwahl",to_addr=address,subject=f"TAKT · Wahltermin #{event.id} · Einladung",
                             body=body,status="pending"))
         queued += 1
     if not queued:
