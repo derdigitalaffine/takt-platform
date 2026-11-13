@@ -26,7 +26,7 @@
       <span class="pr-card-icon"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></span>
       <span class="pr-card-body"><small>{{ bodies.get(election.body_type, election.body_type) }}</small>
         <strong>{{election.title}}</strong><span>{{election.service_name}}</span>
-        <em><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>{{election.election_day.strftime('%d.%m.%Y') if election.election_day else 'Wahltermin noch offen'}} · <span class="pr-status">Vorbereitung</span></em>
+        <em><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>{{election.election_day.strftime('%d.%m.%Y') if election.election_day else 'Wahltermin noch offen'}} · <span class="pr-status">{{{"preparation": "Vorbereitung", "active": "In Durchführung", "completed": "Abgeschlossen", "archived": "Archiviert"}.get(election.status, "Status prüfen")}}</span></em>
       </span>
       <i class="fa-solid fa-arrow-up-right-from-square pr-arrow" aria-hidden="true"></i>
     </a>
