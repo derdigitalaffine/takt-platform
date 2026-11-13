@@ -45,7 +45,7 @@ class LawAiEditorialDraft(Base):
     __tablename__ = "law_ai_editorial_drafts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    draft_id: Mapped[int] = mapped_column(ForeignKey("law_ai_drafts.id", ondelete="CASCADE"), unique=True, index=True)
+    draft_id: Mapped[int] = mapped_column(ForeignKey("law_ai_drafts.id", ondelete="CASCADE"), index=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     source_sha256: Mapped[str] = mapped_column(String(64), default="")
     revision: Mapped[int] = mapped_column(Integer, default=1)
