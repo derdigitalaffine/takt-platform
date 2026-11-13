@@ -166,7 +166,10 @@ def test_browser_discovery_and_3d_controls_remain_in_read_only_view(admin):
         assert page.status_code == 200
         for element in ('id="map-discovery-search"', 'id="map-discovery-region"',
                         'id="map-discovery-topic"', 'id="map-discovery-favorites-only"',
-                        'id="overlay-only-active"', 'id="map-3d-view"'):
+                        'id="overlay-only-active"', 'id="map-3d-view"',
+                        'data-discovery-topic="Wasser und Hochwasser"',
+                        'data-discovery-topic="3D-Gebäude"',
+                        'id="map-discovery-source-links"'):
             assert element in page.text
     assert 'id="map-discovery-activate" type="button" disabled' in public_page.text
     assert 'id="map-discovery-activate" type="button" disabled' not in private_page.text
