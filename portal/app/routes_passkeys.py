@@ -187,6 +187,8 @@ async def passkey_login_verify(request: Request, db: Session = Depends(get_db)):
         )
     except (WebAuthnException, ValueError, TypeError, KeyError):
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.") from None
+    if _b64(verified.credential_id) != stored.credential_id or not verified.user_verified:
+        raise HTTPException(401, "Passkey-Anmeldung nicht möglich.")
     # Race-safe update: never let another parallel verification roll back a counter.
     previous = stored.sign_count
     changed = db.execute(update(PasskeyCredential).where(
