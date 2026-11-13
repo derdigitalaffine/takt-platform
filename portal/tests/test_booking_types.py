@@ -275,7 +275,10 @@ def test_public_wizard_shows_one_day_and_paginates_available_days():
     assert 'name="name"' not in times
     assert len(re.findall(r'class="bk-day-option[ "]', times)) == 7
     assert "Weitere Tage" in times
-    assert times.count('name="slot"') == 7
+    # Die Anzahl buchbarer Zeiten kann je nach Wochentag, Ausnahmen und
+    # bereits belegten Zeiten schwanken; die Tagespagination muss unabhängig
+    # vom Ausführungstag funktionieren.
+    assert 1 <= times.count('name="slot"') <= 7
     value = re.search(r'name="slot" id="s-1-[^"]+" value="([^"]+)"', times).group(1)
     details = c.get(f"{base}?art={a_id}&step=details&slot={quote(value, safe='')}").text
     assert "Ihre Angaben" in details and 'name="name"' in details
