@@ -1,7 +1,7 @@
 """Interne Material- und Geräteplanung mit Bestandsprüfung und Aus-/Rückgabe."""
 from datetime import datetime, timezone
 from fastapi import Depends, Form, HTTPException, Request
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, and_, update
 from sqlalchemy.orm import Session
 from .db import User, utcnow
 from .internal_asset_models import InternalAsset, InternalAssetReservation
@@ -34,9 +34,10 @@ def _date(raw):
 def _reserved(db, asset_id, start, end, exclude=None):
     query = select(func.coalesce(func.sum(InternalAssetReservation.quantity), 0)).where(
         InternalAssetReservation.asset_id == asset_id,
-        InternalAssetReservation.status.in_(("reserved", "issued")),
-        InternalAssetReservation.starts_at < end,
-        InternalAssetReservation.ends_at > start)
+        or_(InternalAssetReservation.status == "issued", and_(
+            InternalAssetReservation.status == "reserved",
+            InternalAssetReservation.starts_at < end,
+            InternalAssetReservation.ends_at > start))
     if exclude:
         query = query.where(InternalAssetReservation.id != exclude)
     return int(db.scalar(query) or 0)
@@ -73,8 +74,9 @@ def internal_asset_reserve(request: Request, asset_id: int, start: str = Form(..
     starts_at, ends_at = _date(start), _date(end)
     if not asset.active or starts_at >= ends_at or starts_at < utcnow() or not 1 <= quantity <= asset.quantity:
         raise HTTPException(422, "Zeitraum oder Menge ungültig.")
-    # SQLite serialisiert den Schreibzugriff; IMMEDIATE verhindert parallele Überbuchungen
-    # nur bei einer vor dem Lesen begonnenen Schreibtransaktion (siehe Produktionshärtung).
+    # Eine tatsächliche UPDATE-Schreibsperre serialisiert die Bestandsprüfung unter SQLite.
+    # Damit können parallele Requests nicht beide denselben Restbestand reservieren.
+    db.execute(update(InternalAsset).where(InternalAsset.id == asset_id).values(quantity=InternalAsset.quantity))
     if _reserved(db, asset_id, starts_at, ends_at) + quantity > asset.quantity:
         flash(request, "Nicht genug Bestand im gewählten Zeitraum verfügbar.", "error")
         return redirect("/resources/intern")
@@ -91,6 +93,10 @@ def internal_asset_transition(request: Request, booking_id: int, action: str,
     booking = db.get(InternalAssetReservation, booking_id)
     if booking is None:
         raise HTTPException(404)
+    # Statuswechsel ebenfalls unter Schreibsperre, bevor der Zustand geprüft wird.
+    db.execute(update(InternalAssetReservation).where(InternalAssetReservation.id == booking_id)
+               .values(quantity=InternalAssetReservation.quantity))
+    db.refresh(booking)
     if action == "cancel" and booking.status == "reserved" and (booking.user_id == user.id or user.is_admin):
         booking.status = "cancelled"
     elif action == "issue" and booking.status == "reserved":
