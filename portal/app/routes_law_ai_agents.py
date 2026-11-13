@@ -1,14 +1,15 @@
 """Ortsrecht read-only LLM pipeline endpoints; owner and AI rights always checked."""
+import asyncio
 import json
 
 from fastapi import Depends, Form, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import law_ai_agents, law_ai_agent_jobs, law_ai_coverage
-from .db import User, get_settings, utcnow
+from .db import SessionLocal, User, get_settings, utcnow
 from .law_ai_agent_models import LawAiAnalysis
 from .main import app, check_csrf, get_db, rate_limit, redirect, require
 from .routes_law_ai import _own
@@ -71,21 +72,97 @@ def start_law_ai_agents(
     return redirect(f"/laws-assistant/{draft_id}")
 
 
+
+
+def _progress_payload(job: LawAiAnalysis | None) -> dict:
+    if not job:
+        return {"status": "none", "step": "none", "ready": False,
+                "failure": "", "progress_done": 0, "progress_total": 0,
+                "stream_active": False, "stream_characters": 0,
+                "stream_chunks": 0, "validated_items": 0}
+    return {
+        "status": job.status, "step": job.step,
+        "ready": job.status in ("done", "failed", "cancelled"),
+        "failure": job.failure if job.status == "failed" else "",
+        "progress_done": job.progress_done,
+        "progress_total": job.progress_total,
+        "stream_active": bool(job.stream_active and job.status == "running"),
+        "stream_characters": job.stream_characters,
+        "stream_chunks": job.stream_chunks,
+        "validated_items": job.validated_items,
+    }
+
+
+def _owned_progress(draft_id: int, job_id: int, user_id: int) -> dict:
+    """Fresh ACL and module check on every SSE snapshot (not just connection)."""
+    with SessionLocal() as db:
+        user = db.get(User, user_id)
+        if user is None or not user.active:
+            raise PermissionError("Berechtigung verloren")
+        try:
+            _ai_permission(user, db)
+            _own(db, draft_id, user)
+        except HTTPException as exc:
+            raise PermissionError("Berechtigung verloren") from exc
+        job = db.get(LawAiAnalysis, job_id)
+        if job is None or job.draft_id != draft_id or job.requested_by != user_id:
+            raise PermissionError("Auftrag nicht sichtbar")
+        return _progress_payload(job)
+
+
+@app.get("/laws-assistant/{draft_id:int}/agents/{job_id:int}/events")
+async def law_ai_agents_events(
+    request: Request, draft_id: int, job_id: int,
+    user: User = Depends(law_user), db: Session = Depends(get_db),
+):
+    """Same-origin SSE carrying *only* counters and validated-item totals."""
+    _ai_permission(user, db)
+    _own(db, draft_id, user)
+    job = db.get(LawAiAnalysis, job_id)
+    if job is None or job.draft_id != draft_id or job.requested_by != user.id:
+        raise HTTPException(404, "KI-Prüfauftrag nicht gefunden.")
+    rate_limit(request, "law-ai-event-stream", limit=15, window=60, key=str(user.id))
+    user_id = user.id
+
+    async def events():
+        last = None
+        for tick in range(1200):  # 20 minute cap, then client can reconnect.
+            if await request.is_disconnected():
+                return
+            try:
+                payload = await asyncio.to_thread(
+                    _owned_progress, draft_id, job_id, user_id
+                )
+            except PermissionError:
+                yield 'event: access-lost\ndata: {"status":"unauthorized"}\n\n'
+                return
+            encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            if encoded != last:
+                yield f"data: {encoded}\n\n"
+                last = encoded
+            elif tick % 15 == 0:
+                yield ": keepalive\n\n"
+            if payload["ready"]:
+                return
+            await asyncio.sleep(1)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "private, no-store",
+                                      "X-Accel-Buffering": "no",
+                                      "X-Content-Type-Options": "nosniff"})
+
 @app.get("/laws-assistant/{draft_id:int}/agents/status")
 def law_ai_agents_status(
     draft_id: int, user: User = Depends(law_user), db: Session = Depends(get_db),
 ):
+    _ai_permission(user, db)
     _own(db, draft_id, user)
     job = db.scalar(select(LawAiAnalysis).where(
         LawAiAnalysis.draft_id == draft_id,
         LawAiAnalysis.requested_by == user.id,
     ).order_by(LawAiAnalysis.id.desc()).limit(1))
-    return JSONResponse({
-        "status": job.status if job else "none",
-        "step": job.step if job else "none",
-        "ready": bool(job and job.status in ("done", "failed", "cancelled")),
-        "failure": job.failure if job and job.status == "failed" else "",
-    }, headers={"Cache-Control": "private, no-store"})
+    return JSONResponse(_progress_payload(job),
+                        headers={"Cache-Control": "private, no-store"})
 
 
 @app.post("/laws-assistant/{draft_id:int}/agents/{job_id:int}/cancel",
@@ -101,7 +178,8 @@ def law_ai_agents_cancel(
         LawAiAnalysis.draft_id == draft_id,
         LawAiAnalysis.requested_by == user.id,
         LawAiAnalysis.status.in_(("queued", "running")),
-    ).values(status="cancelled", step="cancelled", updated_at=utcnow(),
+    ).values(status="cancelled", step="cancelled", stream_active=False,
+             updated_at=utcnow(),
              failure="Durch den Benutzer abgebrochen. Bereits versendete Daten können nicht zurückgerufen werden."))
     db.commit()
     if updated.rowcount != 1:
