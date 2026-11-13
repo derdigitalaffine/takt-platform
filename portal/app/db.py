@@ -3195,6 +3195,7 @@ def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
+    from . import law_ai_models  # noqa: F401 – isolated, unpublished law-import drafts
     from . import knowledge_models  # noqa: F401 – register additive knowledge tables
     from . import signage_models  # noqa: F401 – additive signage models
     from . import anliegen_models  # noqa: F401 – register additive internal request tables

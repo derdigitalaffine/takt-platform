@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Ortsrecht-Assistent{% endblock %}
+{% block content %}
+{% call m.page_head('Ortsrecht-Assistent', 'Dokumente sicher vorbereiten und rechtlich unverändert zur manuellen Prüfung bereitstellen.') %}
+<a href="/laws" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Rechtstexte</a>
+<a href="/laws/new" class="btn btn-outline-secondary">Manuell anlegen</a>
+{% endcall %}
+
+<div class="alert alert-info" role="note">
+  <i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>
+  <strong>Nur redaktionelle Vorbereitung:</strong>
+  Das Original wird unverändert mit SHA-256-Nachweis archiviert. KI- oder OCR-Text ist kein amtlicher Text.
+  Kein Import führt automatisch zu einer Veröffentlichung oder zum Inkrafttreten.
+  Die isolierte PDF-/Bild-OCR und die mehrstufige KI-Auswertung werden in den nächsten Entwicklungsabschnitten ergänzt.
+</div>
+<div class="row g-3">
+  <div class="col-12 col-xl-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="fa-solid fa-file-arrow-up me-2" aria-hidden="true"></i>Original hochladen</div>
+      <div class="card-body">
+        <form method="post" action="/laws-assistant/import" enctype="multipart/form-data">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="form-label" for="law-ai-file">Rechtstext-Datei</label>
+          <input class="form-control" type="file" name="file" id="law-ai-file" required
+                 accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.tif,.tiff,.webp">
+          <p class="form-text">Höchstens 25 MB. Markdown und UTF-8-Text stehen sofort als Vorschlag bereit. PDF, Word und Bilder bleiben bis zur isolierten Texterkennung als Originale vorgemerkt.</p>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Sicher vorbereiten</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Meine Arbeitsentwürfe</div>
+      <div class="list-group list-group-flush">
+        {% for item in drafts %}
+          <a href="/laws-assistant/{{ item.id }}" class="list-group-item list-group-item-action {% if selected and selected.id == item.id %}active{% endif %}">
+            <span class="d-block fw-semibold text-break">{{ item.original_filename }}</span>
+            <span class="small">{{ {'staged': 'Zur Prüfung', 'needs_ocr': 'OCR ausstehend', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') }}</span>
+          </a>
+        {% else %}
+          <p class="text-secondary small p-3 mb-0">Noch keine Importentwürfe vorhanden.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-8">
+    {% if selected %}
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between gap-2">
+        <span><i class="fa-solid fa-clipboard-check me-2" aria-hidden="true"></i>Original überprüfen</span>
+        <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status == 'needs_ocr' else 'secondary' }}">{{ {'staged': 'Prüfung offen', 'needs_ocr': 'OCR ausstehend', 'accepted': 'Übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
+      </div>
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <a class="btn btn-outline-secondary btn-sm" href="/laws-assistant/{{ selected.id }}/original"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Unverändertes Original</a>
+          <span class="small text-secondary">{{ (selected.original_size / 1024) | round(1) }} KB · {{ selected.original_mime }}</span>
+        </div>
+        <dl class="row small">
+          <dt class="col-sm-3">Datei</dt><dd class="col-sm-9 text-break">{{ selected.original_filename }}</dd>
+          <dt class="col-sm-3">SHA-256</dt><dd class="col-sm-9 text-break font-monospace">{{ selected.original_sha256 }}</dd>
+        </dl>
+        {% if selected.status == 'accepted' %}
+          <div class="alert alert-success">Dieser Import wurde durch eine menschliche Entscheidung als <strong>unveröffentlichter Rechtstext</strong> übernommen.
+            {% if selected.accepted_law_id %}<a href="/laws/{{ selected.accepted_law_id }}/edit">Rechtstextentwurf öffnen</a>{% endif %}
+          </div>
+        {% else %}
+          {% if selected.status == 'needs_ocr' %}
+          <div class="alert alert-warning"><strong>Texterkennung steht noch aus.</strong>
+            PDF, Word und Bilddateien werden in diesem ersten sicheren Ausbauschritt nicht innerhalb des Portalprozesses ausgewertet.
+            Sie können den Originaltext zunächst selbst als Markdown übertragen; automatisches OCR folgt mit einem isolierten Worker.
+          </div>
+          {% endif %}
+          <form method="post" action="/laws-assistant/{{ selected.id }}/accept">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label" for="law-ai-title">Geprüfter Titel</label>
+                <input class="form-control" id="law-ai-title" name="title" maxlength="400" required value="{{ selected.proposed_title }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="law-ai-type">Dokumentart</label>
+                <select class="form-select" id="law-ai-type" name="doc_type">
+                  {% for key, label in doc_types.items() %}<option value="{{ key }}" {% if key == 'satzung' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="law-ai-level">Körperschaft / Rechtsebene</label>
+                <select class="form-select" id="law-ai-level" name="level_id">
+                  <option value="">Ohne Zuordnung – später prüfen</option>
+                  {% for level, depth in level_options %}<option value="{{ level.id }}">{{ '   ' * depth }}{{ level.name }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="law-ai-body">Redaktionell geprüfter Markdown-Text</label>
+                <textarea class="form-control font-monospace" id="law-ai-body" name="body_md" rows="18"
+                          maxlength="2097152" spellcheck="false" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ selected.proposed_md }}</textarea>
+                <div class="form-text">Prüfen Sie Paragraphen, Daten, Geldbeträge, Anlagen und jede Abweichung vom Original. Ein unverlässlicher OCR-Text darf nicht ungeprüft übernommen werden.</div>
+              </div>
+              <div class="col-12">
+                <label class="form-check">
+                  <input class="form-check-input" name="confirmed" type="checkbox" value="1" required>
+                  <span class="form-check-label">Ich habe Titel, Text und Original selbst verglichen. Als <strong>unveröffentlichten Entwurf</strong> übernehmen.</span>
+                </label>
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-file-circle-check me-1" aria-hidden="true"></i>Geprüften Entwurf übernehmen</button>
+              </div>
+            </div>
+          </form>
+          <form method="post" action="/laws-assistant/{{ selected.id }}/discard" class="mt-3">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <label class="form-check small mb-2">
+              <input class="form-check-input" name="discard_confirmed" type="checkbox" value="1" required>
+              <span class="form-check-label">Diesen ungeprüften Entwurf einschließlich Original endgültig verwerfen.</span>
+            </label>
+            <button type="submit" class="btn btn-outline-danger btn-sm">Ungeprüften Import verwerfen</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card"><div class="card-body text-center p-5">
+      <i class="fa-solid fa-scale-balanced fa-2x text-secondary mb-3" aria-hidden="true"></i>
+      <h2 class="h5">Original hochladen oder Arbeitsentwurf öffnen</h2>
+      <p class="text-secondary mb-0">Die Texte bleiben zunächst in Ihrem eigenen geschützten Arbeitsbereich und werden niemals automatisch veröffentlicht.</p>
+    </div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
