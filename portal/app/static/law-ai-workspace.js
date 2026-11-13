@@ -67,6 +67,8 @@
         (filter === "review" && state !== "accepted" && state !== "ocr_queued");
       const visible = name.includes(query) && statusMatches;
       draft.hidden = !visible;
+      const row = draft.closest(".law-draft-item");
+      if (row) row.hidden = !visible;
       if (visible) count += 1;
     });
     const counter = $("[data-law-drafts-count]");
