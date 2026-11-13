@@ -29,10 +29,25 @@ Alle Antworten müssen **maschinenlesbare JSON-Objekte** mit eng begrenzten Arra
 - Drei sequenzielle Schritte in einem **separaten asynchronen Task der Portal-Laufzeit** (nicht im HTTP-Request); ein Auftragsstatus `queued/running/done/failed/cancelled`. Die Verarbeitung schickt Quelltext nur an **die bei der Bestätigung angezeigten Provider**. Wenn ein Profil geändert oder gesperrt wird, bricht der Auftrag sicher ab.
 - **Einfach:** drei Modellaufrufe. Im bisherigen Modus wird Text bis 19.000 Zeichen ohne Kürzung analysiert, längere Quellen werden mit klarer Stichprobenkennzeichnung untersucht.
 - **Erweitert:** deterministische, quellengetreue Aufteilung in maximal 10 Abschnitte von höchstens 14.000 Zeichen. Aneinandergehängte Abschnitte ergeben **byte-/zeichengenau den ursprünglichen extrahierten Text**, ohne Auslassungen oder eingefügte KI-Markierungen. Je Agent werden alle Abschnitte durchlaufen, maximal 30 Modellaufrufe, strikt sequentiell. Ein Lauf kann bis zu 12 Minuten dauern; ein überschrittenes Zeitbudget führt zu **Fehler statt unvollständig als erfolgreich gekennzeichneter Analyse**.
-- Pro Modellaufruf max. 70 Sekunden Netzwerklaufzeit und max. 3.072 generierte Tokens; keine Multi-Provider-Fallbacks, keine autonom ausgeführten Aktionen, kein Chatkontext.
+- Pro Modellaufruf max. 70 Sekunden Netzwerklaufzeit, normalerweise bis zu 3.072 generierte Tokens (einmalige JSON-Nachprüfung bis 4.096); keine Multi-Provider-Fallbacks, keine autonom ausgeführten Aktionen, kein Chatkontext.
 - Eingabe weiterhin maximal **120.000 Zeichen**. Der Volltextmodus verwendet einen Abschnittsrahmen von 14.000 Zeichen; damit entfällt die bisherige Beschränkung auf bloße Kopf-/End-/Risikostichproben. Jedes Zitat wird **im tatsächlich übermittelten Abschnitt** überprüft, mit zugehöriger Abschnittsnummer und Textoffset dauerhaft festgehalten. Bei unklaren mehrfachen Stammdatenwerten wird ein Konflikt angezeigt.
 - **Vollständige Textübermittlung bedeutet keineswegs vollständige juristische Prüfung**. Jedes Modell kann Fehler übersehen; Eingangsquelle ist der OCR-/MarkItDown-Text, nicht notwendig eine geprüfte amtliche Fassung. Bei Abbruch, Serverfehler, Änderung von Rechten/Modellen oder fehlender Textabdeckung darf nie ein scheinbar vollständiges Ergebnis entstehen.
 - Der asynchrone Task startet automatisch mit dem Portal. **Anders als der abgeschottete MarkItDown-/Tesseract-OCR-Container** findet die LLM-Orchestrierung derzeit im Portalprozess statt; sie führt dort aber keine schwere OCR aus. Horizontale Skalierung, umfassende Leases und separater KI-Worker bleiben spätere Betriebsaufgaben.
+
+## Diagnose und automatische JSON-Fehlerbehandlung
+
+**Problem vor dem Hotfix:** Die Prüfung brach bereits dann mit der Meldung „KI lieferte keine gültige strukturierte JSON-Antwort“ ab, wenn das Modell ein gültiges JSON mit Einleitung oder Markdown-Zäunen ausgab. Außerdem wurde die Provider-Antwort bei einem Tokenlimit (finish_reason=length) bisher nicht als abgeschnitten erkannt. Dies sind nachweisbare Codeprobleme; ohne Produktionslogs lässt sich nicht feststellen, welche Ursache im Einzelfall vorlag.
+
+**Neues Verhalten:**
+
+1. Ein vollständiges, eindeutiges und zur jeweiligen Stufe passendes JSON-Objekt wird auch mit einer kurzen Einleitung erkannt. Mehrdeutige oder unvollständige Daten werden nicht als Rechtsbefund akzeptiert.
+2. Streaming- und Nicht-Streaming-Adapter melden ein erreichten Token-/Ausgabelimit ausdrücklich, statt stillschweigend abgeschnittene Ergebnisse weiterzugeben.
+3. Nur bei fehlerhaftem JSON-Schema oder abgeschnittener Ausgabe wird der betroffene Textabschnitt einmal **verlustfrei in zwei kleinere Teile** zerlegt. Sehr kurze Passagen werden stattdessen **einmal mit kompaktem JSON-Prompt** an **denselben freigegebenen Anbieter und dasselbe Modell** erneut übergeben.
+4. Bei einem Korrekturversuch werden höchstens drei Fundstellen und bis zu 4.096 Ausgabetokens angefordert; regulär höchstens sechs Vorschläge und 3.072 Tokens. Der Korrekturpfad ist auf eine Stufe begrenzt. Kein unbegrenztes Wiederholen, keine automatische Provider-Umschaltung.
+5. Die Oberfläche informiert **vor Zustimmung** über mögliche zusätzliche Anfragen und zeigt die Anzahl erfolgter Korrekturversuche. Alle Modelle bleiben durch Rechte, Datenempfänger-Snapshot und Quelltext-Hash geschützt.
+6. Die zusammengefügten Quellabschnitte müssen weiterhin vollständig und exakt dem Importtext entsprechen, und jedes KI-Zitat wird gegen den tatsächlich geprüften Text validiert. Bei einem erneuten Fehler wird abgebrochen, ohne ungültige Rechtsvorschläge oder Änderungen zu veröffentlichen.
+
+**Betriebsgrenze:** Maximal 18 Minuten pro Analyseauftrag. Bei langsamen lokal betriebenen LLMs können große Rechtsakte weiterhin ein Zeitbudget ausschöpfen. In diesem Fall ist eine Modellkonfiguration mit ausreichendem Kontext-/Ausgabelimit erforderlich; eine vollständige rechtliche Gewährleistung kann die KI nicht liefern.
 
 ## Live-Feedback und Streaming-Modelle
 
@@ -43,7 +58,7 @@ Im KI-Provider unter **Administration → KI** kann Streaming ausdrücklich akti
 - **Sicherheit:** Weder unvollständige JSON-Schnipsel noch ungeprüfte KI-Behauptungen werden im Status-Endpunkt, im SSE-Kanal oder in der Datenbank veröffentlicht. Zunächst sind ausschließlich numerische Fortschrittswerte sichtbar; Vorschlagszahlen werden erst nach Schema- und wörtlicher Fundstellenprüfung erhöht. Rohantworten werden erst nach vollständiger Validierung in die getrennten Ergebnisfelder übernommen.
 - **Fallback:** Wenn SSE im Browser oder Reverse-Proxy nicht verfügbar ist, verwendet die Anzeige automatisch den geschützten JSON-Statusabruf. Streaming-Provider, die trotz aktivierter Einstellung kein echtes SSE liefern, verursachen einen klaren Analysefehler: keine automatische Doppelübertragung durch stillen Fallback auf `complete()`.
 - **Abbruch und Datenschutz:** Status und SSE prüfen Eigentümer- und KI-Rechte; ein Widerruf, Providerwechsel oder Abbruch unterbindet die weitere Verarbeitung bei der nächsten Streaming-Aktualisierung. Eine bereits versendete externe Anfrage kann nicht rückgängig gemacht werden.
-- **Datenbankschema:** Zusätzliche additive, wiederholbare Migration für `law_ai_analyses` erhält alte KI-Befunde und ergänzt nur `progress_total`, `progress_done`, `stream_characters`, `stream_chunks`, `stream_active`, `validated_items`. Die Statusübertragung enthält keinen Rechtstext und keine API-Schlüssel.
+- **Datenbankschema:** Zusätzliche additive, wiederholbare Migration für `law_ai_analyses` erhält alte KI-Befunde und ergänzt nur `progress_total`, `progress_done`, `retry_attempts`, `stream_characters`, `stream_chunks`, `stream_active`, `validated_items`. Die Statusübertragung enthält keinen Rechtstext und keine API-Schlüssel.
 
 Die technische Antwortmenge ist kein Tokenzähler oder eine Garantie für den Aussagewert der KI. **Die Anzeige „Streaming“ bedeutet ausschließlich, dass eine Antwort technisch eintrifft** – sie bestätigt nicht die Richtigkeit des Rechtsdokuments.
 
