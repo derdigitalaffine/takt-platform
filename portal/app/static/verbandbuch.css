@@ -140,3 +140,6 @@
 .vb-root .vb-field-error{font-size:.8rem;color:var(--bs-danger);font-weight:600}
 .vb-form-footer{position:relative}
 @media(max-width:520px){.vb-wizard-steps li{padding:.65rem .4rem;gap:.3rem;flex-direction:column;text-align:center;font-size:.73rem}.vb-wizard-steps li strong{font-weight:650}.vb-form-footer .vb-actions{display:grid;grid-template-columns:1fr 1fr}.vb-form-footer .vb-actions a{grid-column:1/-1}}
+
+/* Navigation appears only when the progressive enhancement initializes. */
+.vb-form:not([data-vb-enhanced]) [data-vb-next],.vb-form:not([data-vb-enhanced]) [data-vb-prev]{display:none!important}

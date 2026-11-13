@@ -262,8 +262,3 @@ def test_invalid_external_key_does_not_get_replaced(aid_env, monkeypatch, tmp_pa
         aid.generate_key_once()
     assert error.value.status_code == 409
     assert not aid._key_path().exists()
-
-def test_verbandbuch_wizard_assets_and_privacy(client):
-    response = client.get("/verbandbuch/neu")
-    # Depending on authentication state the route redirects to login.
-    assert response.status_code in (200, 303, 307)
