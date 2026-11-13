@@ -41,8 +41,11 @@ def review(markdown: str) -> dict:
         # Preserve all content bytes on each line; only insert ATX markers.
         if prev or not text or len(text) > 120:
             continue
-        if laws.NORM_RE.match(text) and (
-            not following or following.startswith(("(", "§", "Art.", "Artikel"))):
+        norm = laws.NORM_RE.match(text)
+        norm_title = norm.group("title").strip() if norm else ""
+        if (norm and norm_title and norm_title[:1].isupper() and
+                not norm_title.endswith((".", ";", ",")) and
+                (not following or following.startswith(("(", "§", "Art.", "Artikel")))):
             level = 3
         elif laws.GROUP_RE.match(text) and not following:
             level = 2
