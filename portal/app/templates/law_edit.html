@@ -67,6 +67,12 @@
           <button class="btn btn-sm btn-light" type="button" data-insert="\n| Spalte | Spalte |\n| --- | --- |\n|  |  |\n" title="Tabelle"><i class="fa-solid fa-table"></i></button>
           <span class="small text-secondary align-self-center ms-auto" id="law-status"></span>
         </div>
+        <div class="law-md-quality border-bottom px-3 py-2" id="law-md-quality">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" data-law-md-check><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>TAKT-Markdown prüfen und gliedern</button>
+            <span class="small text-secondary" data-law-md-status role="status" aria-live="polite">Markierungen werden nur nach Bestätigung übernommen. Der Rechtswortlaut bleibt unverändert.</span>
+          </div>
+        </div>
         <div class="row g-0 law-split">
           <div class="col law-src"><textarea class="form-control border-0 rounded-0 font-monospace h-100" name="body_md" id="body_md" rows="28" spellcheck="true" style="font-size: .88rem" placeholder="# Hauptsatzung der Ortsgemeinde …
 
@@ -171,4 +177,5 @@ Präambel / Eingangsformel …
 {% block scripts %}
 <link rel="stylesheet" href="/static/laws.css">
 <script src="/static/law-edit.js"></script>
+<script src="/static/law-md-quality.js"></script>
 {% endblock %}
