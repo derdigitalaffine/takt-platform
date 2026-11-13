@@ -302,3 +302,10 @@
 .law-diff-old { border-inline-start:4px solid var(--bs-danger)!important; }
 .law-diff-new { border-inline-start:4px solid var(--bs-success)!important; }
 @media(max-width:800px) { .law-diff-grid { grid-template-columns:minmax(0,1fr); } }
+
+/* Arbeitsvorlagen lassen sich unmittelbar aus der Entwurfsliste verwerfen. */
+.law-workspace .law-draft-item {display:flex;align-items:center;gap:.35rem;border-bottom:1px solid var(--law-line);padding-right:.6rem}
+.law-workspace .law-draft-item .law-draft {flex:1;min-width:0;border-bottom:0}
+.law-workspace .law-draft-item .law-draft-delete {flex-shrink:0}
+.law-workspace .law-draft-item .law-draft-delete button {min-height:2.5rem}
+@media(max-width:575px){.law-workspace .law-draft-item{flex-wrap:wrap;padding:.3rem}.law-workspace .law-draft-item .law-draft {flex-basis:100%}.law-workspace .law-draft-item .law-draft-delete {margin-left:auto}}
