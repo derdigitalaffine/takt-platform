@@ -40,19 +40,19 @@ def _doc(db: Session, election_id: int, document_id: int, user: User, capability
 
 
 @app.get("/personalratswahl")
-def prwahl_index(request: Request, user: User = Depends(current_user),
+def prwahl_index(request: Request, q: str = "", user: User = Depends(current_user),
                  db: Session = Depends(get_db)):
     election_ids = select(PRMandate.election_id).where(PRMandate.user_id == user.id)
     elections = [e for e in db.scalars(select(PRElection).where(PRElection.id.in_(election_ids))
                            .order_by(PRElection.updated_at.desc()).limit(100)).all()
                  if org_access.active_path(db, e.org_id)]
-    orgs = [org for org in db.scalars(select(Organization).where(Organization.active.is_(True))
+    # Search only among already authorized elections; never expose other tenants.\n    q = pw.clean(q, 100).strip()\n    if q:\n        needle = q.casefold()\n        elections = [e for e in elections if needle in e.title.casefold() or\n                     needle in e.service_name.casefold() or\n                     needle in pw.BODY_TYPES.get(e.body_type, e.body_type).casefold()]\n    orgs = [org for org in db.scalars(select(Organization).where(Organization.active.is_(True))
                       .order_by(Organization.name)).all() if org_access.active_path(db, org.id) and
                       (user.is_admin or db.scalar(select(OrgMembership.id).where(
                           OrgMembership.user_id == user.id, OrgMembership.org_id == org.id)) is not None or
                        org_access.allows(db, user, org.id, "settings"))] if user.can("prwahl_setup") else []
     return render(request, "prwahl_index.html", user, elections=elections,
-                  orgs=orgs, bodies=pw.BODY_TYPES, can_create=user.can("prwahl_setup"))
+                  orgs=orgs, bodies=pw.BODY_TYPES, can_create=user.can("prwahl_setup"), search_query=q)
 
 
 @app.post("/personalratswahl/neu", dependencies=[Depends(check_csrf)])
