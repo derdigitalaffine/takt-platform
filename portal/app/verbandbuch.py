@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException
@@ -34,13 +35,69 @@ FIELD_LABELS = {
 }
 
 
+def _key_path() -> Path:
+    """Persistente Datei im bereits gemounteten TAKT-Datenverzeichnis, nie im Webroot."""
+    return Path(settings.data_dir) / "verbandbuch" / "fachschluessel.key"
+
+
+def key_source() -> str:
+    if os.environ.get("VERBANDBUCH_ENCRYPTION_KEY", "").strip():
+        return "environment"
+    return "file" if _key_path().is_file() else "missing"
+
+
+def _key_bytes() -> bytes:
+    env_value = os.environ.get("VERBANDBUCH_ENCRYPTION_KEY", "").strip()
+    if env_value:
+        return env_value.encode("ascii")
+    try:
+        return _key_path().read_bytes().strip()
+    except OSError as exc:
+        raise HTTPException(503, "Fachverschlüsselung nicht eingerichtet.") from exc
+
+
+def generate_key_once() -> None:
+    """Serverseitig generieren, atomar exklusiv speichern; niemals an Browser ausgeben.
+
+    Bei extern verwaltetem Key oder existierenden Fällen kein neues Material erzeugen.
+    Die Betriebsfreigabe bleibt unabhängig davon gesperrt.
+    """
+    if key_source() != "missing":
+        raise HTTPException(409, "Ein Fachschlüssel ist bereits eingerichtet.")
+    from sqlalchemy import func
+    with SessionLocal() as db:
+        if db.scalar(select(func.count()).select_from(FirstAidCase)):
+            raise HTTPException(409, "Bestehende Akten verhindern eine neue Schlüsselgenerierung.")
+    path = _key_path()
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        # O_EXCL verhindert parallele Erzeugung und Überschreiben bestehender Schlüssel.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as exc:
+        raise HTTPException(409, "Ein Fachschlüssel ist bereits eingerichtet.") from exc
+    except OSError as exc:
+        log.exception("Fachschlüssel konnte nicht sicher angelegt werden")
+        raise HTTPException(503, "Sicherer Schlüsselspeicher nicht verfügbar.") from exc
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(Fernet.generate_key() + b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+    except Exception:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            log.exception("Unvollständige Schlüsseldatei konnte nicht entfernt werden")
+        raise
+    log.info("Verbandbuch-Fachschlüssel serverseitig initialisiert")
+
+
 def _cipher() -> Fernet:
     # Bewusst NICHT aus PORTAL_SECRET_KEY oder API-Key-Verschlüsselung abgeleitet.
-    value = os.environ.get("VERBANDBUCH_ENCRYPTION_KEY", "").strip()
     try:
-        return Fernet(value.encode())
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(503, "Fachverschlüsselung nicht eingerichtet.") from exc
+        return Fernet(_key_bytes())
+    except (ValueError, TypeError, UnicodeError) as exc:
+        raise HTTPException(503, "Fachverschlüsselung ungültig oder nicht eingerichtet.") from exc
 
 
 def ready() -> bool:

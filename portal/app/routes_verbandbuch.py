@@ -225,7 +225,19 @@ def verbandbuch_sites(
     grants = db.scalars(select(FirstAidGrant).order_by(FirstAidGrant.site_id, FirstAidGrant.role)).all()
     return _private(render(request, "verbandbuch_sites.html", user, sites=sites, orgs=orgs, users=users,
                            grants=grants, qr_base=settings.portal_base_url, make_qr=aid.qr_token,
-                           ready=aid.ready(), approved=aid.approved()))
+                           ready=aid.ready(), approved=aid.approved(), key_source=aid.key_source()))
+
+
+@app.post("/verbandbuch/schluessel/erzeugen", dependencies=[Depends(check_csrf)])
+def verbandbuch_generate_key(
+    request: Request,
+    user: User = Depends(current_user),
+):
+    if not user.is_admin:
+        raise HTTPException(403)
+    aid.generate_key_once()
+    flash(request, "Fachschlüssel sicher auf dem Server erstellt. Jetzt unbedingt ein geschütztes Backup einrichten. Die Datenschutzfreigabe bleibt unverändert gesperrt.")
+    return redirect("/verbandbuch/standorte")
 
 
 @app.post("/verbandbuch/standorte", dependencies=[Depends(check_csrf)])
