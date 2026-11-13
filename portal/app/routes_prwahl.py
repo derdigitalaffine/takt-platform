@@ -190,9 +190,20 @@ def prwahl_detail(request: Request, election_id: int, tab: str = "overview",
     eligible_ids = _eligible_staff_ids(db, election.org_id) if role in {"coordinator", "chair"} else set()
     users = db.scalars(select(User).where(User.id.in_(eligible_ids))
                        .order_by(User.name, User.id)).all() if eligible_ids else []
+    from .prwahl_next_actions import next_actions
+    from .prwahl_workflow import PRMilestone
+    from .prwahl_schedule import PRScheduleEvent
+    completed_stages = set(db.scalars(select(PRMilestone.stage).where(
+        PRMilestone.election_id == election.id, PRMilestone.completed_at.is_not(None))))
+    scheduled = db.scalars(select(PRScheduleEvent.id).where(
+        PRScheduleEvent.election_id == election.id, PRScheduleEvent.status == "planned").limit(1)).all()
+    actions = next_actions(election, role, mandates, documents, scheduled, completed_stages)
+    pending_tasks = [task for task in tasks if task.completed_at is None]
     return render(request, "prwahl_detail.html", user, election=election,
                   tab=tab, role=role, tasks=tasks, mandates=mandates,
                   users=users, documents=documents, audit=audit,
+                  next_actions=actions, next_tasks=pending_tasks[:4],
+                  remaining_tasks=max(0, len(pending_tasks) - 4),
                   roles=pw.ROLES, bodies=pw.BODY_TYPES, kinds=pw.FORM_KINDS,
                   done=sum(1 for t in tasks if t.completed_at),
                   progress=round(100 * sum(1 for t in tasks if t.completed_at) / len(tasks)) if tasks else 0,
