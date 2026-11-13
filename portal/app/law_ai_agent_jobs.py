@@ -221,7 +221,7 @@ async def process_one(job_id: int) -> None:
                 answer = await _answer(provider, messages, job_id, step,
                                        remaining=remaining,
                                        max_tokens=4096 if depth else 3072)
-                result = law_ai_agents.validate(task, answer, section.text)
+                result = law_ai_agents.validate(task, answer, section.text, with_hints=True)
                 # Number only *successfully* validated sections, in document
                 # order, for unambiguous global character offsets.
                 stage_parts.append((replace(section, number=len(stage_parts) + 1),
