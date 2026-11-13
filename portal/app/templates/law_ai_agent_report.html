@@ -37,7 +37,7 @@
       <a href="/laws-assistant/{{ selected.id }}" class="btn btn-outline-secondary">
         <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zum Prüfplatz
       </a>
-      <button type="button" class="btn btn-primary" onclick="window.print()">
+      <button type="button" class="btn btn-primary" data-law-report-print>
         <i class="fa-solid fa-print me-1" aria-hidden="true"></i>Drucken / als PDF sichern
       </button>
     </div>
@@ -142,3 +142,4 @@
   </footer>
 </article>
 {% endblock %}
+{% block scripts %}<script src="/static/law-ai-report.js" defer></script>{% endblock %}
