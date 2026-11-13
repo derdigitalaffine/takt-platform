@@ -37,3 +37,11 @@ Die strukturierten Musterorientierungen sind **keine wortgetreue Wiedergabe der 
 - LPersVG RLP § 29: Konstituierende Sitzung.
 - WOLPersVG RLP: Wahlvorstand, Wahlvorschläge, Wahlhandlung, öffentliche Auszählung, Ergebnis und Wahlakten.
 - Amtliche Mustervordrucke und aktuelle konsolidierte Landesrechtsfassung über Justizportal RLP / Innenministerium prüfen.
+
+## Vorbelegung und Wahlkalender – ergänzende Assistenz
+
+Neue Vordrucke werden, soweit bekannt und für diesen Wahlbereich berechtigt, aus den Wahl-Stammdaten, Wahlteam-Mandaten, geplanten Wahlteam-Terminen und bei Auszählungsformularen ausschließlich aus manuell bestätigten aggregierten Zahlen vorbelegt. **Jedes Feld zeigt die Datenquelle.** Sitzverteilung, Wahlberechtigtenstatus, Bewerbungen, reale Anwesenheit, Unterschriften und rechtswirksame Beschlüsse werden nicht abgeleitet. Vorbelegungen bleiben editierbare Prüfentwürfe.
+
+Der Wahlkalender schlägt bei einem örtlichen Personalrat aus dem letzten Wahltag ein **Orientierungsdatum für den spätesten Erlass des Wahlausschreibens** (minus sechs Wochen, § 6 Abs. 1 WOLPersVG) vor. Wenn der tatsächliche Erlass als abgeschlossener Ablaufnachweis mit `effective_on` eingetragen ist, erscheint zusätzlich der rechnerische Standard-Endtag der 18-tägigen Wahlvorschlagsfrist (§ 7 Abs. 2 WOLPersVG). **Ausnahmen und eine mögliche Verschiebung des Fristbeginns bis zu drei Arbeitstagen sind nicht automatisch berücksichtigt.** Andere Wahlkörper erhalten keine ungeprüfte gesetzliche Fristberechnung. Die Vorschläge erzeugen keine Termine automatisch: Auswahl belegt das Formular vor, echte Uhrzeiten und Wirksamkeit sind manuell festzulegen; Bekanntmachungen und E-Mails erfolgen nie durch die Vorschlagsberechnung.
+
+Rechtsquellen für die Vorprüfung (Stand 13.11.2026): [WOLPersVG Synopse dbb RLP](https://www.dbb-rlp.de/fileadmin/user_upload/www_dbb-rlp_de/pdf/service/250221_WOLPersVG_Synopse.pdf), [RLP-Wahlausschreiben § 6](https://www.haufe.de/id/norm/wahlordnung-zum-landespersonalvertretungsgesetz-rheinlan-6-wahlausschreiben-HI1676881_p6.html). Vor verbindlicher Nutzung bleibt eine unabhängig abgenommene, versionierte Rechtsgrundlage notwendig.
