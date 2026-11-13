@@ -49,6 +49,19 @@ Alle Antworten müssen **maschinenlesbare JSON-Objekte** mit eng begrenzten Arra
 
 **Betriebsgrenze:** Maximal 18 Minuten pro Analyseauftrag. Bei langsamen lokal betriebenen LLMs können große Rechtsakte weiterhin ein Zeitbudget ausschöpfen. In diesem Fall ist eine Modellkonfiguration mit ausreichendem Kontext-/Ausgabelimit erforderlich; eine vollständige rechtliche Gewährleistung kann die KI nicht liefern.
 
+## Redaktioneller Arbeitsplatz – geführte Benutzeroberfläche
+
+Der Ortsrecht-Assistent unter `/laws-assistant` bietet einen responsiven, auf TAKT/Bootstrap abgestimmten Prüfplatz. Ein Vier-Schritte-Leitfaden unterscheidet Originalschutz, Text-/OCR-Erfassung, optionale KI-Prüfung und die ausschließlich menschliche Übernahme als unveröffentlichter Entwurf.
+
+- **Import:** PDF, DOCX, Bilder und Text über Dateiauswahl oder Drag-and-drop bereitstellen. Dateigröße wird vor dem Upload angezeigt; das Backend bleibt für die tatsächliche Sicherheitsprüfung maßgeblich.
+- **Meine Entwürfe:** private, nach Dateinamen durchsuchbare und nach Status filterbare Liste, mit aktivem Dokument und nächsten Aktionen.
+- **KI:** verständliche Auswahl zwischen Stichproben-Schnellcheck und Volltextprüfung, vor Bestätigung sichtbare Modellprovider und Aufruf-/Kostenhinweise, Fundstellen-Zusammenfassung und ausführliche Befunde nur bei Bedarf.
+- **Prüfeditor:** Markdown-Text mit Dokumentnavigation, Zeilen- und Zeichenzähler, gezielter Fundstellenmarkierung und ausdrücklich bestätigter Übernahme. Für Rechtstext und Metadaten findet **keine automatische Speicherung** statt.
+- **Schutz vor Datenverlust:** Bei ungespeicherten Änderungen warnt der Browser vor Navigation. Ein während der Bearbeitung fertig gewordener OCR-/KI-Auftrag löst **keine automatische Neuladung mit Verlust der Eingaben** aus; statt dessen erscheint ein Hinweis mit bewusstem Neuladen.
+- **Datenschutz:** Der Browser nutzt nur die aktuelle Seite und speichert weder Original- noch KI-Texte in LocalStorage/SessionStorage. Vorschläge werden nicht eigenständig in die Rechtstextdatenbank oder veröffentlichten Fassungen geschrieben.
+
+Hinweis: Anders als ein echter serverseitiger Zwischenstand ist die aktuelle Browserbearbeitung **bis zur expliziten Übernahme flüchtig**. Vor längerem Verlassen des Prüfplatzes entweder die geprüfte Fassung übernehmen oder den Text anderweitig sicher dokumentieren. Eine spätere echte private Zwischenstandspeicherung muss versioniert und getrennt vom OCR-Original implementiert werden, damit die Original-SHA und die bereits freigegebenen KI-Fundstellen nicht unbeabsichtigt verändert werden.
+
 ## Live-Feedback und Streaming-Modelle
 
 Im KI-Provider unter **Administration → KI** kann Streaming ausdrücklich aktiviert werden (`stream_enabled`). Die Ortsrecht-Agenten erkennen diese vorhandene Provider-Einstellung je zugewiesenem Aufgabenmodell:
