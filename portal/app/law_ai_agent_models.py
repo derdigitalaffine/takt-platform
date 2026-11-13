@@ -3,7 +3,7 @@
 A review is *never* a LawText or a planned legal revision; the three
 read-only agents can only store evidence-backed, explicitly untrusted hints.
 """
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base, utcnow
 
@@ -19,6 +19,14 @@ class LawAiAnalysis(Base):
     mode: Mapped[str] = mapped_column(String(16), default="simple")
     status: Mapped[str] = mapped_column(String(16), default="queued")
     step: Mapped[str] = mapped_column(String(32), default="waiting")
+    # The live UI receives only counters and *validated* finding counts.
+    # Untrusted/unfinished model JSON is never persisted or sent to browsers.
+    progress_total: Mapped[int] = mapped_column(Integer, default=0)
+    progress_done: Mapped[int] = mapped_column(Integer, default=0)
+    stream_characters: Mapped[int] = mapped_column(Integer, default=0)
+    stream_chunks: Mapped[int] = mapped_column(Integer, default=0)
+    stream_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    validated_items: Mapped[int] = mapped_column(Integer, default=0)
     provider_map_json: Mapped[str] = mapped_column(Text, default="{}")
     outline_json: Mapped[str] = mapped_column(Text, default="{}")
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")

@@ -9,6 +9,7 @@ from sqlalchemy import create_engine, inspect, text
 
 from app import db as portal_db
 from app.law_ai_models import LawAiDraft
+from app.law_ai_agent_models import LawAiAnalysis
 from sqlalchemy.orm import Session
 
 
@@ -75,5 +76,52 @@ def test_old_ortsrecht_draft_schema_is_extended_without_losing_work(tmp_path, mo
             assert draft is not None
             assert draft.proposed_md == "# Hausordnung\n\n§ 1 Test"
             assert draft.ocr_job_key == ""
+    finally:
+        engine.dispose()
+
+
+
+def test_old_agent_analysis_table_gains_stream_progress_without_data_loss(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'pre-stream.db'}")
+    progress_columns = (
+        "progress_total", "progress_done", "stream_characters",
+        "stream_chunks", "stream_active", "validated_items",
+    )
+    try:
+        portal_db.Base.metadata.create_all(engine)
+        with engine.begin() as connection:
+            for column in progress_columns:
+                connection.execute(text(f"ALTER TABLE law_ai_analyses DROP COLUMN {column}"))
+            connection.execute(text("""
+                INSERT INTO law_ai_analyses
+                  (id, draft_id, requested_by, source_sha256, source_chars,
+                   mode, status, step, provider_map_json,
+                   outline_json, metadata_json, verification_json, failure,
+                   created_at, updated_at)
+                VALUES (71, 77, 1, :sha, 28, 'simple', 'done', 'done', '{}',
+                        '{}', '{"fields":[]}', '{}', '',
+                        '2026-11-13 09:00:00', '2026-11-13 09:02:00')
+            """), {"sha": "c" * 64})
+
+        assert not set(progress_columns).intersection({
+            c["name"] for c in inspect(engine).get_columns("law_ai_analyses")
+        })
+        monkeypatch.setattr(portal_db, "engine", engine)
+        portal_db._migrate()
+        portal_db._migrate()
+        assert set(progress_columns).issubset({
+            c["name"] for c in inspect(engine).get_columns("law_ai_analyses")
+        })
+        with Session(engine) as db:
+            old = db.get(LawAiAnalysis, 71)
+            assert old.status == "done"
+            assert old.source_sha256 == "c" * 64
+            assert old.metadata_json == '{"fields":[]}'
+            assert old.progress_total == 0
+            assert old.progress_done == 0
+            assert old.stream_chunks == 0
+            assert old.stream_characters == 0
+            assert old.stream_active is False
+            assert old.validated_items == 0
     finally:
         engine.dispose()

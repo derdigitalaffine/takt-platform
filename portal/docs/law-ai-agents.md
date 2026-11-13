@@ -34,6 +34,19 @@ Alle Antworten müssen **maschinenlesbare JSON-Objekte** mit eng begrenzten Arra
 - **Vollständige Textübermittlung bedeutet keineswegs vollständige juristische Prüfung**. Jedes Modell kann Fehler übersehen; Eingangsquelle ist der OCR-/MarkItDown-Text, nicht notwendig eine geprüfte amtliche Fassung. Bei Abbruch, Serverfehler, Änderung von Rechten/Modellen oder fehlender Textabdeckung darf nie ein scheinbar vollständiges Ergebnis entstehen.
 - Der asynchrone Task startet automatisch mit dem Portal. **Anders als der abgeschottete MarkItDown-/Tesseract-OCR-Container** findet die LLM-Orchestrierung derzeit im Portalprozess statt; sie führt dort aber keine schwere OCR aus. Horizontale Skalierung, umfassende Leases und separater KI-Worker bleiben spätere Betriebsaufgaben.
 
+## Live-Feedback und Streaming-Modelle
+
+Im KI-Provider unter **Administration → KI** kann Streaming ausdrücklich aktiviert werden (`stream_enabled`). Die Ortsrecht-Agenten erkennen diese vorhandene Provider-Einstellung je zugewiesenem Aufgabenmodell:
+
+- **Streaming aktiv:** Der jeweilige Agent empfängt die OpenAI-kompatible Antwort über `stream_completion()`; die Oberfläche zeigt über eine besitzergeschützte **Server-Sent-Events-Verbindung (SSE)** den Agenten, den Textabschnitt, den Fortschritt, empfangene Zeichen/Antwortteile und die Anzahl bereits quellengeprüfter Vorschläge. Die Streaming-Ausgabe bleibt nur während der Anfrage im Arbeitsspeicher des Workers.
+- **Streaming nicht aktiv:** Der Agent nutzt die vorhandene `complete()`-Schnittstelle und dieselbe Fortschrittsanzeige, ohne eine nicht unterstützte Streaming-Fähigkeit zu unterstellen.
+- **Sicherheit:** Weder unvollständige JSON-Schnipsel noch ungeprüfte KI-Behauptungen werden im Status-Endpunkt, im SSE-Kanal oder in der Datenbank veröffentlicht. Zunächst sind ausschließlich numerische Fortschrittswerte sichtbar; Vorschlagszahlen werden erst nach Schema- und wörtlicher Fundstellenprüfung erhöht. Rohantworten werden erst nach vollständiger Validierung in die getrennten Ergebnisfelder übernommen.
+- **Fallback:** Wenn SSE im Browser oder Reverse-Proxy nicht verfügbar ist, verwendet die Anzeige automatisch den geschützten JSON-Statusabruf. Streaming-Provider, die trotz aktivierter Einstellung kein echtes SSE liefern, verursachen einen klaren Analysefehler: keine automatische Doppelübertragung durch stillen Fallback auf `complete()`.
+- **Abbruch und Datenschutz:** Status und SSE prüfen Eigentümer- und KI-Rechte; ein Widerruf, Providerwechsel oder Abbruch unterbindet die weitere Verarbeitung bei der nächsten Streaming-Aktualisierung. Eine bereits versendete externe Anfrage kann nicht rückgängig gemacht werden.
+- **Datenbankschema:** Zusätzliche additive, wiederholbare Migration für `law_ai_analyses` erhält alte KI-Befunde und ergänzt nur `progress_total`, `progress_done`, `stream_characters`, `stream_chunks`, `stream_active`, `validated_items`. Die Statusübertragung enthält keinen Rechtstext und keine API-Schlüssel.
+
+Die technische Antwortmenge ist kein Tokenzähler oder eine Garantie für den Aussagewert der KI. **Die Anzeige „Streaming“ bedeutet ausschließlich, dass eine Antwort technisch eintrifft** – sie bestätigt nicht die Richtigkeit des Rechtsdokuments.
+
 ## Fehler, Widerruf und Datenschutz
 
 - Berechtigungen, aktive Module, Quelltext-SHA und alle drei Modellprofile werden **vor jedem einzelnen Abschnittsaufruf und bei Rückgabe** erneut geprüft. Änderungen eines KI-Anbieters während einer Verarbeitung blockieren die weitere Übermittlung.

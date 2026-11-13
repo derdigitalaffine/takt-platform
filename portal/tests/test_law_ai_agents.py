@@ -380,3 +380,134 @@ def test_full_section_run_rechecks_provider_after_every_request(monkeypatch, age
         job = db.get(LawAiAnalysis, jid)
         assert job.status == "failed"
         assert db.get(LawAiDraft, did).accepted_law_id is None
+
+
+
+def test_streaming_models_emit_safe_progress_and_validated_results(monkeypatch, agent_routes):
+    from app import routes_law_ai_agents
+    admin = login(*ADMIN)
+    with SessionLocal() as db:
+        db.get(AIProvider, agent_routes).stream_enabled = True
+        db.commit()
+
+    did = _upload(admin)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    start = admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "simple", "transmission_confirmed": "1",
+    })
+    assert start.status_code == 303, start.text
+    jid = law_ai_agent_jobs._claim_next()
+    assert jid is not None
+    streamed = []
+
+    async def fake_stream(provider, messages, *, max_tokens=1024, **kwargs):
+        assert max_tokens == 3072
+        streamed.append(provider.model_id)
+        if provider.model_id == "model-step-1":
+            answer = '{"headings":[{"quote":"§ 1 Geltungsbereich","level":2}]}'
+        elif provider.model_id == "model-step-2":
+            answer = '{"fields":[{"field":"title","value":"Hausordnung","evidence":"Hausordnung der Musterstadt"}]}'
+        else:
+            answer = '{"findings":[{"severity":"high","quote":"Die Gebühr beträgt 10 €.","reason":"Betrag prüfen"}]}'
+        midpoint = len(answer) // 2
+        yield answer[:midpoint]
+        yield answer[midpoint:]
+
+    async def never_complete(*args, **kwargs):
+        raise AssertionError("Streaming models must use stream_completion, not complete")
+
+    monkeypatch.setattr(ai_provider, "stream_completion", fake_stream)
+    monkeypatch.setattr(ai_provider, "complete", never_complete)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    assert streamed == ["model-step-1", "model-step-2", "model-step-3"]
+
+    progress = admin.get(f"/laws-assistant/{did}/agents/status")
+    assert progress.status_code == 200
+    payload = progress.json()
+    assert payload["status"] == "done"
+    assert payload["progress_done"] == 3
+    assert payload["progress_total"] == 3
+    assert payload["stream_active"] is False
+    assert payload["stream_chunks"] == 2
+    assert payload["stream_characters"] > 0
+    assert payload["validated_items"] == 3
+    assert "Hausordnung" not in progress.text  # no raw legal text in progress
+
+    # The SSE endpoint carries only ACL-checked progress and finishes after a
+    # terminal event. No unfinished JSON or original legal text may leak.
+    events = admin.get(f"/laws-assistant/{did}/agents/{jid}/events")
+    assert events.status_code == 200
+    assert "text/event-stream" in events.headers["content-type"]
+    assert events.headers["cache-control"] == "private, no-store"
+    assert '"progress_done":3' in events.text
+    assert "Die Gebühr beträgt 10 €." not in events.text
+    assert "Hausordnung der Musterstadt" not in events.text
+
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "done"
+        assert json.loads(job.metadata_json)["fields"][0]["value"] == "Hausordnung"
+        assert db.get(LawAiDraft, did).accepted_law_id is None
+
+
+def test_cancelled_stream_fails_closed_without_persisting_partial_json(monkeypatch, agent_routes):
+    from app.db import utcnow
+    admin = login(*ADMIN)
+    with SessionLocal() as db:
+        db.get(AIProvider, agent_routes).stream_enabled = True
+        db.commit()
+    did = _upload(admin)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "transmission_confirmed": "1",
+    }).status_code == 303
+    jid = law_ai_agent_jobs._claim_next()
+    assert jid is not None
+    called = []
+
+    async def interrupted_stream(provider, messages, *, max_tokens=1024, **kwargs):
+        called.append(provider.model_id)
+        yield '{"headings":['
+        with SessionLocal() as db:
+            job = db.get(LawAiAnalysis, jid)
+            job.status = "cancelled"
+            job.stream_active = False
+            job.updated_at = utcnow()
+            db.commit()
+        yield '{"quote":"§ 1 Geltungsbereich","level":2}]}'
+
+    monkeypatch.setattr(ai_provider, "stream_completion", interrupted_stream)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    assert called == ["model-step-1"]
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "cancelled"
+        assert job.outline_json == "{}"
+        assert job.metadata_json == "{}"
+        assert db.get(LawAiDraft, did).accepted_law_id is None
+
+
+def test_stream_status_and_events_require_job_owner_and_ai_right(agent_routes):
+    settings(module_laws="1", module_ai="1")
+    admin = login(*ADMIN)
+    did = _upload(admin)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "transmission_confirmed": "1",
+    }).status_code == 303
+    with SessionLocal() as db:
+        job = db.scalar(select(LawAiAnalysis).where(LawAiAnalysis.draft_id == did))
+        jid = job.id
+        other = db.scalar(select(User).where(User.email == "law-stream-other@example.org"))
+        if other is None:
+            other = User(email="law-stream-other@example.org", name="Other editor",
+                         password_hash=hash_password("law-stream-other-pass"),
+                         permissions="laws,ai_chat", active=True, must_change_password=False)
+            db.add(other)
+        other.active = True
+        other.must_change_password = False
+        other.permissions = "laws,ai_chat"
+        db.commit()
+    client_other = login("law-stream-other@example.org", "law-stream-other-pass")
+    assert client_other.get(f"/laws-assistant/{did}/agents/status").status_code == 404
+    assert client_other.get(f"/laws-assistant/{did}/agents/{jid}/events").status_code == 404
