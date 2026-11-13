@@ -90,7 +90,7 @@ def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) 
 
 
 async def _answer(provider, messages: list[dict], job_id: int, step: str,
-                  *, remaining: float) -> str:
+                  *, remaining: float, max_tokens: int = 3072) -> str:
     """Use server SSE only when explicitly enabled; never resend on stream error.
 
     Raw chunks are kept inside the worker and validated as a complete JSON
@@ -99,7 +99,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
     """
     if not provider.stream_enabled:
         return await asyncio.wait_for(
-            ai_provider.complete(provider, messages, max_tokens=3072),
+            ai_provider.complete(provider, messages, max_tokens=max_tokens),
             timeout=min(STAGE_TIMEOUT, remaining),
         )
 
@@ -109,7 +109,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
         count = 0
         last = time.monotonic()
         async for fragment in ai_provider.stream_completion(
-            provider, messages, max_tokens=3072,
+            provider, messages, max_tokens=max_tokens,
         ):
             if not isinstance(fragment, str):
                 raise ValueError("Der Modellstream hat ein ungültiges Format.")
@@ -208,7 +208,8 @@ async def process_one(job_id: int) -> None:
                     step = job.step
 
                 answer = await _answer(provider, messages, job_id, step,
-                                       remaining=remaining)
+                                       remaining=remaining,
+                                       max_tokens=4096 if depth else 3072)
                 result = law_ai_agents.validate(task, answer, section.text)
                 # Number only *successfully* validated sections, in document
                 # order, for unambiguous global character offsets.
