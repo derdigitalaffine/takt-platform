@@ -295,4 +295,8 @@ def passkey_admin_revoke(request: Request, target_id: int, password: str = Form(
         raise HTTPException(400, "Kontobestätigung fehlt oder Konto unbekannt.")
     db.execute(delete(PasskeyCredential).where(PasskeyCredential.user_id == target_id))
     db.commit()
+    # Revoking a potentially stolen key also invalidates any session it created.
+    sessions.end_all(db, target_id)
+    if target_id == user.id:
+        request.session.clear()
     return redirect("/admin/users#benutzer")
