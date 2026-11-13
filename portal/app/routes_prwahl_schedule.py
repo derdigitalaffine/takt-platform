@@ -5,6 +5,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .db import User, Notification, utcnow
+from .calendar_models import Calendar, CalendarGrant, CalendarEvent
 from .main import app, check_csrf, current_user, get_db, render, redirect, flash
 from .prwahl import scope, record, clean
 from .prwahl_models import PRMandate
@@ -99,4 +100,40 @@ def prwahl_schedule_notify(request: Request, election_id: int, event_id: int,
     record(db,user.id,election.id,"schedule_notification",f"event:{event.id}:recipients:{queued}")
     db.commit()
     flash(request,f"{queued} E-Mail-Benachrichtigungen zur Zustellung vorgemerkt. Die Versandwarteschlange bestimmt den tatsächlichen Zustellstatus.")
+    return redirect(f"/personalratswahl/{election.id}/termine")
+
+@app.post("/personalratswahl/{election_id:int}/termine/{event_id:int}/kalender", dependencies=[Depends(check_csrf)])
+def prwahl_schedule_calendar(request: Request, election_id: int, event_id: int,
+                            user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Explicitly publish a minimal event into a private, member-ACL calendar."""
+    election, role = scope(db, election_id, user, "board")
+    event = _event(db, election.id, event_id)
+    if event.status != "planned":
+        raise HTTPException(409, "Abgesagte Termine können nicht übernommen werden.")
+    calendar = db.scalar(select(Calendar).where(Calendar.owner_id == user.id,
+        Calendar.source == "prwahl", Calendar.visibility == "private",
+        Calendar.org_id == election.org_id, Calendar.title == f"Wahlteam · {election.id}"))
+    if calendar is None:
+        calendar = Calendar(owner_id=user.id, title=f"Wahlteam · {election.id}",
+                            visibility="private", source="prwahl", org_id=election.org_id,
+                            include_children=False)
+        db.add(calendar)
+        db.flush()
+    members = db.scalars(select(PRMandate).where(PRMandate.election_id == election.id,
+        PRMandate.role.in_(["chair", "member", "clerk"]))).all()
+    for mandate in members:
+        if mandate.user_id != user.id and not db.scalar(select(CalendarGrant.id).where(
+            CalendarGrant.calendar_id == calendar.id, CalendarGrant.user_id == mandate.user_id)):
+            db.add(CalendarGrant(calendar_id=calendar.id, user_id=mandate.user_id, can_write=False))
+    existing = db.scalar(select(CalendarEvent).where(CalendarEvent.calendar_id == calendar.id,
+                                                      CalendarEvent.uid == event.uid))
+    if existing:
+        raise HTTPException(409, "Der Termin ist bereits im Wahlteam-Kalender vorhanden.")
+    db.add(CalendarEvent(calendar_id=calendar.id, uid=event.uid,
+        title=event.title, location=event.location, description="Geschützter Wahlteam-Termin.",
+        org_id=None, include_children=False, starts_at=event.starts_at.isoformat()+"Z",
+        ends_at=event.ends_at.isoformat()+"Z", ical_data=calendar_file(event)))
+    record(db, user.id, election.id, "calendar_exported", f"event:{event.id}")
+    db.commit()
+    flash(request, "Termin im privaten TAKT-Wahlteam-Kalender angelegt. Nur ausdrücklich berechtigte Mitglieder haben Zugriff.")
     return redirect(f"/personalratswahl/{election.id}/termine")
