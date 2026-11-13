@@ -122,3 +122,12 @@
 .pr-schedule-actions form{margin:0}
 .pr-schedule-actions .btn{min-height:2.5rem;white-space:normal;text-align:center}
 @media(max-width:650px){.pr-schedule-actions{display:grid;grid-template-columns:1fr}.pr-schedule-actions form,.pr-schedule-actions .btn{width:100%}.pr-schedule-card{padding:.85rem}}
+
+/* Search only the election workspaces authorized for the signed-in user. */
+.pr-search{margin:0 0 1.2rem;padding:1rem;border:1px solid var(--pr-stroke);border-radius:1rem;background:var(--pr-card)}
+.pr-search>label{display:block;font-size:.86rem;font-weight:650;margin-bottom:.45rem}
+.pr-search-controls{display:flex;align-items:stretch;gap:.55rem;flex-wrap:wrap}
+.pr-search-controls input{flex:1 1 18rem;min-width:0}
+.pr-search-controls .btn{min-height:2.6rem}
+.pr-search-summary{font-size:.82rem;color:var(--bs-secondary-color);margin:.65rem 0 0}
+@media(max-width:560px){.pr-search-controls{display:grid;grid-template-columns:1fr}.pr-search-controls input,.pr-search-controls .btn{width:100%}}
