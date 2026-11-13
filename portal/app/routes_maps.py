@@ -962,6 +962,36 @@ def map_library_public(q: str = '', region: str = '', topic: str = ''):
     return JSONResponse(result, headers={'Cache-Control': 'public, max-age=1800'})
 
 
+
+@app.get('/maps/library/{key}/overlay')
+def map_library_public_overlay(request: Request, key: str):
+    """A fixed, publicly licensed XYZ source can be activated by guests.
+
+    Unlike /maps/sign, this does not accept arbitrary URLs or user input.
+    In particular a private WMS, private MapLayer or a dataset-download is
+    never signed through this endpoint. It helps comply with volunteer tile
+    policies that require a publicly usable map, without registration.
+    """
+    if 'maps' not in enabled_modules():
+        raise HTTPException(404)
+    rate_limit(request, 'map-library-public-overlay', limit=30, window=60)
+    spec = catalog_library.CATALOG.get(key)
+    if not spec or spec['kind'] != 'xyz' or not key.startswith('orm-'):
+        raise HTTPException(404)
+    definition = mp.clean_custom({
+        'kind': 'xyz', 'name': spec['name'], 'url': spec['url'],
+        'category': spec['topic'] + ' · ' + spec['region'],
+        'attribution': spec['attribution'],
+        'service': {'tile_size': spec.get('tile_size', 256)},
+    })
+    if not definition:
+        raise HTTPException(404)
+    return JSONResponse(
+        {'ok': True, 'layer': mp.custom_config(definition, mp.sign(definition))},
+        headers={'Cache-Control': 'public, max-age=300'})
+
+
+
 @app.post('/maps/library/{key}/layers', dependencies=[Depends(check_csrf)])
 async def map_library_layers(request: Request, key: str,
                              user: User = Depends(map_user)):
