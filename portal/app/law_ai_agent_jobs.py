@@ -235,7 +235,8 @@ async def process_one(job_id: int) -> None:
                     job.updated_at = utcnow()
                     db.commit()
 
-            except (law_ai_agents.InvalidAgentJSON, ai_provider.AIOutputTruncated) as exc:
+            except (law_ai_agents.InvalidAgentJSON, ai_provider.AIOutputTruncated,
+                    ai_provider.AIContextLimit) as exc:
                 # No automatic retries for 401/403/429, network failures or
                 # provider changes; only malformed/length-limited responses.
                 halves = (law_ai_coverage.bisect(section)
@@ -274,6 +275,8 @@ async def process_one(job_id: int) -> None:
                     if job is not None and job.status == "running":
                         cause = ("Antwort am Tokenlimit abgeschnitten."
                                  if isinstance(exc, ai_provider.AIOutputTruncated)
+                                 else "Eingabe überschreitet die Kontextgrenze des Modells."
+                                 if isinstance(exc, ai_provider.AIContextLimit)
                                  else "Kein vollständiges gültiges JSON erhalten.")
                         _fail(db, job, "KI-Ausgabe von " + task +
                               " konnte auch nach begrenzter Abschnittsverkleinerung "
