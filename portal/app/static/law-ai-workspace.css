@@ -98,6 +98,10 @@
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
+.law-workspace .law-draft[hidden],
+.law-workspace [data-law-drafts-empty][hidden],
+.law-workspace [data-law-ai-source-warning][hidden],
+.law-workspace [data-law-editor-dirty][hidden] { display: none !important; }
 .law-workspace .law-draft {
   display: flex;
   align-items: flex-start;
