@@ -27,7 +27,7 @@ from webauthn.helpers.structs import (
 from .config import settings
 from .db import User, get_settings, utcnow
 from .main import (
-    app, admin_user, check_csrf, current_user, home_for, rate_limit,
+    app, admin_user, check_csrf, current_user, get_db, home_for, rate_limit,
     redirect, safe_next,
 )
 from .passkey_models import PasskeyCeremony, PasskeyCredential
@@ -144,7 +144,7 @@ def _credential(data: dict) -> dict:
 
 
 @app.post("/auth/passkeys/login/options", dependencies=[Depends(check_csrf)])
-async def passkey_login_options(request: Request, db: Session = Depends(__import__("app.main", fromlist=["get_db"]).get_db)):
+async def passkey_login_options(request: Request, db: Session = Depends(get_db)):
     rate_limit(request, "passkey-start", limit=12, window=900)
     rp_id, origin = _rp(request)
     opts = generate_authentication_options(
@@ -156,7 +156,7 @@ async def passkey_login_options(request: Request, db: Session = Depends(__import
 
 
 @app.post("/auth/passkeys/login/verify", dependencies=[Depends(check_csrf)])
-async def passkey_login_verify(request: Request, db: Session = Depends(__import__("app.main", fromlist=["get_db"]).get_db)):
+async def passkey_login_verify(request: Request, db: Session = Depends(get_db)):
     rate_limit(request, "passkey-verify", limit=15, window=900)
     data = await _payload(request)
     credential = _credential(data)
@@ -204,7 +204,7 @@ async def passkey_login_verify(request: Request, db: Session = Depends(__import_
 
 @app.post("/profile/passkeys/options", dependencies=[Depends(check_csrf)])
 async def passkey_register_options(request: Request, user: User = Depends(current_user),
-                                    db: Session = Depends(__import__("app.main", fromlist=["get_db"]).get_db)):
+                                    db: Session = Depends(get_db)):
     rate_limit(request, "passkey-register", limit=8, window=900, key=str(user.id))
     data = await _payload(request)
     _verify_recent(user, request, str(data.get("password") or ""))
@@ -230,7 +230,7 @@ async def passkey_register_options(request: Request, user: User = Depends(curren
 
 @app.post("/profile/passkeys/verify", dependencies=[Depends(check_csrf)])
 async def passkey_register_verify(request: Request, user: User = Depends(current_user),
-                                   db: Session = Depends(__import__("app.main", fromlist=["get_db"]).get_db)):
+                                   db: Session = Depends(get_db)):
     rate_limit(request, "passkey-enroll-verify", limit=10, window=900, key=str(user.id))
     data = await _payload(request)
     credential = _credential(data)
@@ -268,7 +268,7 @@ async def passkey_register_verify(request: Request, user: User = Depends(current
 @app.post("/profile/passkeys/{credential_id:int}/delete", dependencies=[Depends(check_csrf)])
 def passkey_delete(request: Request, credential_id: int, password: str = Form(""),
                    user: User = Depends(current_user),
-                   db: Session = Depends(__import__("app.main", fromlist=["get_db"]).get_db)):
+                   db: Session = Depends(get_db)):
     rate_limit(request, "passkey-delete", limit=10, window=900, key=str(user.id))
     _verify_recent(user, request, password)
     key = db.scalar(select(PasskeyCredential).where(
@@ -283,7 +283,7 @@ def passkey_delete(request: Request, credential_id: int, password: str = Form(""
 @app.post("/admin/users/{target_id:int}/passkeys/revoke", dependencies=[Depends(check_csrf)])
 def passkey_admin_revoke(request: Request, target_id: int, password: str = Form(""),
                          confirm: str = Form(""), user: User = Depends(admin_user),
-                         db: Session = Depends(__import__("app.main", fromlist=["get_db"]).get_db)):
+                         db: Session = Depends(get_db)):
     rate_limit(request, "passkey-admin-revoke", limit=10, window=900, key=str(user.id))
     _verify_recent(user, request, password)
     if confirm != "1" or db.get(User, target_id) is None:
