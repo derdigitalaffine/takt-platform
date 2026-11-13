@@ -243,6 +243,17 @@
                   <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3" data-law-analysis-form>
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <fieldset class="mb-3">
+                      <legend class="form-label fw-semibold fs-6">Agentenauftrag auswählen</legend>
+                      <label for="law-ai-selected-stage" class="form-label small">Du kannst alle Agenten gemeinsam oder nur einen einzelnen Prüfungsschritt starten.</label>
+                      <select class="form-select" name="stage" id="law-ai-selected-stage" data-law-stage-select>
+                        <option value="all">Alle drei Agenten – vollständiger Prüfablauf</option>
+                        <option value="law_structure">Nur Gliederung und Markdown-Struktur</option>
+                        <option value="law_metadata">Nur Stammdaten und Fundstellen</option>
+                        <option value="law_verify">Nur Texttreue, Fristen, Beträge und Verweise</option>
+                      </select>
+                      <p class="form-text">Jeder Einzelauftrag benötigt eine neue Übermittlungsfreigabe. Nicht ausgewählte Prüfungen werden nicht ausgeführt.</p>
+                    </fieldset>
+                    <fieldset class="mb-3">
                       <legend class="form-label fw-semibold fs-6">Wie gründlich soll geprüft werden?</legend>
                       <div class="row g-2">
                         <div class="col-12 col-lg-6">
@@ -265,7 +276,7 @@
                     </fieldset>
                     <label class="form-check small mb-2">
                       <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
-                      <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
+                      <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Es werden nur die für den ausgewählten Prüfauftrag benötigten KI-Modelle aufgerufen. Bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
                     </label>
                     <p class="small fw-semibold mb-2" id="law-analysis-budget" data-law-analysis-budget data-law-advanced-calls="{{ max_model_calls }}" aria-live="polite">Schnellcheck: 3 Anfragen, bei fehlerhaftem JSON bis zu 9.</p>
                     <details class="small text-secondary mb-3">
