@@ -112,6 +112,7 @@ async def lifespan(_app: FastAPI):
     try:
         yield
     finally:
+        law_agent_task.cancel()
         law_index_task.cancel()
         rag_task.cancel()
         task.cancel()
