@@ -2,7 +2,7 @@
 {% block title %}Papierauszählung · {{election.title}}{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
 {% block content %}
-<div class="pr-page">
+<div class="pr-page pr-count-page">
   <a class="ds-back-link" href="/personalratswahl/{{election.id}}/ablauf"><i class="fa-solid fa-arrow-left me-2"></i>Zum Wahlfahrplan</a>
   <header class="ds-page-header pr-header"><div class="ds-page-title"><span class="pr-eyebrow">Optionale Ergebnisermittlung</span><h1>Öffentliche Papierauszählung</h1><p>Stimmen je Liste oder Person erfassen, Plausibilität prüfen und das Ergebnis nachvollziehbar dokumentieren.</p></div><div class="ds-page-actions"><a href="/personalratswahl/{{election.id}}?tab=docs" class="btn btn-outline-primary"><i class="fa-regular fa-file-pdf me-2"></i>Ergebnisvordrucke</a></div></header>
   <div class="pr-alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Keine elektronische Stimmabgabe und keine automatische Wahlfeststellung</strong><span>Hier werden ausschließlich Summen der öffentlich ausgezählten Papierstimmen erfasst. Die Sitzberechnung für Listen ist eine Rechenhilfe. Bei Gleichstand, Personenwahl, Sonderfällen und Gruppenverteilung entscheidet der Wahlvorstand nach dem geltenden Recht.</span></div></div>
@@ -28,6 +28,7 @@
       <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th scope="col">Liste / Person</th><th scope="col" class="text-end">Stimmen</th><th scope="col" class="text-end">Rechnerische Sitze</th></tr></thead><tbody>
         {% for entry in detail.entries %}<tr><td>{{entry.label}}</td><td class="text-end">{{entry.votes}}</td><td class="text-end">{{detail.result.assigned.get(entry.label, '–')}}</td></tr>{% endfor %}
       </tbody></table></div>
+      <div class="pr-count-print-meta small"><strong>Wahlberechtigte:</strong> {{round.eligible}} · <strong>Wählende:</strong> {{round.voters}} · <strong>Abgegebene Stimmzettel:</strong> {{round.ballots_cast}} · <strong>Ungültige:</strong> {{round.invalid_ballots}} · <strong>Erfassung:</strong> #{{round.id}}</div>
       {% if detail.result.tie %}<div class="pr-note"><strong>Offener Quotientengleichstand bei Sitz {{detail.result.tie.seat}}:</strong> {{detail.result.tie.labels|join(', ')}}. Eine Entscheidung darf nicht automatisch getroffen werden.</div>{% endif %}
       {% if detail.result.note %}<p class="pr-note">{{detail.result.note}}</p>{% endif %}
       {% if round.status=='confirmed' %}<p class="small text-secondary"><i class="fa-solid fa-check-circle me-1"></i>Prüfnachweis: {{round.count_reference}}</p>
