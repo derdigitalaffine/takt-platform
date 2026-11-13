@@ -1,6 +1,5 @@
 """Review scope for explicitly delegated organizational subtrees."""
 from uuid import uuid4
-from sqlalchemy import select
 from app.db import Organization, SessionLocal, User
 from app.verbandbuch_models import FirstAidSite, FirstAidOrgGrant
 from app import verbandbuch as aid
@@ -16,11 +15,10 @@ def test_subtree_review_permission_requires_global_right_and_active_path():
         site = FirstAidSite(org_id=child.id, title="Child site")
         other_site = FirstAidSite(org_id=outsider.id, title="Other site")
         db.add_all([site, other_site]); db.flush()
-        reviewer = db.scalar(select(User).where(User.active.is_(True), User.permissions.like("%verbandbuch_review%")))
-        if reviewer is None:
-            # Existing fixture tests exercise account management separately.
-            db.rollback()
-            return
+        reviewer = User(name="Subtree reviewer", email=uuid4().hex+"@example.org",
+                        password_hash="disabled-test-credentials", permissions="verbandbuch_review",
+                        is_admin=False, active=True, must_change_password=False)
+        db.add(reviewer); db.flush()
         grant = FirstAidOrgGrant(org_id=parent.id, user_id=reviewer.id, role="review",
                                  include_children=True, created_by_id=reviewer.id)
         db.add(grant); db.flush()
