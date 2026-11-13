@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{form_def[0]}} · Personalratswahl{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
+{% block content %}
+<div class="pr-page pr-doc-workspace">
+  <a class="ds-back-link" href="/personalratswahl/{{election.id}}?tab=docs"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Zur Dokumentenbibliothek</a>
+  <header class="ds-page-header pr-header"><div class="ds-page-title">
+    <span class="pr-eyebrow">Vordruckstudio · {{form_def[1]}}</span><h1>{{form_def[0]}}</h1><p>{{election.title}} · {{election.service_name}}{% if document %} · Fassung {{document.revision}}{% endif %}</p>
+  </div>
+  <div class="ds-page-actions">{% if document %}<a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pdf" class="btn btn-primary"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>A4-PDF erzeugen</a>{% endif %}</div></header>
+  <div class="pr-alert" role="note"><i class="fa-solid fa-file-circle-exclamation" aria-hidden="true"></i><div><strong>Prüfentwurf – keine amtliche Freigabe</strong><span>Vor Verwendung mit dem gültigen Landesmuster vergleichen. Unterschriften, Originalbelege, Beschlüsse, Pflichtinhalte und rechtlich zulässige Bekanntgabe müssen gesondert geprüft werden.</span></div></div>
+  <div class="pr-doc-layout">
+    <section class="pr-panel">
+      <div class="pr-panel-head"><div><span class="pr-eyebrow">Strukturiert statt Freitext-Chaos</span><h2>Vordruck ausfüllen</h2><p>Die Felder gliedern das spätere PDF. Leere Werte werden als zu prüfen gekennzeichnet.</p></div></div>
+      <form method="post" action="/personalratswahl/{{election.id}}/dokumente/speichern" id="pr-doc-form">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <input type="hidden" name="kind" value="{{form_kind}}">
+        <input type="hidden" name="document_id" value="{{document.id if document else 0}}">
+        {% for field,label,field_type in form_def[2] %}
+        <div class="pr-field">
+          <label for="pr-field-{{field}}" class="form-label">{{loop.index}}. {{label}}</label>
+          {% if field_type=='multiline' %}
+          <textarea class="form-control" id="pr-field-{{field}}" name="{{field}}" rows="4" maxlength="3000" placeholder="Hier die geprüften Angaben eintragen …" {% if mode=='readonly' %}readonly{% endif %}>{{values.get(field,'')}}</textarea>
+          {% else %}
+          <input class="form-control" id="pr-field-{{field}}" name="{{field}}" type="{{'date' if field_type=='date' else 'text'}}" maxlength="350" value="{{values.get(field,'')}}" {% if mode=='readonly' %}readonly{% endif %}>
+          {% endif %}
+        </div>{% endfor %}
+        {% if mode!='readonly' %}<div class="pr-form-actions"><span>Speichern erzeugt eine neue, nachvollziehbare Fassung.</span><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>{{'Neue Fassung speichern' if document else 'Prüfentwurf erstellen'}}</button></div>{% endif %}
+      </form>
+    </section>
+    <aside class="pr-sidebar">
+      <div class="pr-panel">
+        <span class="pr-eyebrow">Druckqualität</span><h2>A4-Layoutvorschau</h2>
+        <div class="pr-paper"><div class="pr-paper-bar"></div><small>PERSONALRATSWAHL / ARBEITSUNTERLAGE</small><strong>{{form_def[0]}}</strong><span>{{election.service_name}}</span><div class="pr-paper-line"></div><div class="pr-paper-line short"></div><div class="pr-paper-line"></div><div class="pr-paper-line short"></div><em>PRÜFENTWURF</em></div>
+        <div class="pr-document-features"><p><i class="fa-solid fa-check" aria-hidden="true"></i> DIN A4 · klare Typografie & großzügige Abstände</p><p><i class="fa-solid fa-check" aria-hidden="true"></i> Längere Inhalte über mehrere Seiten</p><p><i class="fa-solid fa-check" aria-hidden="true"></i> Pflicht zur Unterschrift sichtbar</p><p><i class="fa-solid fa-check" aria-hidden="true"></i> Dokumentversion und Vertraulichkeitsvermerk</p></div>
+        {% if document %}
+        <dl class="pr-doc-facts"><dt>Gespeichert</dt><dd>{{document.created_at|local}}</dd><dt>Fassung</dt><dd>v{{document.revision}}</dd><dt>Interne Sichtung</dt><dd>{{'Dokumentiert' if document.review_status=='checked' else 'Noch ausstehend'}}</dd></dl>
+        {% if user.id and mode!='readonly' %}<a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pdf" class="btn btn-outline-primary w-100 mt-2"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>PDF herunterladen</a>{% endif %}
+        {% endif %}
+      </div>
+      {% if document and document.current and document.review_status=='draft' %}
+      <div class="pr-panel"><h2>Fachliche Kontrolle</h2><p class="small text-secondary">Nur der Wahlvorstandsvorsitz kann den eigenen Prüfvermerk dokumentieren; eine amtliche oder juristische Freigabe entsteht dadurch nicht.</p>
+        <form method="post" action="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pruefen"><input type="hidden" name="csrf" value="{{csrf}}">
+          <label for="pr-resolution" class="form-label">Beschluss-/Prüfvermerk</label><input class="form-control" id="pr-resolution" name="resolution_reference" required minlength="8" maxlength="250" placeholder="Niederschrift vom … / TOP …">
+          <button class="btn btn-outline-secondary mt-3" type="submit">Interne Prüfung dokumentieren</button>
+        </form>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}
