@@ -44,6 +44,20 @@
 
   const editor = document.getElementById("law-ai-body");
 
+  // Python source offsets count Unicode code points. Browser textareas use
+  // UTF-16 offsets; correctly handle supplementary characters in OCR text.
+  function toTextAreaOffset(text, codePointOffset) {
+    if (!Number.isSafeInteger(codePointOffset) || codePointOffset < 0) return -1;
+    let position = 0;
+    let codePoints = 0;
+    for (const character of text) {
+      if (codePoints === codePointOffset) return position;
+      position += character.length;
+      codePoints += 1;
+    }
+    return codePoints === codePointOffset ? position : -1;
+  }
+
   document.querySelectorAll("[data-law-ai-apply-heading]").forEach((button) => {
     button.addEventListener("click", () => {
       if (!editor) return;
@@ -52,15 +66,23 @@
       if (!quote || !Number.isInteger(level) || level < 1 || level > 5) return;
       const normalized = (line) => line.trim();
       const lines = editor.value.split("\n");
-      const matching = lines.map((line, index) => normalized(line) === quote ? index : -1)
+      const rawOffset = button.getAttribute("data-law-ai-offset") || "";
+      const offset = /^\d+$/.test(rawOffset)
+        ? toTextAreaOffset(editor.value, Number(rawOffset)) : -1;
+      const targetLine = (offset >= 0 &&
+                          editor.value.slice(offset, offset + quote.length).trim() === quote)
+        ? editor.value.slice(0, offset).split("\n").length - 1 : -1;
+      const matches = lines.map((line, index) => normalized(line) === quote ? index : -1)
         .filter((index) => index >= 0);
-      if (matching.length !== 1) {
+      const chosen = targetLine >= 0 && normalized(lines[targetLine]) === quote
+        ? targetLine : matches.length === 1 ? matches[0] : -1;
+      if (chosen < 0) {
         button.textContent = "Fundstelle nicht eindeutig – bitte manuell prüfen";
         return;
       }
-      const line = lines[matching[0]];
+      const line = lines[chosen];
       const inner = line.trim().replace(/^#{1,5}\s+/, "");
-      lines[matching[0]] = "#".repeat(level) + " " + inner;
+      lines[chosen] = "#".repeat(level) + " " + inner;
       editor.value = lines.join("\n");
       editor.dispatchEvent(new Event("input", { bubbles: true }));
       button.textContent = "Im Entwurf formatiert – vor Übernahme prüfen";
@@ -72,9 +94,15 @@
     button.addEventListener("click", () => {
       if (!editor) return;
       const quote = button.getAttribute("data-law-ai-locate") || "";
-      const index = editor.value.indexOf(quote);
+      const rawOffset = button.getAttribute("data-law-ai-offset") || "";
+      const offset = /^\d+$/.test(rawOffset)
+        ? toTextAreaOffset(editor.value, Number(rawOffset)) : -1;
+      const exact = offset >= 0 && editor.value.slice(offset, offset + quote.length) === quote;
+      const first = editor.value.indexOf(quote);
+      const ambiguous = first >= 0 && editor.value.indexOf(quote, first + quote.length) >= 0;
+      const index = exact ? offset : !ambiguous ? first : -1;
       if (index < 0 || !quote) {
-        button.textContent = "Fundstelle nicht mehr vorhanden";
+        button.textContent = "Fundstelle verändert oder mehrdeutig – bitte manuell suchen";
         return;
       }
       editor.focus();
@@ -109,7 +137,12 @@
         window.location.reload();
         return;
       }
-      if (status) status.textContent = "KI-Auswertung: " + (labels[value.step] || "In Bearbeitung");
+      const progress = /^(law_structure|law_metadata|law_verify):(\d+)\/(\d+)$/.exec(value.step || "");
+      if (status) {
+        status.textContent = "KI-Auswertung: " + (progress
+          ? labels[progress[1]] + " · Textabschnitt " + progress[2] + " von " + progress[3]
+          : labels[value.step] || "In Bearbeitung");
+      }
     } catch (_) {
       clearInterval(timer);
       if (status) status.textContent = "Status nicht abrufbar – bitte manuell aktualisieren.";

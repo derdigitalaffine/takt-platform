@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import law_ai_agents, law_ai_agent_jobs
+from . import law_ai_agents, law_ai_agent_jobs, law_ai_coverage
 from .db import User, get_settings, utcnow
 from .law_ai_agent_models import LawAiAnalysis
 from .main import app, check_csrf, get_db, rate_limit, redirect, require
@@ -41,6 +41,12 @@ def start_law_ai_agents(
         raise HTTPException(413, "Für diese KI-Analyse sind 1 bis 120.000 Textzeichen zulässig.")
     if mode not in ("simple", "advanced"):
         raise HTTPException(422, "Unbekannter Analysemodus.")
+    try:
+        # Bound external calls and fail before authorization/queue creation
+        # if the entire source cannot be divided without omissions.
+        law_ai_coverage.count_calls(source, mode)
+    except ValueError as exc:
+        raise HTTPException(413, str(exc)) from exc
     if transmission_confirmed != "1":
         raise HTTPException(422, "Bitte die Übermittlung an die ausgewählten KI-Server bestätigen.")
     selected = law_ai_agent_jobs.configured_routes(db)

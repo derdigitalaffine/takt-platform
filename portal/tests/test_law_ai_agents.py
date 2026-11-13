@@ -6,7 +6,7 @@ import re
 import pytest
 from sqlalchemy import select
 
-from app import ai_provider, law_ai_agents, law_ai_agent_jobs
+from app import ai_provider, law_ai_agents, law_ai_agent_jobs, law_ai_coverage
 from app.ai_models import AIProvider, AITaskProfile
 from app.db import LawText, SessionLocal, User
 from app.law_ai_agent_models import LawAiAnalysis
@@ -245,3 +245,138 @@ def test_laws_only_editor_cannot_send_documents_to_llm(agent_routes):
         "csrf": csrf, "transmission_confirmed": "1",
     }).status_code == 403
     assert "KI-Redaktionsprüfung" not in editor.get(f"/laws-assistant/{did}").text
+
+
+
+def _upload_long_md(c, text):
+    csrf = csrf_of(c.get("/laws-assistant").text)
+    response = c.post("/laws-assistant/import", data={"csrf": csrf}, files={
+        "file": ("volltext-satzung.md", text.encode("utf-8"), "text/markdown"),
+    })
+    assert response.status_code == 303, response.text
+    return int(re.search(r"/laws-assistant/(\d+)", response.headers["location"]).group(1))
+
+
+def _model_context(messages):
+    body = messages[1]["content"]
+    return body.split("\n<<<BEGIN_UNTRUSTED_ORTSRECHT>>>\n", 1)[1].split(
+        "\n<<<END_UNTRUSTED_ORTSRECHT>>>", 1)[0]
+
+
+def test_advanced_agents_cover_every_source_character_without_publication(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("# Satzung\n§ 1 Gebühren 10 €\n§ 2 Keine Ausnahmen\n" * 900)
+    assert len(source) > law_ai_agents.MAX_CONTEXT_CHARS
+    sections = law_ai_coverage.sections(source)
+    did = _upload_long_md(admin, source)
+    page = admin.get(f"/laws-assistant/{did}")
+    assert "Erweitert" in page.text
+    assert f"{len(sections) * 3} Modellaufrufe" in page.text
+    csrf = csrf_of(page.text)
+    submitted = admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
+    })
+    assert submitted.status_code == 303, submitted.text
+    job_id = law_ai_agent_jobs._claim_next()
+    assert job_id is not None
+    requests = []
+
+    async def full_fake(provider, messages, *, max_tokens=1024, **kwargs):
+        excerpt = _model_context(messages)
+        assert len(excerpt) <= law_ai_coverage.MAX_CHUNK_CHARS
+        assert "[GLIEDERUNGSÜBERSICHT]" not in excerpt
+        requests.append((provider.model_id, excerpt))
+        if provider.model_id == "model-step-1":
+            return json.dumps({"headings": [], "warnings": []})
+        if provider.model_id == "model-step-2":
+            return json.dumps({"fields": [], "warnings": []})
+        return json.dumps({"findings": [
+            {"severity": "medium", "quote": excerpt[:45],
+             "reason": "Die Fundstelle muss mit dem Original abgeglichen werden.",
+             "suggestion": "Original manuell prüfen"},
+        ]})
+    monkeypatch.setattr(ai_provider, "complete", full_fake)
+    asyncio.run(law_ai_agent_jobs.process_one(job_id))
+    assert len(requests) == 3 * len(sections)
+    for idx, expected_model in enumerate(("model-step-1", "model-step-2", "model-step-3")):
+        calls = requests[idx * len(sections):(idx + 1) * len(sections)]
+        assert {model for model, _ in calls} == {expected_model}
+        assert "".join(chunk for _, chunk in calls) == source
+
+    with SessionLocal() as db:
+        analysis = db.get(LawAiAnalysis, job_id)
+        assert analysis.status == "done", analysis.failure
+        result = json.loads(analysis.verification_json)
+        assert result["coverage"]["mode"] == "full_text_submitted"
+        assert result["coverage"]["sections_total"] == len(sections)
+        assert result["coverage"]["source_chars"] == len(source)
+        assert result["sampled"] is False
+        for item in result["findings"]:
+            assert source[item["source_start"]:item["source_end"]] == item["quote"]
+        draft = db.get(LawAiDraft, did)
+        assert draft.proposed_md == source
+        assert draft.accepted_law_id is None
+    html = admin.get(f"/laws-assistant/{did}").text
+    assert "Gesamter importierter Text wurde abschnittsweise" in html
+    assert "Zeichen" in html
+    assert "keine OCR-Texttreue" in html
+
+
+def test_simple_agents_explicitly_keep_sampling_on_long_text(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("§ 1 Frist 14 Tage, keine Ausnahme.\n" * 950)
+    did = _upload_long_md(admin, source)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "simple", "transmission_confirmed": "1",
+    }).status_code == 303
+    job_id = law_ai_agent_jobs._claim_next()
+    assert job_id
+    contexts = []
+
+    async def sample_fake(provider, messages, *, max_tokens=1024, **kwargs):
+        contexts.append(_model_context(messages))
+        if provider.model_id == "model-step-1":
+            return '{"headings":[]}'
+        if provider.model_id == "model-step-2":
+            return '{"fields":[]}'
+        return '{"findings":[]}'
+    monkeypatch.setattr(ai_provider, "complete", sample_fake)
+    asyncio.run(law_ai_agent_jobs.process_one(job_id))
+    assert len(contexts) == 3
+    assert all(len(chunk) <= law_ai_agents.MAX_CONTEXT_CHARS for chunk in contexts)
+    with SessionLocal() as db:
+        result = json.loads(db.get(LawAiAnalysis, job_id).verification_json)
+        assert result["coverage"]["mode"] == "excerpts_only"
+        assert result["sampled"] is True
+
+
+
+def test_full_section_run_rechecks_provider_after_every_request(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    source = ("# Rechtsverordnung\n§ 7 Eine Gebühr gilt nicht.\n" * 570)
+    assert len(law_ai_coverage.sections(source)) > 1
+    did = _upload_long_md(admin, source)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    result = admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
+    })
+    assert result.status_code == 303, result.text
+    jid = law_ai_agent_jobs._claim_next()
+    assert jid is not None
+    call_count = 0
+
+    async def changes_mid_call(provider, messages, *, max_tokens=1024, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        with SessionLocal() as db:
+            db.get(AITaskProfile, "law_structure").model_id = "unapproved-replacement"
+            db.commit()
+        return '{"headings":[]}'
+    monkeypatch.setattr(ai_provider, "complete", changes_mid_call)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    assert call_count == 1, "Never send a second section after changing the approved recipient"
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "failed"
+        assert db.get(LawAiDraft, did).accepted_law_id is None

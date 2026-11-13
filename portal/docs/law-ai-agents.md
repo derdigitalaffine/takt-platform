@@ -8,7 +8,8 @@
 2. Ortsrecht- und KI-Modul müssen aktiviert sein. Bearbeiter benötigen beide Rechte: `laws` und `ai_chat`. Nur die Eigentümerin/der Eigentümer eines Importentwurfs darf ihn KI-analysieren und die Ergebnisse sehen.
 3. Nach Markdown-/Textimport oder OCR-Abschluss einen eigenen Entwurf unter **`/laws-assistant`** öffnen. Die KI erhält **nur den zuvor extrahierten Markdown-/Textvorschlag**, nicht das binäre Original, und ruft keine externe Websuche und kein Fachtool auf.
 4. Die drei tatsächlich konfigurierten Serveradressen, Providernamen und Modelle werden **vor dem Start sichtbar** angezeigt. Mit der ausdrücklichen Zustimmungscheckbox wird nur diese einzelne Analyseautorisation erteilt.
-5. Nach Analyse: vorgeschlagene **Gliederung**, **Stammdaten** (jeweils wortgetreue Belegstelle) und **Prüfhinweise** ansehen. Einfach-/Expertenmodus steuert die Präsentation. Die Übernahme einzelner Metadaten ins Formular erfolgt **nur durch Klick**, ebenso optionale inhaltsneutral zu prüfende Markdown-Überschriftenformatierung.
+5. **Einfach** versendet je Stufe eine Anfrage; bei langen Dokumenten verwendet die KI ausdrücklich gekennzeichnete Stichproben. **Erweitert** übermittelt den vollständigen importierten Text in bis zu **10 lückenlos aufeinanderfolgenden Abschnitten** von maximal 14.000 Zeichen an **jeden** der drei Agenten (maximal **30 Modellaufrufe**). Die UI nennt die Anzahl und möglichen Mehrkosten **vor** der Zustimmung.
+6. Nach Analyse: vorgeschlagene **Gliederung**, **Stammdaten** (jeweils wortgetreue Belegstelle) und **Prüfhinweise** ansehen. Bei Volltextprüfung erscheinen Abdeckung und die präzisen Textzeichenpositionen. Metadaten und optische Überschriften werden ausschließlich **nach einem zusätzlichen Klick** in den bearbeitbaren Formularentwurf übernommen.
 
 ## Agenten und Sicherheitsverträge
 
@@ -26,13 +27,16 @@ Alle Antworten müssen **maschinenlesbare JSON-Objekte** mit eng begrenzten Arra
 
 - Additives Tabellenmodell `law_ai_analyses`, mit Entwurfs- und Nutzerbezug, Quelltext-Hash, Modus, Start-/Fertigstellungsstatus und **konkretem Modell-/Provider-Snapshot**.
 - Drei sequenzielle Schritte in einem **separaten asynchronen Task der Portal-Laufzeit** (nicht im HTTP-Request); ein Auftragsstatus `queued/running/done/failed/cancelled`. Die Verarbeitung schickt Quelltext nur an **die bei der Bestätigung angezeigten Provider**. Wenn ein Profil geändert oder gesperrt wird, bricht der Auftrag sicher ab.
-- Pro Schritt max. 70 Sekunden Netzwerklaufzeit, max. 3.072 generierte Tokens; keine Multi-Provider-Fallbacks, keine autonom ausgeführten Aktionen, kein Chatkontext.
-- Eingabe maximal **120.000 Zeichen**; Modellkontext je Stufe maximal **19.000 Zeichen**. Bei langen Dokumenten werden nur Anfangs-/Endstellen, Gliederungsüberschriften und Risikostellen übergeben. Der Befund zeigt ausdrücklich **Teilanalyse / Stichprobe**. Er darf nicht als vollständige rechtliche Prüfung verstanden werden.
+- **Einfach:** drei Modellaufrufe. Im bisherigen Modus wird Text bis 19.000 Zeichen ohne Kürzung analysiert, längere Quellen werden mit klarer Stichprobenkennzeichnung untersucht.
+- **Erweitert:** deterministische, quellengetreue Aufteilung in maximal 10 Abschnitte von höchstens 14.000 Zeichen. Aneinandergehängte Abschnitte ergeben **byte-/zeichengenau den ursprünglichen extrahierten Text**, ohne Auslassungen oder eingefügte KI-Markierungen. Je Agent werden alle Abschnitte durchlaufen, maximal 30 Modellaufrufe, strikt sequentiell. Ein Lauf kann bis zu 12 Minuten dauern; ein überschrittenes Zeitbudget führt zu **Fehler statt unvollständig als erfolgreich gekennzeichneter Analyse**.
+- Pro Modellaufruf max. 70 Sekunden Netzwerklaufzeit und max. 3.072 generierte Tokens; keine Multi-Provider-Fallbacks, keine autonom ausgeführten Aktionen, kein Chatkontext.
+- Eingabe weiterhin maximal **120.000 Zeichen**. Der Volltextmodus verwendet einen Abschnittsrahmen von 14.000 Zeichen; damit entfällt die bisherige Beschränkung auf bloße Kopf-/End-/Risikostichproben. Jedes Zitat wird **im tatsächlich übermittelten Abschnitt** überprüft, mit zugehöriger Abschnittsnummer und Textoffset dauerhaft festgehalten. Bei unklaren mehrfachen Stammdatenwerten wird ein Konflikt angezeigt.
+- **Vollständige Textübermittlung bedeutet keineswegs vollständige juristische Prüfung**. Jedes Modell kann Fehler übersehen; Eingangsquelle ist der OCR-/MarkItDown-Text, nicht notwendig eine geprüfte amtliche Fassung. Bei Abbruch, Serverfehler, Änderung von Rechten/Modellen oder fehlender Textabdeckung darf nie ein scheinbar vollständiges Ergebnis entstehen.
 - Der asynchrone Task startet automatisch mit dem Portal. **Anders als der abgeschottete MarkItDown-/Tesseract-OCR-Container** findet die LLM-Orchestrierung derzeit im Portalprozess statt; sie führt dort aber keine schwere OCR aus. Horizontale Skalierung, umfassende Leases und separater KI-Worker bleiben spätere Betriebsaufgaben.
 
 ## Fehler, Widerruf und Datenschutz
 
-- Berechtigungen, aktive Module, Quelltext-SHA und drei Modellprofile werden **vor jeder einzelnen Stufe** erneut geprüft.
+- Berechtigungen, aktive Module, Quelltext-SHA und alle drei Modellprofile werden **vor jedem einzelnen Abschnittsaufruf und bei Rückgabe** erneut geprüft. Änderungen eines KI-Anbieters während einer Verarbeitung blockieren die weitere Übermittlung.
 - Benutzer können einen noch nicht abgeschlossenen Prüfauftrag abbrechen. Das verhindert weitere Agentenschritte und das Speichern eines erfolgreich abgeschlossenen Befunds; eine bereits versandte Anfrage ist jedoch **nicht rückholbar**.
 - Gescheiterte / abgebrochene Aufträge verändern weder `LawText`, geplante Fassung noch Veröffentlichungsstatus. Ein neuer Auftrag ist nach ausdrücklicher Zustimmung möglich.
 - Nur validierte, auf den Quelltext belegte strukturierte Ergebnisse und Modellkennungen werden gespeichert; **keine Rohprompts, fremden Chats, API-Keys oder unvalidierten LLM-Rohantworten** im Analyseprotokoll.
@@ -42,7 +46,7 @@ Alle Antworten müssen **maschinenlesbare JSON-Objekte** mit eng begrenzten Arra
 
 ```bash
 cd portal
-python -m pytest -q tests/test_law_ai_agents.py tests/test_law_ai_staging.py tests/test_law_ocr_queue.py
+python -m pytest -q tests/test_law_ai_agents.py tests/test_law_ai_coverage.py tests/test_law_ai_staging.py tests/test_law_ocr_queue.py
 ```
 
 Die Agententests verwenden **Fake-LLM-Modelle** und senden keine echten Daten; geprüft werden getrennte Modellrouten, JSON-Schemas, erfundene Belegstellen, Rollenkontrolle, Providerwechsel, Quelltext-Fingerabdruck und Nichtveröffentlichung. Die gesamte Portal-Suite und die vorhandenen OCR-Image-Smokes bleiben Merge-Gates.
@@ -50,6 +54,6 @@ Die Agententests verwenden **Fake-LLM-Modelle** und senden keine echten Daten; g
 ## Nicht Bestandteil dieses Slices
 
 - Direkte multimodale OCR-Korrektur `law_ocr_vision` mit rechtssicherer Bildübermittlung.
-- Vollständige Dokumentabdeckung unabhängig von Kontextlänge, juristischer Synopsenprüfung und Verifikation rechtsverbindlicher Fassungen.
+- Dokumente über 120.000 Zeichen, adaptive oder parallele Kontextverteilung, juristische Synopsenprüfung und Verifikation rechtsverbindlicher Originalfassungen. Die neue Volltextanalyse ist für Texte innerhalb der genannten Obergrenze nutzbar, nicht für beliebig lange Anlagen.
 - Automatische Rechtskraftprüfung oder KI-gesteuerte Veröffentlichung – **ausdrücklich nicht erlaubt**.
 - Eigenständiger horizontal skalierter LLM-Prozess mit fortgeschrittenem Rate-/Kostenbudget.
