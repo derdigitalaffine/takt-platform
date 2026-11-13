@@ -4,7 +4,7 @@ Every source character belongs to exactly one consecutive segment. No semantic
 retrieval, OCR correction, silent truncation or automatic legal text changes.
 """
 from dataclasses import dataclass
-from . import law_ai_agents
+from . import law_ai_agents, law_ai_toc
 
 MAX_CHUNK_CHARS = 14_000
 MIN_CHUNK_CHARS = 12_000
@@ -114,6 +114,7 @@ def aggregate(stage: str, parts: list[tuple[Section, dict, bool]],
     seen = set()
     metadata_values: dict[str, set[str]] = {}
     excluded = 0
+    navigation = law_ai_toc.toc_ranges(full_source)
     for section, result, sampled in parts:
         if sampled:
             warnings.append(f"Abschnitt {section.number}: Nur ausgewählte Textteile analysiert.")
@@ -130,7 +131,15 @@ def aggregate(stage: str, parts: list[tuple[Section, dict, bool]],
             if not isinstance(quote, str) or not quote or quote not in section.text:
                 excluded += 1
                 continue
-            absolute_pos = section.start + section.text.find(quote)
+            offsets = [section.start + p for p in law_ai_toc.source_line_offsets(section.text, quote)]
+            usable = [p for p in offsets if not law_ai_toc.in_toc(
+                p, p + len(quote), navigation)]
+            # A repeated quote in the body is not a unique anchor:
+            # reject for structures and mark metadata as ambiguous.
+            if not usable:
+                excluded += 1
+                continue
+            absolute_pos = usable[0]
             if full_source[absolute_pos:absolute_pos + len(quote)] != quote:
                 excluded += 1
                 continue
@@ -142,7 +151,7 @@ def aggregate(stage: str, parts: list[tuple[Section, dict, bool]],
                 # A quote can be repeated in the same source section. In that
                 # case no precise *semantic* occurrence is proven; prohibit
                 # direct one-click transformations in the UI.
-                "quote_occurrences": section.text.count(quote),
+                "quote_occurrences": len(usable),
             })
             fingerprint = (candidate.get("field"), candidate.get("value"),
                            candidate.get("level"), quote, absolute_pos)

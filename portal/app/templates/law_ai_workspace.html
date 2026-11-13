@@ -84,7 +84,8 @@
       <div class="law-draft-list" data-law-draft-list>
         {% for item in drafts %}
           {% set draft_status = {'staged': 'Text bereit', 'needs_ocr': 'OCR erforderlich', 'ocr_queued': 'OCR läuft', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') %}
-          <a href="/laws-assistant/{{ item.id }}" class="law-draft {{ 'is-selected' if selected and selected.id == item.id else '' }}"
+          <div class="law-draft-item">
+          <a href="/laws-assistant/{{ item.id }}?bereich={{ 'import' if item.status in ('needs_ocr','ocr_queued','ocr_failed') else 'ki' if item.status != 'accepted' else 'uebersicht' }}" class="law-draft {{ 'is-selected' if selected and selected.id == item.id else '' }}"
              data-law-draft data-law-draft-name="{{ item.original_filename|lower }}" data-law-draft-status="{{ item.status }}"
              {% if selected and selected.id == item.id %}aria-current="page"{% endif %}>
             <span class="law-draft-icon"><i class="fa-solid {{ 'fa-file-pdf' if item.original_filename.lower().endswith('.pdf') else 'fa-file-word' if item.original_filename.lower().endswith('.docx') else 'fa-file-lines' }}" aria-hidden="true"></i></span>
@@ -94,6 +95,19 @@
               <span class="d-block mt-1"><span class="badge text-bg-{{ 'success' if item.status == 'accepted' else 'warning' if item.status in ('ocr_failed', 'needs_ocr') else 'secondary' }}">{{ draft_status }}</span></span>
             </span>
           </a>
+          {% if item.status not in ('accepted', 'ocr_queued') %}
+          <form method="post" action="/laws-assistant/{{ item.id }}/discard" class="law-draft-delete">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="discard_confirmed" value="1">
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    data-confirm="Arbeitsentwurf „{{ item.original_filename }}“ und das gespeicherte Original endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+                    data-confirm-button="Endgültig löschen"
+                    title="Nicht übernommene Arbeitsvorlage löschen">
+              <i class="fa-solid fa-trash-can me-1" aria-hidden="true"></i>Löschen
+            </button>
+          </form>
+          {% endif %}
+          </div>
         {% endfor %}
       </div>
       <div class="p-3 border-top small text-secondary" data-law-drafts-count aria-live="polite">{{ drafts|length }} Entwürfe angezeigt</div>
@@ -225,23 +239,38 @@
               {% if selected.status == 'ocr_queued' %}
                 <div class="alert alert-secondary small mb-0">Bitte zuerst die laufende OCR abschließen.</div>
               {% elif selected.status in ('staged', 'ocr_review') %}
-                {% if not agent_routes or agent_routes|length != 3 %}
-                  <div class="alert alert-warning small">Die drei Ortsrecht-Profile <code>law_structure</code>, <code>law_metadata</code> und <code>law_verify</code> müssen vor der Nutzung in <a href="/admin/ai#ai-task-profiles">KI-Administration</a> jeweils einem freigegebenen aktiven Modell zugewiesen werden. Es wird kein fremder Provider als stiller Ersatz genutzt.</div>
+                {% if not agent_routes %}
+                  <div class="alert alert-warning small">Mindestens eines der Ortsrecht-Profile <code>law_structure</code>, <code>law_metadata</code> oder <code>law_verify</code> muss vor der Nutzung in <a href="/admin/ai#ai-task-profiles">KI-Administration</a> jeweils einem freigegebenen aktiven Modell zugewiesen werden. Es wird kein fremder Provider als stiller Ersatz genutzt.</div>
                 {% else %}
                   <div class="border rounded-3 p-3 mb-3" aria-label="Empfänger und KI-Modelle">
-                    <div class="small fw-semibold mb-1">Diese drei KI-Server/Modelle erhalten den Text:</div>
+                    <div class="small fw-semibold mb-1">Verfügbare KI-Profile – nur der ausgewählte Auftrag erhält den Dokumenttext:</div>
                     <dl class="row small mb-0">
                       {% for task,label in agent_stages %}
                         <dt class="col-sm-5">{{ label }}</dt>
-                        <dd class="col-sm-7 text-break">{{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}
+                        <dd class="col-sm-7 text-break">
+                          {% if task in agent_routes %}
+                          {{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}
                           <span class="badge text-bg-light border text-dark">{{ 'Streaming aktiviert' if agent_routes[task].stream_enabled else 'Antwort nach Abschluss' }}</span>
                           <div class="text-secondary small">{{ agent_routes[task].destination }}</div>
+                          {% else %}<span class="text-warning">Nicht konfiguriert – Einzelauftrag derzeit nicht verfügbar</span>{% endif %}
                         </dd>
                       {% endfor %}
                     </dl>
                   </div>
                   <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3" data-law-analysis-form>
                     <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <fieldset class="mb-3">
+                      <legend class="form-label fw-semibold fs-6">Agentenauftrag auswählen</legend>
+                      <label for="law-ai-selected-stage" class="form-label small">Du kannst alle Agenten gemeinsam oder nur einen einzelnen Prüfungsschritt starten.</label>
+                      <select class="form-select" name="stage" id="law-ai-selected-stage" data-law-stage-select>
+                        {% set default_agent = agent_routes|list|first %}
+                        <option value="all" {% if agent_routes|length != 3 %}disabled{% else %}selected{% endif %}>Alle drei Agenten – vollständiger Prüfablauf</option>
+                        <option value="law_structure" {% if 'law_structure' not in agent_routes %}disabled{% elif agent_routes|length != 3 and default_agent == 'law_structure' %}selected{% endif %}>Nur Gliederung und Markdown-Struktur</option>
+                        <option value="law_metadata" {% if 'law_metadata' not in agent_routes %}disabled{% elif agent_routes|length != 3 and default_agent == 'law_metadata' %}selected{% endif %}>Nur Stammdaten und Fundstellen</option>
+                        <option value="law_verify" {% if 'law_verify' not in agent_routes %}disabled{% elif agent_routes|length != 3 and default_agent == 'law_verify' %}selected{% endif %}>Nur Texttreue, Fristen, Beträge und Verweise</option>
+                      </select>
+                      <p class="form-text">Jeder Einzelauftrag benötigt eine neue Übermittlungsfreigabe. Nicht ausgewählte Prüfungen werden nicht ausgeführt.</p>
+                    </fieldset>
                     <fieldset class="mb-3">
                       <legend class="form-label fw-semibold fs-6">Wie gründlich soll geprüft werden?</legend>
                       <div class="row g-2">
@@ -265,7 +294,7 @@
                     </fieldset>
                     <label class="form-check small mb-2">
                       <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
-                      <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
+                      <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die für diesen Auftrag ausgewählten oben angezeigten KI-Anbieter übermitteln darf. Es werden nur die für den ausgewählten Prüfauftrag benötigten KI-Modelle aufgerufen. Bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
                     </label>
                     <p class="small fw-semibold mb-2" id="law-analysis-budget" data-law-analysis-budget data-law-advanced-calls="{{ max_model_calls }}" aria-live="polite">Schnellcheck: 3 Anfragen, bei fehlerhaftem JSON bis zu 9.</p>
                     <details class="small text-secondary mb-3">
@@ -346,7 +375,7 @@
                           {% for entry in metadata.get('fields', []) %}
                             <div class="law-result-row">
                               <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                                <span><span class="badge text-bg-secondary">{{ law_field_names.get(entry.field, entry.field) }}</span> <strong class="text-break">{{ entry.value }}</strong></span>
+                                <span><span class="badge text-bg-secondary">{{ law_field_names.get(entry.field, entry.field) }}</span> <strong class="text-break">{{ entry.value }}</strong> {% if entry.origin|default("") == "rule_based" %}<span class="badge text-bg-info">Regelbasiert erkannt</span>{% else %}<span class="badge text-bg-light border text-body">KI-Fundstelle</span>{% endif %}</span>
                                 <button type="button" class="btn btn-outline-primary btn-sm" data-law-ai-apply-field="{{ entry.field }}" data-law-ai-value="{{ entry.value }}" title="Vorschlag manuell ins Formular übertragen">Ins Formular übernehmen</button>
                               </div>
                               <blockquote class="law-quote small text-secondary mt-2 mb-0">{{ entry.evidence }}</blockquote>
@@ -492,6 +521,16 @@
                     <div class="small text-secondary mt-2">Klicke auf einen Eintrag, um die Stelle im Editor zu öffnen.</div>
                   </aside>
                 </div>
+                <section id="law-original-diff" class="law-diff-panel mt-3" aria-label="Original und Bearbeitung vergleichen">
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                    <div>
+                      <h4 class="h6 mb-1"><i class="fa-solid fa-code-compare me-1" aria-hidden="true"></i>Original mit Entwurf vergleichen</h4>
+                      <p class="small text-secondary mb-0">Zeigt Änderungen seit dem Import. Es werden keine Inhalte an den KI-Server übertragen.</p>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-law-diff-run>Änderungen vergleichen</button>
+                  </div>
+                  <div data-law-diff-result aria-live="polite"><p class="small text-secondary mb-0">Zum Vergleichen klicken.</p></div>
+                </section>
                 <p class="small text-warning mt-2 mb-0" data-law-editor-dirty hidden>Du hast ungespeicherte Änderungen. Verlasse diese Seite nicht, bevor du den geprüften Entwurf übernommen hast.</p>
               </div>
               <div class="col-12">
@@ -537,6 +576,7 @@
 {% block scripts %}
 <script src="/static/law-ai-workspace.js" defer></script>
 <script src="/static/law-md-quality.js" defer></script>
+<script src="/static/law-ai-diff.js" defer></script>
 {% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}
 {% if selected and ai_enabled %}<script src="/static/law-ai-agents.js" defer></script>{% endif %}
 {% endblock %}

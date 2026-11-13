@@ -102,7 +102,10 @@ def _render(request, db, user, selected=None, bereich="uebersicht"):
         ocr_pages, ocr_warnings = [], []
     cfg = get_settings(db)
     ai_enabled = user.can("ai_chat") and cfg.get("module_ai") == "1" and cfg.get("module_laws") == "1"
-    agent_routes = law_ai_agent_jobs.configured_routes(db) if ai_enabled else {}
+    agent_routes = {}
+    if ai_enabled:
+        for task, _label in law_ai_agents.STAGES:
+            agent_routes.update(law_ai_agent_jobs.configured_routes(db, (task,)))
     analysis = (db.scalar(select(LawAiAnalysis).where(
         LawAiAnalysis.draft_id == selected.id,
         LawAiAnalysis.requested_by == user.id,
@@ -257,7 +260,7 @@ def law_ai_queue_ocr(
         temporary.unlink(missing_ok=True)
         submitted.unlink(missing_ok=True)
         raise
-    return redirect(f"/laws-assistant/{row.id}")
+    return redirect(f"/laws-assistant/{row.id}?bereich=import")
 
 
 def _ocr_phase(draft: LawAiDraft) -> dict:
@@ -350,7 +353,7 @@ async def law_ai_import(request: Request, file: UploadFile = File(...),
         db.rollback()
         path.unlink(missing_ok=True)
         raise
-    return redirect(f"/laws-assistant/{row.id}")
+    return redirect(f"/laws-assistant/{row.id}?bereich={'ki' if status == 'staged' else 'import'}")
 
 
 @app.get("/laws-assistant/{draft_id:int}")
@@ -468,10 +471,14 @@ def law_ai_discard(
     if discard_confirmed != "1":
         raise HTTPException(422, "Das Verwerfen muss ausdrücklich bestätigt werden.")
     row = _own(db, draft_id, user)
-    if row.status == "accepted":
-        raise HTTPException(409, "Ein bereits übernommener Originalnachweis darf nicht entfernt werden.")
+    if row.status not in ("staged", "needs_ocr", "ocr_review", "ocr_failed"):
+        raise HTTPException(409, "Dieser Arbeitsstand kann nicht gelöscht werden.")
     if row.status == "ocr_queued":
         raise HTTPException(409, "OCR-Auftrag läuft noch. Nach Abschluss kann der Entwurf verworfen werden.")
+    if db.scalar(select(LawAiAnalysis.id).where(
+            LawAiAnalysis.draft_id == draft_id,
+            LawAiAnalysis.status.in_(("queued", "running"))).limit(1)) is not None:
+        raise HTTPException(409, "Laufende KI-Analyse zuerst abschließen oder abbrechen.")
     path = _original_path(row)
     db.delete(row)
     db.commit()

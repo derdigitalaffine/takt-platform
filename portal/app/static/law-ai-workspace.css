@@ -293,3 +293,21 @@
 .law-workspace[data-view="ki"] .law-layout-side { display:none!important; }
 .law-workspace[data-view="editor"] .law-layout-main,
 .law-workspace[data-view="ki"] .law-layout-main { flex:0 0 100%; max-width:100%; }
+
+/* Source-to-working-draft comparison, with no horizontal page overflow. */
+.law-diff-panel { padding:1rem; border:1px solid var(--law-line); border-radius:.8rem; background:var(--law-card); }
+.law-diff-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+.law-diff-grid section { min-width:0; }
+.law-diff-grid pre { border:1px solid var(--law-line); border-radius:.65rem; padding:1rem; white-space:pre-wrap; overflow-wrap:anywhere; max-height:36rem; overflow:auto; font-size:.86rem; line-height:1.65; }
+.law-diff-old { border-inline-start:4px solid var(--bs-danger)!important; }
+.law-diff-new { border-inline-start:4px solid var(--bs-success)!important; }
+@media(max-width:800px) { .law-diff-grid { grid-template-columns:minmax(0,1fr); } }
+
+/* Arbeitsvorlagen lassen sich unmittelbar aus der Entwurfsliste verwerfen. */
+.law-workspace .law-draft-item {display:flex;align-items:center;gap:.35rem;border-bottom:1px solid var(--law-line);padding-right:.6rem}
+.law-workspace .law-draft-item .law-draft {flex:1;min-width:0;border-bottom:0}
+.law-workspace .law-draft-item .law-draft-delete {flex-shrink:0}
+.law-workspace .law-draft-item .law-draft-delete button {min-height:2.5rem}
+@media(max-width:575px){.law-workspace .law-draft-item{flex-wrap:wrap;padding:.3rem}.law-workspace .law-draft-item .law-draft {flex-basis:100%}.law-workspace .law-draft-item .law-draft-delete {margin-left:auto}}
+
+.law-workspace .law-draft-item[hidden] { display:none!important; }

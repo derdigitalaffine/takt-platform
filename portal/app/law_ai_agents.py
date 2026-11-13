@@ -8,7 +8,7 @@ import hashlib
 import json
 import re
 
-from . import laws, laws_meta
+from . import laws, laws_meta, law_ai_toc, law_ai_metadata_hints
 
 MAX_SOURCE_CHARS = 120_000
 MAX_CONTEXT_CHARS = 19_000
@@ -62,8 +62,11 @@ def extract_context(source: str, stage: str, *,
     if stage == "law_structure":
         front = min(4500, context_limit // 3)
         tail = min(3500, context_limit // 3)
-        headings = "\n".join(m.group(0).strip() for m in
-                             list(_HEADING.finditer(source))[:90])
+        navigation = law_ai_toc.toc_ranges(source)
+        headings = "\n".join(
+            m.group(0).strip() for m in _HEADING.finditer(source)
+            if not law_ai_toc.in_toc(m.start(), m.end(), navigation)
+        )[:max(1000, context_limit // 2)]
         body = headings[:max(0, context_limit - front - tail - 120)]
         context = (source[:front] + "\n\n[GLIEDERUNGSÜBERSICHT]\n"
                    + body + "\n\n[TEXTENDE]\n" + source[-tail:])
@@ -104,12 +107,15 @@ def prompt(stage: str, source: str, *,
         instructions = (
             'Antworte exakt nach Schema {"headings":[{"quote":"wörtliche Überschriftszeile",'
             '"level":2}],"warnings":["kurzer Prüfhinweis"]}. '
-            "Schlage maximal 6 besonders relevante Überschriften aus vorhandenen Zeilen vor; "
-            "level 1–5. TAKT-Markdown verwendet # für den Dokumenttitel, ## für Teile/Abschnitte "
-            "und ### für Paragraphen/Artikel. Bereits vorhandene Markdown-Marker nicht verdoppeln. "
-            "Jede quote muss die exakte Quellzeile inklusive etwaiger #-Marker sein. "
-            "Keine neuen Formulierungen. Änderungen an Wörtern, Satzzeichen oder Rechtsfolgen "
-            "sind verboten. Markdown-Ebene ist nur ein Darstellungsvorschlag."
+            "Prüfe die ECHTEN Überschriften des Regelungstextes, NICHT das Inhaltsverzeichnis. "
+            "Überspringe Inhaltsverzeichnis, Seitenzahlen, Punktführer, Vorblätter und Listen mit "
+            "nur wiedergegebenen §-Titeln. Die tatsächlichen Vorschriften beginnen häufig erst "
+            "NACH einem Inhaltsverzeichnis; identische Titel dort NICHT doppelt melden. "
+            "Schlage maximal 6 belegte Überschriften als exakt zitierte ganze Zeilen vor, "
+            "level 1–5. TAKT: # ausschließlich Dokumenttitel, ## Teile/Abschnitte, "
+            "### Paragraphen/Artikel. Fehlende Überschriften niemals erfinden. "
+            "Marker nicht verdoppeln. Jede quote ist exakte Quellzeile inkl. #-Marker; "
+            "nur Darstellung, keine Änderung am Wortlaut."
         )
     elif stage == "law_metadata":
         instructions = (
@@ -117,9 +123,18 @@ def prompt(stage: str, source: str, *,
             '"evidence":"wortgetreues Zitat"}],"warnings":["..."]}. '
             "Erlaubte Felder: title, short_title, doc_type, level, version_note, "
             "issued_on, valid_from, valid_until. "
-            "Niemals Veröffentlichungsstatus, amtliche Wirksamkeit oder Geltungsbeginn "
-            "aus bloßer Vermutung angeben. Datum nur bei explizitem Beleg; "
-            "Feldwert muss mit dem Beleg vereinbar sein. Höchstens 6 knappe Vorschläge."
+            "PRIORITÄT: (1) amtlich klingender Dokumenttitel vom Titelblatt oder "
+            "der ersten eigentlichen Überschrift, nicht aus dem Inhaltsverzeichnis; "
+            "(2) Dokumentart; (3) Ausfertigung; (4) Inkrafttreten; (5) außer Kraft; "
+            "(6) Körperschaft; (7) Fassung/Änderungsstand und Abkürzung. "
+            "JEDES Datum muss mit seiner Art im Zitat belegt sein: "
+            "issued_on nur bei Ausfertigung, valid_from nur bei ausdrücklichem "
+            "Inkrafttreten, valid_until nur bei ausdrücklichem Außerkrafttreten. "
+            "Beschlussdatum, Bekanntmachungsdatum und Druckdatum sind NICHT automatisch "
+            "Inkrafttretensdaten. Ortsgemeinde/Verbandsgemeinde nicht raten. "
+            "Keine aus einem Inhaltsverzeichnis abgeleiteten Metadaten. "
+            "Niemals Veröffentlichungsstatus oder amtliche Wirksamkeit behaupten. "
+            "Höchstens 8 kurze belegte Vorschläge, Werte im Originalwortlaut."
         )
     elif stage == "law_verify":
         instructions = (
@@ -193,7 +208,7 @@ def _verified_quote(quote: object, source: str) -> str | None:
     return quote
 
 
-def validate(stage: str, answer: str, source: str) -> dict:
+def validate(stage: str, answer: str, source: str, *, with_hints: bool = False, allow_header: bool = True) -> dict:
     """Reject invented quotes/fields. Never return raw model output to templates."""
     result = _json_object(answer, stage)
     warnings = _warnings(result.get("warnings"))
@@ -213,7 +228,14 @@ def validate(stage: str, answer: str, source: str) -> dict:
                     or quote.strip() not in [line.strip() for line in source.splitlines()]):
                 discarded += 1
                 continue
-            heading = re.sub(r"^#{1,6}\\s+", "", quote.strip())
+            # Reject bare navigation entries from OCR contents tables.
+            quote_offsets = law_ai_toc.source_line_offsets(source, quote)
+            if quote_offsets and all(law_ai_toc.in_toc(
+                    p, p + len(quote), law_ai_toc.toc_ranges(source))
+                    for p in quote_offsets):
+                discarded += 1
+                continue
+            heading = re.sub(r"^#{1,6}\s+", "", quote.strip())
             # Prevent invalid constructs such as "### # § 1" and force
             # the canonical hierarchy for statutory units.
             if laws.NORM_RE.match(heading):
@@ -235,6 +257,13 @@ def validate(stage: str, answer: str, source: str) -> dict:
                 continue
             field, value = item.get("field"), item.get("value")
             evidence = _verified_quote(item.get("evidence"), source)
+            if evidence:
+                positions = law_ai_toc.source_line_offsets(source, evidence)
+                toc_spans = law_ai_toc.toc_ranges(source)
+                if positions and all(law_ai_toc.in_toc(
+                        p, p + len(evidence), toc_spans) for p in positions):
+                    discarded += 1
+                    continue
             if field not in FIELDS or not isinstance(value, str) or not evidence:
                 discarded += 1
                 continue
@@ -243,6 +272,15 @@ def validate(stage: str, answer: str, source: str) -> dict:
                 discarded += 1
                 continue
             if field in _DATE_FIELDS:
+                evidence_lower = evidence.casefold()
+                date_context = {
+                    "issued_on": r"ausgefertigt|ausfertigung",
+                    "valid_from": r"tritt.{0,35}in kraft|in kraft.{0,20}treten|inkrafttreten|gilt ab|gültig ab",
+                    "valid_until": r"außer kraft|ausser kraft|befristet bis|gilt bis",
+                }
+                if not re.search(date_context[field], evidence_lower):
+                    discarded += 1
+                    continue
                 normalized = laws_meta.parse_date(value)
                 # Dates must be explicitly visible in the cited passage.
                 observed = re.findall(r"\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\.\s*\d{1,2}\.\s*\d{4}", evidence)
@@ -261,6 +299,17 @@ def validate(stage: str, answer: str, source: str) -> dict:
                 discarded += 1
                 continue
             out.append({"field": field, "value": value, "evidence": evidence})
+        if with_hints:
+            already = {entry["field"] for entry in out}
+            for hint in law_ai_metadata_hints.hints(source, allow_header=allow_header):
+                field, value, evidence = hint["field"], hint["value"], hint["evidence"]
+                if field in already or field not in FIELDS or len(value) > FIELDS[field]:
+                    continue
+                if evidence not in source:
+                    continue
+                out.append({"field": field, "value": value,
+                            "evidence": evidence, "origin": "rule_based"})
+                already.add(field)
         key = "fields"
     elif stage == "law_verify":
         candidates = result.get("findings")

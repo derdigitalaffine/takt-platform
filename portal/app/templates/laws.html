@@ -11,7 +11,8 @@
     <li><a class="dropdown-item" href="/laws/export{{ ('?level=' ~ selected.id) if selected }}"><i class="fa-solid fa-file-export fa-fw me-2"></i>{{ ('„' ~ selected.name ~ '“') if selected else 'Alle Texte' }} exportieren</a></li>
     <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#law-import"><i class="fa-solid fa-file-import fa-fw me-2"></i>Importieren …</button></li></ul></div>
 <a class="btn btn-outline-primary" href="/laws/upload{{ ('?level=' ~ selected.id) if selected }}"><i class="fa-solid fa-file-arrow-up me-1"></i>Dateien hochladen</a>
-<a class="btn btn-primary" href="/laws/new{{ ('?level=' ~ selected.id) if selected }}"><i class="fa-solid fa-plus me-1"></i>Neuer Rechtstext</a>
+<a class="btn btn-primary" href="/laws-assistant?bereich=import"><i class="fa-solid fa-wand-magic-sparkles me-1"></i>Mit KI erstellen</a>
+<a class="btn btn-outline-primary" href="/laws/new{{ ('?level=' ~ selected.id) if selected }}"><i class="fa-solid fa-plus me-1"></i>Neuer Rechtstext</a>
 {% endcall %}
 
 <div class="row g-3 mb-4">
