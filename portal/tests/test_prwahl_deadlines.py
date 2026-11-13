@@ -37,7 +37,7 @@ def test_missing_dates_generate_no_fabricated_deadline():
 
 def test_notice_date_after_latest_standard_window_is_flagged():
     from app.prwahl_deadlines import diagnose
-    warnings = diagnose(election(date(2027, 4, 14)), notice_effective_on=date(2027, 3, 10))
+    warnings = diagnose(election(date(2027, 4, 14)), notice_effective_on=date(2027, 4, 5))
     assert any("Sechswochen" in w["title"] for w in warnings)
     assert any("Vorschlagsfrist" in w["title"] for w in warnings)
     assert all(w["kind"] == "warning" for w in warnings)
