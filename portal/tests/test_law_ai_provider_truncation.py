@@ -102,3 +102,27 @@ def test_generic_http_400_is_not_misclassified_as_context_limit(monkeypatch):
     with pytest.raises(ai_provider.AIProviderError, match="HTTP 400") as error:
         asyncio.run(ai_provider.complete(_provider(), [{"role": "user", "content": "x"}]))
     assert not isinstance(error.value, ai_provider.AIContextLimit)
+
+
+def test_opt_in_json_object_format_is_forwarded_to_openai_compatible_provider(monkeypatch):
+    seen = []
+    async def fake_request(provider, operation, key, *, payload=None):
+        seen.append((operation, payload))
+        return {"choices": [{"message": {"content": '{"fields": []}'},
+                             "finish_reason": "stop"}]}
+    monkeypatch.setattr(ai_provider, "_request", fake_request)
+    result = asyncio.run(ai_provider.complete(
+        _provider(), [{"role": "user", "content": "Extrahiere Stammdaten als JSON."}],
+        max_tokens=1536, response_format={"type": "json_object"},
+    ))
+    assert result == '{"fields": []}'
+    assert seen[0][0] == "chat/completions"
+    assert seen[0][1]["max_tokens"] == 1536
+    assert seen[0][1]["response_format"] == {"type": "json_object"}
+
+    with pytest.raises(ai_provider.AIProviderError, match="JSON-Ausgabeformat"):
+        asyncio.run(ai_provider.complete(
+            _provider(), [{"role": "user", "content": "x"}],
+            response_format={"type": "arbitrary_unsupported"},
+        ))
+    assert len(seen) == 1
