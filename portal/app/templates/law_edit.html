@@ -9,7 +9,6 @@
 <a class="btn btn-primary" href="/laws-assistant"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>KI-Assistent starten</a>
 <a class="btn btn-outline-primary" href="#law-text-editor">Zum Texteditor</a>
 <a class="btn btn-outline-primary" href="#law-toc">Zur Gliederung</a>
-<a class="btn btn-outline-primary" href="/laws-assistant" hidden><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Ortsrecht-Assistent</a>
 {% if law %}<a class="btn btn-outline-secondary" href="/recht/{{ law.slug }}" target="_blank"><i class="fa-regular fa-eye me-1"></i>Ansehen</a>
 <a class="btn btn-outline-secondary" href="/laws/{{ law.id }}/plan"><i class="fa-regular fa-calendar-plus me-1"></i>{{ 'Vorbereitete Fassung' if law.planned_valid_from else 'Neue Fassung vorbereiten' }}</a>{% endif %}
 {% endcall %}
