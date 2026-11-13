@@ -34,11 +34,16 @@ def hints(source: str, *, allow_header: bool = True) -> list[dict[str, str]]:
             match = re.fullmatch(r"#{1,2}\s+(.{8,200})", line)
             if match and not line.lower().endswith("inhaltsverzeichnis"):
                 found["title"] = {"field": "title", "value": match.group(1), "evidence": line}
+            elif (index < 10 and len(line) >= 18 and len(line) <= 200
+                  and _KIND.search(line) and not line.startswith(("§", "(", "-", "*"))
+                  and not line.endswith((".", ":", ";"))
+                  and "inhaltsverzeichnis" not in line.casefold()):
+                found["title"] = {"field": "title", "value": line, "evidence": line}
         if allow_header and index < 26 and "doc_type" not in found:
             match = _KIND.search(line)
             if match:
                 kind = match.group(1).casefold()
-                key = {"geschäftsordnung": "geschaeftsordnung"}.get(kind, kind)
+                key = {"geschäftsordnung": "geschaeftsordnung"}.get(kind,\n                      "satzung" if kind.endswith("satzung") else kind)
                 found["doc_type"] = {"field": "doc_type", "value": key,
                                      "evidence": line[:300]}
         for field, pattern in _EVENTS:
