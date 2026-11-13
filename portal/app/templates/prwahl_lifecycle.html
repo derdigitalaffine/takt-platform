@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Wahlablauf · {{election.title}}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
+{% block content %}
+<div class="pr-page">
+  <a class="ds-back-link" href="/personalratswahl/{{election.id}}"><i class="fa-solid fa-arrow-left me-2"></i>Zum Wahlcockpit</a>
+  <header class="ds-page-header pr-header"><div class="ds-page-title"><span class="pr-eyebrow">Geführter Wahlprozess · Rheinland-Pfalz</span><h1>Vom Wahlvorstand bis zur Konstituierung</h1><p>{{election.title}} · Nachweise, Dokumente und Entscheidungen an einem Ort.</p></div><div class="ds-page-actions"><a class="btn btn-primary" href="/personalratswahl/{{election.id}}/auszaehlung"><i class="fa-solid fa-calculator me-2"></i>Ergebnisermittlung</a></div></header>
+  <div class="pr-alert"><i class="fa-solid fa-shield-halved"></i><div><strong>Digital begleitet, auf Papier gewählt</strong><span>Wahlvorstandsbeschlüsse, Papierunterschriften und Bekanntgaben müssen rechtmäßig erfolgen. Die Fortschrittsanzeige dokumentiert nur erfasste Nachweise.</span></div></div>
+  <div class="pr-panel"><div class="pr-panel-head"><div><span class="pr-eyebrow">Wahlfahrplan</span><h2>Alle neun Phasen</h2><p>Die konstituierende Sitzung ist spätestens sechs Werktage nach dem Wahltag vorgesehen (§ 29 LPersVG RLP). Fristen bitte im Einzelfall prüfen.</p></div><span class="pr-pill">{{progress}} % dokumentiert</span></div>
+  <div class="pr-progress" role="progressbar" aria-label="Dokumentierte Wahlphasen" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{progress}}"><span style="width:{{progress}}%"></span></div>
+  <div class="pr-lifecycle">
+  {% for stage, title, description in stages %}
+  {% set item=milestones.get(stage) %}
+  <section class="pr-life-step {{'pr-life-done' if item and item.completed_at else ''}}">
+    <div class="pr-life-number">{{'✓' if item and item.completed_at else loop.index}}</div>
+    <div class="pr-life-main"><div class="pr-life-heading"><h3>{{title}}</h3>{% if item and item.completed_at %}<span class="pr-pill">Nachweis erfasst</span>{% endif %}</div>
+      <p>{{description}}</p>
+      {% if item and item.completed_at %}<div class="pr-life-evidence"><strong>Nachweis:</strong> {{item.evidence}}{% if item.effective_on %} · {{item.effective_on.strftime('%d.%m.%Y')}}{% endif %}</div>{% elif can_edit %}
+      <details class="pr-life-action"><summary>Schritt dokumentieren</summary><form method="post" action="/personalratswahl/{{election.id}}/ablauf/{{stage}}/nachweis" class="row g-2 pt-3"><input type="hidden" name="csrf" value="{{csrf}}">
+        <div class="col-md-8"><label for="evidence-{{stage}}" class="form-label">Akten-/Beschluss-/Bekanntgabenachweis</label><input id="evidence-{{stage}}" name="evidence" class="form-control" maxlength="500" minlength="12" required placeholder="Niederschrift vom …, Ablageort, TOP …"></div>
+        <div class="col-md-4"><label for="date-{{stage}}" class="form-label">Datum des Schritts</label><input id="date-{{stage}}" name="effective_on" class="form-control" type="date"></div>
+        <div class="col-12"><button type="submit" class="btn btn-outline-primary btn-sm">Nachweis speichern</button></div>
+      </form></details>{% endif %}
+      {% if stage=='appointment' %}<a href="/personalratswahl/{{election.id}}?tab=board">Wahlvorstand & Mandate verwalten</a>
+      {% elif stage in ['announcement','nominations','determination','constitution'] %}<a href="/personalratswahl/{{election.id}}?tab=docs">Passende Formulare erstellen</a>
+      {% elif stage=='counting' %}<a href="/personalratswahl/{{election.id}}/auszaehlung">Papierauszählung erfassen</a>{% endif %}
+    </div>
+  </section>{% endfor %}
+  </div></div>
+  <div class="pr-panel"><h2>Auszählungen</h2><p>Die Wahl findet ausschließlich auf Papier statt. Eine digitale Auszählung ist optional und wird erst nach manueller Prüfung als erfasst bestätigt.</p><a class="btn btn-outline-primary" href="/personalratswahl/{{election.id}}/auszaehlung">{{rounds|length}} Erfassungen ansehen</a></div>
+</div>
+{% endblock %}
