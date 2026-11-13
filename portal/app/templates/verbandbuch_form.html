@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Erste Hilfe dokumentieren{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/vendor/mantine/styles.css"><link rel="stylesheet" href="/static/verbandbuch.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/mantine/styles.css"><link rel="stylesheet" href="/static/verbandbuch.css"><script src="/static/verbandbuch-form.js" defer></script>{% endblock %}
 {% block content %}
 <div class="vb-root vb-narrow">
   <div class="vb-subheading"><a href="/verbandbuch" class="vb-back"><i class="fa-solid fa-arrow-left"></i> Verbandbuch</a><span class="vb-chip"><i class="fa-solid fa-shield-halved"></i> Vertrauliche Meldung</span></div>
@@ -8,9 +8,14 @@
   {% if not ready or not approved %}<div class="alert alert-warning" role="alert">Die Erfassung ist noch nicht freigegeben. Bitte wende dich an die zuständige Administration.</div>{% endif %}
   {% if errors %}<div class="alert alert-danger" role="alert" tabindex="-1"><strong>Bitte prüfe folgende Angaben:</strong><ul class="mb-0">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
   {% if not sites %}<div class="vb-card vb-empty"><i class="fa-solid fa-location-dot"></i><strong>Kein freigegebener Standort</strong><p>Für dein Konto ist noch kein Erfassungsstandort hinterlegt. Bitte die zuständige Stelle kontaktieren.</p></div>{% else %}
-  <form method="post" action="/verbandbuch/neu" class="vb-form" autocomplete="off">
+  <nav class="vb-wizard-nav" aria-label="Fortschritt der Dokumentation">
+    <ol class="vb-wizard-steps"><li data-vb-nav="0" aria-current="step"><span>1</span><strong>Ort & Zeit</strong></li><li data-vb-nav="1"><span>2</span><strong>Ereignis</strong></li><li data-vb-nav="2"><span>3</span><strong>Erste Hilfe</strong></li></ol>
+    <p class="vb-wizard-status" id="vb-wizard-status" role="status">Schritt 1 von 3 · Ort und Zeit</p>
+  </nav>
+  <form method="post" action="/verbandbuch/neu" class="vb-form" autocomplete="off" data-vb-wizard>
+
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <section class="vb-card vb-form-section"><div class="vb-section-title"><span class="vb-step">1</span><div><h2>Wo und wann?</h2><p>Standort und Zeitpunkt des Ereignisses.</p></div></div>
+    <section class="vb-card vb-form-section" data-vb-step="0" aria-label="Schritt 1: Ort und Zeit"><div class="vb-section-title"><span class="vb-step">1</span><div><h2>Wo und wann?</h2><p>Standort und Zeitpunkt des Ereignisses.</p></div></div>
       <div class="vb-fields"><div class="vb-field vb-full"><label for="site_id">Standort / Arbeitgeber <span class="vb-required">*</span></label><select name="site_id" id="site_id" class="form-select" required>
         <option value="">Bitte auswählen</option>{% for site in sites %}<option value="{{ site.id }}" {% if selected_id == site.id %}selected{% endif %}>{{ site.title }}</option>{% endfor %}
       </select><small>Über den QR-Code wird der Standort bereits ausgewählt.</small></div>
@@ -18,7 +23,7 @@
       <div class="vb-field"><label for="aid_at">Erste Hilfe: Datum & Uhrzeit <span class="vb-required">*</span></label><input type="datetime-local" name="aid_at" id="aid_at" class="form-control" required value="{{ values.get('aid_at',now) }}"></div>
       <div class="vb-field vb-full"><label for="incident_place">Genauer Ort des Ereignisses <span class="vb-required">*</span></label><input type="text" name="incident_place" id="incident_place" class="form-control" maxlength="200" required placeholder="z. B. Treppe im Erdgeschoss, Verwaltungsgebäude" value="{{ values.get('incident_place','') }}"></div></div>
     </section>
-    <section class="vb-card vb-form-section"><div class="vb-section-title"><span class="vb-step">2</span><div><h2>Was ist passiert?</h2><p>Nur Angaben, die für den Erste-Hilfe-Nachweis erforderlich sind.</p></div></div>
+    <section class="vb-card vb-form-section" data-vb-step="1" aria-label="Schritt 2: Ereignis"><div class="vb-section-title"><span class="vb-step">2</span><div><h2>Was ist passiert?</h2><p>Nur Angaben, die für den Erste-Hilfe-Nachweis erforderlich sind.</p></div></div>
       <div class="vb-fields"><div class="vb-field"><label for="person_name">Name der betroffenen Person <span class="vb-required">*</span></label><input class="form-control" id="person_name" name="person_name" maxlength="160" required value="{{ values.get('person_name','') }}" placeholder="Vor- und Nachname"></div>
       <div class="vb-field"><label for="person_group">Personenkreis</label><select class="form-select" name="person_group" id="person_group">
         {% for value, label in [('', 'Nicht angegeben'), ('beschaeftigt','Beschäftigte'),('gast','Gast / Besuch'),('extern','Fremdpersonal'),('ehrenamt','Ehrenamtliche'),('andere','Andere')] %}<option value="{{ value }}" {% if values.get('person_group','') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -26,13 +31,13 @@
       <div class="vb-field vb-full"><label for="incident_description">Hergang <span class="vb-required">*</span></label><textarea name="incident_description" id="incident_description" class="form-control" rows="3" maxlength="2500" required placeholder="Was hat zum Unfall oder zur Erkrankung geführt?">{{ values.get('incident_description','') }}</textarea></div>
       <div class="vb-field vb-full"><label for="injury">Art und Umfang der Verletzung / Erkrankung <span class="vb-required">*</span></label><textarea name="injury" id="injury" class="form-control" rows="3" maxlength="2000" required placeholder="z. B. kleine Schnittwunde am Finger">{{ values.get('injury','') }}</textarea></div></div>
     </section>
-    <section class="vb-card vb-form-section"><div class="vb-section-title"><span class="vb-step">3</span><div><h2>Welche Hilfe wurde geleistet?</h2><p>Maßnahmen und beteiligte Personen dokumentieren.</p></div></div>
+    <section class="vb-card vb-form-section" data-vb-step="2" aria-label="Schritt 3: Erste Hilfe"><div class="vb-section-title"><span class="vb-step">3</span><div><h2>Welche Hilfe wurde geleistet?</h2><p>Maßnahmen und beteiligte Personen dokumentieren.</p></div></div>
       <div class="vb-fields"><div class="vb-field vb-full"><label for="aid_description">Art und Weise der Erste-Hilfe-Maßnahme <span class="vb-required">*</span></label><textarea name="aid_description" id="aid_description" class="form-control" maxlength="2000" rows="3" required placeholder="z. B. Wunde gereinigt und mit Pflaster versorgt">{{ values.get('aid_description','') }}</textarea></div>
       <div class="vb-field"><label for="aider_name">Ersthelfende Person <span class="vb-required">*</span></label><input type="text" class="form-control" name="aider_name" id="aider_name" maxlength="160" required value="{{ values.get('aider_name','') }}"></div>
       <div class="vb-field"><label for="witnesses">Zeuginnen und Zeugen</label><input type="text" class="form-control" name="witnesses" id="witnesses" maxlength="700" placeholder="Namen, falls bekannt; sonst leer lassen" value="{{ values.get('witnesses','') }}"></div></div>
     </section>
     <div class="vb-form-footer"><div class="vb-note"><i class="fa-solid fa-lock"></i><span>Vertrauliche Speicherung. Kein Versand medizinischer Details per E-Mail. Nach dem Speichern erhältst du einen neutralen Nachweis.</span></div>
-      <div class="vb-actions"><a href="/verbandbuch" class="btn btn-outline-secondary">Abbrechen</a><button class="btn btn-primary btn-lg" type="submit" {% if not ready or not approved %}disabled{% endif %}><i class="fa-solid fa-shield-check me-2"></i>Geschützt speichern</button></div></div>
+      <div class="vb-actions"><a href="/verbandbuch" class="btn btn-outline-secondary">Abbrechen</a><button type="button" class="btn btn-outline-primary" data-vb-prev hidden><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zurück</button><button type="button" class="btn btn-primary" data-vb-next>Weiter <i class="fa-solid fa-arrow-right ms-1" aria-hidden="true"></i></button><button class="btn btn-primary btn-lg" data-vb-submit type="submit" {% if not ready or not approved %}disabled{% endif %}><i class="fa-solid fa-shield-check me-2"></i>Geschützt speichern</button></div></div>
   </form>{% endif %}
 </div>
 {% endblock %}

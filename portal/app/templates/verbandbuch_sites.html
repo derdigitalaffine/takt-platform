@@ -24,6 +24,7 @@
     </div></div>
   </section>
   {% if not approved %}<div class="alert alert-info">Betriebsfreigabe steht aus. Die Erfassung bleibt bis zur dokumentierten Prüfung gesperrt.</div>{% endif %}
+  <div class="vb-quick-guide"><i class="fa-solid fa-list-check" aria-hidden="true"></i><span><strong>Einrichtung in drei Schritten:</strong> 1. Fachschlüssel sicher anlegen · 2. Standort und Fachberechtigungen einrichten · 3. QR-Aushang erzeugen. Die separate Datenschutzfreigabe ist zusätzlich erforderlich.</span></div>
   <div class="vb-grid vb-main-grid">
     <section class="vb-card vb-form-section"><h2>Standort anlegen</h2>
       <form method="post" action="/verbandbuch/standorte" class="vb-fields"><input type="hidden" name="csrf" value="{{csrf}}">
