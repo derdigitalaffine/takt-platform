@@ -213,7 +213,7 @@ DATASETS = {
         'topic': '3D-Gebäude', 'region': 'Rheinland-Pfalz',
         'provider': 'LVermGeo Rheinland-Pfalz',
         'source_url': 'https://lvermgeo.rlp.de/produktinformationen/geotopografie/3d-geodaten/3d-gebaeudemodell',
-        'download_url': 'https://geoshop.rlp.de/opendata-geb3dlo.html',
+        'download_url': 'https://geoshop.rlp.de/id-3d-gebaeudemodelle/_3d-gebaeudemodelle.html',
         'viewer_url': 'https://rlp.plexmap.de/v/RLP-in-3D-neu/',
         'license': 'DL-DE BY 2.0', 'license_url': BY,
         'format': 'CityGML', 'kind': 'download',
