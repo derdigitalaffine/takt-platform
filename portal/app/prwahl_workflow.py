@@ -114,8 +114,17 @@ def dhondt(entries, seats):
     configuration, not a legally binding allocation or a candidate ranking.
     """
     seats = _integer(seats, "Sitze", minimum=1, maximum=200)
-    if not entries or sum(v for _,v in entries) == 0:
+    if not entries or sum(v for _, v in entries) == 0:
         raise HTTPException(422, "Für die Berechnung sind gültige Stimmen erforderlich.")
+    # Defensive checks: callers may invoke this helper directly, bypassing
+    # parse_entries. Duplicate names would overwrite the assignment map.
+    names = [name for name, _ in entries]
+    if any(not isinstance(name, str) or not name.strip() or len(name) > 180 for name in names):
+        raise HTTPException(422, "Ungültige Listenbezeichnung.")
+    if len({name.strip().casefold() for name in names}) != len(names):
+        raise HTTPException(422, "Listenbezeichnungen müssen eindeutig sein.")
+    if any(not isinstance(votes, int) or isinstance(votes, bool) or votes < 0 for _, votes in entries):
+        raise HTTPException(422, "Stimmen müssen nichtnegative ganze Zahlen sein.")
     assigned = {name: 0 for name,_ in entries}
     rows = []
     for index in range(seats):
