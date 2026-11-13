@@ -31,16 +31,16 @@ ROLES = {
 }
 EDIT_ROLES = {"coordinator", "chair", "member", "clerk"}
 INITIAL_TASKS = (
-    ("Bestellung des Wahlvorstands nachweisen", "appointment", "LPersVG / WOLPersVG"),
+    ("Bestellung des Wahlvorstands, Gruppenvertretung und Vertretung nachweisen", "appointment", "§ 16 LPersVG; § 1 WOLPersVG"),
     ("Dienststelle, Wahlkörper und Wahlart fachlich prüfen", "scope", "LPersVG"),
-    ("Wahlberechtigtenverzeichnis rechtssicher prüfen", "electors", "§§ 2–3 WOLPersVG"),
+    ("Wahlberechtigtenverzeichnis und Einspruchsverfahren prüfen", "electors", "§§ 2–3 WOLPersVG; §§ 10–11 LPersVG"),
     ("Sitz- und Gruppenverteilung durch Wahlvorstand feststellen", "seats", "§ 5 WOLPersVG"),
-    ("Wahlausschreiben beschließen, unterzeichnen und bekanntgeben", "notice", "§ 6 WOLPersVG"),
-    ("Wahlvorschläge und Originalunterschriften prüfen", "nominations", "§§ 7–13 WOLPersVG"),
+    ("Wahlausschreiben beschließen, unterschreiben und rechtswirksam bekanntgeben", "notice", "§§ 1, 6 WOLPersVG"),
+    ("Wahlvorschläge, Zustimmung und gegebenenfalls Nachfrist prüfen", "nominations", "§§ 7–13 WOLPersVG"),
     ("Wahlmaterial und ggf. schriftliche Stimmabgabe organisieren", "material", "WOLPersVG"),
     ("Papierwahl durchführen und Wahlgeheimnis sicherstellen", "voting", "LPersVG / WOLPersVG"),
-    ("Ergebnis auszählen und Wahlvorstandsbeschluss dokumentieren", "count", "WOLPersVG"),
-    ("Ergebnis bekanntmachen und Wahlakten geordnet übergeben", "close", "WOLPersVG"),
+    ("Öffentliche Auszählung, Niederschrift und Wahlvorstandsbeschluss dokumentieren", "count", "§§ 20–21 WOLPersVG"),
+    ("Gewählte benachrichtigen, Ergebnis bekanntmachen und Wahlakten übergeben", "close", "§§ 22–24 WOLPersVG"),
 )
 # (label, help, fields): keys are strictly allowlisted, so metadata cannot smuggle
 # input fields into PDF, print output, logs, other modules or the audit trail.
