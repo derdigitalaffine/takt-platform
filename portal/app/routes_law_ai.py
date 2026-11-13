@@ -11,14 +11,15 @@ import secrets
 from pathlib import Path
 
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import laws as lx, law_ai_agents, law_ai_agent_jobs, law_ai_coverage
 from .config import settings
 from .db import LawText, User, utcnow, get_settings
-from .law_ai_models import LawAiDraft
+from .law_ai_models import LawAiDraft, LawAiEditorialDraft
 from .law_ai_agent_models import LawAiAnalysis
 from .main import app, check_csrf, get_db, rate_limit, redirect, render, require
 
@@ -124,7 +125,24 @@ def _render(request, db, user, selected=None):
                 analysis_results[key] = decoded if isinstance(decoded, dict) else {}
             except ValueError:
                 analysis_results[key] = {}
+    editorial = (db.scalar(select(LawAiEditorialDraft).where(
+        LawAiEditorialDraft.draft_id == selected.id,
+        LawAiEditorialDraft.owner_id == user.id,
+    )) if selected and selected.status != "accepted" else None)
+    editorial_stale = bool(
+        editorial and editorial.source_sha256 != law_ai_agents.source_hash(selected.proposed_md or "")
+    )
+    try:
+        editorial_fields = json.loads(editorial.fields_json) if editorial and not editorial_stale else {}
+        if not isinstance(editorial_fields, dict):
+            editorial_fields = {}
+    except (TypeError, ValueError):
+        editorial_fields = {}
     response = render(request, "law_ai_workspace.html", user,
+                      editorial=editorial if not editorial_stale else None,
+                      editorial_stale=editorial_stale,
+                      editorial_fields=editorial_fields,
+                      editorial_body=editorial.body_md if editorial and not editorial_stale else None,
                       drafts=rows, selected=selected, doc_types=lx.DOC_TYPES,
                       ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
                       ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
@@ -372,6 +390,82 @@ def law_ai_original(draft_id: int, user: User = Depends(law_user),
     )
 
 
+_EDITOR_FIELDS = ("title", "short_title", "doc_type", "level_id",
+                  "version_note", "issued_on", "valid_from", "valid_until")
+
+
+@app.post("/laws-assistant/{draft_id:int}/save-edit",
+          dependencies=[Depends(check_csrf)])
+def law_ai_save_editorial(
+    request: Request, draft_id: int, revision: int = Form(0),
+    title: str = Form(""), body_md: str = Form(""),
+    short_title: str = Form(""), doc_type: str = Form("satzung"),
+    level_id: str = Form(""), version_note: str = Form(""),
+    issued_on: str = Form(""), valid_from: str = Form(""),
+    valid_until: str = Form(""),
+    user: User = Depends(law_user), db: Session = Depends(get_db),
+):
+    """Save an owner-only working copy; never touch imported original/LawText."""
+    rate_limit(request, "law-ai-save-editorial", limit=120, window=3600,
+               key=str(user.id))
+    row = _own(db, draft_id, user)
+    if row.status not in ("staged", "needs_ocr", "ocr_review", "ocr_failed"):
+        raise HTTPException(409, "Dieser Arbeitsentwurf ist nicht mehr bearbeitbar.")
+    if not 0 < len(title.strip()) <= 400 or len(body_md.encode("utf-8")) > TEXT_LIMIT:
+        raise HTTPException(422, "Ungültiger Titel oder redaktioneller Text (maximal 2 MB).")
+    if revision < 0:
+        raise HTTPException(422, "Ungültige Bearbeitungsversion.")
+    data = dict(zip(_EDITOR_FIELDS, (
+        title.strip(), short_title, doc_type, level_id, version_note,
+        issued_on, valid_from, valid_until,
+    )))
+    if (len(short_title) > 80 or len(version_note) > 255
+            or doc_type not in lx.DOC_TYPES
+            or len(level_id) > 32
+            or any(len(data[key]) > 12 for key in ("issued_on", "valid_from", "valid_until"))):
+        raise HTTPException(422, "Ungültige redaktionelle Stammdaten.")
+    source_sha = law_ai_agents.source_hash(row.proposed_md or "")
+    existing = db.scalar(select(LawAiEditorialDraft).where(
+        LawAiEditorialDraft.draft_id == row.id,
+        LawAiEditorialDraft.owner_id == user.id,
+    ))
+    if existing:
+        if existing.source_sha256 != source_sha:
+            raise HTTPException(409, "OCR- oder Importtext geändert. Bitte Quelle und früheren Stand prüfen.")
+        changed = db.execute(update(LawAiEditorialDraft).where(
+            LawAiEditorialDraft.id == existing.id,
+            LawAiEditorialDraft.owner_id == user.id,
+            LawAiEditorialDraft.revision == revision,
+            LawAiEditorialDraft.source_sha256 == source_sha,
+        ).values(revision=revision + 1, body_md=body_md,
+                 fields_json=json.dumps(data, ensure_ascii=False),
+                 updated_at=utcnow()))
+        if changed.rowcount != 1:
+            db.rollback()
+            raise HTTPException(409, "Der Entwurf wurde in einem anderen Tab geändert. Bitte Stand prüfen.")
+        new_revision = revision + 1
+    else:
+        if revision != 0:
+            raise HTTPException(409, "Bearbeitungsversion passt nicht zum Server.")
+        db.add(LawAiEditorialDraft(
+            draft_id=row.id, owner_id=user.id, source_sha256=source_sha,
+            revision=1, body_md=body_md,
+            fields_json=json.dumps(data, ensure_ascii=False),
+        ))
+        new_revision = 1
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Parallel gespeicherter Entwurf. Bitte neuen Stand laden.") from None
+    return JSONResponse(
+        {"saved": True, "revision": new_revision,
+         "message": "Private Arbeitsfassung gespeichert, nicht übernommen oder veröffentlicht."},
+        headers={"Cache-Control": "private, no-store",
+                 "X-Content-Type-Options": "nosniff"},
+    )
+
+
 @app.post("/laws-assistant/{draft_id:int}/accept",
           dependencies=[Depends(check_csrf)])
 def law_ai_accept(
@@ -381,11 +475,21 @@ def law_ai_accept(
     short_title: str = Form(""), version_note: str = Form(""),
     issued_on: str = Form(""), valid_from: str = Form(""),
     valid_until: str = Form(""), confirmed: str = Form(""),
+    edit_revision: int = Form(0),
     user: User = Depends(law_user),
     db: Session = Depends(get_db),
 ):
     """Only explicit human confirmation creates a NEW UNPUBLISHED law draft."""
     row = _own(db, draft_id, user)
+    saved_edit = db.scalar(select(LawAiEditorialDraft).where(
+        LawAiEditorialDraft.draft_id == draft_id,
+        LawAiEditorialDraft.owner_id == user.id,
+    ))
+    if saved_edit and (
+        saved_edit.revision != edit_revision or
+        saved_edit.source_sha256 != law_ai_agents.source_hash(row.proposed_md or "")
+    ):
+        raise HTTPException(409, "Private Arbeitsfassung wurde anderswo verändert. Bitte Seite neu laden.")
     if row.status == "accepted":
         raise HTTPException(409, "Dieser Entwurf wurde bereits übernommen.")
     if confirmed != "1":
