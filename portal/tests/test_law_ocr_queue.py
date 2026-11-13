@@ -126,3 +126,70 @@ def test_ocr_result_requires_matching_original_checksum(monkeypatch, tmp_path):
         assert row.status == "ocr_queued"
         assert row.proposed_md == ""
         assert row.accepted_law_id is None
+
+
+def test_ocr_phases_distinguish_queue_worker_and_missing_job(monkeypatch, tmp_path):
+    settings(module_laws="1")
+    queue = tmp_path / "queue"
+    queue.mkdir()
+    results = tmp_path / "results"
+    results.mkdir()
+    monkeypatch.setattr(routes_law_ai, "OCR_QUEUE", queue)
+    monkeypatch.setattr(routes_law_ai, "OCR_RESULTS", results)
+    c = login(*ADMIN)
+    did = _upload(c)
+    key, _ = _enqueue(c, did)
+    url = f"/laws-assistant/{did}/ocr/status"
+    queued = c.get(url)
+    assert queued.status_code == 200
+    assert queued.headers["cache-control"] == "private, no-store"
+    assert queued.json()["phase"] == "queued"
+    assert queued.json()["ready"] is False
+    assert queued.json()["needs_attention"] is False
+    assert "job_key" not in queued.text
+    jobfile = queue / (key + ".job.json")
+    workfile = queue / (key + ".work.json")
+    jobfile.rename(workfile)
+    working = c.get(url)
+    assert working.status_code == 200
+    assert working.json()["phase"] == "processing"
+    workfile.unlink()
+    unknown = c.get(url).json()
+    assert unknown["phase"] == "unknown"
+    assert unknown["status"] == "ocr_queued"
+    with SessionLocal() as db:
+        row = db.get(LawAiDraft, did)
+        from datetime import timedelta
+        from app.db import utcnow
+        row.updated_at = utcnow() - timedelta(minutes=12)
+        db.commit()
+    aged = c.get(url).json()
+    assert aged["needs_attention"] is True
+    assert aged["elapsed_seconds"] >= 600
+    assert c.get(f"/laws-assistant/{did}").status_code == 200
+    assert 'data-law-ocr-phase' in c.get(f"/laws-assistant/{did}").text
+
+
+def test_ocr_status_is_owner_scoped_even_with_known_job_id(monkeypatch, tmp_path):
+    settings(module_laws="1")
+    monkeypatch.setattr(routes_law_ai, "OCR_QUEUE", tmp_path / "queue")
+    monkeypatch.setattr(routes_law_ai, "OCR_RESULTS", tmp_path / "results")
+    c = login(*ADMIN)
+    did = _upload(c)
+    _enqueue(c, did)
+    from app.db import User
+    from app.security import hash_password
+    from sqlalchemy import select
+    with SessionLocal() as db:
+        other = db.scalar(select(User).where(User.email == "law-ocr-status-other@example.org"))
+        if other is None:
+            other = User(email="law-ocr-status-other@example.org", name="OCR Reviewer",
+                         password_hash=hash_password("secure-review-456"),
+                         permissions="laws", active=True, must_change_password=False)
+            db.add(other)
+        other.permissions = "laws"
+        other.active = True
+        other.must_change_password = False
+        db.commit()
+    unauthorised = login("law-ocr-status-other@example.org", "secure-review-456")
+    assert unauthorised.get(f"/laws-assistant/{did}/ocr/status").status_code == 404

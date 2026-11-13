@@ -257,6 +257,42 @@ def law_ai_queue_ocr(
     return redirect(f"/laws-assistant/{row.id}")
 
 
+def _ocr_phase(draft: LawAiDraft) -> dict:
+    """Bounded, privacy-safe phase from worker file names; no directory scan.
+
+    File queue is intentionally an offline protocol, not a real-time page
+    progress API. Do not claim percentages or worker availability.
+    """
+    phase = "not_required"
+    message = "Keine Texterkennung beauftragt."
+    elapsed = 0
+    attention = False
+    if draft.status == "ocr_queued":
+        key = draft.ocr_job_key
+        if _safe_job_key(key):
+            if (OCR_QUEUE / (key + ".work.json")).is_file():
+                phase, message = "processing", "Offline-Texterkennung verarbeitet das Dokument."
+            elif (OCR_QUEUE / (key + ".job.json")).is_file():
+                phase, message = "queued", "Auftrag wartet in der Offline-Warteschlange."
+            elif (OCR_RESULTS / (key + ".result.json")).is_file():
+                phase, message = "finalizing", "OCR-Ergebnis wird für die Prüfung eingelesen."
+            else:
+                phase, message = "unknown", "OCR-Auftrag ist noch nicht erreichbar; Worker und Queue prüfen."
+        else:
+            phase, message = "unknown", "OCR-Auftragskennung nicht verfügbar."
+        try:
+            elapsed = min(86400, max(0, int((utcnow() - draft.updated_at).total_seconds())))
+        except (AttributeError, TypeError, ValueError):
+            elapsed = 0
+        attention = phase in ("queued", "unknown") and elapsed >= 600
+    elif draft.status == "ocr_review":
+        phase, message = "review", "OCR-Vorschlag liegt zur manuellen Kontrolle bereit."
+    elif draft.status == "ocr_failed":
+        phase, message = "failed", "Die Texterkennung ist fehlgeschlagen."
+    return {"phase": phase, "phase_message": message,
+            "elapsed_seconds": elapsed, "needs_attention": attention}
+
+
 @app.get("/laws-assistant/{draft_id:int}/ocr/status")
 def law_ai_ocr_status(
     draft_id: int, user: User = Depends(law_user), db: Session = Depends(get_db),
@@ -268,6 +304,7 @@ def law_ai_ocr_status(
         "status": row.status,
         "ready": row.status in ("ocr_review", "ocr_failed"),
         "failure": row.ocr_failure if row.status == "ocr_failed" else "",
+        **_ocr_phase(row),
     }, headers={"Cache-Control": "private, no-store"})
 
 @app.get("/laws-assistant")
