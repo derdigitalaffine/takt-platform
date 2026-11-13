@@ -172,6 +172,11 @@ with sync_playwright() as pw:
     assert page.evaluate("window.__mapkit.overlays[1].visible") is True
     tabs.get_by_role("tab", name="Meine Karte").click()
     expect(page.get_by_role("button", name="Bodenschutz ausblenden")).to_be_visible()
+    # Quick actions also work if the expert-layer list is hidden by a filter.
+    page.locator("#overlay-list .layer-row[data-id=soil]").evaluate("node => node.remove()")
+    page.get_by_role("button", name="Bodenschutz ausblenden").click()
+    assert page.evaluate("window.__mapkit.overlays[1].visible") is False
+    expect(page.locator("#map-easy-count")).to_have_text("0 aktiv")
 
     # Keyboard-only operation follows the standard tab pattern.
     tab = tabs.get_by_role("tab", name="Meine Karte")
