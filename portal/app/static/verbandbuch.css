@@ -162,3 +162,8 @@
   #vb-review-table tbody td:last-child{margin-top:.35rem}
   #vb-review-table tbody td:last-child .btn{min-height:2.65rem}
 }
+
+/* Filterzustände der vertraulichen Fachablage */
+.vb-filter-empty {margin:1rem 1.35rem;padding:1.2rem;border:1px dashed var(--vb-line);border-radius:.75rem;background:var(--vb-tint);color:var(--vb-muted);text-align:center}
+.vb-root [hidden] {display:none!important}
+@media (max-width:640px) {.vb-list-tools {align-items:stretch}.vb-list-tools .btn {width:100%}}
