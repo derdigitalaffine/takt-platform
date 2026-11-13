@@ -25,6 +25,24 @@ class AIProvider(Base):
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
 
 
+class AITaskProfile(Base):
+    """One explicitly configured model for each registered AI task.
+
+    A missing row means legacy/default provider resolution. Provider deletion
+    is blocked by the admin route while any task still references it.
+    """
+    __tablename__ = "ai_task_profiles"
+
+    task: Mapped[str] = mapped_column(String(60), primary_key=True)
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_providers.id", ondelete="RESTRICT"), index=True,
+    )
+    model_id: Mapped[str] = mapped_column(String(200))
+    updated_at: Mapped[object] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow,
+    )
+
+
 class AIConversation(Base):
     __tablename__ = "ai_conversations"
 

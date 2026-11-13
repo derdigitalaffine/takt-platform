@@ -197,8 +197,13 @@ async def form_ai_draft(
     if provider_id:
         provider = db.get(AIProvider, provider_id)
     else:
-        provider = db.scalar(select(AIProvider).where(
+        from . import ai_task_routing
+        legacy = db.scalar(select(AIProvider).where(
             AIProvider.active.is_(True), AIProvider.text_key_enc != "").order_by(AIProvider.id))
+        try:
+            provider = ai_task_routing.select_provider(db, "form_draft", fallback=legacy)
+        except ai_provider.AIProviderError as exc:
+            raise HTTPException(503, str(exc)) from exc
     if provider is None or not provider.active or not provider.text_key_enc:
         raise HTTPException(503, "Kein aktives KI-Textmodell mit API-Zugang konfiguriert.")
     blocks = []

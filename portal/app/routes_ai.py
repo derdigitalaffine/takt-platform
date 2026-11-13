@@ -20,8 +20,8 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select, delete, func, or_
 from sqlalchemy.orm import Session
 
-from . import agent_mode
-from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector, AIDmsSource
+from . import agent_mode, ai_task_routing
+from .ai_models import AIProvider, AIConversation, AIMessage, AIKnowledge, AILawSource, AIKnowledgeVector, AIDmsSource, AITaskProfile
 from . import ai_knowledge, ai_provider, ai_vector, ai_vector_jobs, ai_web, ai_dms, ai_qdrant, ai_source_policy, ai_index_status, ai_law_vector, ai_law_vector_jobs
 from .db import LawText, User, DmsRecord, DmsArea, SessionLocal, get_settings, set_setting, utcnow
 from .main import (app, admin_user, check_csrf, current_user, enabled_modules,
@@ -63,7 +63,13 @@ def _conversation(db: Session, conversation_id: int, user: User) -> AIConversati
 def _selected_provider(db: Session, convo: AIConversation) -> AIProvider:
     if convo.provider_id is None:
         raise HTTPException(503, "Für diese Unterhaltung ist kein KI-Modell eingerichtet.")
-    return _provider(db, convo.provider_id, active=True)
+    provider = _provider(db, convo.provider_id, active=True)
+    assigned = db.get(AITaskProfile, "chat")
+    # Preserve a conversation's explicitly selected provider; use the chat
+    # profile's model only when it targets that same provider.
+    return (ai_task_routing.select_provider(db, "chat", fallback=provider)
+            if assigned is not None and assigned.provider_id == provider.id
+            else provider)
 
 
 def _validate_base_url(url: str) -> str:
@@ -191,7 +197,9 @@ def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
         or_(DmsRecord.applicant_email.is_(None), DmsRecord.applicant_email == "")
     )) or 0
     index_health = ai_index_status.status(db, docs)
+    task_profiles = {row.task: row for row in db.scalars(select(AITaskProfile))}
     return render(request, "admin_ai.html", user, providers=providers, selected=selected,
+                  task_names=ai_task_routing.TASKS, task_profiles=task_profiles,
                   masked_text=mask_secret(decrypt(selected.text_key_enc)) if selected else "",
                   masked_image=mask_secret(decrypt(selected.image_key_enc)) if selected else "",
                   cfg=cfg, docs=docs, laws=laws, allowed_laws=allowed,
@@ -207,6 +215,55 @@ def admin_ai(request: Request, edit: int | None = None, dms_q: str = "",
                   index_health=index_health,
                   masked_web_key=mask_secret(decrypt(cfg.get('ai_web_key_enc', ''))),
                   searxng_installed=ai_web.searxng_installed())
+
+
+@app.get("/admin/ai/provider/{provider_id:int}/models")
+async def admin_ai_model_catalog(
+    request: Request, provider_id: int, user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    """Browser-facing catalog: credentials never leave this server."""
+    rate_limit(request, "ai-model-catalog", limit=24, window=60, key=str(user.id))
+    provider = _provider(db, provider_id, active=True)
+    # GET only; a bounded model listing does not modify provider configuration.
+    try:
+        models = await ai_provider.list_model_details(provider)
+    except ai_provider.AIProviderError as exc:
+        raise HTTPException(502, str(exc)) from exc
+    return JSONResponse({"models": models, "provider": provider.name},
+                        headers={"Cache-Control": "private, no-store"})
+
+
+@app.post("/admin/ai/task-profile", dependencies=[Depends(check_csrf)])
+def admin_ai_task_profile_save(
+    request: Request, task: str = Form(...), provider_id: int = Form(0),
+    model_id: str = Form(""), user: User = Depends(admin_user),
+    db: Session = Depends(get_db),
+):
+    if task not in ai_task_routing.TASKS:
+        raise HTTPException(400, "Unbekannte KI-Aufgabe.")
+    existing = db.get(AITaskProfile, task)
+    if provider_id == 0:
+        if existing is not None:
+            db.delete(existing)
+            db.commit()
+        flash(request, "Für diese Aufgabe gilt wieder die bisherige Standardauswahl.")
+        return redirect("/admin/ai#ai-task-profiles")
+
+    provider = _provider(db, provider_id, active=True)
+    chosen_model = model_id.strip()
+    # Blank means inherit this provider's default model, even after later edits.
+    if len(chosen_model) > 200 or any(ord(ch) < 32 for ch in chosen_model):
+        raise HTTPException(400, "Ungültige Modell-ID.")
+    if existing is None:
+        existing = AITaskProfile(task=task, provider_id=provider.id, model_id=chosen_model)
+        db.add(existing)
+    else:
+        existing.provider_id = provider.id
+        existing.model_id = chosen_model
+    db.commit()
+    flash(request, "Aufgabenprofil gespeichert. Deaktivierte Provider werden nicht automatisch ersetzt.")
+    return redirect("/admin/ai#ai-task-profiles")
 
 
 @app.get("/admin/ai/index/status")
@@ -255,8 +312,10 @@ def admin_ai_provider_save(
 def admin_ai_provider_delete(request: Request, provider_id: int, user: User = Depends(admin_user),
                              db: Session = Depends(get_db)):
     provider = _provider(db, provider_id)
-    if db.scalar(select(AIConversation.id).where(AIConversation.provider_id == provider_id).limit(1)):
-        flash(request, "Provider wird noch von Unterhaltungen referenziert und kann nicht gelöscht werden.", "error")
+    if db.scalar(select(AIConversation.id).where(AIConversation.provider_id == provider_id).limit(1)) or (
+            db.scalar(select(AITaskProfile.task).where(
+                AITaskProfile.provider_id == provider_id).limit(1))):
+        flash(request, "Provider wird noch von Unterhaltungen oder Aufgabenprofilen verwendet.", "error")
     else:
         db.delete(provider)
         db.commit()
@@ -918,11 +977,14 @@ async def ai_temporary_updates(
 @app.post("/ki/new", dependencies=[Depends(check_csrf)])
 def ai_new_chat(request: Request, provider_id: int = Form(0),
                 user: User = Depends(chat_user), db: Session = Depends(get_db)):
-    provider = _provider(db, provider_id, active=True) if provider_id else db.scalar(
-        select(AIProvider).where(AIProvider.active.is_(True)).order_by(AIProvider.id))
-    if provider is None:
-        flash(request, "Bitte zuerst einen KI-Provider in der Administration aktivieren.", "error")
-        return redirect("/agent")
+    if provider_id:
+        provider = _provider(db, provider_id, active=True)
+    else:
+        try:
+            provider = ai_task_routing.select_provider(db, "chat")
+        except ai_provider.AIProviderError:
+            flash(request, "Bitte zuerst ein aktives KI-Chatmodell in der Administration konfigurieren.", "error")
+            return redirect("/agent")
     from .main import stash_get
     for key in ("takt-agent-plan", "takt-agent-context", "takt-agent-private-intake", "takt-agent-krank"):
         stash_get(request, key, pop=True)

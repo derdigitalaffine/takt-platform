@@ -14,10 +14,12 @@ CC = 'https://creativecommons.org/licenses/by/4.0/'
 
 
 def source(name, url, region, topic, provider, source_url, license, license_url,
-           *, role='overlay', layer='', note='', attribution=''):
+           *, role='overlay', layer='', note='', attribution='', kind='wms',
+           tile_size=256, maxzoom=19):
     return dict(name=name, url=url, region=region, topic=topic, provider=provider,
                 source_url=source_url, license=license, license_url=license_url,
-                role=role, layer=layer, kind='wms', note=note,
+                role=role, layer=layer, kind=kind, note=note,
+                tile_size=tile_size, maxzoom=maxzoom,
                 attribution=attribution or f'© {provider} ({YEAR}), {license}; {license_url}')
 
 
@@ -126,6 +128,175 @@ for key, spec in parcels.CATALOG.items():
         license_url='https://www.geoportal.rlp.de/' if key.startswith('plans-') else BY,
         attribution=spec.get('attribution', parcels.ATTRIBUTION), kind=spec.get('kind','wms'),
         role='base' if key.startswith('dtk') else 'overlay', note='')
+
+
+
+# Official LVermGeo RP source URLs below are the GetCapabilities links
+# published in the Open Data service directory. We discover the supported
+# layer names lazily; never assume a particular WMS layer still exists.
+RLP_OPEN = 'https://lvermgeo.rlp.de/geodaten-geoshop/open-data/'
+RLP_WMS = 'https://www.geoportal.rlp.de/mapbender/php/wms.php?layer_id={id}&withChilds=1'
+RLP_ATTR = f'©GeoBasis-DE / LVermGeoRP {YEAR}, dl-de/by-2-0, www.lvermgeo.rlp.de'
+for key, title, layer_id, topic, role in [
+    ('dop20', 'RP · Digitale Orthophotos (20 cm)', 61675, 'Luftbilder', 'base'),
+    ('dop-historic', 'RP · Historische Luftbilder (Zeitauswahl)', 74200, 'Luftbilder', 'overlay'),
+    ('relief1', 'RP · Schummerung (1 m)', 49358, 'Gelände', 'overlay'),
+    ('contours', 'RP · Höhenlinien', 32876, 'Gelände', 'overlay'),
+    ('soil-estimate', 'RP · Bodenschätzung tagesaktuell', 86762, 'Boden und Geologie', 'overlay'),
+]:
+    add('rp-'+key, title, RLP_WMS.format(id=layer_id),
+        'Rheinland-Pfalz', topic, 'LVermGeo Rheinland-Pfalz',
+        RLP_OPEN, 'DL-DE BY 2.0', BY, role=role,
+        note='Dienst und angebotene Layer werden erst bei Auswahl geprüft. '
+             'Maßstab, Aktualität und Nutzbarkeit beachten.',
+        attribution=RLP_ATTR)
+
+# Further official free data sources, taken from the LVermGeo Open Data
+# Capabilities links. These are curated *service* URLs rather than private
+# cadastral records; the actual advertised feature names are fetched lazily.
+for key, title, layer_id, topic in [
+    ('afis-fixedpoints', 'RP · AFIS Festpunktübersicht', 76140, 'Vermessung'),
+    ('properties-wms', 'RP · Liegenschaften (Übersicht)', 61680, 'Kataster'),
+]:
+    add('rp-'+key, title, RLP_WMS.format(id=layer_id),
+        'Rheinland-Pfalz', topic, 'LVermGeo Rheinland-Pfalz',
+        RLP_OPEN, 'DL-DE BY 2.0', BY,
+        note='Amtliche Darstellungsdaten. Aktualität, Maßstab, '
+             'Datenumfang und Eignung für den Einsatzzweck prüfen.',
+        attribution=RLP_ATTR)
+
+for key, title, endpoint, topic in [
+    ('alkis-points-wfs', 'RP · ALKIS-Punkte (WFS)',
+     'https://www.geoportal.rlp.de/registry/wfs/669', 'Kataster'),
+    ('alkis-simplified-wfs', 'RP · ALKIS vereinfacht (WFS)',
+     'https://www.geoportal.rlp.de/registry/wfs/519', 'Kataster'),
+    ('soil-wfs', 'RP · Bodenschätzung (WFS)',
+     'https://www.geoportal.rlp.de/registry/wfs/571', 'Boden und Geologie'),
+]:
+    add('rp-'+key, title, endpoint, 'Rheinland-Pfalz',
+        topic, 'LVermGeo Rheinland-Pfalz', RLP_OPEN,
+        'DL-DE BY 2.0', BY, kind='wfs',
+        note='Die amtliche WFS-Schnittstelle und angebotene Geometrien '
+             'werden erst beim Öffnen geprüft. Große Datenmengen sowie '
+             'nicht unterstützte Koordinatenreferenzsysteme erfordern '
+             'die Nutzung des offiziellen Downloadangebotes.',
+        attribution=RLP_ATTR)
+
+# Landesfachdaten beyond cadastral/topographic data. The original
+# licensing is different: do not relabel third-party sectoral data
+# under the LVermGeo data licence.
+for key, title, lid, topic in [
+    ('flood-hq100', 'RP · Hochwassergefahr – Wassertiefe HQ100', 73097, 'Wasser und Hochwasser'),
+    ('flood-extreme', 'RP · Hochwassergefahr – Wassertiefe Extrem', 70256, 'Wasser und Hochwasser'),
+    ('flood-rivers', 'RP · Hochwasserrisikogewässer (Stand 2018)', 86507, 'Wasser und Hochwasser'),
+]:
+    add('rp-'+key, title, RLP_WMS.format(id=lid), 'Rheinland-Pfalz',
+        topic, 'Wasserwirtschaftsverwaltung Rheinland-Pfalz',
+        'https://www.geoportal.rlp.de/', 'CC BY 4.0', CC,
+        note='Fachdaten mit Anbieterzeitstand; keine Echtzeitvorhersage und '
+             'kein Ersatz für amtliche Warnungen oder Gefahrenbeurteilung.',
+        attribution=f'© Wasserwirtschaftsverwaltung Rheinland-Pfalz ({YEAR}), CC BY 4.0')
+add('rp-nature-reserves', 'RP · Naturschutzgebiete',
+    RLP_WMS.format(id=30825), 'Rheinland-Pfalz', 'Natur und Umwelt',
+    'Naturschutzverwaltung Rheinland-Pfalz (LANIS)',
+    'https://www.geoportal.rlp.de/', 'ODbL 1.0',
+    'https://opendatacommons.org/licenses/odbl/1-0/',
+    note='Schutzgebietsdaten zum Überblick; für verbindliche Grenzen '
+         'sind die amtlichen Rechtsgrundlagen maßgeblich.',
+    attribution='Daten © Naturschutzverwaltung Rheinland-Pfalz (LANIS), ODbL 1.0')
+
+add('rp-atkis-basis', 'RP · ATKIS Basis-DLM – Objekte',
+    'https://geo5.service24.rlp.de/wfs/basisdlm_shape_rp.fcgi', 'Rheinland-Pfalz',
+    'Topografie', 'LVermGeo Rheinland-Pfalz', RLP_OPEN,
+    'DL-DE BY 2.0', BY, kind='wfs',
+    note='Nur unterstützte WFS-Featuretypen mit begrenztem Kartenausschnitt; '
+         'größere Datenmengen beim Anbieter herunterladen.', attribution=RLP_ATTR)
+
+# OpenRailwayMap supplies transparent overlays, not a standalone street map.
+# The volunteer-hosted service has strict fair-use terms. Nothing is fetched
+# until the user deliberately enables the layer; never precache in bulk.
+ORM_LICENSE = 'https://wiki.openstreetmap.org/wiki/DE:OpenRailwayMap/API'
+ORM_ATTR = ('Daten © OpenStreetMap-Mitwirkende, '
+            'Grafik CC-BY-SA 2.0 © OpenRailwayMap')
+for style, label in [
+    ('standard', 'Bahninfrastruktur und Gleise'),
+    ('signals', 'Signale und Zugsicherung'),
+    ('maxspeed', 'Streckenhöchstgeschwindigkeiten'),
+    ('electrification', 'Elektrifizierung'),
+    ('gauge', 'Spurweiten'),
+]:
+    add('orm-'+style, 'OpenRailwayMap · '+label,
+        'https://tiles.openrailwaymap.org/'+style+'/{z}/{x}/{y}.png',
+        'Weltweit', 'Eisenbahn', 'OpenRailwayMap / OpenStreetMap',
+        'https://www.openrailwaymap.org/', 'CC BY-SA 2.0 / ODbL',
+        ORM_LICENSE, kind='xyz', tile_size=512, maxzoom=18,
+        note='Ehrenamtlicher Best-Effort-Dienst: keine Massenabfragen, nur '
+             'bei aktivem Layer laden; nur für öffentlich zugängliche '
+             'Anwendungen ohne Registrierungspflicht.',
+        attribution=ORM_ATTR)
+
+# Not every free GIS product is a ready-made tile or WMS service.
+# In particular CityGML LoD1/LoD2 must be downloaded and converted to a
+# suitable streaming format before it can be rendered in MapLibre.
+DATASETS = {
+    'rp-lod1': {
+        'name': 'RP · 3D-Gebäudemodell LoD1 (Blockmodell)',
+        'topic': '3D-Gebäude', 'region': 'Rheinland-Pfalz',
+        'provider': 'LVermGeo Rheinland-Pfalz',
+        'source_url': 'https://lvermgeo.rlp.de/produktinformationen/geotopografie/3d-geodaten/3d-gebaeudemodell',
+        'download_url': 'https://geoshop.rlp.de/id-3d-gebaeudemodelle/_3d-gebaeudemodelle.html',
+        'viewer_url': 'https://rlp.plexmap.de/v/RLP-in-3D-neu/',
+        'license': 'DL-DE BY 2.0', 'license_url': BY,
+        'format': 'CityGML', 'kind': 'download',
+        'note': 'Amtliches LoD1: Gebäude als Blockmodell mit Flachdach. '
+                'Keine unmittelbar streambaren MapLibre-Kacheln veröffentlicht.'
+    },
+    'rp-lod2': {
+        'name': 'RP · 3D-Gebäudemodell LoD2 (Dachformen)',
+        'topic': '3D-Gebäude', 'region': 'Rheinland-Pfalz',
+        'provider': 'LVermGeo Rheinland-Pfalz',
+        'source_url': 'https://lvermgeo.rlp.de/produktinformationen/geotopografie/3d-geodaten/3d-gebaeudemodell',
+        'download_url': 'https://geoshop.rlp.de/opendata-geb3dlo.html',
+        'viewer_url': 'https://rlp.plexmap.de/v/RLP-in-3D-neu/',
+        'license': 'DL-DE BY 2.0', 'license_url': BY,
+        'format': 'CityGML', 'kind': 'download',
+        'note': 'Amtliches LoD2 mit standardisierten Dachformen. Für eine '
+                'native 3D-Karte muss CityGML vorab in 3D-Tiles oder '
+                'geometrisch geeignete GeoJSON-Daten konvertiert werden. '
+                'Der GeoShop meldet derzeit eingeschränkte Verfügbarkeit.'
+    },
+    'rp-dgm1': {
+        'name': 'RP · Digitales Geländemodell DGM1',
+        'topic': '3D-Gebäude', 'region': 'Rheinland-Pfalz',
+        'provider': 'LVermGeo Rheinland-Pfalz',
+        'source_url': RLP_OPEN,
+        'download_url': 'https://geoshop.rlp.de/',
+        'license': 'DL-DE BY 2.0', 'license_url': BY,
+        'format': 'Raster / Höhenraster', 'kind': 'download',
+        'note': 'Höhenmodell zum Datenbezug und zur späteren '
+                'DEM-Aufbereitung; kein direktes Terrain-RGB.'
+    }
+}
+
+
+def discover(query='', region='', topic=''):
+    """Cohesive read-only catalog used by the browser and tests.
+
+    A catalog entry is a selectable service only if kind is a supported OGC
+    type. Download datasets are clearly separate and never tile-proxied.
+    """
+    terms = query.casefold().split()
+    def matches(item):
+        return (not region or item['region'] == region) and (
+            not topic or item['topic'] == topic) and all(
+                word in ' '.join(str(v) for v in item.values()).casefold()
+                for word in terms)
+    return {
+        'services': {k: dict(v) for k, v in CATALOG.items() if matches(v)},
+        'datasets': {k: dict(v) for k, v in DATASETS.items() if matches(v)},
+        'regions': sorted({v['region'] for v in (*CATALOG.values(), *DATASETS.values())}),
+        'topics': sorted({v['topic'] for v in (*CATALOG.values(), *DATASETS.values())}),
+    }
 
 
 def search(query='', region='', topic=''):
