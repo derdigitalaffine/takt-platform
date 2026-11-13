@@ -417,44 +417,55 @@
           {% elif selected.status in ('staged', 'ocr_review') %}
             <div class="small alert alert-secondary">Der KI-Agent ist für diesen Benutzer oder die Organisation deaktiviert. Die manuelle Ortsrecht-Bearbeitung bleibt uneingeschränkt möglich.</div>
           {% endif %}
-          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form">
+          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form"
+                data-law-save-url="/laws-assistant/{{ selected.id }}/save-edit">
             <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="edit_revision" value="{{ editorial.revision if editorial else 0 }}">
             <div class="row g-3">
               <div class="col-12">
                 <div class="law-section-title mb-1"><span class="law-section-icon"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></span><h3 class="h6 mb-0">Redaktionelle Bearbeitung und Übernahme</h3></div>
-                <p class="small text-secondary mb-1">Hier bearbeitest du den tatsächlichen Rechtstextentwurf. <strong>Änderungen werden erst durch „Geprüften Entwurf übernehmen“ gespeichert</strong> – keine automatische Zwischenspeicherung.</p>
+                <p class="small text-secondary mb-1">Du kannst die Arbeitsfassung <strong>privat zwischenspeichern</strong>. Erst „Geprüften Entwurf übernehmen“ erzeugt einen unveröffentlichten Rechtstextentwurf. Die importierte OCR-/KI-Quelle wird durch Zwischenspeichern nicht verändert.</p>
+                {% if editorial_stale %}<div class="alert alert-warning small" role="alert">Die importierte Textquelle hat sich seit dem letzten gespeicherten Arbeitsstand verändert. Der alte Zwischenstand wird nicht automatisch in die aktuelle Fassung übernommen.</div>{% endif %}
+                <div class="law-actions align-items-center mt-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm" data-law-save-button>
+                    <i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Arbeitsstand speichern
+                  </button>
+                  <span class="small text-secondary" data-law-save-status role="status" aria-live="polite">
+                    {{ 'Private Arbeitsfassung gespeichert · Version ' ~ editorial.revision if editorial else 'Noch nicht zwischengespeichert' }}
+                  </span>
+                </div>
               </div>
               <div class="col-12">
                 <label class="form-label" for="law-ai-title">Geprüfter Titel</label>
-                <input class="form-control" id="law-ai-title" name="title" maxlength="400" required value="{{ selected.proposed_title }}">
+                <input class="form-control" id="law-ai-title" name="title" maxlength="400" required value="{{ editorial_fields.get('title', selected.proposed_title) }}">
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="law-ai-short-title">Kurztitel / Abkürzung</label>
-                <input class="form-control" id="law-ai-short-title" name="short_title" maxlength="80" placeholder="Optional">
+                <input class="form-control" id="law-ai-short-title" name="short_title" maxlength="80" placeholder="Optional" value="{{ editorial_fields.get('short_title', '') }}">
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="law-ai-version-note">Fassungshinweis</label>
-                <input class="form-control" id="law-ai-version-note" name="version_note" maxlength="255" placeholder="Optional">
+                <input class="form-control" id="law-ai-version-note" name="version_note" maxlength="255" placeholder="Optional" value="{{ editorial_fields.get('version_note', '') }}">
               </div>
               <div class="col-12">
                 <div class="row g-2">
-                  <div class="col-md-4"><label class="form-label small" for="law-ai-issued">Ausfertigungsdatum</label><input class="form-control" type="date" id="law-ai-issued" name="issued_on"></div>
-                  <div class="col-md-4"><label class="form-label small" for="law-ai-valid-from">Inkrafttreten laut geprüfter Quelle</label><input class="form-control" type="date" id="law-ai-valid-from" name="valid_from"></div>
-                  <div class="col-md-4"><label class="form-label small" for="law-ai-valid-until">Außerkrafttreten laut Quelle</label><input class="form-control" type="date" id="law-ai-valid-until" name="valid_until"></div>
+                  <div class="col-md-4"><label class="form-label small" for="law-ai-issued">Ausfertigungsdatum</label><input class="form-control" type="date" id="law-ai-issued" name="issued_on" value="{{ editorial_fields.get('issued_on', '') }}"></div>
+                  <div class="col-md-4"><label class="form-label small" for="law-ai-valid-from">Inkrafttreten laut geprüfter Quelle</label><input class="form-control" type="date" id="law-ai-valid-from" name="valid_from" value="{{ editorial_fields.get('valid_from', '') }}"></div>
+                  <div class="col-md-4"><label class="form-label small" for="law-ai-valid-until">Außerkrafttreten laut Quelle</label><input class="form-control" type="date" id="law-ai-valid-until" name="valid_until" value="{{ editorial_fields.get('valid_until', '') }}"></div>
                 </div>
                 <p class="small text-secondary mt-1">Diese Felder werden nicht automatisch aus KI-Ergebnissen übernommen. Rechtswirksamkeit und Bekanntmachung müssen fachlich geprüft werden.</p>
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="law-ai-type">Dokumentart</label>
                 <select class="form-select" id="law-ai-type" name="doc_type">
-                  {% for key, label in doc_types.items() %}<option value="{{ key }}" {% if key == 'satzung' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                  {% for key, label in doc_types.items() %}<option value="{{ key }}" {% if key == editorial_fields.get('doc_type', 'satzung') %}selected{% endif %}>{{ label }}</option>{% endfor %}
                 </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="law-ai-level">Körperschaft / Rechtsebene</label>
                 <select class="form-select" id="law-ai-level" name="level_id">
-                  <option value="">Ohne Zuordnung – später prüfen</option>
-                  {% for level, depth in level_options %}<option value="{{ level.id }}">{{ '   ' * depth }}{{ level.name }}</option>{% endfor %}
+                  <option value="" {{ 'selected' if not editorial_fields.get('level_id') else '' }}>Ohne Zuordnung – später prüfen</option>
+                  {% for level, depth in level_options %}<option value="{{ level.id }}" {% if editorial_fields.get('level_id', '') == (level.id|string) %}selected{% endif %}>{{ '   ' * depth }}{{ level.name }}</option>{% endfor %}
                 </select>
               </div>
               <div class="col-12" id="law-editor">
@@ -466,7 +477,7 @@
                   <div class="col-12 col-xxl-9">
                     <textarea class="form-control font-monospace law-editor" id="law-ai-body" name="body_md" rows="20"
                               maxlength="2097152" spellcheck="false" required
-                              aria-describedby="law-editor-hint" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ selected.proposed_md }}</textarea>
+                              aria-describedby="law-editor-hint" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ editorial_body if editorial_body is not none else selected.proposed_md }}</textarea>
                     <p class="form-text" id="law-editor-hint">Wortlaut, Paragraphen, Beträge, Fristen, Verneinungen und Anlagen mit dem Original abgleichen. Die Gliederung rechts ist nur eine Orientierung im bearbeiteten Text.</p>
                   </div>
                   <aside class="col-12 col-xxl-3" aria-label="Gliederung im Entwurf">
