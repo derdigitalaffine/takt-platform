@@ -96,7 +96,7 @@ def custom_config(defn: dict, token: str, opacity: float = 1.0) -> dict:
     base = f"/map/c/{token}"
     kind = defn.get("kind")
     return {"id": "c" + hashlib.sha1(token.encode()).hexdigest()[:10], "name": defn.get("name") or "Eigener Layer",
-            "kind": kind, "role": "overlay", "category": "Eigene Layer", "description": defn.get("url", ""),
+            "kind": kind, "role": "overlay", "category": defn.get("category") or "Eigene Layer", "description": defn.get("url", ""),
             "attribution": html.escape(defn.get("attribution", "")), "opacity": opacity, "minzoom": min([int(z) for z in defn.get("service", {}).get("matrices", {})] or [0]), "maxzoom": max([int(z) for z in defn.get("service", {}).get("matrices", {})] or [22]),
             "tileSize": defn.get("service", {}).get("tile_size", 256), "visible": True, "color": defn.get("color") or "#7b2cbf",
             "featureInfo": kind == "wms", "times": defn.get("times") or [], "time": defn.get("time", ""),
@@ -120,6 +120,7 @@ def clean_custom(raw: dict) -> dict | None:
            "version": raw.get("version") if raw.get("version") in ("1.1.1", "1.3.0", "1.1.0", "2.0.0") else "",
            "format": raw.get("format") if raw.get("format") in FORMATS else "image/png",
            "attribution": str(raw.get("attribution") or "")[:300],
+           "category": re.sub(r"[<>]", "", str(raw.get("category") or "Eigene Layer"))[:100],
            "times": [str(t)[:40] for t in (raw.get("times") or [])][:2000] if isinstance(raw.get("times"), list) else [],
            "time": str(raw.get("time") or "")[:40], "color": raw.get("color") if re.match(r"^#[0-9a-fA-F]{6}$", str(raw.get("color") or "")) else "#7b2cbf",
            "swap_xy": bool(raw.get("swap_xy"))}
