@@ -42,6 +42,47 @@
     });
   });
 
+  const editor = document.getElementById("law-ai-body");
+
+  document.querySelectorAll("[data-law-ai-apply-heading]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!editor) return;
+      const quote = (button.getAttribute("data-law-ai-apply-heading") || "").trim();
+      const level = Number(button.getAttribute("data-law-ai-heading-level"));
+      if (!quote || !Number.isInteger(level) || level < 1 || level > 5) return;
+      const normalized = (line) => line.trim();
+      const lines = editor.value.split("\n");
+      const matching = lines.map((line, index) => normalized(line) === quote ? index : -1)
+        .filter((index) => index >= 0);
+      if (matching.length !== 1) {
+        button.textContent = "Fundstelle nicht eindeutig – bitte manuell prüfen";
+        return;
+      }
+      const line = lines[matching[0]];
+      const inner = line.trim().replace(/^#{1,5}\s+/, "");
+      lines[matching[0]] = "#".repeat(level) + " " + inner;
+      editor.value = lines.join("\n");
+      editor.dispatchEvent(new Event("input", { bubbles: true }));
+      button.textContent = "Im Entwurf formatiert – vor Übernahme prüfen";
+      editor.focus();
+    });
+  });
+
+  document.querySelectorAll("[data-law-ai-locate]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!editor) return;
+      const quote = button.getAttribute("data-law-ai-locate") || "";
+      const index = editor.value.indexOf(quote);
+      if (index < 0 || !quote) {
+        button.textContent = "Fundstelle nicht mehr vorhanden";
+        return;
+      }
+      editor.focus();
+      editor.setSelectionRange(index, index + quote.length);
+      editor.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
+
   const panel = document.querySelector("[data-law-ai-analysis-pending]");
   const id = panel?.getAttribute("data-draft-id");
   if (!panel || !/^\d+$/.test(id || "")) return;
