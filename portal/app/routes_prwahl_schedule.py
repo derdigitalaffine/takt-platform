@@ -10,6 +10,8 @@ from .main import app, check_csrf, current_user, get_db, render, redirect, flash
 from .prwahl import scope, record, clean
 from .prwahl_models import PRMandate
 from .prwahl_schedule import PRScheduleEvent, KINDS, local_to_utc, display_local, calendar_file
+from .prwahl_deadlines import suggestions
+from .prwahl_workflow import PRMilestone
 
 def _redacted_event(event):
     """Prevent sensitive event titles and locations leaking through CalDAV feeds."""
@@ -26,11 +28,19 @@ def _event(db, election_id, event_id):
     return event
 
 @app.get("/personalratswahl/{election_id:int}/termine")
-def prwahl_schedule(request: Request, election_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def prwahl_schedule(request: Request, election_id: int, suggest: str = "",
+                     user: User = Depends(current_user), db: Session = Depends(get_db)):
     election, role = scope(db, election_id, user)
     events = db.scalars(select(PRScheduleEvent).where(PRScheduleEvent.election_id == election.id).order_by(PRScheduleEvent.starts_at)).all()
-    return render(request, "prwahl_schedule.html", user, election=election, role=role, events=events,
-                  kinds=KINDS, display_local=display_local, can_edit=role in {"coordinator","chair","member","clerk"})
+    published = db.scalar(select(PRMilestone).where(PRMilestone.election_id == election.id,
+                         PRMilestone.stage == "announcement"))
+    notice_date = published.effective_on if published and published.completed_at else None
+    proposals = suggestions(election, notice_effective_on=notice_date)
+    selected = next((item for item in proposals if item["code"] == suggest), None)
+    return render(request, "prwahl_schedule.html", user, election=election, role=role,
+                  events=events, proposed=proposals, selected_proposal=selected,
+                  kinds=KINDS, display_local=display_local,
+                  can_edit=role in {"coordinator","chair","member","clerk"})
 
 @app.post("/personalratswahl/{election_id:int}/termine/neu", dependencies=[Depends(check_csrf)])
 def prwahl_schedule_add(request: Request, election_id: int, kind: str = Form(...), title: str = Form(...),
