@@ -2,14 +2,15 @@
 {% import "_macros.html" as m with context %}
 {% import "_res_macros.html" as rm with context %}
 {% block title %}{{ res.name }} · Belegung{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/resources-polish.css">{% endblock %}
 {% block content %}
 {% call rm.head('home', [(res.name, '')], res.name, (res.category ~ (' · ' ~ res.location if res.location else ''))) %}
   {% if res.active and res.public %}<a class="btn btn-outline-secondary" href="{{ public_link }}" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Öffentliche Seite</a>{% endif %}
   {% if level >= 3 %}<a class="btn btn-outline-secondary" href="/resources/{{ res.id }}/edit"><i class="fa-solid fa-pen me-1"></i>Bearbeiten</a>
   <a class="btn btn-primary" href="/resources/{{ res.id }}/book"><i class="fa-solid fa-plus me-1"></i>Intern eintragen</a>{% endif %}
 {% endcall %}
-<div class="row g-4">
-  <div class="col-12 col-xl-8"><div class="card"><div class="card-body"><div class="js-res-cal" data-src="/resources/{{ res.id }}/events.json"></div>
+<div class="row g-4 res-detail-layout">
+  <div class="col-12 col-xl-8"><div class="card res-calendar-card"><div class="card-body"><div class="js-res-cal" data-src="/resources/{{ res.id }}/events.json"></div>
     <div class="small text-secondary mt-2"><span class="badge text-bg-primary res-ev res-tentative">schraffiert</span> Anfrage/vorgemerkt · <span class="badge text-bg-secondary">grau</span> Sperrzeit · Klick öffnet die Buchung.</div></div></div></div>
   <div class="col-12 col-xl-4">
     <div class="card mb-4"><div class="card-header"><i class="fa-solid fa-list me-2"></i>Anstehend</div>

@@ -119,7 +119,7 @@
     </div>
   </section>
   <section id="reservierungen" class="mb-5">
-    <h2 class="h4 mb-3">{{'Ausgabe- und Reservierungsübersicht' if manager else 'Meine Reservierungen'}}</h2>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h2 class="h4 mb-0">{{'Ausgabe- und Reservierungsübersicht' if manager else 'Meine Reservierungen'}}</h2><a class="btn btn-outline-secondary btn-sm" href="/resources/intern{{'#reservierungen' if history else '?verlauf=1#reservierungen'}}">{{'Nur offene Vorgänge' if history else 'Abgeschlossene Vorgänge anzeigen'}}</a></div>
     <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
       <thead><tr><th>Gegenstand</th>{% if manager %}<th>Buchende Person</th>{% endif %}<th>Zeitraum</th><th>Menge</th><th>Status</th><th>Aktionen</th></tr></thead>
       <tbody>{% for b in bookings %}<tr>
@@ -129,6 +129,7 @@
         <td>{{b.quantity}}</td>
         <td><span class="badge {{'text-bg-primary' if b.status=='issued' else 'text-bg-warning'}}">{{status_labels[b.status]}}</span></td>
         <td class="res-pool-actions">
+          {% if b.status != "cancelled" %}<a class="btn btn-sm btn-outline-secondary" href="/resources/intern/buchungen/{{b.id}}/termin.ics" title="Kalendertermin herunterladen"><i class="fa-solid fa-calendar-arrow-down" aria-hidden="true"></i> .ics</a>{% endif %}
           {% if manager and b.status == 'reserved' %}
           <form method="post" action="/resources/intern/buchungen/{{b.id}}/issue"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Ausgabehinweis" placeholder="Abholer / Zustand"><button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-hand-holding me-1"></i>Ausgeben</button></form>
           {% elif manager and b.status == 'issued' %}

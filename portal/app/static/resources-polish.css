@@ -1,0 +1,30 @@
+/* Ressourcenverwaltung – optisches Polish mit TAKT-/Bootstrap-Tokens; keine neue Design-Insel. */
+.res-kpi-card,.res-catalog-card,.res-data-card,.res-calendar-card,.res-filter-card{border:1px solid var(--bs-border-color);border-radius:1rem;background:var(--bs-body-bg);box-shadow:0 5px 22px color-mix(in srgb,var(--bs-body-color) 4%,transparent)}
+.res-kpi-card{position:relative;overflow:hidden}
+.res-kpi-card::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--bs-primary);opacity:.75}
+.res-kpi-card .card-body{padding:1.25rem 1.4rem}
+.res-kpi-card .fs-3{font-size:clamp(1.6rem,2.5vw,2rem)!important;letter-spacing:-.035em;line-height:1.2;margin:.35rem 0 .7rem;font-variant-numeric:tabular-nums}
+.res-kpi-card .small.text-secondary{font-weight:600}
+.res-kpi-card li+li{margin-top:.45rem}
+.res-section-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.8rem;margin:1.4rem 0 .9rem;padding:.15rem 0}
+.res-catalog-card{overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+.res-catalog-card:hover{border-color:color-mix(in srgb,var(--bs-primary) 40%,var(--bs-border-color));box-shadow:0 12px 30px color-mix(in srgb,var(--bs-body-color) 9%,transparent);transform:translateY(-2px)}
+.res-catalog-card .card-body{padding:1.2rem 1.25rem;gap:.2rem}
+.res-catalog-card .h6{font-size:1.05rem;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+.res-catalog-card .res-thumb{aspect-ratio:16/7;object-fit:cover}
+.res-catalog-card .mt-auto{padding-top:.8rem;border-top:1px solid var(--bs-border-color)}
+.res-catalog-card .btn{min-height:2.35rem}
+.res-data-card{overflow:hidden}
+.res-data-card .table{margin-bottom:0}
+.res-data-card .table thead th{background:var(--bs-tertiary-bg);color:var(--bs-secondary-color);font-size:.75rem;font-weight:700;letter-spacing:.025em;white-space:nowrap;border-bottom:1px solid var(--bs-border-color)}
+.res-data-card .table tbody td{padding-top:.9rem;padding-bottom:.9rem}
+.res-data-card .table tbody tr:last-child td{border-bottom:0}
+.res-filter-card .card-body{padding:1.2rem}
+.res-filter-card .form-label{font-weight:650}
+.res-detail-layout .card{border-radius:1rem;border-color:var(--bs-border-color)}
+.res-detail-layout .card-header{background:var(--bs-tertiary-bg);font-weight:700;border-radius:1rem 1rem 0 0}
+.res-detail-layout .list-group-item a{text-decoration:none}
+.res-detail-layout .list-group-item a:hover{text-decoration:underline}
+.res-calendar-card .card-body{padding:1.15rem}
+@media(max-width:767.98px){.res-kpi-card .card-body{padding:1rem 1.1rem}.res-catalog-card .res-thumb{aspect-ratio:16/8}.res-catalog-card .card-body{padding:1rem}.res-filter-card .card-body{padding:1rem}.res-section-bar .ds-view-switch{width:100%;display:flex}.res-section-bar .ds-view-switch .btn{flex:1}.res-calendar-card .card-body{padding:.65rem}}
+@media(prefers-reduced-motion:reduce){.res-catalog-card{transition:none}.res-catalog-card:hover{transform:none}}

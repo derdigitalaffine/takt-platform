@@ -2,11 +2,12 @@
 {% import "_macros.html" as m with context %}
 {% import "_res_macros.html" as rm with context %}
 {% block title %}Buchungen{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/resources-polish.css">{% endblock %}
 {% block content %}
 {% call rm.head('bookings', [('Buchungen', '')], 'Buchungen', 'Anfragen und Buchungen aller Ressourcen, die Sie sehen dürfen.') %}
   <a class="btn btn-outline-secondary" href="/resources/bookings?{{ query }}{{ '&' if query }}format=csv"><i class="fa-solid fa-file-csv me-1"></i>CSV (Excel)</a>
 {% endcall %}
-<form method="get" class="card mb-3"><div class="card-body row g-2 align-items-end">
+<form method="get" class="card mb-3 res-filter-card"><div class="card-body row g-2 align-items-end">
   <div class="col-12 col-md-3"><label class="form-label small mb-1" for="b-q">Suche</label><input class="form-control form-control-sm" id="b-q" name="q" value="{{ f.q }}" placeholder="Nummer, Name, Anlass" type="search"></div>
   <div class="col-6 col-md-2"><label class="form-label small mb-1" for="b-r">Ressource</label><select class="form-select form-select-sm" id="b-r" name="resource"><option value="">alle</option>{% for rid, (r, lvl) in items.items() %}<option value="{{ rid }}" {% if f.resource == rid | string %}selected{% endif %}>{{ r.name }}</option>{% endfor %}</select></div>
   <div class="col-6 col-md-2"><label class="form-label small mb-1" for="b-s">Status</label><select class="form-select form-select-sm" id="b-s" name="status"><option value="">aktuell (offen + bestätigt)</option><option value="all" {% if f.status == 'all' %}selected{% endif %}>alle</option>{% for k, s in statuses.items() %}<option value="{{ k }}" {% if f.status == k %}selected{% endif %}>{{ s[0] }}</option>{% endfor %}</select></div>
@@ -27,7 +28,7 @@
   <button class="btn btn-sm btn-outline-danger" name="action" value="reject" type="submit" data-confirm-title="Ausgewählte Anfragen ablehnen?" data-confirm="Alle bekommen eine Mail mit Ihrer Mitteilung." data-confirm-button="Ablehnen"><i class="fa-solid fa-xmark me-1"></i>Ablehnen</button>
 </div></div>
 {% endif %}
-<div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0 small">
+<div class="card res-data-card"><div class="table-responsive"><table class="table table-hover align-middle mb-0 small">
   <thead><tr>{% if requests %}<th style="width: 2rem"><input class="form-check-input" type="checkbox" id="bulk-all" aria-label="Alle Anfragen auswählen"></th>{% endif %}<th>Zeitraum</th><th>Ressource</th><th>Anlass</th><th>Gebucht von</th><th class="text-end">Betrag</th><th>Zahlung</th><th>Status</th></tr></thead>
   <tbody>{% for b in rows %}{% set r, lvl = items[b.resource_id] %}{% set st = statuses[b.status] %}
     <tr>{% if requests %}<td>{% if b.status == 'requested' and lvl >= 3 %}<input class="form-check-input js-bulk" type="checkbox" name="ids" value="{{ b.id }}" aria-label="{{ b.ref }} auswählen">{% endif %}</td>{% endif %}

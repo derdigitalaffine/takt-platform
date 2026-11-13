@@ -141,12 +141,15 @@ def internal_home(request: Request, user: User = Depends(current_user),
             a.name, a.category, a.inventory_code, a.location,
             a.storage_location.name if a.storage_location else "",
         )).casefold()]
-    bookings_query = select(InternalAssetReservation).where(
-        InternalAssetReservation.status.in_(("reserved", "issued")))
+    history = request.query_params.get("verlauf") == "1"
+    bookings_query = select(InternalAssetReservation)
+    if not history:
+        bookings_query = bookings_query.where(InternalAssetReservation.status.in_(("reserved", "issued")))
     if not manager:
         bookings_query = bookings_query.where(InternalAssetReservation.user_id == user.id)
     bookings = db.scalars(bookings_query.order_by(
-        InternalAssetReservation.starts_at).limit(300)).all()
+        InternalAssetReservation.created_at.desc() if history
+        else InternalAssetReservation.starts_at).limit(300)).all()
     maintenance = db.scalars(select(InternalAssetMaintenance).where(
         InternalAssetMaintenance.ends_at > utcnow()
     ).order_by(InternalAssetMaintenance.starts_at).limit(100)).all() if manager else []
@@ -163,7 +166,8 @@ def internal_home(request: Request, user: User = Depends(current_user),
                   bookings=bookings, manager=manager, locations=locations,
                   maintenance=maintenance, events=events, available_now=available_now,
                   categories=CATEGORIES, status_labels=STATUS_LABELS, q=q,
-                  category=category, today=to_local(now).strftime("%Y-%m-%dT%H:%M"))
+                  category=category, history=history,
+                  today=to_local(now).strftime("%Y-%m-%dT%H:%M"))
 
 
 @app.get("/resources/intern/verfuegbarkeit")
@@ -385,3 +389,33 @@ def internal_week_plan(request: Request, start: str = "", category: str = "",
                   days=days, rows=rows, category=category, categories=CATEGORIES,
                   prev=(first - timedelta(days=7)).isoformat(),
                   next=(first + timedelta(days=7)).isoformat())
+
+
+@app.get("/resources/intern/buchungen/{booking_id:int}/termin.ics")
+def internal_booking_ical(booking_id: int, user: User = Depends(current_user),
+                          db: Session = Depends(get_db)):
+    """Kalenderexport ohne öffentlich teilbaren Buchungstoken."""
+    manager = _access(user)
+    booking = db.get(InternalAssetReservation, booking_id)
+    if booking is None or (not manager and booking.user_id != user.id):
+        raise HTTPException(404)
+    if booking.status == "cancelled":
+        raise HTTPException(410)
+    from icalendar import Calendar, Event
+    from fastapi.responses import Response
+    cal = Calendar()
+    cal.add("prodid", "-//TAKT Interner Geraetepool//DE")
+    cal.add("version", "2.0")
+    event = Event()
+    event.add("uid", f"takt-internal-{booking.id}@local")
+    event.add("summary", f"Gerätepool: {booking.asset.name}")
+    event.add("description", f"{booking.quantity} Stück; {booking.purpose}")
+    event.add("dtstart", booking.starts_at.replace(tzinfo=timezone.utc))
+    event.add("dtend", booking.ends_at.replace(tzinfo=timezone.utc))
+    event.add("dtstamp", booking.created_at.replace(tzinfo=timezone.utc))
+    event.add("location", booking.asset.storage_location.name if booking.asset.storage_location
+              else booking.asset.location)
+    cal.add_component(event)
+    return Response(cal.to_ical(), media_type="text/calendar; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="takt-material-{booking.id}.ics"',
+                             "Cache-Control": "private, no-store"})

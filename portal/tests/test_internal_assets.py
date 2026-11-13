@@ -151,3 +151,49 @@ def test_week_plan_keeps_personal_details_private():
     assert response.status_code == 200, response.text[:400]
     assert "Material-Belegungsplan" in response.text
     assert "Vorige Woche" in response.text
+
+
+def test_ical_contains_no_public_token():
+    settings(module_resources="1")
+    c = login("admin@example.org", "admin-passwort-123")
+    with SessionLocal() as db:
+        bid = db.scalar(select(InternalAssetReservation.id).where(
+            InternalAssetReservation.status == "returned").order_by(
+            InternalAssetReservation.id.desc()))
+    if bid:
+        response = c.get(f"/resources/intern/buchungen/{bid}/termin.ics")
+        assert response.status_code == 200
+        assert b"BEGIN:VCALENDAR" in response.content
+        assert b"BEGIN:VEVENT" in response.content
+        assert "private" in response.headers["cache-control"]
+
+
+def test_booker_is_not_inventory_manager_over_http():
+    from app.security import hash_password
+    settings(module_resources="1")
+    email, password = "pool-only@example.org", "Testbucher-123456"
+    with SessionLocal() as db:
+        person = db.scalar(select(User).where(User.email == email))
+        if not person:
+            person = User(email=email, name="Gerätepool-Testperson",
+                          password_hash=hash_password(password), permissions="internal_assets_book",
+                          active=True, password_set=True)
+            db.add(person)
+        else:
+            person.password_hash = hash_password(password)
+            person.permissions, person.active, person.must_change_password = "internal_assets_book", True, False
+        db.commit()
+    c = login(email, password)
+    page = c.get("/resources/intern")
+    assert page.status_code == 200 and "Interner Gerätepool" in page.text
+    assert c.get("/resources/intern/plan").status_code == 200
+    csrf = csrf_of(page.text)
+    creation = c.post("/resources/intern/gegenstaende",
+                      data={"csrf": csrf, "name": "Unzulässiges Inventar"})
+    assert creation.status_code == 403
+    with SessionLocal() as db:
+        booking = db.scalar(select(InternalAssetReservation).order_by(
+            InternalAssetReservation.id.desc()))
+        if booking:
+            response = c.get(f"/resources/intern/buchungen/{booking.id}/termin.ics")
+            assert response.status_code == 404
