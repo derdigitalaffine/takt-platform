@@ -16,6 +16,7 @@ from . import maps as mp
 from . import map_lifecycle
 from . import map_catalog as catalog_library
 from . import map_lod2
+from . import map_dgm
 from .db import MapLayer, TrashItem, SessionLocal, User, UserMap, Group, get_settings, set_setting
 from .main import (
     app, check_csrf, enabled_modules, flash, get_db, rate_limit, redirect, render, require,
@@ -199,6 +200,71 @@ def admin_maps_lod2_delete(request: Request, user: User = Depends(maps_admin_use
     map_lod2.remove()
     flash(request, "Die lokale LoD2-Vorschau wurde entfernt.")
     return redirect("/admin/maps#lod2-preview")
+
+
+# --- Optional DGM elevation mesh aligned to the local LoD2 model ------------------
+
+@app.get("/maps/dgm/status")
+def maps_dgm_status(user: User = Depends(map_user)):
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    return JSONResponse(map_dgm.status(), headers={"Cache-Control": "private, no-store"})
+
+
+@app.get("/maps/dgm/mesh")
+def maps_dgm_mesh(user: User = Depends(map_user)):
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    if not map_dgm.status()["available"]:
+        raise HTTPException(404, "Kein kompatibles DGM-Höhenmodell importiert.")
+    try:
+        content = map_dgm.mesh_path().read_bytes()
+    except OSError:
+        raise HTTPException(404, "DGM-Vorschau ist derzeit nicht verfügbar.") from None
+    if len(content) > map_dgm.MAX_RENDER_BYTES:
+        raise HTTPException(413)
+    return Response(content, media_type="application/json",
+                    headers={"Cache-Control": "private, no-store",
+                             "X-Content-Type-Options": "nosniff"})
+
+
+@app.post("/admin/maps/dgm/import", dependencies=[Depends(check_csrf)])
+async def admin_maps_dgm_import(request: Request, file: UploadFile = File(...),
+                                confirm_dhhn2016: str = Form(""),
+                                user: User = Depends(maps_admin_user)):
+    """No remote downloads and no unverified datum conversion.
+
+    The administrator explicitly confirms that their *official* DGM XYZ
+    and LoD2 excerpt have the same orthometric reference EPSG:7837. We cannot
+    infer a vertical CRS from three-column XYZ alone.
+    """
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    rate_limit(request, "map-dgm-import", limit=5, window=3600)
+    if confirm_dhhn2016 != "1":
+        raise HTTPException(422, "Bitte den gemeinsamen Höhenbezug DHHN2016 ausdrücklich bestätigen.")
+    if not file.filename or not file.filename.lower().endswith((".xyz", ".txt", ".asc")):
+        raise HTTPException(422, "Bitte eine amtliche DGM-ASCII-XYZ-Datei auswählen.")
+    raw = await file.read(map_dgm.MAX_UPLOAD + 1)
+    await file.close()
+    if len(raw) > map_dgm.MAX_UPLOAD:
+        raise HTTPException(413, "Das DGM darf höchstens 12 MiB groß sein.")
+    try:
+        model = await run_in_threadpool(map_dgm.convert_xyz, raw, map_lod2.status())
+        await run_in_threadpool(map_dgm.save, model)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    return JSONResponse({"ok": True, "status": map_dgm.status()},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/maps/dgm/delete", dependencies=[Depends(check_csrf)])
+def admin_maps_dgm_delete(request: Request, user: User = Depends(maps_admin_user)):
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    map_dgm.remove()
+    flash(request, "Die lokale DGM-Geländevorschau wurde entfernt.")
+    return redirect("/admin/maps#dgm-preview")
 
 
 # --- Proxy -------------------------------------------------------------------------------
