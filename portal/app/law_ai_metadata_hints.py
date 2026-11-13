@@ -14,7 +14,7 @@ _EVENTS = (
     ("valid_from", re.compile(r"(?i)(?:tritt|treten).{0,80}?\b(?:am|zum)\s*(" + _DATE + r")\s+in\s+kraft|\b(?:gilt|gelten)\s+ab\s+(" + _DATE + ")")),
     ("valid_until", re.compile(r"(?i)(?:tritt|treten).{0,80}?\b(?:am|zum)\s*(" + _DATE + r")\s+außer\s+kraft")),
 )
-_KIND = re.compile(r"(?i)\b(Satzung|Verordnung|Richtlinie|Dienstanweisung|Geschäftsordnung|Bekanntmachung|Gesetz|Vertrag)\b")
+_KIND = re.compile(r"(?i)\b((?:Haupt|Gebühren|Haushalts)?satzung|Verordnung|Richtlinie|Dienstanweisung|Geschäftsordnung|Bekanntmachung|Gesetz|Vertrag)\b")
 
 
 def hints(source: str, *, allow_header: bool = True) -> list[dict[str, str]]:
