@@ -303,19 +303,26 @@
                     {{ coverage.get('sections_analyzed', 0) }} von {{ coverage.get('sections_total', '?') }} Abschnitt(en), {{ coverage.get('source_chars', 0) }} Quellzeichen.
                     Fundstellen sind Zeichenpositionen des OCR-/MarkItDown-Textes, keine amtlichen PDF-Seitenbelege.
                   </p>
+                  <div class="law-results-summary" aria-label="Zusammenfassung der KI-Fundstellen">
+                    <span><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i><strong>{{ metadata.get('fields', [])|length }}</strong> Stammdaten</span>
+                    <span><i class="fa-solid fa-list-ol me-1" aria-hidden="true"></i><strong>{{ structure.get('headings', [])|length }}</strong> Gliederungen</span>
+                    <span><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>{{ verification.get('findings', [])|length }}</strong> Prüfhinweise</span>
+                  </div>
+                  <p class="small text-secondary">Öffne die passende Gruppe und übertrage nur nach Abgleich mit der Originaldatei. Die Liste ist keine amtliche Richtigkeitsbescheinigung.</p>
+                  {% set law_field_names = {'title': 'Titel', 'short_title': 'Kurztitel', 'doc_type': 'Dokumentart', 'level': 'Körperschaft', 'version_note': 'Fassungshinweis', 'issued_on': 'Ausfertigungsdatum', 'valid_from': 'Inkrafttreten', 'valid_until': 'Außerkrafttreten'} %}
                   <div class="accordion mb-2" id="law-agent-results-{{ analysis.id }}">
                     <div class="accordion-item">
-                      <h4 class="accordion-header"><button class="accordion-button {{ '' if analysis.mode == 'advanced' else 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="{{ 'true' if analysis.mode == 'advanced' else 'false' }}">Stammdaten-Vorschläge · {{ metadata.get('fields', [])|length }} Fundstellen</button></h4>
+                      <h4 class="accordion-header"><button class="accordion-button {{ '' if analysis.mode == 'advanced' else 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="{{ 'true' if analysis.mode == 'advanced' else 'false' }}"><i class="fa-solid fa-id-card me-2" aria-hidden="true"></i>Stammdaten · {{ metadata.get('fields', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-metadata-{{ analysis.id }}" class="accordion-collapse collapse {{ 'show' if analysis.mode == 'advanced' else '' }}" data-bs-parent="#law-agent-results-{{ analysis.id }}">
                         <div class="accordion-body">
                           {% if metadata.get('sampled') %}<p class="small text-warning">Nur Textauszüge analysiert – möglicherweise fehlen weitere Angaben.</p>{% endif %}
                           {% for entry in metadata.get('fields', []) %}
-                            <div class="border-bottom py-2">
+                            <div class="law-result-row">
                               <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                                <span><span class="badge text-bg-secondary">{{ entry.field }}</span> <strong class="text-break">{{ entry.value }}</strong></span>
+                                <span><span class="badge text-bg-secondary">{{ law_field_names.get(entry.field, entry.field) }}</span> <strong class="text-break">{{ entry.value }}</strong></span>
                                 <button type="button" class="btn btn-outline-primary btn-sm" data-law-ai-apply-field="{{ entry.field }}" data-law-ai-value="{{ entry.value }}" title="Vorschlag manuell ins Formular übertragen">Ins Formular übernehmen</button>
                               </div>
-                              <blockquote class="border-start ps-2 small text-secondary mt-1 mb-0">{{ entry.evidence }}</blockquote>
+                              <blockquote class="law-quote small text-secondary mt-2 mb-0">{{ entry.evidence }}</blockquote>
                               {% if entry.source_start is defined %}
                                 <div class="small text-secondary">Textabschnitt {{ entry.section }} · Zeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}
                                   {% if entry.quote_occurrences|default(1) > 1 %}· Das Zitat kommt {{ entry.quote_occurrences }}-mal in diesem Abschnitt vor; die genaue Fundstelle ist nicht eindeutig.{% endif %}
@@ -328,12 +335,12 @@
                       </div>
                     </div>
                     <div class="accordion-item">
-                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-outline-{{ analysis.id }}" aria-expanded="false">Gliederung und Markdown-Vorschläge · {{ structure.get('headings', [])|length }} Fundstellen</button></h4>
+                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-outline-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-list-ol me-2" aria-hidden="true"></i>Gliederung · {{ structure.get('headings', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-outline-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
                         <div class="accordion-body">
                           {% if structure.get('sampled') %}<p class="small text-warning">Nur Ausschnitte und Überschriften ausgewertet.</p>{% endif %}
                           {% for entry in structure.get('headings', []) %}
-                            <div class="py-2 border-bottom"><span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
+                            <div class="law-result-row"><span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
                               <code class="d-block text-break mt-1">{{ entry.markdown_suggestion }}</code>
                               <div class="small text-secondary">Original: {{ entry.quote }}</div>
                               {% if entry.source_start is defined %}
@@ -354,14 +361,14 @@
                       </div>
                     </div>
                     <div class="accordion-item">
-                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-verify-{{ analysis.id }}" aria-expanded="false">Texttreue und kritische Stellen · {{ verification.get('findings', [])|length }} Hinweise</button></h4>
+                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-verify-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Texttreue · {{ verification.get('findings', [])|length }} Hinweise</button></h4>
                       <div id="law-agent-verify-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
                         <div class="accordion-body">
                           {% if verification.get('sampled') %}<p class="small text-warning">Stichproben, keine Vollprüfung des Originals.</p>{% endif %}
                           {% for finding in verification.get('findings', []) %}
-                            <div class="border-start border-warning ps-3 py-2 mb-2">
+                            <div class="law-result-row border-start border-warning ps-3 mb-2">
                               <span class="badge text-bg-{{ 'danger' if finding.severity in ('critical', 'high') else 'warning' }}">{{ finding.severity }}</span>
-                              <blockquote class="small mt-1 mb-1 text-break">{{ finding.quote }}</blockquote>
+                              <blockquote class="law-quote small mt-2 mb-1">{{ finding.quote }}</blockquote>
                               {% if finding.source_start is defined %}<div class="small text-secondary">Textabschnitt {{ finding.section }} · Zeichen {{ finding.source_start + 1 }}–{{ finding.source_end }}
                                 {% if finding.quote_occurrences|default(1) > 1 %}· Zitat mehrfach vorhanden, genaue Position bitte manuell prüfen.{% endif %}</div>{% endif %}
                               <button type="button" class="btn btn-link btn-sm p-0"
@@ -392,9 +399,13 @@
           {% elif selected.status in ('staged', 'ocr_review') %}
             <div class="small alert alert-secondary">Der KI-Agent ist für diesen Benutzer oder die Organisation deaktiviert. Die manuelle Ortsrecht-Bearbeitung bleibt uneingeschränkt möglich.</div>
           {% endif %}
-          <form method="post" action="/laws-assistant/{{ selected.id }}/accept">
+          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="row g-3">
+              <div class="col-12">
+                <div class="law-section-title mb-1"><span class="law-section-icon"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></span><h3 class="h6 mb-0">Redaktionelle Bearbeitung und Übernahme</h3></div>
+                <p class="small text-secondary mb-1">Hier bearbeitest du den tatsächlichen Rechtstextentwurf. <strong>Änderungen werden erst durch „Geprüften Entwurf übernehmen“ gespeichert</strong> – keine automatische Zwischenspeicherung.</p>
+              </div>
               <div class="col-12">
                 <label class="form-label" for="law-ai-title">Geprüfter Titel</label>
                 <input class="form-control" id="law-ai-title" name="title" maxlength="400" required value="{{ selected.proposed_title }}">
@@ -428,45 +439,70 @@
                   {% for level, depth in level_options %}<option value="{{ level.id }}">{{ '   ' * depth }}{{ level.name }}</option>{% endfor %}
                 </select>
               </div>
-              <div class="col-12">
-                <label class="form-label" for="law-ai-body">Redaktionell geprüfter Markdown-Text</label>
-                <textarea class="form-control font-monospace" id="law-ai-body" name="body_md" rows="18"
-                          maxlength="2097152" spellcheck="false" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ selected.proposed_md }}</textarea>
-                <div class="form-text">Prüfen Sie Paragraphen, Daten, Geldbeträge, Anlagen und jede Abweichung vom Original. Ein unverlässlicher OCR-Text darf nicht ungeprüft übernommen werden.</div>
+              <div class="col-12" id="law-editor">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <label class="form-label fw-semibold mb-0" for="law-ai-body">Redaktionell geprüfter Markdown-Text</label>
+                  <span class="small text-secondary" data-law-editor-count aria-live="polite">Textstand aus Import</span>
+                </div>
+                <div class="row g-3">
+                  <div class="col-12 col-xxl-9">
+                    <textarea class="form-control font-monospace law-editor" id="law-ai-body" name="body_md" rows="20"
+                              maxlength="2097152" spellcheck="false" required
+                              aria-describedby="law-editor-hint" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ selected.proposed_md }}</textarea>
+                    <p class="form-text" id="law-editor-hint">Wortlaut, Paragraphen, Beträge, Fristen, Verneinungen und Anlagen mit dem Original abgleichen. Die Gliederung rechts ist nur eine Orientierung im bearbeiteten Text.</p>
+                  </div>
+                  <aside class="col-12 col-xxl-3" aria-label="Gliederung im Entwurf">
+                    <div class="fw-semibold small mb-2"><i class="fa-solid fa-list-ul me-1" aria-hidden="true"></i>Dokumentnavigation</div>
+                    <div class="law-outline" data-law-editor-outline aria-live="off">
+                      <p class="text-secondary small mb-0">Überschriften werden beim Bearbeiten erkannt.</p>
+                    </div>
+                    <div class="small text-secondary mt-2">Klicke auf einen Eintrag, um die Stelle im Editor zu öffnen.</div>
+                  </aside>
+                </div>
+                <p class="small text-warning mt-2 mb-0" data-law-editor-dirty hidden>Du hast ungespeicherte Änderungen. Verlasse diese Seite nicht, bevor du den geprüften Entwurf übernommen hast.</p>
               </div>
               <div class="col-12">
-                <label class="form-check">
-                  <input class="form-check-input" name="confirmed" type="checkbox" value="1" required>
-                  <span class="form-check-label">Ich habe Titel, Text und Original selbst verglichen. Als <strong>unveröffentlichten Entwurf</strong> übernehmen.</span>
-                </label>
-              </div>
-              <div class="col-12">
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-file-circle-check me-1" aria-hidden="true"></i>Geprüften Entwurf übernehmen</button>
+                <div class="law-sticky-actions">
+                  <label class="form-check mb-2">
+                    <input class="form-check-input" name="confirmed" type="checkbox" value="1" required>
+                    <span class="form-check-label small">Ich habe <strong>Original, Titel und Text selbst verglichen</strong> und übernehme ausschließlich einen <strong>unveröffentlichten</strong> Rechtstextentwurf.</span>
+                  </label>
+                  <div class="law-actions align-items-center">
+                    <button type="submit" class="btn btn-primary" data-law-accept-submit><i class="fa-solid fa-file-circle-check me-1" aria-hidden="true"></i>Geprüften Entwurf übernehmen</button>
+                    <a href="/laws-assistant/{{ selected.id }}/original" class="btn btn-outline-secondary"><i class="fa-solid fa-file-arrow-down me-1" aria-hidden="true"></i>Original erneut ansehen</a>
+                  </div>
+                </div>
               </div>
             </div>
           </form>
-          <form method="post" action="/laws-assistant/{{ selected.id }}/discard" class="mt-3">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <label class="form-check small mb-2">
-              <input class="form-check-input" name="discard_confirmed" type="checkbox" value="1" required>
-              <span class="form-check-label">Diesen ungeprüften Entwurf einschließlich Original endgültig verwerfen.</span>
-            </label>
-            <button type="submit" class="btn btn-outline-danger btn-sm">Ungeprüften Import verwerfen</button>
-          </form>
+          <details class="mt-4 border-top pt-3">
+            <summary class="small text-secondary">Weitere Optionen: Import endgültig verwerfen</summary>
+            <form method="post" action="/laws-assistant/{{ selected.id }}/discard" class="mt-3" data-law-discard-form>
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <p class="small text-danger">Hierdurch werden der Arbeitsentwurf und das zugehörige Original gelöscht. Diese Aktion lässt sich nicht rückgängig machen.</p>
+              <label class="form-check small mb-2">
+                <input class="form-check-input" name="discard_confirmed" type="checkbox" value="1" required>
+                <span class="form-check-label">Ich möchte diesen Import einschließlich Original endgültig verwerfen.</span>
+              </label>
+              <button type="submit" class="btn btn-outline-danger btn-sm">Import endgültig verwerfen</button>
+            </form>
+          </details>
         {% endif %}
       </div>
     </article>
     {% else %}
-    <div class="card"><div class="card-body text-center p-5">
-      <i class="fa-solid fa-scale-balanced fa-2x text-secondary mb-3" aria-hidden="true"></i>
-      <h2 class="h5">Original hochladen oder Arbeitsentwurf öffnen</h2>
-      <p class="text-secondary mb-0">Die Texte bleiben zunächst in Ihrem eigenen geschützten Arbeitsbereich und werden niemals automatisch veröffentlicht.</p>
+    <div class="law-surface"><div class="law-card-body text-center py-5 px-3">
+      <span class="law-section-icon mx-auto mb-3" style="width:3.2rem;height:3.2rem;border-radius:1rem"><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i></span>
+      <h2 class="h5">Starte mit einem Originaldokument</h2>
+      <p class="text-secondary mx-auto" style="max-width:32rem">Lade links eine Datei hoch oder wähle einen vorhandenen Arbeitsentwurf. Du wirst dann durch Texterkennung, optionale KI-Prüfung und manuelle Übernahme geführt.</p>
+      <p class="small text-secondary mb-0"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Privater Arbeitsbereich, keine automatische Veröffentlichung.</p>
     </div></div>
     {% endif %}
   </div>
 </div>
 </div>
 {% block scripts %}
+<script src="/static/law-ai-workspace.js" defer></script>
 {% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}
 {% if selected and ai_enabled %}<script src="/static/law-ai-agents.js" defer></script>{% endif %}
 {% endblock %}
