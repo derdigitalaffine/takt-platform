@@ -123,7 +123,10 @@
                     <dl class="row small mb-0">
                       {% for task,label in agent_stages %}
                         <dt class="col-sm-5">{{ label }}</dt>
-                        <dd class="col-sm-7 text-break">{{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}<div class="text-secondary small">{{ agent_routes[task].destination }}</div></dd>
+                        <dd class="col-sm-7 text-break">{{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}
+                          <span class="badge text-bg-light border text-dark">{{ 'Streaming aktiviert' if agent_routes[task].stream_enabled else 'Antwort nach Abschluss' }}</span>
+                          <div class="text-secondary small">{{ agent_routes[task].destination }}</div>
+                        </dd>
                       {% endfor %}
                     </dl>
                   </div>
@@ -146,10 +149,27 @@
               {% endif %}
               {% if analysis %}
                 {% if analysis.status in ('queued', 'running') %}
-                <div class="alert alert-info mb-2" data-law-ai-analysis-pending data-draft-id="{{ selected.id }}">
-                  <i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>
-                  <span role="status" aria-live="polite">KI-Auswertung läuft · {{ analysis.step }}.</span>
-                  <p class="small mb-1">Die drei Schritte werden nacheinander ausgeführt, im erweiterten Modus abschnittsweise. Die LLM-Befunde sind getrennte interne Prüfprotokolle; der Rechtstext wird nicht gespeichert oder veröffentlicht.</p>
+                <div class="alert alert-info mb-2" data-law-ai-analysis-pending
+                     data-draft-id="{{ selected.id }}" data-job-id="{{ analysis.id }}">
+                  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <span class="fw-semibold" role="status" aria-live="polite" data-law-ai-stage>KI-Auswertung läuft · {{ analysis.step }}.</span>
+                    <span class="badge text-bg-secondary" data-law-ai-stream-badge>
+                      {{ 'Modell streamt' if analysis.stream_active else 'Antwort wird verarbeitet' }}
+                    </span>
+                  </div>
+                  <div class="progress mb-2" role="progressbar" aria-label="Bearbeitete KI-Prüfschritte"
+                       aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                       data-law-ai-progress>
+                    <div class="progress-bar" data-law-ai-progress-bar style="width: 0%"></div>
+                  </div>
+                  <div class="d-flex flex-wrap gap-3 small mb-2">
+                    <span data-law-ai-call-count>{{ analysis.progress_done }} von {{ analysis.progress_total }} Modellaufrufen geprüft</span>
+                    <span data-law-ai-stream-stats>
+                      {% if analysis.stream_active %}{{ analysis.stream_characters }} Zeichen in {{ analysis.stream_chunks }} Streaming-Teilen empfangen{% else %}Warten auf Modellantwort{% endif %}
+                    </span>
+                    <span data-law-ai-validated>{{ analysis.validated_items }} quellengeprüfte Vorschläge</span>
+                  </div>
+                  <p class="small mb-2">Streaming zeigt den laufenden <strong>Antwortfortschritt</strong>, keine ungeprüften Rechtsaussagen. Ergebnisse erscheinen erst nach vollständiger JSON- und Fundstellenprüfung. Die Ursprungsdatei, der Entwurf und der Veröffentlichungsstatus bleiben unverändert.</p>
                   <form action="/laws-assistant/{{ selected.id }}/agents/{{ analysis.id }}/cancel" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <button class="btn btn-outline-danger btn-sm" type="submit">KI-Analyse abbrechen</button>
