@@ -169,7 +169,9 @@ def test_browser_discovery_and_3d_controls_remain_in_read_only_view(admin):
                         'id="overlay-only-active"', 'id="map-3d-view"',
                         'data-discovery-topic="Wasser und Hochwasser"',
                         'data-discovery-topic="3D-Gebäude"',
-                        'id="map-discovery-source-links"'):
+                        'id="map-discovery-source-links"',
+                        'id="map-compare-toggle"', 'id="map-compare-canvas"',
+                        'id="map-compare-position"', '/static/map-compare.js'):
             assert element in page.text
     assert 'id="map-discovery-activate" type="button" disabled' in public_page.text
     assert 'id="map-discovery-activate" type="button" disabled' not in private_page.text
