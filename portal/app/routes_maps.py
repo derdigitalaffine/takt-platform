@@ -993,9 +993,10 @@ def map_library_public_overlay(request: Request, key: str):
 
 
 
-@app.post('/maps/library/{key}/layers', dependencies=[Depends(check_csrf)])
+@app.post('/maps/library/{key}/layers')
 async def map_library_layers(request: Request, key: str,
-                             user: User = Depends(map_user)):
+                             user: User = Depends(map_user),
+                             _csrf: None = Depends(check_csrf)):
     """Discover exact live OGC identifiers only after user interaction.
 
     No arbitrary URL is accepted here. Every source is a curated public
