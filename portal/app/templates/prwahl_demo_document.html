@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Muster: {{form_def[0]}} · Personalratswahl{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
+{% block content %}
+<div class="pr-page pr-doc-workspace pr-demo-page">
+  <a class="ds-back-link" href="/personalratswahl/demo#demo-unterlagen"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Zur fiktiven Musterwahl</a>
+  <header class="ds-page-header pr-header"><div class="ds-page-title"><span class="pr-eyebrow">MUSTER · ausschließlich fiktive Daten</span><h1>{{form_def[0]}}</h1><p>{{form_def[1]}} · Stadtverwaltung Sonnenfels (fiktiv)</p></div><div class="ds-page-actions"><a class="btn btn-primary" href="/personalratswahl/demo/dokumente/{{kind}}/pdf"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>Muster-PDF</a><a class="btn btn-outline-primary" href="/personalratswahl/demo/dokumente/{{kind}}/docx"><i class="fa-regular fa-file-word me-2" aria-hidden="true"></i>Muster-DOCX</a></div></header>
+  <div class="pr-alert" role="note"><i class="fa-solid fa-flask" aria-hidden="true"></i><div><strong>MUSTER – kein rechtsverbindliches Wahldokument</strong><span>Alle Inhalte sind vollständig erfunden. Es erfolgt weder Speicherung noch Veröffentlichung, Versand, Zustimmung oder Wahlrechtsprüfung. Für echte Verfahren müssen die gültigen amtlichen Muster und Rechtsvorschriften geprüft werden.</span></div></div>
+  <section class="pr-panel" aria-labelledby="pr-demo-document-fields"><div class="pr-panel-head"><div><span class="pr-eyebrow">Vorausgefüllter Beispielvordruck</span><h2 id="pr-demo-document-fields">Inhaltliche Vorschau</h2><p>Das PDF und die Word-Datei werden aus diesen synthetischen Werten ohne Datenbankeintrag erzeugt.</p></div></div>
+    <dl class="pr-demo-fields">{% for field,label,field_type in form_def[2] %}<div><dt>{{label}}</dt><dd>{{values.get(field, '')}}</dd></div>{% endfor %}</dl>
+  </section>
+  <p class="pr-footnote">Die Downloads sind ausschließlich für Schulung, Präsentation und Layoutprüfung bestimmt. Im Demomodus sind keine Bearbeitung, Speicherung oder rechtswirksame Freigabe vorgesehen.</p>
+</div>
+{% endblock %}
