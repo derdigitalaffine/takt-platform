@@ -103,12 +103,161 @@
               </details>
             {% endif %}
           {% endif %}
+
+          {% if ai_enabled %}
+          <section class="card mb-4" aria-labelledby="law-agent-heading">
+            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <h3 class="h6 mb-0" id="law-agent-heading"><i class="fa-solid fa-brain me-2" aria-hidden="true"></i>KI-Redaktionsprüfung</h3>
+              <span class="badge text-bg-secondary">3 spezialisierte Agenten</span>
+            </div>
+            <div class="card-body">
+              <p class="small text-secondary">Die KI liest ausschließlich den importierten <strong>Textvorschlag</strong>; Original-PDF und Bilder werden nicht an Sprachmodelle versendet. Die Analyse führt keine Rechtsänderung durch. Vorschläge sind mit wörtlichen Fundstellen zu belegen; fehlende Belege werden verworfen.</p>
+              {% if selected.status == 'ocr_queued' %}
+                <div class="alert alert-secondary small mb-0">Bitte zuerst die laufende OCR abschließen.</div>
+              {% elif selected.status in ('staged', 'ocr_review') %}
+                {% if not agent_routes or agent_routes|length != 3 %}
+                  <div class="alert alert-warning small">Die drei Ortsrecht-Profile <code>law_structure</code>, <code>law_metadata</code> und <code>law_verify</code> müssen vor der Nutzung in <a href="/admin/ai#ai-task-profiles">KI-Administration</a> jeweils einem freigegebenen aktiven Modell zugewiesen werden. Es wird kein fremder Provider als stiller Ersatz genutzt.</div>
+                {% else %}
+                  <details class="mb-3">
+                    <summary class="small fw-semibold">Empfänger und Modelle ansehen</summary>
+                    <dl class="row small mt-2 mb-0">
+                      {% for task,label in agent_stages %}
+                        <dt class="col-sm-6">{{ label }}</dt>
+                        <dd class="col-sm-6 text-break">{{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}</dd>
+                      {% endfor %}
+                    </dl>
+                  </details>
+                  <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <fieldset class="mb-2"><legend class="form-label fw-semibold fs-6">Analyseumfang</legend>
+                      <div class="d-flex flex-wrap gap-3">
+                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="simple" checked><span class="form-check-label">Einfach – kompakte Hinweise</span></label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="advanced"><span class="form-check-label">Erweitert – ausführliche Fundstellen</span></label>
+                      </div>
+                    </fieldset>
+                    <label class="form-check small mb-2">
+                      <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
+                      <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
+                    </label>
+                    <p class="small text-secondary">Für längere Dokumente verwendet die KI ausdrücklich gekennzeichnete Auszüge. Sie führt <strong>keine vollständige juristische Prüfung</strong> aus. Maximal {{ ai_source_limit }} Zeichen. Bestehende OCR-/MarkItDown-Vorschläge bleiben unverändert.</p>
+                    <button class="btn btn-outline-primary btn-sm" type="submit"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Drei KI-Prüfagenten starten</button>
+                  </form>
+                {% endif %}
+              {% endif %}
+              {% if analysis %}
+                {% if analysis.status in ('queued', 'running') %}
+                <div class="alert alert-info mb-2" data-law-ai-analysis-pending data-draft-id="{{ selected.id }}">
+                  <i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>
+                  <span role="status" aria-live="polite">KI-Auswertung läuft · {{ analysis.step }}.</span>
+                  <p class="small mb-1">Die drei Schritte werden nacheinander ausgeführt; das Dokument wird nicht gespeichert oder veröffentlicht.</p>
+                  <form action="/laws-assistant/{{ selected.id }}/agents/{{ analysis.id }}/cancel" method="post">
+                    <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <button class="btn btn-outline-danger btn-sm" type="submit">KI-Analyse abbrechen</button>
+                  </form>
+                </div>
+                {% elif analysis.status == 'failed' %}
+                  <div class="alert alert-warning mb-2" role="alert">Die KI-Analyse wurde nicht abgeschlossen: {{ analysis.failure }}. Es wurden keine Vorschläge automatisch übernommen.</div>
+                {% elif analysis.status == 'cancelled' %}
+                  <div class="alert alert-secondary mb-2">KI-Analyse abgebrochen. Eine bereits erfolgte Übertragung an den Anbieter lässt sich dadurch nicht rückgängig machen.</div>
+                {% elif analysis.status == 'done' and not analysis_current %}
+                  <div class="alert alert-warning mb-2">Dieser KI-Befund bezieht sich auf eine ältere OCR-Textversion und wird daher nicht angezeigt. Bitte neu analysieren.</div>
+                {% elif analysis.status == 'done' and analysis_current %}
+                  <div class="alert alert-success small">
+                    KI-Prüflauf abgeschlossen. <strong>Alle Ergebnisse sind unverbindliche Vorschläge</strong>; Fundstellen belegen nur das Vorkommen im importierten Text, nicht seine amtliche Richtigkeit.
+                  </div>
+                  {% set structure = analysis_results.get('structure', {}) %}
+                  {% set metadata = analysis_results.get('metadata', {}) %}
+                  {% set verification = analysis_results.get('verification', {}) %}
+                  <div class="accordion mb-2" id="law-agent-results-{{ analysis.id }}">
+                    <div class="accordion-item">
+                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="false">Stammdaten-Vorschläge · {{ metadata.get('fields', [])|length }} Fundstellen</button></h4>
+                      <div id="law-agent-metadata-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
+                        <div class="accordion-body">
+                          {% if metadata.get('sampled') %}<p class="small text-warning">Nur Textauszüge analysiert – möglicherweise fehlen weitere Angaben.</p>{% endif %}
+                          {% for entry in metadata.get('fields', []) %}
+                            <div class="border-bottom py-2">
+                              <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                                <span><span class="badge text-bg-secondary">{{ entry.field }}</span> <strong class="text-break">{{ entry.value }}</strong></span>
+                                <button type="button" class="btn btn-outline-primary btn-sm" data-law-ai-apply-field="{{ entry.field }}" data-law-ai-value="{{ entry.value }}" title="Vorschlag manuell ins Formular übertragen">Ins Formular übernehmen</button>
+                              </div>
+                              <blockquote class="border-start ps-2 small text-secondary mt-1 mb-0">{{ entry.evidence }}</blockquote>
+                            </div>
+                          {% else %}<p class="small text-secondary">Keine ausreichend belegten Stammdaten gefunden.</p>{% endfor %}
+                          {% for warn in metadata.get('warnings', []) %}<p class="small text-warning mt-2 mb-0">{{ warn }}</p>{% endfor %}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="accordion-item">
+                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-outline-{{ analysis.id }}" aria-expanded="false">Gliederung und Markdown-Vorschläge · {{ structure.get('headings', [])|length }} Fundstellen</button></h4>
+                      <div id="law-agent-outline-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
+                        <div class="accordion-body">
+                          {% if structure.get('sampled') %}<p class="small text-warning">Nur Ausschnitte und Überschriften ausgewertet.</p>{% endif %}
+                          {% for entry in structure.get('headings', []) %}
+                            <div class="py-2 border-bottom"><span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
+                              <code class="d-block text-break mt-1">{{ entry.markdown_suggestion }}</code>
+                              <div class="small text-secondary">Original: {{ entry.quote }}</div>
+                            </div>
+                          {% else %}<p class="small text-secondary">Keine zusätzlichen Gliederungsvorschläge.</p>{% endfor %}
+                          <div class="small text-secondary mt-2">Diese Vorschläge werden nicht automatisch in den Rechtstext übernommen. Markdown kann nach Sichtprüfung manuell angepasst werden.</div>
+                          {% for warn in structure.get('warnings', []) %}<p class="small text-warning mt-2 mb-0">{{ warn }}</p>{% endfor %}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="accordion-item">
+                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-verify-{{ analysis.id }}" aria-expanded="false">Texttreue und kritische Stellen · {{ verification.get('findings', [])|length }} Hinweise</button></h4>
+                      <div id="law-agent-verify-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
+                        <div class="accordion-body">
+                          {% if verification.get('sampled') %}<p class="small text-warning">Stichproben, keine Vollprüfung des Originals.</p>{% endif %}
+                          {% for finding in verification.get('findings', []) %}
+                            <div class="border-start border-warning ps-3 py-2 mb-2">
+                              <span class="badge text-bg-{{ 'danger' if finding.severity in ('critical', 'high') else 'warning' }}">{{ finding.severity }}</span>
+                              <blockquote class="small mt-1 mb-1 text-break">{{ finding.quote }}</blockquote>
+                              <div class="small">{{ finding.reason }}</div>
+                              {% if finding.suggestion %}<div class="small text-secondary">{{ finding.suggestion }}</div>{% endif %}
+                            </div>
+                          {% else %}<p class="small text-secondary">Keine konkret belegten Prüfhinweise gefunden – das ist keine Aussage zur Texttreue.</p>{% endfor %}
+                          {% for warn in verification.get('warnings', []) %}<p class="small text-warning mt-2 mb-0">{{ warn }}</p>{% endfor %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <details class="small text-secondary mt-2">
+                    <summary>Prüfprotokoll und Modellzuweisung</summary>
+                    <div>Prüf-ID: {{ analysis.id }} · Modus: {{ analysis.mode }} · Stand: {{ analysis.updated_at|local }}</div>
+                    <div class="font-monospace text-break">Text-SHA-256: {{ analysis.source_sha256 }}</div>
+                    {% for task,label in agent_stages %}
+                      {% if agent_routes.get(task) %}<div>{{ label }}: {{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}</div>{% endif %}
+                    {% endfor %}
+                  </details>
+                {% endif %}
+              {% endif %}
+            </div>
+          </section>
+          {% elif selected.status in ('staged', 'ocr_review') %}
+            <div class="small alert alert-secondary">Der KI-Agent ist für diesen Benutzer oder die Organisation deaktiviert. Die manuelle Ortsrecht-Bearbeitung bleibt uneingeschränkt möglich.</div>
+          {% endif %}
           <form method="post" action="/laws-assistant/{{ selected.id }}/accept">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label" for="law-ai-title">Geprüfter Titel</label>
                 <input class="form-control" id="law-ai-title" name="title" maxlength="400" required value="{{ selected.proposed_title }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="law-ai-short-title">Kurztitel / Abkürzung</label>
+                <input class="form-control" id="law-ai-short-title" name="short_title" maxlength="80" placeholder="Optional">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="law-ai-version-note">Fassungshinweis</label>
+                <input class="form-control" id="law-ai-version-note" name="version_note" maxlength="255" placeholder="Optional">
+              </div>
+              <div class="col-12">
+                <div class="row g-2">
+                  <div class="col-md-4"><label class="form-label small" for="law-ai-issued">Ausfertigungsdatum</label><input class="form-control" type="date" id="law-ai-issued" name="issued_on"></div>
+                  <div class="col-md-4"><label class="form-label small" for="law-ai-valid-from">Inkrafttreten laut geprüfter Quelle</label><input class="form-control" type="date" id="law-ai-valid-from" name="valid_from"></div>
+                  <div class="col-md-4"><label class="form-label small" for="law-ai-valid-until">Außerkrafttreten laut Quelle</label><input class="form-control" type="date" id="law-ai-valid-until" name="valid_until"></div>
+                </div>
+                <p class="small text-secondary mt-1">Diese Felder werden nicht automatisch aus KI-Ergebnissen übernommen. Rechtswirksamkeit und Bekanntmachung müssen fachlich geprüft werden.</p>
               </div>
               <div class="col-md-6">
                 <label class="form-label" for="law-ai-type">Dokumentart</label>
@@ -160,5 +309,8 @@
     {% endif %}
   </div>
 </div>
-{% block scripts %}{% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}{% endblock %}
+{% block scripts %}
+{% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}
+{% if selected and ai_enabled %}<script src="/static/law-ai-agents.js" defer></script>{% endif %}
+{% endblock %}
 {% endblock %}
