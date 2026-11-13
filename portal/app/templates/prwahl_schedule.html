@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Wahltermine · {{election.title}}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
+{% block content %}
+<div class="pr-page">
+<a class="ds-back-link" href="/personalratswahl/{{election.id}}/ablauf">← Wahlfahrplan</a>
+<header class="ds-page-header pr-header"><div class="ds-page-title"><span class="pr-eyebrow">Personalratswahl · Terminplanung</span><h1>Termine und Einladungen</h1><p>Geschützter Terminplan mit optionalem Kalenderexport und bewusst freigegebenen Benachrichtigungen.</p></div></header>
+<div class="pr-alert"><i class="fa-solid fa-lock"></i><div><strong>Vertrauliche Wahlorganisation</strong><span>Nur berechtigte Wahlteammitglieder sehen diesen Kalender. E-Mail-Einladungen gehen ausschließlich an zugeordnete Wahlvorstandsmitglieder; keine automatischen Nachrichten an alle Beschäftigten. Amtliche Bekanntgaben bleiben separat erforderlich.</span></div></div>
+{% if can_edit %}
+<section class="pr-panel"><div class="pr-panel-head"><div><span class="pr-eyebrow">Planung</span><h2>Termin hinzufügen</h2><p>Alle Zeiten werden als Ortszeit Rheinland-Pfalz (Europe/Berlin) eingegeben.</p></div></div>
+<form method="post" action="/personalratswahl/{{election.id}}/termine/neu" class="row g-3"><input type="hidden" name="csrf" value="{{csrf}}">
+<div class="col-md-5"><label class="form-label" for="pr-kind">Terminart</label><select class="form-select" id="pr-kind" name="kind" required>{% for key,label in kinds.items() %}<option value="{{key}}">{{label}}</option>{% endfor %}</select></div>
+<div class="col-md-7"><label class="form-label" for="pr-title">Bezeichnung</label><input class="form-control" id="pr-title" name="title" maxlength="180" required placeholder="z. B. Sitzung Wahlvorstand"></div>
+<div class="col-md-4"><label class="form-label" for="pr-start">Beginn</label><input class="form-control" id="pr-start" name="starts_at" type="datetime-local" required></div>
+<div class="col-md-4"><label class="form-label" for="pr-end">Ende</label><input class="form-control" id="pr-end" name="ends_at" type="datetime-local" required></div>
+<div class="col-md-4"><label class="form-label" for="pr-location">Ort (optional)</label><input class="form-control" id="pr-location" name="location" maxlength="240"></div>
+<div class="col-12"><button type="submit" class="btn btn-primary">Termin speichern</button></div>
+</form></section>{% endif %}
+<section class="pr-panel"><div class="pr-panel-head"><div><h2>Geplante Wahltermine</h2><p>Einladung und Kalenderdatei sind getrennte, ausdrücklich auszulösende Aktionen.</p></div><span class="pr-pill">{{events|length}} Termine</span></div>
+{% for event in events %}
+<article class="pr-count-result"><div class="pr-panel-head"><div><span class="pr-eyebrow">{{kinds[event.kind]}} · {{'Abgesagt' if event.status=='cancelled' else 'Geplant'}}</span><h3>{{event.title}}</h3><p>{{display_local(event.starts_at)}} – {{display_local(event.ends_at)}} Uhr{% if event.location %} · {{event.location}}{% endif %}</p></div></div>
+<div class="d-flex gap-2 flex-wrap"><a class="btn btn-outline-primary btn-sm" href="/personalratswahl/{{election.id}}/termine/{{event.id}}.ics">Kalenderdatei (.ics)</a>
+{% if role=='chair' and event.status=='planned' %}<form method="post" action="/personalratswahl/{{election.id}}/termine/{{event.id}}/benachrichtigen"><input type="hidden" name="csrf" value="{{csrf}}"><button type="submit" class="btn btn-outline-primary btn-sm">Wahlvorstand per E-Mail informieren</button></form>{% endif %}
+{% if role in ['coordinator','chair'] and event.status=='planned' %}<form method="post" action="/personalratswahl/{{election.id}}/termine/{{event.id}}/absagen"><input type="hidden" name="csrf" value="{{csrf}}"><button type="submit" class="btn btn-outline-danger btn-sm">Termin absagen</button></form>{% endif %}</div>
+</article>
+{% else %}<div class="pr-empty pr-inline"><h3>Noch keine Termine</h3><p>Lege eine Sitzung, Frist oder den Wahltag an. Es werden keine automatischen Fristen behauptet.</p></div>{% endfor %}
+</section></div>
+{% endblock %}
