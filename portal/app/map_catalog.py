@@ -150,6 +150,30 @@ for key, title, layer_id, topic, role in [
         note='Dienst und angebotene Layer werden erst bei Auswahl geprüft. '
              'Maßstab, Aktualität und Nutzbarkeit beachten.',
         attribution=RLP_ATTR)
+
+# Landesfachdaten beyond cadastral/topographic data. The original
+# licensing is different: do not relabel third-party sectoral data
+# under the LVermGeo data licence.
+for key, title, lid, topic in [
+    ('flood-hq100', 'RP · Hochwassergefahr – Wassertiefe HQ100', 73097, 'Wasser und Hochwasser'),
+    ('flood-extreme', 'RP · Hochwassergefahr – Wassertiefe Extrem', 70256, 'Wasser und Hochwasser'),
+    ('flood-rivers', 'RP · Hochwasserrisikogewässer (Stand 2018)', 86507, 'Wasser und Hochwasser'),
+]:
+    add('rp-'+key, title, RLP_WMS.format(id=lid), 'Rheinland-Pfalz',
+        topic, 'Wasserwirtschaftsverwaltung Rheinland-Pfalz',
+        'https://www.geoportal.rlp.de/', 'CC BY 4.0', CC,
+        note='Fachdaten mit Anbieterzeitstand; keine Echtzeitvorhersage und '
+             'kein Ersatz für amtliche Warnungen oder Gefahrenbeurteilung.',
+        attribution=f'© Wasserwirtschaftsverwaltung Rheinland-Pfalz ({YEAR}), CC BY 4.0')
+add('rp-nature-reserves', 'RP · Naturschutzgebiete',
+    RLP_WMS.format(id=30825), 'Rheinland-Pfalz', 'Natur und Umwelt',
+    'Naturschutzverwaltung Rheinland-Pfalz (LANIS)',
+    'https://www.geoportal.rlp.de/', 'ODbL 1.0',
+    'https://opendatacommons.org/licenses/odbl/1-0/',
+    note='Schutzgebietsdaten zum Überblick; für verbindliche Grenzen '
+         'sind die amtlichen Rechtsgrundlagen maßgeblich.',
+    attribution='Daten © Naturschutzverwaltung Rheinland-Pfalz (LANIS), ODbL 1.0')
+
 add('rp-atkis-basis', 'RP · ATKIS Basis-DLM – Objekte',
     'https://geo5.service24.rlp.de/wfs/basisdlm_shape_rp.fcgi', 'Rheinland-Pfalz',
     'Topografie', 'LVermGeo Rheinland-Pfalz', RLP_OPEN,
