@@ -187,20 +187,21 @@
           {% endif %}
 
           {% if ai_enabled %}
-          <section class="card mb-4" aria-labelledby="law-agent-heading">
-            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-              <h3 class="h6 mb-0" id="law-agent-heading"><i class="fa-solid fa-brain me-2" aria-hidden="true"></i>KI-Redaktionsprüfung</h3>
-              <span class="badge text-bg-secondary">3 spezialisierte Agenten</span>
+          <section class="law-surface mb-4" aria-labelledby="law-agent-heading">
+            <div class="law-card-head">
+              <div class="law-section-title"><span class="law-section-icon"><i class="fa-solid fa-brain" aria-hidden="true"></i></span><h3 class="h6" id="law-agent-heading">KI-Redaktionsprüfung <span class="badge text-bg-secondary ms-1">Optional</span></h3></div>
+              <span class="small text-secondary">3 spezialisierte Agenten</span>
             </div>
-            <div class="card-body">
-              <p class="small text-secondary">Die KI liest ausschließlich den importierten <strong>Textvorschlag</strong>; Original-PDF und Bilder werden nicht an Sprachmodelle versendet. Die Analyse führt keine Rechtsänderung durch. Vorschläge sind mit wörtlichen Fundstellen zu belegen; fehlende Belege werden verworfen.</p>
+            <div class="law-card-body">
+              <p class="small text-secondary">Die Agenten untersuchen nur den <strong>importierten Textstand</strong>, nicht ungespeicherte Änderungen im Editor. Originaldateien bleiben lokal. Kein Ergebnis wird automatisch in den Rechtstext übernommen.</p>
+              <div class="alert alert-warning small py-2" role="status" data-law-ai-source-warning hidden>Du hast den Text im Editor verändert. Eine neue KI-Analyse verwendet trotzdem den importierten Original-Textvorschlag, nicht deine noch nicht übernommenen Änderungen.</div>
               {% if selected.status == 'ocr_queued' %}
                 <div class="alert alert-secondary small mb-0">Bitte zuerst die laufende OCR abschließen.</div>
               {% elif selected.status in ('staged', 'ocr_review') %}
                 {% if not agent_routes or agent_routes|length != 3 %}
                   <div class="alert alert-warning small">Die drei Ortsrecht-Profile <code>law_structure</code>, <code>law_metadata</code> und <code>law_verify</code> müssen vor der Nutzung in <a href="/admin/ai#ai-task-profiles">KI-Administration</a> jeweils einem freigegebenen aktiven Modell zugewiesen werden. Es wird kein fremder Provider als stiller Ersatz genutzt.</div>
                 {% else %}
-                  <div class="border rounded-3 p-2 mb-3" aria-label="Empfänger und KI-Modelle">
+                  <div class="border rounded-3 p-3 mb-3" aria-label="Empfänger und KI-Modelle">
                     <div class="small fw-semibold mb-1">Diese drei KI-Server/Modelle erhalten den Text:</div>
                     <dl class="row small mb-0">
                       {% for task,label in agent_stages %}
@@ -212,20 +213,39 @@
                       {% endfor %}
                     </dl>
                   </div>
-                  <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3">
+                  <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3" data-law-analysis-form>
                     <input type="hidden" name="csrf" value="{{ csrf }}">
-                    <fieldset class="mb-2"><legend class="form-label fw-semibold fs-6">Analyseumfang</legend>
-                      <div class="d-flex flex-wrap gap-3">
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="simple" checked><span class="form-check-label">Einfach – normalerweise 3 Modellaufrufe (bei JSON-Fehlern bis zu 9), bei langen Texten Stichproben</span></label>
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}><span class="form-check-label">Erweitert – {{ advanced_sections }} Textabschnitte, 3 Agenten ({{ max_model_calls }} Aufrufe regulär, höchstens {{ max_model_calls * 3 }} bei JSON-Nachprüfung)</span></label>
+                    <fieldset class="mb-3">
+                      <legend class="form-label fw-semibold fs-6">Wie gründlich soll geprüft werden?</legend>
+                      <div class="row g-2">
+                        <div class="col-12 col-lg-6">
+                          <label class="law-choice d-block">
+                            <input class="form-check-input me-2" type="radio" name="mode" value="simple" checked>
+                            <span class="law-choice-title">Schnellcheck</span>
+                            <small>3 Modellaufrufe. Gute erste Orientierung; lange Texte nur in Auszügen.</small>
+                            <span class="badge text-bg-light border text-dark mt-2">Schneller · weniger API-Aufwand</span>
+                          </label>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                          <label class="law-choice d-block">
+                            <input class="form-check-input me-2" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}>
+                            <span class="law-choice-title">Gesamter Text</span>
+                            <small>{{ advanced_sections }} Textabschnitte für jeden Agenten; {{ max_model_calls }} reguläre Modellaufrufe.</small>
+                            <span class="badge text-bg-light border text-dark mt-2">Ausführlicher · mehr Aufwand</span>
+                          </label>
+                        </div>
                       </div>
                     </fieldset>
                     <label class="form-check small mb-2">
                       <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
                       <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
                     </label>
-                    <p class="small text-secondary">Im einfachen Modus werden bei langen Texten Auszüge analysiert. Im erweiterten Modus erhält jeder Agent alle Zeichen des importierten Textes in {{ advanced_sections }} überprüfbaren Abschnitten. Regulär sind {{ max_model_calls }} Modellaufrufe vorgesehen. Bei fehlerhaftem oder am Tokenlimit abgeschnittenem JSON darf ein Abschnitt einmal in zwei kleinere Teile zerlegt und beim <strong>gleichen freigegebenen Modell</strong> erneut analysiert werden: maximal {{ max_model_calls * 3 }} Aufrufe insgesamt. Die zusätzlichen Aufrufe können Kosten und Laufzeit erhöhen; der gesamte Auftrag bleibt zeitlich begrenzt. <strong>Vollständige Textübermittlung ist keine vollständige juristische Prüfung</strong> und garantiert keine OCR-Texttreue. Maximal {{ ai_source_limit }} Zeichen; keine Änderung an MarkItDown-/Tesseract-Originalen.</p>
-                    <button class="btn btn-outline-primary btn-sm" type="submit"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Drei KI-Prüfagenten starten</button>
+                    <p class="small fw-semibold mb-2" id="law-analysis-budget" data-law-analysis-budget aria-live="polite">Schnellcheck: 3 Anfragen, bei fehlerhaftem JSON bis zu 9.</p>
+                    <details class="small text-secondary mb-3">
+                      <summary>Verarbeitung, Grenzen und mögliche Zusatzkosten</summary>
+                      <p class="mt-2 mb-0">Im Schnellcheck werden bei langen Dokumenten Textauszüge geprüft. Im Volltextmodus wird der gesamte importierte Text abschnittsweise übermittelt, regulär {{ max_model_calls }} Aufrufe. Bei ungültigem oder abgeschnittenem JSON darf ein Abschnitt einmal am gleichen Modell nachgeprüft werden (maximal {{ max_model_calls * 3 }} Aufrufe insgesamt). Das verursacht ggf. zusätzliche Kosten. Kein KI-Ergebnis ist eine vollständige juristische Prüfung oder garantiert korrekte OCR. Maximal {{ ai_source_limit }} Textzeichen; das Original bleibt unverändert.</p>
+                    </details>
+                    <button class="btn btn-primary" type="submit" data-law-analysis-submit><i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>KI-Prüfung starten</button>
                   </form>
                 {% endif %}
               {% endif %}
@@ -259,14 +279,20 @@
                   </form>
                 </div>
                 {% elif analysis.status == 'failed' %}
-                  <div class="alert alert-warning mb-2" role="alert">Die KI-Analyse wurde nicht abgeschlossen: {{ analysis.failure }}. Es wurden keine Vorschläge automatisch übernommen.</div>
+                  <div class="alert alert-warning mb-3" role="alert">
+                  <div class="fw-semibold mb-1"><i class="fa-solid fa-triangle-exclamation me-2" aria-hidden="true"></i>KI-Prüfung konnte nicht abgeschlossen werden</div>
+                  <p class="small mb-2">{{ analysis.failure }}</p>
+                  <p class="small mb-2">Es wurden keine Vorschläge automatisch übernommen. Prüfe die Modellkonfiguration oder starte einen neuen, ausdrücklich bestätigten Prüflauf.</p>
+                  <a class="btn btn-outline-secondary btn-sm" href="#law-agent-heading">Erneut konfigurieren</a>
+                </div>
                 {% elif analysis.status == 'cancelled' %}
                   <div class="alert alert-secondary mb-2">KI-Analyse abgebrochen. Eine bereits erfolgte Übertragung an den Anbieter lässt sich dadurch nicht rückgängig machen.</div>
                 {% elif analysis.status == 'done' and not analysis_current %}
                   <div class="alert alert-warning mb-2">Dieser KI-Befund bezieht sich auf eine ältere OCR-Textversion und wird daher nicht angezeigt. Bitte neu analysieren.</div>
                 {% elif analysis.status == 'done' and analysis_current %}
                   <div class="alert alert-success small">
-                    KI-Prüflauf abgeschlossen. <strong>Alle Ergebnisse sind unverbindliche Vorschläge</strong>; Fundstellen belegen nur das Vorkommen im importierten Text, nicht seine amtliche Richtigkeit.
+                    <strong><i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>KI-Prüfung abgeschlossen.</strong>
+                    Hinweise sind Vorschläge mit Fundstellen im importierten Text – keine amtliche oder juristische Bestätigung.
                   </div>
                   {% set structure = analysis_results.get('structure', {}) %}
                   {% set metadata = analysis_results.get('metadata', {}) %}
