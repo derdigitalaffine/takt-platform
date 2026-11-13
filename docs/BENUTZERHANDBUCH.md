@@ -26,7 +26,7 @@ Willkommen im TAKT-Portal. Die Dokumentation ist jetzt **nach Aufgaben geglieder
 
 ## Modulanleitungen
 
-Alle **18 konfigurierbaren Module** aus dem aktuellen Portal sowie zusätzlich die übergreifenden Arbeitsbereiche Meetings, Abwesenheiten und Zahlungen haben eine eigene Anleitung. Die Reihenfolge entspricht typischen Arbeitsaufgaben, nicht technischen Modulkennungen.
+Alle **19 konfigurierbaren Module** aus dem aktuellen Portal sowie zusätzlich die übergreifenden Arbeitsbereiche Meetings, Abwesenheiten und Zahlungen haben eine eigene Anleitung. Die Reihenfolge entspricht typischen Arbeitsaufgaben, nicht technischen Modulkennungen.
 
 ### Mein Arbeitsplatz
 
@@ -34,7 +34,7 @@ Alle **18 konfigurierbaren Module** aus dem aktuellen Portal sowie zusätzlich d
 |---|---|
 | [**Interne Anliegen**](handbuch/module/interne-anliegen.md) | Beschaffung, Mängel, Beschwerden und Zuständigkeiten |
 | [**Aufgaben & Zusammenarbeit**](handbuch/module/aufgaben.md) | Aufgaben, Checklisten und Kanbanboards |
-| <a id="12c-krank-melden-und-krankmeldungen-bearbeiten"></a>[**Krankmeldungen**](handbuch/module/krankmeldungen.md) | Krankmeldung abgeben und berechtigt bearbeiten |
+| [**Digitales Verbandbuch**](handbuch/module/digitales-verbandbuch.md) | Erste Hilfe vertraulich erfassen und Fachakten prüfen |\n| <a id="12c-krank-melden-und-krankmeldungen-bearbeiten"></a>[**Krankmeldungen**](handbuch/module/krankmeldungen.md) | Krankmeldung abgeben und berechtigt bearbeiten |
 | <a id="12a-abwesenheiten-und-vertretungen"></a>[**Abwesenheiten & Vertretungen**](handbuch/module/abwesenheiten.md) | Eigene Abwesenheiten und Vertretung |
 
 ### Termine & Räume
