@@ -86,7 +86,8 @@
       '<div class="layer-head"><i class="fa-solid fa-grip-vertical drag small" title="Reihenfolge ändern"></i>' +
       '<input class="form-check-input mt-0" type="checkbox" data-toggle' + (l.visible ? ' checked' : '') + ' aria-label="' + esc(l.name) + ' anzeigen">' + swatch +
       '<span class="layer-name" title="' + esc(l.description || l.name) + '">' + esc(l.name) + '</span>' +
-      (l.legend ? '<button class="btn-icon" type="button" data-legend title="Legende"><i class="fa-solid fa-list-ul"></i></button>' : '') +
+      (l.legend ? '<button class="btn-icon" type="button" data-legend title="Legende" aria-label="Legende für '+esc(l.name)+'"><i class="fa-solid fa-list-ul"></i></button>' : '') +
+      ((l.kind==='wfs'||l.kind==='geojson')?'<button class="btn-icon" type="button" data-extrude aria-pressed="'+(l.extrude?'true':'false')+'" title="3D nach vorhandenen Höhenangaben" aria-label="3D-Extrusion für '+esc(l.name)+' '+(l.extrude?'ausschalten':'einschalten')+'"><i class="fa-solid fa-cubes-stacked"></i></button>':'') +
       (l.custom ? '<button class="btn-icon" type="button" data-remove title="Entfernen"><i class="fa-solid fa-xmark"></i></button>' : '') + '</div>' +
       '<div class="layer-tools"><div class="d-flex align-items-center gap-2"><i class="fa-solid fa-circle-half-stroke text-secondary small" title="Deckkraft"></i>' +
       '<input type="range" class="form-range flex-grow-1" min="0" max="100" value="' + Math.round(l.opacity * 100) + '" data-opacity aria-label="Deckkraft">' +
@@ -126,6 +127,11 @@
       document.getElementById('legend-title').textContent = 'Legende: ' + l.name;
       document.getElementById('legend-body').innerHTML = '<img src="' + esc(l.legend) + '" alt="Legende ' + esc(l.name) + '" style="max-width:100%">';
       bootstrap.Modal.getOrCreateInstance(document.getElementById('legend-modal')).show();
+    }
+    if (ev.target.closest('[data-extrude]')) {
+      kit.setExtrusion(l.id,!l.extrude);
+      if(l.extrude&&map.getPitch()<10)map.easeTo({pitch:55,duration:500});
+      renderOverlays();
     }
     if (ev.target.closest('[data-remove]')) { kit.removeOverlay(l.id); renderOverlays(); }
   });
