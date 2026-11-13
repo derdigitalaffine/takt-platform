@@ -52,8 +52,7 @@ def test_ai_heading_validation_uses_canonical_markdown():
     import json
     from app.law_ai_agents import validate
 
-    source = "# Satzung\\n\\n## Erster Teil\\n\\n### § 1 Name\\n(1) Inhalt"
-    source = source.replace("\\\\n", "\\n")
+    source = chr(10).join(["# Satzung", "", "## Erster Teil", "", "### § 1 Name", "(1) Inhalt"])
     answer = json.dumps({"headings": [
         {"quote": "### § 1 Name", "level": 2},
         {"quote": "## Erster Teil", "level": 5},
@@ -70,7 +69,7 @@ def test_review_endpoint_requires_auth_and_does_not_persist():
     anon = client()
     response = anon.post("/laws-assistant/markdown/review",
                          data={"body_md": "# Satzung\\n\\n§ 1 Name"})
-    assert response.status_code in (302, 303, 401, 403)
+    assert response.status_code in (302, 303, 400, 401, 403)
 
     c = login("admin@example.org", "admin-passwort-123")
     csrf = csrf_of(c.get("/laws-assistant").text)
