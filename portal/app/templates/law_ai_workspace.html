@@ -8,7 +8,21 @@
 <a href="/laws/new" class="btn btn-outline-secondary">Manuell anlegen</a>
 {% endcall %}
 
-<div class="law-workspace">
+<div class="law-workspace {{ 'law-focused-editor' if workspace_view == 'editor' else '' }}">
+  <nav class="law-module-nav mb-3" aria-label="Rechtstexte – Arbeitsbereiche">
+    <a href="/laws" class="law-module-link"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>Rechtstexte</a>
+    <a href="/laws-assistant" class="law-module-link {{ 'is-current' if workspace_view == 'all' else '' }}" {% if workspace_view == 'all' %}aria-current="page"{% endif %}><i class="fa-solid fa-house" aria-hidden="true"></i>Übersicht</a>
+    <a href="/laws-assistant/import" class="law-module-link {{ 'is-current' if workspace_view == 'import' else '' }}" {% if workspace_view == 'import' %}aria-current="page"{% endif %}><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i>Import</a>
+    <a href="/laws-assistant/drafts" class="law-module-link {{ 'is-current' if workspace_view == 'drafts' else '' }}" {% if workspace_view == 'drafts' %}aria-current="page"{% endif %}><i class="fa-solid fa-folder-open" aria-hidden="true"></i>Meine Entwürfe</a>
+    {% if selected %}
+      <span class="law-nav-separator" aria-hidden="true"></span>
+      <a href="/laws-assistant/{{ selected.id }}/ocr" class="law-module-link {{ 'is-current' if workspace_view == 'ocr' else '' }}" {% if workspace_view == 'ocr' %}aria-current="page"{% endif %}><i class="fa-solid fa-file-magnifying-glass" aria-hidden="true"></i>OCR</a>
+      {% if ai_enabled %}
+      <a href="/laws-assistant/{{ selected.id }}/ai" class="law-module-link {{ 'is-current' if workspace_view == 'ai' else '' }}" {% if workspace_view == 'ai' %}aria-current="page"{% endif %}><i class="fa-solid fa-brain" aria-hidden="true"></i>KI-Agenten</a>
+      {% endif %}
+      <a href="/laws-assistant/{{ selected.id }}/editor" class="law-module-link {{ 'is-current' if workspace_view == 'editor' else '' }}" {% if workspace_view == 'editor' %}aria-current="page"{% endif %}><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i>Großer Editor</a>
+    {% endif %}
+  </nav>
   <div class="law-trust mb-3" role="note">
     <i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i>
     <div class="flex-grow-1">
@@ -33,7 +47,9 @@
   </nav>
   {% endif %}
   <div class="row g-3">
-  <div class="col-12 col-xl-3">
+  {% if workspace_view in ('all', 'import', 'drafts') %}
+  <div class="{{ 'col-12 col-xl-3' if workspace_view == 'all' else 'col-12 col-lg-9 col-xxl-7 mx-auto' }}">
+    {% if workspace_view != 'drafts' %}
     <section class="law-surface mb-3" aria-labelledby="law-upload-title">
       <div class="law-card-head">
         <h2 class="h6" id="law-upload-title"><i class="fa-solid fa-file-circle-plus me-2 text-primary" aria-hidden="true"></i>Neues Dokument</h2>
@@ -52,6 +68,8 @@
         </form>
       </div>
     </section>
+    {% endif %}
+    {% if workspace_view != 'import' %}
     <section class="law-surface" aria-labelledby="law-drafts-title">
       <div class="law-card-head">
         <h2 class="h6" id="law-drafts-title">Meine Arbeitsentwürfe</h2>
@@ -96,13 +114,16 @@
       </div>
       {% endif %}
     </section>
+    {% endif %}
   </div>
-  <div class="col-12 col-xl-9">
+  {% endif %}
+  {% if workspace_view not in ('import','drafts') %}
+  <div class="{{ 'col-12 col-xl-9' if workspace_view == 'all' else 'col-12' }}">
     {% if selected %}
     <article class="law-surface" aria-labelledby="law-review-title">
       <header class="law-card-head">
         <div>
-          <div class="law-kicker mb-1">Geschützter Arbeitsbereich · Import #{{ selected.id }}</div>
+          <div class="law-kicker mb-1">Geschützter Arbeitsbereich · Import #{{ selected.id }} · {{ {'ai': 'KI-Agenten', 'ocr': 'Texterkennung', 'editor': 'Rechtstexteditor'}.get(workspace_view, 'Bearbeitungsübersicht') }}</div>
           <h2 class="h5 text-break" id="law-review-title">{{ selected.original_filename }}</h2>
         </div>
         <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status in ('needs_ocr', 'ocr_failed') else 'secondary' }}">{{ {'staged': 'Text zur Prüfung', 'needs_ocr': 'Texterkennung nötig', 'ocr_queued': 'OCR läuft', 'ocr_review': 'OCR-Vorschlag prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
@@ -126,10 +147,10 @@
           <div class="law-actions mt-2">
             <a class="btn btn-sm btn-outline-primary" href="/laws-assistant/{{ selected.id }}/original"><i class="fa-solid fa-file-arrow-down me-1" aria-hidden="true"></i>Original herunterladen</a>
             {% if selected.status in ('staged', 'ocr_review', 'needs_ocr', 'ocr_failed') %}
-              <a class="btn btn-sm btn-outline-secondary" href="#law-editor"><i class="fa-solid fa-pen-to-square me-1" aria-hidden="true"></i>Zum Texteditor</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ '#law-editor' if workspace_view in ('all','ai','editor') else '/laws-assistant/' ~ selected.id ~ '/editor' }}"><i class="fa-solid fa-pen-to-square me-1" aria-hidden="true"></i>Zum Texteditor</a>
             {% endif %}
             {% if ai_enabled and selected.status in ('staged', 'ocr_review') %}
-              <a class="btn btn-sm btn-outline-secondary" href="#law-agent-heading"><i class="fa-solid fa-brain me-1" aria-hidden="true"></i>Zur KI-Prüfung</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ '#law-agent-heading' if workspace_view in ('all','ai') else '/laws-assistant/' ~ selected.id ~ '/ai' }}"><i class="fa-solid fa-brain me-1" aria-hidden="true"></i>Zur KI-Prüfung</a>
             {% endif %}
           </div>
         </div>
@@ -146,6 +167,7 @@
             {% if selected.accepted_law_id %}<a href="/laws/{{ selected.accepted_law_id }}/edit">Rechtstextentwurf öffnen</a>{% endif %}
           </div>
         {% else %}
+          {% if workspace_view in ('all','ocr') %}
           {% if selected.status in ('needs_ocr', 'ocr_failed') %}
           <section class="border rounded-3 p-3 mb-3" aria-label="Texterkennung">
             <h3 class="h6"><i class="fa-solid fa-file-magnifying-glass me-1" aria-hidden="true"></i>Texterkennung mit MarkItDown und Tesseract</h3>
@@ -203,7 +225,12 @@
               </details>
             {% endif %}
           {% endif %}
+          {% endif %}
+          {% if workspace_view == 'ocr' and selected.status in ('staged','ocr_review') %}
+            <div class="alert alert-success small">Der importierte Text liegt bereit. <a href="/laws-assistant/{{ selected.id }}/editor" class="alert-link">Im großen Editor prüfen</a>.</div>
+          {% endif %}
 
+          {% if workspace_view in ('all','ai') %}
           {% if ai_enabled %}
           <section class="law-surface mb-4" aria-labelledby="law-agent-heading">
             <div class="law-card-head">
@@ -417,6 +444,8 @@
           {% elif selected.status in ('staged', 'ocr_review') %}
             <div class="small alert alert-secondary">Der KI-Agent ist für diesen Benutzer oder die Organisation deaktiviert. Die manuelle Ortsrecht-Bearbeitung bleibt uneingeschränkt möglich.</div>
           {% endif %}
+          {% endif %}
+          {% if workspace_view in ('all','editor','ai') %}
           <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="row g-3">
@@ -505,6 +534,7 @@
               <button type="submit" class="btn btn-outline-danger btn-sm">Import endgültig verwerfen</button>
             </form>
           </details>
+          {% endif %}
         {% endif %}
       </div>
     </article>
@@ -517,6 +547,7 @@
     </div></div>
     {% endif %}
   </div>
+  {% endif %}
 </div>
 </div>
 {% block scripts %}
