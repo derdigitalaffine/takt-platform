@@ -79,3 +79,16 @@ def test_dhondt_zero_votes_are_rejected():
     with pytest.raises(HTTPException) as exc:
         dhondt([("A", 0), ("B", 0)], 1)
     assert exc.value.status_code == 422
+
+
+@pytest.mark.parametrize("bad", [True, False, 1.9, -0.1, "1.5", "NaN", "", "  ", "1e2"])
+def test_ballot_totals_reject_non_integer_inputs(bad):
+    with pytest.raises(HTTPException) as exc:
+        validate_totals(eligible=bad, voters=0, ballots_cast=0,
+                        invalid_ballots=0, abstentions=0)
+    assert exc.value.status_code == 422
+
+
+def test_ballot_totals_accept_decimal_string_from_html_form():
+    assert validate_totals(eligible="120", voters="100", ballots_cast="99",
+                           invalid_ballots="4", abstentions="0") == (120, 100, 99, 4, 0)

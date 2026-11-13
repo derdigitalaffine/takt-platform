@@ -63,9 +63,16 @@ class PRCountEntry(Base):
     votes: Mapped[int] = mapped_column(Integer)
 
 def _integer(value, label, *, minimum=0, maximum=10000000):
+    # int(1.9) silently truncates and int(True) becomes 1. Neither is a
+    # legitimate manually counted ballot or seat value.
+    if isinstance(value, bool) or isinstance(value, float):
+        raise HTTPException(422, f"{label}: Bitte eine ganze Zahl eingeben.")
+    if isinstance(value, str) and (not value.strip() or not value.strip().isascii() or
+                                   not value.strip().isdecimal()):
+        raise HTTPException(422, f"{label}: Bitte eine nichtnegative ganze Zahl eingeben.")
     try:
         n = int(value)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         raise HTTPException(422, f"{label}: Bitte eine ganze Zahl eingeben.")
     if n < minimum or n > maximum:
         raise HTTPException(422, f"{label}: Wert außerhalb des zulässigen Bereichs.")
