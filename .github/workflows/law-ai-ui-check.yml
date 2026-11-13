@@ -1,0 +1,24 @@
+name: Ortsrecht agent UI static checks
+
+on:
+  pull_request:
+    paths:
+      - "portal/app/static/law-ai-agents.js"
+      - "portal/app/templates/law_ai_workspace.html"
+      - "portal/app/law_ai_coverage.py"
+      - "portal/app/law_ai_agent_jobs.py"
+      - "portal/tests/test_law_ai_coverage.py"
+      - ".github/workflows/law-ai-ui-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  law-agent-js:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate law-agent browser script syntax
+        run: node --check portal/app/static/law-ai-agents.js
