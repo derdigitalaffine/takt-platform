@@ -211,6 +211,7 @@ MODULES = {
     "resources": ("Ressourcenbuchung", "module_resources", ("/resources", "/r/", "/r", "/r-embed")),
     "signage": ("Digital Signage", "module_signage", ("/signage",)),
     "krank": ("BlueOtter Krankmelder", "module_krank", ("/krank", "/krankmelder")),
+    "prwahl": ("Personalratswahl", "module_prwahl", ("/personalratswahl",)),
 }
 _module_cache: dict = {"at": 0.0, "enabled": set(MODULES)}
 
@@ -3206,6 +3207,7 @@ from . import routes_leave  # noqa: E402,F401
 
 from . import routes_calendars  # noqa: E402,F401
 from . import routes_birthdays  # noqa: E402,F401
+from . import routes_prwahl  # noqa: E402,F401  (separate protected election Fachdomäne)
 
 from . import routes_calendar_devices  # noqa: E402,F401
 
