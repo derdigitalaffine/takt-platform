@@ -50,8 +50,10 @@ def prwahl_milestone(request: Request, election_id: int, stage: str,
         raise HTTPException(403, "Der Wahlvorstandsvorsitz muss diesen Schritt dokumentieren.")
     if stage == "determination":
         rounds = db.scalars(select(PRCountRound).where(PRCountRound.election_id == election.id)).all()
-        if not rounds or any(r.status != "confirmed" for r in rounds):
-            raise HTTPException(409, "Vor der Ergebnisfeststellung müssen alle angelegten Auszählungen durch den Vorsitz bestätigt sein.")
+        if any(r.status != "confirmed" for r in rounds):
+            raise HTTPException(409, "Vor der Ergebnisfeststellung müssen alle digital angelegten Auszählungen durch den Vorsitz bestätigt sein.")
+        # Paper-only counting without optional TAKT entries is valid; the signed
+        # official record is the required evidence, not a digital count.
     if stage == "constitution":
         prior = db.scalar(select(PRMilestone).where(PRMilestone.election_id == election.id,
                                                    PRMilestone.stage == "determination"))
