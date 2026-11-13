@@ -62,8 +62,11 @@ def extract_context(source: str, stage: str, *,
     if stage == "law_structure":
         front = min(4500, context_limit // 3)
         tail = min(3500, context_limit // 3)
-        headings = "\n".join(m.group(0).strip() for m in
-                             list(_HEADING.finditer(source))[:90])
+        navigation = law_ai_toc.toc_ranges(source)
+        headings = "\n".join(
+            m.group(0).strip() for m in _HEADING.finditer(source)
+            if not law_ai_toc.in_toc(m.start(), m.end(), navigation)
+        )[:max(1000, context_limit // 2)]
         body = headings[:max(0, context_limit - front - tail - 120)]
         context = (source[:front] + "\n\n[GLIEDERUNGSÜBERSICHT]\n"
                    + body + "\n\n[TEXTENDE]\n" + source[-tail:])
