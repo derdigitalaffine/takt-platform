@@ -10,9 +10,19 @@ Die Kartenadministration kann einen örtlich begrenzten, manuell bezogenen CityG
 - Authentifizierte Mesh-/Status-Abfrage; Adminberechtigung plus CSRF für Upload/Löschen.
 - Importlimits: 4 MiB Datei, 3.500 Polygonflächen, 16.000 Dreiecke, 4 MiB Mesh, nur unterstützte EPSG:25832-Koordinaten.
 
+## Ergänzung: lokales DGM-Relief (Ausbaustufe 2)
+
+Unter [KARTEN-DGM-RELIEF.md](KARTEN-DGM-RELIEF.md) ist nun ein optionaler DGM-XYZ-Import
+mit tatsächlichen Geländedreiecken dokumentiert. Es gibt eine gesonderte,
+standardmäßig ausgeschaltete Geländeschicht; Dachflächen und DGM werden
+**nur bei vom Administrator bestätigtem gemeinsamen DHHN2016-Höhenbezug**
+relativ zum selben LoD2-Import-Höhenursprung dargestellt. Diese lokale
+Visualisierung ist weiterhin **keine** zertifizierte Höhenreferenz oder
+landesweite DGM-Kacheldarstellung.
+
 ## Verbindliche Grenzen
 
-Die Darstellung zeigt echte geneigte Dachflächen, ist aber weiterhin eine **lokale Vorschau ohne amtlichen Höhenabgleich**. Die niedrigste Polygonhöhe wird für die Vorschau auf 0 gesetzt. Ein zugehöriges DGM1, die vertikale Umrechnung aus DHHN2016, ein räumlich gekachelter Datenserver und Hochleistungs-Streaming für ganz RLP fehlen noch. Höhenangaben in der Vorschau dürfen nicht für Vermessungen oder amtliche Entscheidungen verwendet werden.
+Die Darstellung zeigt echte geneigte Dachflächen, ist aber weiterhin eine **lokale Vorschau ohne amtlichen Höhenabgleich**. Die niedrigste Polygonhöhe wird für die Vorschau auf 0 gesetzt. Ein separater kleiner DGM-XYZ-Ausschnitt kann inzwischen optional zusammen mit LoD2 dargestellt werden; eine zertifizierte Höhenumrechnung, ein räumlich gekachelter Datenserver und Hochleistungs-Streaming für ganz RLP fehlen weiterhin. Höhenangaben in der Vorschau dürfen nicht für Vermessungen oder amtliche Entscheidungen verwendet werden.
 
 Nur CityGML mit direkt eingebetteten RoofSurface-/WallSurface-Polygonen und gml:posList-Dreifachkoordinaten wird unterstützt. Polygone mit Innenringen, reine XLink-Geometrien und degenerierte Flächen werden ausgelassen; vollständig fehlende Dach-/Wandgeometrien führen zum Fehler. DTD-/ENTITY-Deklarationen und ZIP werden abgewiesen. Ein fehlgeschlagener Import ersetzt kein zuvor verfügbares Modell.
 
@@ -26,7 +36,7 @@ Nur CityGML mit direkt eingebetteten RoofSurface-/WallSurface-Polygonen und gml:
 ## Weiterarbeit aus #433
 
 - Belastbare CityGML-Konvertierung mit externen Referenzen, Löchern, komplexen Dachformen, mehreren Kacheln und überprüften geodätischen Transformationen.
-- DGM-basierter Terrain- und DHHN2016-Höhenbezug, Geländemodelle und fachlich korrekte Höhenprofile.
+- Zertifizierter, geoidgerechter DGM-/DHHN2016-Höhenbezug, kachelbasiertes Terrain und fachlich korrekte Höhenprofile (örtliche XYZ-Geländevorschau ist inzwischen getrennt verfügbar).
 - Serverseitige räumlich partitionierte Tiles, Fortschrittsanzeige, Abbruch, Cache/Versionen, Multi-Tenancy und Ressourcenlimits für landesweite Bereitstellung.
 - Verifizierte Browser-Benchmarks mit einem echten amtlichen RLP-LoD2-Testausschnitt vor produktiver Nutzung großer Datenmengen.
 

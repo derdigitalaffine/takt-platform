@@ -66,6 +66,52 @@
       Datenquelle: ©GeoBasis-DE / LVermGeoRP, dl-de/by-2-0, www.lvermgeo.rlp.de [Daten bearbeitet].</p>
   </div>
 </section>
+<section class="card mb-4" id="dgm-preview" aria-labelledby="dgm-admin-title">
+  <div class="card-header"><h2 class="h6 mb-0" id="dgm-admin-title">
+    <i class="fa-solid fa-mountain-sun me-2" aria-hidden="true"></i>Rheinland-Pfalz: DGM-Geländevorschau</h2></div>
+  <div class="card-body">
+    <p class="small text-secondary">Ein örtlich begrenztes <strong>amtliches DGM als ASCII-XYZ (X Y Z)</strong>
+      kann mit dem oben importierten LoD2-Gebäudemodell kombiniert werden. Voraussetzung:
+      <strong>identisches Lagesystem EPSG:25832 und identischer Höhenbezug DHHN2016 (EPSG:7837)</strong>.
+      Das reine XYZ-Format enthält keinen überprüfbaren Höhenbezug. Daher muss dieser anhand
+      der amtlichen Produktangaben bestätigt werden. Der Import ermöglicht eine
+      vereinfachte, triangulierte Geländevorschau; keine amtliche Höhenanalyse,
+      keine automatische DGM1-Gesamtverarbeitung oder MapLibre-Terrain-Kacheln.
+      <a href="https://geoshop.rlp.de/digitale_gelaendemodelle/digitale_gelaendemodelle_dgm.html"
+         target="_blank" rel="noopener noreferrer">Offizielle DGM-Produktinformationen</a>.</p>
+    <div id="dgm-admin-state" role="status" class="small mb-2">DGM-Status wird geladen …</div>
+    <form method="post" enctype="multipart/form-data" action="/admin/maps/dgm/import"
+          id="dgm-import-form" class="d-grid gap-2">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div>
+        <label for="dgm-xyz-file" class="form-label">DGM-XYZ-Datei (.xyz, .txt oder .asc), max. 12 MiB</label>
+        <input class="form-control" type="file" name="file" id="dgm-xyz-file"
+               accept=".xyz,.txt,.asc,text/plain" required>
+        <div class="form-text">Rasterabstand 1, 2, 5, 10, 25 oder 50 m, maximal 1,5 km Kantenlänge;
+          große Raster werden nur für die Darstellung ausgedünnt. Fehlende Rasterzellen bleiben Lücken.</div>
+      </div>
+      <label class="form-check small">
+        <input class="form-check-input" type="checkbox" id="dgm-confirm-height"
+               name="confirm_dhhn2016" value="1" required>
+        <span class="form-check-label">Ich bestätige anhand der amtlichen Quellen:
+          DGM und das oben importierte LoD2-Gebäudemodell verwenden
+          <strong>beide DHHN2016 (EPSG:7837)</strong> und EPSG:25832.</span>
+      </label>
+      <div><button class="btn btn-primary" id="dgm-import-submit" type="submit">
+        Lokales Geländemodell importieren</button></div>
+    </form>
+    <form method="post" action="/admin/maps/dgm/delete" id="dgm-delete-form" class="mt-2">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn btn-sm btn-outline-danger"
+              data-confirm="Lokale DGM-Geländevorschau wirklich entfernen?"
+              data-confirm-button="Entfernen">Geländevorschau entfernen</button>
+    </form>
+    <p class="small text-secondary mt-2 mb-0">
+      Ein DGM wird nur zusammen mit der exakt passenden LoD2-Importversion angezeigt.
+      Nach Austausch der Gebäudedaten muss das DGM neu importiert werden.
+      Daten: © GeoBasis-DE / LVermGeoRP, dl-de/by-2-0 [Daten bearbeitet].</p>
+  </div>
+</section>
 <div class="row g-3 mb-4">
   <div class="col-6 col-xl-3">{{ m.stat('fa-layer-group', layers | length, 'Layer gesamt') }}</div>
   <div class="col-6 col-xl-3">{{ m.stat('fa-toggle-on', layers | selectattr('enabled') | list | length, 'aktiv') }}</div>
@@ -204,4 +250,5 @@
 })();
 </script>
 <script src="/static/map-lod2-admin.js" defer></script>
+<script src="/static/map-dgm-admin.js" defer></script>
 {% endblock %}
