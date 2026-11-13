@@ -5,7 +5,7 @@ reviewable suggestion only; applying it requires an explicit user action.
 """
 import re
 
-from . import laws
+from . import laws, law_ai_toc
 
 _NORMALIZE_MAX = 2_000_000
 _HEAD = re.compile(r"^\s{0,3}#{1,6}\s+")
@@ -21,9 +21,15 @@ def review(markdown: str) -> dict:
     source = markdown.replace("\r\n", "\n").replace("\r", "\n")
     lines = source.split("\n")
     output = list(lines)
+    navigation = law_ai_toc.toc_ranges(source)
     suggestions = []
     fence = None
+    line_offset = 0
     for index, line in enumerate(lines):
+        position = line_offset
+        line_offset += len(line) + 1
+        if law_ai_toc.in_toc(position, position + len(line), navigation):
+            continue
         match = _FENCE.match(line)
         if match:
             char = match.group(1)[0]
@@ -56,6 +62,8 @@ def review(markdown: str) -> dict:
     proposed = "\n".join(output)
     parsed = laws.parse(proposed)
     issues = list(laws.check_outline(parsed))
+    if navigation:
+        issues.append("Inhaltsverzeichnis erkannt: Einträge dort werden nicht als echte Vorschriften formatiert.")
     title_lines = []
     open_fence = None
     for number, raw in enumerate(lines, 1):
@@ -103,5 +111,6 @@ def review(markdown: str) -> dict:
         "title": parsed.title,
         "norms": parsed.norms,
         "groups": parsed.groups,
+        "contents_blocks": len(navigation),
         "note": "Nur Formatierungsvorschlag. Vor Übernahme jede Überschrift mit dem Original abgleichen.",
     }
