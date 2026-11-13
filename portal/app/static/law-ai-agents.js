@@ -166,6 +166,11 @@
         ? Math.max(0, value.validated_items) : 0;
       validated.textContent = items + " fundstellengeprüfte Vorschläge";
     }
+    if (retries) {
+      const count = Number.isSafeInteger(value.retry_attempts)
+        ? Math.max(0, value.retry_attempts) : 0;
+      retries.textContent = count + " automatische Abschnittsverkleinerungen";
+    }
     if (value.stream_active === true) {
       const chars = Number.isSafeInteger(value.stream_characters)
         ? Math.max(0, value.stream_characters) : 0;
