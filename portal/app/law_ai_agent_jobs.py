@@ -34,6 +34,7 @@ def configured_routes(db) -> dict:
             return {}
         result[task] = {
             "provider_id": provider.id, "name": provider.name,
+            "destination": provider.base_url,
             "model_id": assignment.model_id or provider.model_id,
         }
     return result
@@ -186,5 +187,12 @@ async def run_forever():
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001
-            logger.exception("Fehler im KI-Rechtstext-Worker (keine Dokumentdaten protokolliert)")
+            # Avoid infinite running jobs and keep unknown model/backend
+            # exceptions from exposing document content in logs.
+            if "job_id" in locals() and job_id is not None:
+                with SessionLocal() as db:
+                    job = db.get(LawAiAnalysis, job_id)
+                    if job is not None and job.status == "running":
+                        _fail(db, job, "Ein interner Fehler hat die KI-Analyse abgebrochen.")
+            logger.warning("KI-Rechtstext-Worker: interner Fehler, Auftrag sicher beendet")
         await asyncio.sleep(POLL_SECONDS)
