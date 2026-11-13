@@ -8,7 +8,7 @@ import hashlib
 import json
 import re
 
-from . import laws, laws_meta, law_ai_toc
+from . import laws, laws_meta, law_ai_toc, law_ai_metadata_hints
 
 MAX_SOURCE_CHARS = 120_000
 MAX_CONTEXT_CHARS = 19_000
@@ -205,7 +205,7 @@ def _verified_quote(quote: object, source: str) -> str | None:
     return quote
 
 
-def validate(stage: str, answer: str, source: str) -> dict:
+def validate(stage: str, answer: str, source: str, *, with_hints: bool = False) -> dict:
     """Reject invented quotes/fields. Never return raw model output to templates."""
     result = _json_object(answer, stage)
     warnings = _warnings(result.get("warnings"))
@@ -296,6 +296,17 @@ def validate(stage: str, answer: str, source: str) -> dict:
                 discarded += 1
                 continue
             out.append({"field": field, "value": value, "evidence": evidence})
+        if with_hints:
+            already = {entry["field"] for entry in out}
+            for hint in law_ai_metadata_hints.hints(source):
+                field, value, evidence = hint["field"], hint["value"], hint["evidence"]
+                if field in already or field not in FIELDS or len(value) > FIELDS[field]:
+                    continue
+                if evidence not in source:
+                    continue
+                out.append({"field": field, "value": value,
+                            "evidence": evidence, "origin": "rule_based"})
+                already.add(field)
         key = "fields"
     elif stage == "law_verify":
         candidates = result.get("findings")
