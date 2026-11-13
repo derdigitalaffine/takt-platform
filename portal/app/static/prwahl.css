@@ -65,3 +65,7 @@
 @media(max-width:900px){.pr-two-columns,.pr-doc-layout{grid-template-columns:1fr}.pr-sidebar{position:static}.pr-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:575px){.pr-metrics{gap:.5rem}.pr-metrics>div{padding:.7rem}.pr-template-grid{grid-template-columns:1fr}.pr-document-row{flex-wrap:wrap}.pr-document-row>a{width:100%}.pr-member{flex-wrap:wrap}.pr-member>form{width:100%;text-align:right}.pr-form-actions>button{width:100%}.pr-tabs a{font-size:.85rem;padding:.65rem .7rem}}
 @media(prefers-reduced-motion:reduce){.pr-election-card,.pr-template-card{transition:none}}
+
+/* Compact, paper-friendly evidence overview; not an official signed protocol. */
+.pr-count-print-meta {padding: .65rem .85rem; margin: .5rem 0 1rem; border-radius: .6rem; background: var(--bs-tertiary-bg, #f5f6f8);}
+@media print { .pr-count-page .pr-header .ds-page-actions, .pr-count-page form, .pr-count-page .ds-back-link, .pr-count-page .pr-alert {display:none!important;} .pr-count-page .pr-count-result {break-inside:avoid; border:1px solid #bbb; margin-bottom:12mm; padding:5mm;} .pr-count-page .pr-count-print-meta {background:transparent; border:1px solid #ddd;} }
