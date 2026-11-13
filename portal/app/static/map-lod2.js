@@ -73,11 +73,18 @@
           this.posAttr = gl.getAttribLocation(program, 'a_position');
           this.kindAttr = gl.getAttribLocation(program, 'a_kind');
           this.matrixUniform = gl.getUniformLocation(program, 'u_matrix');
+          // Mercator coordinates (~0.5) are much larger than the differences
+          // between small roofs (~1e-7). Retain an anchor in JS double
+          // precision and send only local offsets to Float32 vertex buffers.
+          var first = data.vertices[0];
+          var origin = maplibregl.MercatorCoordinate.fromLngLat(
+            {lng: first[0], lat: first[1]}, 0);
+          this.origin = [origin.x, origin.y, 0];
           var positions = new Float32Array(data.vertices.length * 4);
           data.vertices.forEach(function (v, i) {
             var m = maplibregl.MercatorCoordinate.fromLngLat(
               {lng: v[0], lat: v[1]}, v[2]);
-            positions.set([m.x, m.y, m.z, v[3]], i * 4);
+            positions.set([m.x - origin.x, m.y - origin.y, m.z, v[3]], i * 4);
           });
           this.count = data.vertices.length;
           this.buffer = gl.createBuffer();
@@ -91,7 +98,15 @@
           var projection = args && args.defaultProjectionData;
           if (!projection || !projection.mainMatrix) return;
           gl.useProgram(this.program);
-          gl.uniformMatrix4fv(this.matrixUniform, false, projection.mainMatrix);
+          // CPU-side high-precision translation: (mainMatrix * T(origin))
+          // without converting origin to Float32 before multiplication.
+          var base = projection.mainMatrix;
+          var matrix = new Float32Array(base);
+          var ox = this.origin[0], oy = this.origin[1];
+          for (var r = 0; r < 4; r++) {
+            matrix[12 + r] = base[r] * ox + base[4 + r] * oy + base[12 + r];
+          }
+          gl.uniformMatrix4fv(this.matrixUniform, false, matrix);
           gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
           gl.enableVertexAttribArray(this.posAttr);
           gl.vertexAttribPointer(this.posAttr, 3, gl.FLOAT, false, 16, 0);
