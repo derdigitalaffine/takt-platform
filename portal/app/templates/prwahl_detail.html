@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{election.title}} · Personalratswahl{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
+{% block content %}
+<div class="pr-page">
+  <a class="ds-back-link" href="/personalratswahl"><i class="fa-solid fa-arrow-left me-2" aria-hidden="true"></i>Alle Wahlbereiche</a>
+  <header class="ds-page-header pr-header">
+    <div class="ds-page-title">
+      <span class="pr-eyebrow"><i class="fa-solid fa-building-columns" aria-hidden="true"></i> {{bodies.get(election.body_type,election.body_type)}} · {{election.service_name}}</span>
+      <h1>{{election.title}}</h1>
+      <p>{{election.election_day.strftime('%d.%m.%Y') if election.election_day else 'Wahltermin offen'}}{% if election.election_end_day %} – {{election.election_end_day.strftime('%d.%m.%Y')}}{% endif %}{% if election.election_location %} · {{election.election_location}}{% endif %}</p>
+    </div>
+    <div class="ds-page-actions"><a href="/personalratswahl/{{election.id}}?tab=docs" class="btn btn-primary"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>Vordrucke erstellen</a></div>
+  </header>
+  <div class="pr-alert" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong>Rechtsprüfung ausstehend – nur Arbeitsentwürfe</strong><span>Diese Wahl hat kein fachjuristisch freigegebenes Regelpaket. TAKT führt keine rechtswirksamen Handlungen aus, berechnet keine Fristen und ersetzt keine Originalunterschriften.</span></div></div>
+  <div class="pr-metrics" aria-label="Stand der Vorbereitung">
+    <div><small>Organisation</small><strong><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Vorbereitung</strong></div>
+    <div><small>Checkliste</small><strong>{{done}} <span>/ {{tasks|length}}</span></strong></div>
+    <div><small>Fachteam</small><strong>{{mandates|length}} <span>Person(en)</span></strong></div>
+    <div><small>Vordrucke</small><strong>{{documents|length}} <span>aktuelle</span></strong></div>
+  </div>
+  <nav class="pr-tabs" aria-label="Wahlarbeitsbereich">
+    {% for key, label, icon in [('overview','Übersicht','fa-house'),('tasks','Ablauf & Fristen','fa-list-check'),('board','Wahlvorstand','fa-users'),('docs','Formulare & PDF','fa-file-lines'),('audit','Nachweise','fa-shield-halved')] %}
+    <a class="{{'active' if tab==key else ''}}" href="/personalratswahl/{{election.id}}?tab={{key}}" {% if tab==key %}aria-current="page"{% endif %}><i class="fa-solid {{icon}}" aria-hidden="true"></i><span>{{label}}</span></a>
+    {% endfor %}
+  </nav>
+  {% if tab=='overview' %}
+  <div class="pr-two-columns">
+    <section class="pr-panel">
+      <div class="pr-panel-head"><div><span class="pr-eyebrow">Dein nächster Schritt</span><h2>Wahlvorbereitung im Blick</h2><p>Schritt für Schritt, mit Nachweisen statt automatischer Rechtsentscheidungen.</p></div></div>
+      <div class="pr-progress" role="progressbar" aria-valuenow="{{done}}" aria-valuemin="0" aria-valuemax="{{tasks|length}}" aria-label="Erledigte Prüfpunkte"><span style="width:{{(100*done/tasks|length)|round|int if tasks|length else 0}}%"></span></div>
+      <div class="pr-step-list">
+        {% for item in tasks if not item.completed_at %}
+        <a href="/personalratswahl/{{election.id}}?tab=tasks"><span class="pr-step-number">{{loop.index}}</span><span><strong>{{item.title}}</strong><small>{{item.legal_reference or 'Manueller Prüfpunkt'}}</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+        {% else %}<p class="text-secondary mb-0">Alle internen Prüfpunkte sind als erledigt markiert. Die Rechtsfreigabe erfolgt davon unabhängig.</p>{% endfor %}
+      </div>
+    </section>
+    <aside class="pr-panel">
+      <div class="pr-panel-head"><div><h2>Wahl-Steckbrief</h2><p>Planungsdaten jederzeit nachführen.</p></div></div>
+      {% if can_edit %}
+      <form method="post" action="/personalratswahl/{{election.id}}/daten" class="row g-3">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <div class="col-12"><label for="pr-d-title" class="form-label">Wahlbezeichnung</label><input id="pr-d-title" name="title" class="form-control" required maxlength="180" value="{{election.title}}"></div>
+        <div class="col-sm-6"><label for="pr-d-day" class="form-label">Erster Wahltag</label><input id="pr-d-day" name="election_day" type="date" class="form-control" value="{{election.election_day.isoformat() if election.election_day else ''}}"></div>
+        <div class="col-sm-6"><label for="pr-d-end" class="form-label">Letzter Wahltag</label><input id="pr-d-end" name="election_end_day" type="date" class="form-control" value="{{election.election_end_day.isoformat() if election.election_end_day else ''}}"></div>
+        <div class="col-12"><label for="pr-d-location" class="form-label">Wahlort</label><input id="pr-d-location" name="election_location" class="form-control" maxlength="240" value="{{election.election_location}}"></div>
+        <div class="col-12"><button class="btn btn-outline-primary" type="submit"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Planung speichern</button></div>
+      </form>
+      {% else %}<p>Der Wahlbereich wird derzeit von den beauftragten Mitgliedern bearbeitet. Dein Mandat: {{roles[role]}}.</p>{% endif %}
+      <div class="pr-note mt-3"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Geplante Wahltermine sind keine automatisch geprüften gesetzlichen Fristen.</div>
+    </aside>
+  </div>
+  {% elif tab=='tasks' %}
+  <section class="pr-panel">
+    <div class="pr-panel-head"><div><span class="pr-eyebrow">Ablaufplan</span><h2>Prüfpunkte & manuelle Fristen</h2><p>Erledigungen immer mit einem konkreten Nachweis dokumentieren. Die Software entscheidet nicht über gesetzliche Fristen.</p></div><span class="pr-pill">{{done}} / {{tasks|length}} erledigt</span></div>
+    <ol class="pr-task-list">
+      {% for item in tasks %}
+      <li class="{{'completed' if item.completed_at else ''}}">
+        <span class="pr-task-icon"><i class="fa-solid {{'fa-check' if item.completed_at else 'fa-circle-dot'}}" aria-hidden="true"></i></span>
+        <div class="pr-task-detail"><strong>{{item.title}}</strong><small>{{item.legal_reference}}{% if item.due_on %} · Termin: {{item.due_on.strftime('%d.%m.%Y')}} (manuell){% endif %}</small>
+          {% if item.completed_at %}<p><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>{{item.completion_note}} · {{item.completed_at|local}}</p>{% endif %}
+          {% if can_edit %}<form method="post" action="/personalratswahl/{{election.id}}/aufgaben/{{item.id}}/umschalten" class="pr-task-form"><input type="hidden" name="csrf" value="{{csrf}}">
+            {% if not item.completed_at %}<label class="visually-hidden" for="task-note-{{item.id}}">Erledigungsvermerk: {{item.title}}</label><input id="task-note-{{item.id}}" class="form-control form-control-sm" name="note" required minlength="5" maxlength="350" placeholder="Beschluss / Aktenvermerk / Ablageort …">{% endif %}
+            <button class="btn btn-sm {{'btn-outline-secondary' if item.completed_at else 'btn-outline-primary'}}" type="submit">{{'Wieder öffnen' if item.completed_at else 'Mit Nachweis erledigen'}}</button></form>{% endif %}
+        </div>
+      </li>{% endfor %}
+    </ol>
+  </section>
+  {% if can_edit %}<details class="pr-panel pr-collapse"><summary><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Zusätzlichen Prüfpunkt aufnehmen</summary><form class="row g-3 pt-3" method="post" action="/personalratswahl/{{election.id}}/aufgaben/neu"><input type="hidden" name="csrf" value="{{csrf}}">
+    <div class="col-md-7"><label class="form-label" for="task-title">Prüfpunkt</label><input class="form-control" id="task-title" name="title" required maxlength="180"></div>
+    <div class="col-md-5"><label class="form-label" for="task-due">Manuelles Datum (optional)</label><input class="form-control" id="task-due" type="date" name="due_on"></div>
+    <div class="col-12"><label class="form-label" for="task-norm">Normstelle / Quelle</label><input class="form-control" id="task-norm" name="legal_reference" maxlength="150"></div>
+    <div class="col-12"><button class="btn btn-primary" type="submit">Prüfpunkt ergänzen</button></div>
+  </form></details>{% endif %}
+  {% elif tab=='board' %}
+  <section class="pr-panel">
+    <div class="pr-panel-head"><div><span class="pr-eyebrow">Objektbezogene Zugriffe</span><h2>Wahlvorstand & Fachteam</h2><p>Globale Adminrechte gewähren hier ausdrücklich keine Einsicht. Eine TAKT-Zuordnung ersetzt keine rechtliche Bestellung.</p></div></div>
+    <div class="pr-members">
+      {% for mandate, person in mandates %}
+      <div class="pr-member"><span class="pr-avatar">{{person.name[:1]|upper}}</span><span><strong>{{person.name}}</strong><small>{{roles[mandate.role]}}{% if mandate.appointment_reference %} · {{mandate.appointment_reference}}{% endif %}</small></span>
+        {% if can_manage and mandate.user_id != user.id and not (mandate.role=='coordinator' and mandate.user_id==election.created_by) %}
+        <form method="post" action="/personalratswahl/{{election.id}}/team/{{mandate.id}}/entziehen"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-outline-danger btn-sm" type="submit" aria-label="Zugriff für {{person.name}} entziehen">Entziehen</button></form>{% endif %}
+      </div>{% endfor %}
+    </div>
+  </section>
+  {% if can_manage %}
+  <section class="pr-panel"><div class="pr-panel-head"><div><h2>Person zuordnen</h2><p>Einzelberechtigung mit nachweisbarer Funktion. Bereits zugeordnete Personen können geändert werden.</p></div></div>
+    <form method="post" action="/personalratswahl/{{election.id}}/team" class="row g-3"><input type="hidden" name="csrf" value="{{csrf}}">
+    <div class="col-md-5"><label class="form-label" for="pr-member-user">Person</label><select class="form-select" id="pr-member-user" name="user_id" required><option value="">Person wählen</option>{% for p in users %}<option value="{{p.id}}">{{p.name}} ({{p.email}})</option>{% endfor %}</select></div>
+    <div class="col-md-4"><label class="form-label" for="pr-member-role">Fachrolle</label><select class="form-select" id="pr-member-role" name="role">{% for key,label in roles.items() %}<option value="{{key}}">{{label}}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label" for="pr-member-ref">Bestellungs-/Benennungsnachweis</label><input class="form-control" id="pr-member-ref" name="appointment_reference" maxlength="250" placeholder="Beschluss vom …"></div>
+    <div class="col-12"><button class="btn btn-primary" type="submit">Fachrolle zuordnen</button></div></form>
+  </section>{% endif %}
+  {% elif tab=='docs' %}
+  <section class="pr-panel">
+    <div class="pr-panel-head"><div><span class="pr-eyebrow">Dokumentenstudio</span><h2>Vordrucke & hochwertige A4-PDFs</h2><p>Strukturierte Eingabe, vertrauliche Speicherung, unveränderliche Vorversionen und sorgfältig gesetzte Druckausgabe.</p></div></div>
+    <div class="pr-document-list">{% for document in documents %}
+      <div class="pr-document-row"><span class="pr-doc-icon"><i class="fa-regular fa-file-pdf" aria-hidden="true"></i></span><div><strong>{{document.title}}</strong><small>Fassung {{document.revision}} · {{'Intern geprüft' if document.review_status=='checked' else 'Prüfentwurf'}} · {{document.created_at|local}}</small></div>
+        {% if role!='auditor' %}<a class="btn btn-outline-primary btn-sm" href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}">Öffnen</a>{% endif %}
+      </div>{% else %}<div class="pr-empty pr-inline"><i class="fa-regular fa-file-lines" aria-hidden="true"></i><h3>Noch keine Vordrucke</h3><p>Lege mit der Vorlagenbibliothek den ersten Prüfdruck an.</p></div>{% endfor %}</div>
+  </section>
+  {% if can_edit %}
+  <section class="pr-panel"><div class="pr-panel-head"><div><h2>Vorlagenbibliothek</h2><p>Nach den rheinland-pfälzischen Mustervordrucken strukturiert. Jeder Ausdruck bleibt bis zur Rechtsprüfung als Entwurf markiert.</p></div></div>
+    <div class="pr-template-grid">{% for kind, form in kinds.items() %}<a class="pr-template-card" href="/personalratswahl/{{election.id}}/dokumente/neu/{{kind}}"><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i><span><strong>{{form[0]}}</strong><small>{{form[1]}}</small></span><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>{% endfor %}</div>
+  </section>{% endif %}
+  {% else %}
+  <section class="pr-panel"><div class="pr-panel-head"><div><h2>Nachweisprotokoll</h2><p>Wer hat wann welche Aktion ausgeführt? Aus Gründen der Datenminimierung werden keine Vordruckinhalte protokolliert.</p></div></div>
+    <div class="table-responsive"><table class="table align-middle"><thead><tr><th scope="col">Zeitpunkt</th><th scope="col">Person</th><th scope="col">Aktion</th><th scope="col">Referenz</th></tr></thead><tbody>
+    {% for entry, person in audit %}<tr><td>{{entry.at|local}}</td><td>{{person.name}}</td><td><code>{{entry.action}}</code></td><td>{{entry.target}}</td></tr>{% else %}<tr><td colspan="4">Noch keine Ereignisse.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  {% endif %}
+  <p class="pr-footnote"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Wahlgeheimnis geschützt: Keine Online-Stimmabgabe, keine Zuordnung einer Stimme zu einer Person und keine Übertragung in allgemeine Aufgaben, KI oder DMS. <a href="https://mdi.rlp.de/themen/buerger-und-staat/oeffentliches-dienstrecht" target="_blank" rel="noopener noreferrer">Rechts- und Mustervordrucke des Landes <span class="visually-hidden">(öffnet in neuem Tab)</span></a></p>
+</div>
+{% endblock %}
