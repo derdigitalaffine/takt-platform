@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Papierauszählung · {{election.title}}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
+{% block content %}
+<div class="pr-page">
+  <a class="ds-back-link" href="/personalratswahl/{{election.id}}/ablauf"><i class="fa-solid fa-arrow-left me-2"></i>Zum Wahlfahrplan</a>
+  <header class="ds-page-header pr-header"><div class="ds-page-title"><span class="pr-eyebrow">Optionale Ergebnisermittlung</span><h1>Öffentliche Papierauszählung</h1><p>Stimmen je Liste oder Person erfassen, Plausibilität prüfen und das Ergebnis nachvollziehbar dokumentieren.</p></div><div class="ds-page-actions"><a href="/personalratswahl/{{election.id}}?tab=docs" class="btn btn-outline-primary"><i class="fa-regular fa-file-pdf me-2"></i>Ergebnisvordrucke</a></div></header>
+  <div class="pr-alert"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Keine elektronische Stimmabgabe und keine automatische Wahlfeststellung</strong><span>Hier werden ausschließlich Summen der öffentlich ausgezählten Papierstimmen erfasst. Die Sitzberechnung für Listen ist eine Rechenhilfe. Bei Gleichstand, Personenwahl, Sonderfällen und Gruppenverteilung entscheidet der Wahlvorstand nach dem geltenden Recht.</span></div></div>
+  {% if can_edit %}
+  <section class="pr-panel"><div class="pr-panel-head"><div><span class="pr-eyebrow">Neue Zählerfassung</span><h2>Auszählung erfassen</h2><p>Jede Erfassung bleibt als eigenständiger Nachweis bestehen. Erfassungsfehler werden durch eine neue, dokumentierte Fassung berichtigt.</p></div></div>
+    <form action="/personalratswahl/{{election.id}}/auszaehlung/erfassen" method="post" class="row g-3"><input type="hidden" name="csrf" value="{{csrf}}">
+      <div class="col-md-7"><label class="form-label" for="count-group">Wahlkörper / Gruppe</label><input id="count-group" class="form-control" name="group_name" maxlength="100" required placeholder="z. B. gemeinsame Wahl oder Gruppe der Arbeitnehmer"></div>
+      <div class="col-md-5"><label class="form-label" for="count-mode">Wahlverfahren</label><select id="count-mode" name="mode" class="form-select"><option value="list">Listenwahl · d’Hondt-Rechenhilfe</option><option value="person">Personenwahl · Stimmenübersicht</option></select></div>
+      <div class="col-sm-6 col-lg-4"><label class="form-label" for="count-seats">Zu vergebende Sitze</label><input id="count-seats" name="seats" class="form-control" type="number" min="1" max="200" required></div>
+      <div class="col-sm-6 col-lg-4"><label class="form-label" for="count-eligible">Wahlberechtigte</label><input id="count-eligible" name="eligible" class="form-control" type="number" min="0" required></div>
+      <div class="col-sm-6 col-lg-4"><label class="form-label" for="count-voters">Wählende laut Verzeichnis</label><input id="count-voters" name="voters" class="form-control" type="number" min="0" required></div>
+      <div class="col-sm-6 col-lg-4"><label class="form-label" for="count-ballots">Abgegebene Papierstimmzettel</label><input id="count-ballots" name="ballots_cast" class="form-control" type="number" min="0" required></div>
+      <div class="col-sm-6 col-lg-4"><label class="form-label" for="count-invalid">Ungültige Stimmzettel</label><input id="count-invalid" name="invalid_ballots" class="form-control" type="number" min="0" value="0" required></div>
+      <div class="col-sm-6 col-lg-4"><label class="form-label" for="count-abstentions">Ohne gültige Listenstimme</label><input id="count-abstentions" name="abstentions" class="form-control" type="number" min="0" value="0" required><div class="form-text">Bei Personenwahl nur dokumentarisch.</div></div>
+      <div class="col-12"><label class="form-label" for="count-entries">Listen / Personen und ausgezählte Stimmen</label><textarea id="count-entries" class="form-control" name="entries" rows="6" required maxlength="20000" placeholder="Liste A; 120&#10;Liste B; 90&#10;Liste C; 30"></textarea><div class="form-text">Eine Zeile pro Liste oder Person, getrennt durch Semikolon. Keine einzelnen Stimmzettel, Wählerdaten oder personenbezogenen Abstimmungsprofile erfassen.</div></div>
+      <div class="col-12"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-calculator me-2"></i>Summen prüfen und Erfassung speichern</button></div>
+    </form>
+  </section>{% endif %}
+  <section class="pr-panel"><div class="pr-panel-head"><div><h2>Erfasste Auszählungen</h2><p>Rechnerisch nachvollziehbar; eine Bestätigung dokumentiert die Prüfung der Zählerfassung, nicht automatisch das Wahlergebnis.</p></div><span class="pr-pill">{{rounds|length}} Erfassung(en)</span></div>
+    {% for round in rounds %}
+    {% set detail=details[round.id] %}
+    <article class="pr-count-result"><div class="pr-panel-head"><div><span class="pr-eyebrow">{{'Listenwahl' if round.mode=='list' else 'Personenwahl'}} · Erfassung #{{round.id}}</span><h3>{{round.group_name}}</h3><p>{{round.ballots_cast}} Stimmzettel · {{round.invalid_ballots}} ungültig · {{round.seats}} Sitze</p></div><span class="pr-pill">{{'Durch Vorsitz geprüft' if round.status=='confirmed' else 'Unbestätigt'}}</span></div>
+      <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th scope="col">Liste / Person</th><th scope="col" class="text-end">Stimmen</th><th scope="col" class="text-end">Rechnerische Sitze</th></tr></thead><tbody>
+        {% for entry in detail.entries %}<tr><td>{{entry.label}}</td><td class="text-end">{{entry.votes}}</td><td class="text-end">{{detail.result.assigned.get(entry.label, '–')}}</td></tr>{% endfor %}
+      </tbody></table></div>
+      {% if detail.result.tie %}<div class="pr-note"><strong>Offener Quotientengleichstand bei Sitz {{detail.result.tie.seat}}:</strong> {{detail.result.tie.labels|join(', ')}}. Eine Entscheidung darf nicht automatisch getroffen werden.</div>{% endif %}
+      {% if detail.result.note %}<p class="pr-note">{{detail.result.note}}</p>{% endif %}
+      {% if round.status=='confirmed' %}<p class="small text-secondary"><i class="fa-solid fa-check-circle me-1"></i>Prüfnachweis: {{round.count_reference}}</p>
+      {% elif role=='chair' %}
+      <form method="post" action="/personalratswahl/{{election.id}}/auszaehlung/{{round.id}}/bestaetigen" class="row g-2 align-items-end"><input type="hidden" name="csrf" value="{{csrf}}">
+        <div class="col-md-8"><label for="confirm-{{round.id}}" class="form-label">Niederschrift der öffentlichen Auszählung</label><input id="confirm-{{round.id}}" class="form-control" name="count_reference" minlength="12" maxlength="250" required placeholder="Niederschrift vom …, Aktenzeichen …"></div>
+        <div class="col-md-4"><button class="btn btn-outline-primary w-100" type="submit">Erfassung bestätigen</button></div>
+      </form>{% endif %}
+    </article>{% else %}
+    <div class="pr-empty pr-inline"><i class="fa-solid fa-calculator"></i><h3>Keine Erfassungen vorhanden</h3><p>Die Wahl kann auch vollständig auf Papier ausgezählt werden. Die digitale Erfassung ist freiwillig.</p></div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}
