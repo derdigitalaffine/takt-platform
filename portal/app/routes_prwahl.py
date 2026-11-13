@@ -43,8 +43,9 @@ def _doc(db: Session, election_id: int, document_id: int, user: User, capability
 def prwahl_index(request: Request, user: User = Depends(current_user),
                  db: Session = Depends(get_db)):
     election_ids = select(PRMandate.election_id).where(PRMandate.user_id == user.id)
-    elections = db.scalars(select(PRElection).where(PRElection.id.in_(election_ids))
+    elections = [e for e in db.scalars(select(PRElection).where(PRElection.id.in_(election_ids))
                            .order_by(PRElection.updated_at.desc()).limit(100)).all()
+                 if org_access.active_path(db, e.org_id)]
     orgs = [org for org in db.scalars(select(Organization).where(Organization.active.is_(True))
                       .order_by(Organization.name)).all() if org_access.active_path(db, org.id) and
                       (user.is_admin or db.scalar(select(OrgMembership.id).where(
@@ -111,8 +112,11 @@ def prwahl_detail(request: Request, election_id: int, tab: str = "overview",
     audit = db.execute(select(PRAudit, User).join(User, PRAudit.actor_id == User.id)
                        .where(PRAudit.election_id == election.id)
                        .order_by(PRAudit.id.desc()).limit(80)).all() if tab == "audit" else []
-    users = db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)).all() \
-        if role in {"coordinator", "chair"} else []
+    # Avoid listing all platform accounts as potential election team members.
+    # Only users explicitly assigned to the selected organization are eligible here.
+    users = db.scalars(select(User).join(OrgMembership, OrgMembership.user_id == User.id).where(
+        User.active.is_(True), OrgMembership.org_id == election.org_id).distinct()
+        .order_by(User.name)).all() if role in {"coordinator", "chair"} else []
     return render(request, "prwahl_detail.html", user, election=election,
                   tab=tab, role=role, tasks=tasks, mandates=mandates,
                   users=users, documents=documents, audit=audit,
