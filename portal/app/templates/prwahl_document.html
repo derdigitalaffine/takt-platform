@@ -7,7 +7,7 @@
   <header class="ds-page-header pr-header"><div class="ds-page-title">
     <span class="pr-eyebrow">Vordruckstudio · {{form_def[1]}}</span><h1>{{form_def[0]}}</h1><p>{{election.title}} · {{election.service_name}}{% if document %} · Fassung {{document.revision}}{% endif %}</p>
   </div>
-  <div class="ds-page-actions">{% if document %}<a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pdf" class="btn btn-primary"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>A4-PDF erzeugen</a>{% endif %}</div></header>
+  <div class="ds-page-actions">{% if document %}<a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pdf" class="btn btn-primary"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>A4-PDF erzeugen</a><a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/docx" class="btn btn-outline-primary"><i class="fa-regular fa-file-word me-2" aria-hidden="true"></i>Word-Datei</a>{% endif %}</div></header>
   <div class="pr-alert" role="note"><i class="fa-solid fa-file-circle-exclamation" aria-hidden="true"></i><div><strong>Prüfentwurf – keine amtliche Freigabe</strong><span>Vor Verwendung mit dem gültigen Landesmuster vergleichen. Unterschriften, Originalbelege, Beschlüsse, Pflichtinhalte und rechtlich zulässige Bekanntgabe müssen gesondert geprüft werden.</span></div></div>
   <div class="pr-doc-layout">
     <section class="pr-panel">
@@ -35,7 +35,7 @@
         <div class="pr-document-features"><p><i class="fa-solid fa-check" aria-hidden="true"></i> DIN A4 · klare Typografie & großzügige Abstände</p><p><i class="fa-solid fa-check" aria-hidden="true"></i> Längere Inhalte über mehrere Seiten</p><p><i class="fa-solid fa-check" aria-hidden="true"></i> Pflicht zur Unterschrift sichtbar</p><p><i class="fa-solid fa-check" aria-hidden="true"></i> Dokumentversion und Vertraulichkeitsvermerk</p></div>
         {% if document %}
         <dl class="pr-doc-facts"><dt>Gespeichert</dt><dd>{{document.created_at|local}}</dd><dt>Fassung</dt><dd>v{{document.revision}}</dd><dt>Interne Sichtung</dt><dd>{{'Dokumentiert' if document.review_status=='checked' else 'Noch ausstehend'}}</dd></dl>
-        {% if user.id and mode!='readonly' %}<a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pdf" class="btn btn-outline-primary w-100 mt-2"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>PDF herunterladen</a>{% endif %}
+        {% if document %}<a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pdf" class="btn btn-outline-primary w-100 mt-2"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>PDF herunterladen</a><a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/docx" class="btn btn-outline-secondary w-100 mt-2"><i class="fa-regular fa-file-word me-2" aria-hidden="true"></i>Bearbeitbare Word-Datei</a>{% endif %}
         {% endif %}
       </div>
       {% if document and versions %}
