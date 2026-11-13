@@ -92,8 +92,15 @@ def _own(db: Session, draft_id: int, user: User) -> LawAiDraft:
 def _render(request, db, user, selected=None):
     rows = list(db.scalars(select(LawAiDraft).where(
         LawAiDraft.owner_id == user.id).order_by(LawAiDraft.created_at.desc()).limit(40)))
+    try:
+        ocr_pages = json.loads(selected.ocr_pages_json or "[]") if selected else []
+        ocr_warnings = json.loads(selected.ocr_warnings_json or "[]") if selected else []
+    except (ValueError, TypeError):
+        ocr_pages, ocr_warnings = [], []
     response = render(request, "law_ai_workspace.html", user,
                       drafts=rows, selected=selected, doc_types=lx.DOC_TYPES,
+                      ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
+                      ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
                       level_options=lx.level_options(db))
     response.headers["Cache-Control"] = "private, no-store"
     return response
