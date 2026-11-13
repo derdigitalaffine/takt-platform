@@ -179,3 +179,11 @@
 .map-admin-3d-body > .card:last-child {margin-bottom:0!important}
 .map-admin-3d-body > .card {box-shadow:none}
 @media(max-width:767.98px){.map-admin-3d-body{padding:.25rem .55rem .65rem}}
+
+/* A 39%-high mobile sheet previously exposed mostly navigation instead of
+   usable controls. Keep enough map visible while showing the main action. */
+@media(max-width:767.98px){
+  .map-shell.map-easy-ready .map-panel {height:clamp(18rem,52%,28rem)}
+  .map-shell.map-easy-ready.panel-half .map-panel {height:72%}
+  .map-shell.map-easy-ready.panel-expanded .map-panel {height:94%}
+}
