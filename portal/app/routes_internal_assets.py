@@ -1,5 +1,5 @@
 """Interner Gerätepool: keine Veröffentlichung, Zahlung oder externe Buchung."""
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, update
@@ -355,3 +355,33 @@ def internal_asset_transition(request: Request, booking_id: int, action: str,
     flash(request, {"cancel": "Reservierung storniert.", "issue": "Ausgabe dokumentiert.",
                     "return": "Rückgabe dokumentiert."}[action])
     return redirect("/resources/intern#reservierungen")
+
+
+@app.get("/resources/intern/plan")
+def internal_week_plan(request: Request, start: str = "", category: str = "",
+                       user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Öffentliche Belegungsdichte nur für berechtigte interne Nutzer, ohne fremde Personendaten."""
+    manager = _access(user)
+    try:
+        first = date.fromisoformat(start) if start else to_local(utcnow()).date()
+    except ValueError:
+        first = to_local(utcnow()).date()
+    first -= timedelta(days=first.weekday())
+    days = [first + timedelta(days=n) for n in range(7)]
+    assets = db.scalars(select(InternalAsset).where(
+        InternalAsset.active.is_(True)).order_by(
+        InternalAsset.category, InternalAsset.name)).all()
+    if category:
+        assets = [asset for asset in assets if asset.category == category]
+    rows = []
+    for asset in assets[:250]:
+        free = []
+        for day in days:
+            a = _time(f"{day.isoformat()}T00:00")
+            b = _time(f"{(day + timedelta(days=1)).isoformat()}T00:00")
+            free.append(max(0, asset.quantity - _peak(db, asset.id, a, b)))
+        rows.append((asset, free))
+    return render(request, "resource_internal_plan.html", user, manager=manager,
+                  days=days, rows=rows, category=category, categories=CATEGORIES,
+                  prev=(first - timedelta(days=7)).isoformat(),
+                  next=(first + timedelta(days=7)).isoformat())

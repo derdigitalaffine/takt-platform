@@ -142,3 +142,12 @@ def test_maintenance_http_blocks_and_can_be_lifted():
     r = c.get("/resources/intern/verfuegbarkeit",
               params={"asset_id": aid, "start": start, "end": end})
     assert r.json()["available"] == 1
+
+
+def test_week_plan_keeps_personal_details_private():
+    settings(module_resources="1")
+    c = login("admin@example.org", "admin-passwort-123")
+    response = c.get("/resources/intern/plan")
+    assert response.status_code == 200, response.text[:400]
+    assert "Material-Belegungsplan" in response.text
+    assert "Vorige Woche" in response.text

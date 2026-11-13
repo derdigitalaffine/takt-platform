@@ -4,7 +4,8 @@
 {% block head %}{{ super() }}<link rel="stylesheet" href="/static/internal-assets.css">{% endblock %}
 {% block content %}
 {% call rm.head('internal', [('Interner Gerätepool', '')], 'Interner Gerätepool', 'Material, Technik, Mobiliar und Fahrzeuge für den Dienstbetrieb planen.') %}
-  <a href="/resources/planner" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-calendar-days me-1"></i>Raumplaner</a>
+  <a href="/resources/intern/plan" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-calendar-week me-1"></i>Wochenplan</a>
+  {% if manager %}<a href="/resources/planner" class="btn btn-outline-secondary btn-sm">Raumplaner</a>{% endif %}
 {% endcall %}
 <div class="res-pool">
   <div class="res-pool-intro d-flex align-items-start gap-3 mb-4">
@@ -15,6 +16,7 @@
   </div>
   <nav class="res-pool-tabs mb-4" aria-label="Abschnitte des Gerätepools">
     <a href="#katalog"><i class="fa-solid fa-layer-group me-1"></i>Katalog</a>
+    <a href="/resources/intern/plan"><i class="fa-solid fa-calendar-week me-1"></i>Wochenplan</a>
     <a href="#reservierungen"><i class="fa-solid fa-calendar-check me-1"></i>Reservierungen</a>
     {% if manager %}<a href="#lagerorte"><i class="fa-solid fa-location-dot me-1"></i>Lager &amp; Inventar</a>
     <a href="#wartungen"><i class="fa-solid fa-screwdriver-wrench me-1"></i>Wartungen</a>{% endif %}
@@ -128,7 +130,7 @@
         <td><span class="badge {{'text-bg-primary' if b.status=='issued' else 'text-bg-warning'}}">{{status_labels[b.status]}}</span></td>
         <td class="res-pool-actions">
           {% if manager and b.status == 'reserved' %}
-          <form method="post" action="/resources/intern/buchungen/{{b.id}}/issue"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-hand-holding me-1"></i>Ausgeben</button></form>
+          <form method="post" action="/resources/intern/buchungen/{{b.id}}/issue"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Ausgabehinweis" placeholder="Abholer / Zustand"><button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-hand-holding me-1"></i>Ausgeben</button></form>
           {% elif manager and b.status == 'issued' %}
           <form method="post" action="/resources/intern/buchungen/{{b.id}}/return"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Rückgabehinweis" placeholder="Zustand / Rückgabehinweis"><button class="btn btn-sm btn-success" type="submit">Rücknahme</button></form>
           {% endif %}
