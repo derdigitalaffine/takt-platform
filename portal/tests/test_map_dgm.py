@@ -1,7 +1,7 @@
 """RLP DGM XYZ relief preview: geodetic alignment, decimation and access tests."""
 import pytest
 
-from app import map_dgm as dgm, map_lod2 as lod2
+from app import map_dgm as dgm, map_lod2 as lod2, map_catalog
 from conftest import client, csrf_of, login, settings
 from test_circulations import actors
 from test_map_lod2_preview import CITYGML
@@ -17,6 +17,19 @@ def xyz(nx=3, ny=3, spacing=5, offset=0):
 
 def building():
     return lod2.convert(CITYGML) | {"available": True}
+
+
+def test_official_dgm_downloads_are_discoverable_without_tile_proxy():
+    for resolution in (1, 5, 10):
+        item = map_catalog.DATASETS[f"rp-dgm{resolution}"]
+        assert item["kind"] == "download"
+        assert item["topic"] == "Gelände"
+        assert item["license"] == "DL-DE BY 2.0"
+        assert item["download_url"].startswith("https://geoshop.rlp.de/")
+        assert "XYZ" in item["format"]
+    result = map_catalog.discover(topic="Gelände")
+    assert "rp-dgm5" in result["datasets"]
+    assert "rp-dgm10" in result["datasets"]
 
 
 def test_dgm_alignment_uses_same_height_origin_as_lod2():
