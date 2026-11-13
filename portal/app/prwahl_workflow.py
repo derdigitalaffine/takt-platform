@@ -123,15 +123,26 @@ def dhondt(entries, seats):
     seats = _integer(seats, "Sitze", minimum=1, maximum=200)
     if not entries:
         raise HTTPException(422, "Für die Berechnung sind gültige Stimmen erforderlich.")
-    # Defensive checks: callers may invoke this helper directly, bypassing
-    # parse_entries. Duplicate names would overwrite the assignment map.
-    names = [name for name, _ in entries]
-    if any(not isinstance(name, str) or not name.strip() or len(name) > 180 for name in names):
-        raise HTTPException(422, "Ungültige Listenbezeichnung.")
-    if len({name.strip().casefold() for name in names}) != len(names):
-        raise HTTPException(422, "Listenbezeichnungen müssen eindeutig sein.")
-    if any(not isinstance(votes, int) or isinstance(votes, bool) or votes < 0 for _, votes in entries):
-        raise HTTPException(422, "Stimmen müssen nichtnegative ganze Zahlen sein.")
+    # Direct callers must not bypass the same count limits as the form parser.
+    # A list of malformed pairs must produce 422, never an unhandled 500.
+    if not isinstance(entries, (list, tuple)) or len(entries) > 150:
+        raise HTTPException(422, "Bitte zwischen 1 und 150 Listen erfassen.")
+    normalized = []
+    seen = set()
+    for item in entries:
+        if not isinstance(item, (list, tuple)) or len(item) != 2:
+            raise HTTPException(422, "Ungültiger Listeneintrag.")
+        name, votes = item
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 180:
+            raise HTTPException(422, "Ungültige Listenbezeichnung.")
+        name = name.strip()
+        if name.casefold() in seen:
+            raise HTTPException(422, "Listenbezeichnungen müssen eindeutig sein.")
+        seen.add(name.casefold())
+        if not isinstance(votes, int) or isinstance(votes, bool) or not 0 <= votes <= 10000000:
+            raise HTTPException(422, "Stimmen müssen ganze Zahlen zwischen 0 und 10000000 sein.")
+        normalized.append((name, votes))
+    entries = normalized
     if sum(votes for _, votes in entries) == 0:
         raise HTTPException(422, "Für die Berechnung sind gültige Stimmen erforderlich.")
     assigned = {name: 0 for name,_ in entries}

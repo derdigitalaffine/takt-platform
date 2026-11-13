@@ -92,3 +92,23 @@ def test_ballot_totals_reject_non_integer_inputs(bad):
 def test_ballot_totals_accept_decimal_string_from_html_form():
     assert validate_totals(eligible="120", voters="100", ballots_cast="99",
                            invalid_ballots="4", abstentions="0") == (120, 100, 99, 4, 0)
+
+
+@pytest.mark.parametrize("entries", [
+    [("A", 10000001)],
+    [("A", 1), ("A ", 2)],
+    [("A", 1), ("B", 2, 3)],
+    [("A", 1), ("B",)],
+    [("A", 1), "B"],
+    [("A", 1)] * 151,
+])
+def test_direct_allocation_rejects_invalid_structure_or_bounds(entries):
+    with pytest.raises(HTTPException) as exc:
+        dhondt(entries, 2)
+    assert exc.value.status_code == 422
+
+
+def test_direct_allocation_normalizes_surrounding_whitespace():
+    result = dhondt([(" Liste A ", 100), ("Liste B", 60)], 1)
+    assert result["complete"] is True
+    assert result["assigned"] == {"Liste A": 1, "Liste B": 0}
