@@ -257,3 +257,26 @@ def test_fictional_demo_has_all_forms_and_is_separate_from_production():
     assert admin.get("/personalratswahl/demo/dokumente/board_notice/exe").status_code == 404
     with SessionLocal() as db:
         assert db.scalar(select(func.count()).select_from(PRElection)) == before
+
+
+def test_calendar_duplicate_prevention_and_advisory_visibility():
+    owner = _user(setup=True)
+    eid = _create(owner)
+    url = f"/personalratswahl/{eid}/termine"
+    page = owner.get(url)
+    assert page.status_code == 200
+    assert "Vorgeschlagene Wahltermine" in page.text
+    token = csrf_of(page.text)
+    data = {"csrf": token, "kind": "ballot", "title": "Wahl vor Ort",
+            "starts_at": "2027-04-14T09:00", "ends_at": "2027-04-14T10:00",
+            "location": "Rathaus"}
+    first = owner.post(url + "/neu", data=data)
+    assert first.status_code == 303
+    refreshed = owner.get(url)
+    assert "Termin dieser Art bereits an diesem Tag vorgesehen" in refreshed.text
+    repeated = owner.post(url + "/neu", data={**data, "csrf": csrf_of(refreshed.text)})
+    assert repeated.status_code == 409
+    # A different kind of event may be deliberately scheduled at the same time.
+    other = owner.post(url + "/neu", data={**data, "csrf": csrf_of(refreshed.text),
+                                              "kind": "board", "title": "Wahlvorstand"})
+    assert other.status_code == 303
