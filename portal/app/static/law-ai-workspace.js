@@ -85,13 +85,17 @@
     const showBudget = () => {
       const mode = $('input[name="mode"]:checked', analyzeForm)?.value;
       if (!budget) return;
-      budget.textContent = mode === "advanced"
-        ? "Gesamter Text: " + advancedCalls + " reguläre Anfragen, bei Nachprüfung höchstens " +
-          (advancedCalls * 3) + ". Mehr Laufzeit und mögliche API-Kosten."
-        : "Schnellcheck: 3 reguläre Anfragen, bei Nachprüfung höchstens 9. Lange Texte nur auszugsweise.";
+      const stage = $('[data-law-stage-select]', analyzeForm)?.value || "all";
+      const stageCount = stage === "all" ? 3 : 1;
+      const calls = mode === "advanced" ? Math.floor(advancedCalls / 3) * stageCount : stageCount;
+      budget.textContent = (mode === "advanced" ? "Gesamter Text" : "Schnellcheck") +
+        ": " + calls + " reguläre Modellaufrufe, bei begrenzten Wiederholungsversuchen höchstens " +
+        (calls * 3) + ". " + (stageCount === 1 ? "Ein Agent ausgewählt." : "Drei Agenten ausgewählt.") +
+        (mode === "simple" ? " Lange Texte werden nur auszugsweise geprüft." : " Vollständige Abschnittsabdeckung.");
     };
-    $$('input[name="mode"]', analyzeForm).forEach((input) =>
+    $('input[name="mode"]', analyzeForm).forEach((input) =>
       input.addEventListener("change", showBudget));
+    $("[data-law-stage-select]", analyzeForm)?.addEventListener("change", showBudget);
     showBudget();
   }
 
