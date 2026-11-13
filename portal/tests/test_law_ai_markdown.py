@@ -46,3 +46,18 @@ def test_empty_and_large_inputs_are_rejected():
         review(" ")
     with pytest.raises(ValueError):
         review("x" * 2_000_001)
+
+
+def test_ai_heading_validation_uses_canonical_markdown():
+    import json
+    from app.law_ai_agents import validate
+
+    source = "# Satzung\\n\\n## Erster Teil\\n\\n### § 1 Name\\n(1) Inhalt"
+    source = source.replace("\\\\n", "\\n")
+    answer = json.dumps({"headings": [
+        {"quote": "### § 1 Name", "level": 2},
+        {"quote": "## Erster Teil", "level": 5},
+    ], "warnings": []})
+    parsed = validate("law_structure", answer, source)
+    assert parsed["headings"][0]["markdown_suggestion"] == "### § 1 Name"
+    assert parsed["headings"][1]["markdown_suggestion"] == "## Erster Teil"
