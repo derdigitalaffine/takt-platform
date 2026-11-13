@@ -113,42 +113,123 @@
 
   const panel = document.querySelector("[data-law-ai-analysis-pending]");
   const id = panel?.getAttribute("data-draft-id");
-  if (!panel || !/^\d+$/.test(id || "")) return;
-  let running = false;
-  const status = panel.querySelector('[role="status"]');
-  const labels = {
-    waiting: "wartet auf Bearbeitung",
-    preparing: "Quellenprüfung",
-    law_structure: "1/3 · Gliederungsagent",
-    law_metadata: "2/3 · Stammdatenagent",
-    law_verify: "3/3 · Texttreueagent",
+  const jobId = panel?.getAttribute("data-job-id");
+  if (!panel || !/^\d+$/.test(id || "") || !/^\d+$/.test(jobId || "")) return;
+
+  const status = panel.querySelector("[data-law-ai-stage]");
+  const badge = panel.querySelector("[data-law-ai-stream-badge]");
+  const calls = panel.querySelector("[data-law-ai-call-count]");
+  const stats = panel.querySelector("[data-law-ai-stream-stats]");
+  const validated = panel.querySelector("[data-law-ai-validated]");
+  const bar = panel.querySelector("[data-law-ai-progress]");
+  const fill = panel.querySelector("[data-law-ai-progress-bar]");
+  const names = {
+    law_structure: "Gliederungsagent (1/3)",
+    law_metadata: "Stammdatenagent (2/3)",
+    law_verify: "Texttreueagent (3/3)",
+    waiting: "Warteschlange",
+    preparing: "Quellen- und Berechtigungsprüfung",
   };
-  const poll = async () => {
-    if (running || document.hidden) return;
-    running = true;
+  const statusUrl = "/laws-assistant/" + id + "/agents/status";
+  const eventsUrl = "/laws-assistant/" + id + "/agents/" + jobId + "/events";
+  let source = null;
+  let pollTimer = null;
+  let polling = false;
+  let finished = false;
+
+  function render(value) {
+    if (!value || typeof value !== "object" || finished) return;
+    if (value.ready === true) {
+      finished = true;
+      source?.close();
+      if (pollTimer !== null) clearInterval(pollTimer);
+      window.location.reload();
+      return;
+    }
+    const match = /^(law_structure|law_metadata|law_verify):(\d+)\/(\d+)$/.exec(value.step || "");
+    if (status) {
+      status.textContent = match
+        ? names[match[1]] + " · Abschnitt " + match[2] + " von " + match[3]
+        : names[value.step] || "KI-Auftrag wird vorbereitet";
+    }
+    const total = Number.isSafeInteger(value.progress_total) && value.progress_total > 0
+      ? value.progress_total : 0;
+    const done = Number.isSafeInteger(value.progress_done) && value.progress_done >= 0
+      ? Math.min(value.progress_done, total) : 0;
+    if (calls) calls.textContent = done + " von " + (total || "…") + " Modellaufrufen abgeschlossen";
+    const percent = total ? Math.min(100, Math.round(done / total * 100)) : 0;
+    if (bar) bar.setAttribute("aria-valuenow", String(percent));
+    if (fill) fill.style.width = percent + "%";
+    if (validated) {
+      const items = Number.isSafeInteger(value.validated_items)
+        ? Math.max(0, value.validated_items) : 0;
+      validated.textContent = items + " fundstellengeprüfte Vorschläge";
+    }
+    if (value.stream_active === true) {
+      const chars = Number.isSafeInteger(value.stream_characters)
+        ? Math.max(0, value.stream_characters) : 0;
+      const chunks = Number.isSafeInteger(value.stream_chunks)
+        ? Math.max(0, value.stream_chunks) : 0;
+      if (badge) badge.textContent = "Streaming aktiv";
+      if (stats) stats.textContent = chars.toLocaleString("de-DE") +
+        " Zeichen · " + chunks + " Antwortteile empfangen (noch ungeprüft)";
+    } else {
+      if (badge) badge.textContent = "Modell verarbeitet";
+      if (stats) stats.textContent = "Warte auf Antwort oder prüfe Fundstellen …";
+    }
+  }
+
+  async function poll() {
+    if (polling || finished || document.hidden) return;
+    polling = true;
     try {
-      const response = await fetch("/laws-assistant/" + id + "/agents/status", {
+      const response = await fetch(statusUrl, {
         credentials: "same-origin", cache: "no-store",
         headers: { Accept: "application/json" },
       });
-      if (!response.ok) throw new Error("Statusabruf nicht möglich.");
-      const value = await response.json();
-      if (value.ready === true) {
-        window.location.reload();
-        return;
-      }
-      const progress = /^(law_structure|law_metadata|law_verify):(\d+)\/(\d+)$/.exec(value.step || "");
-      if (status) {
-        status.textContent = "KI-Auswertung: " + (progress
-          ? labels[progress[1]] + " · Textabschnitt " + progress[2] + " von " + progress[3]
-          : labels[value.step] || "In Bearbeitung");
-      }
+      if (!response.ok) throw new Error("Status nicht verfügbar.");
+      render(await response.json());
     } catch (_) {
-      clearInterval(timer);
-      if (status) status.textContent = "Status nicht abrufbar – bitte manuell aktualisieren.";
+      if (status) status.textContent =
+        "Live-Status ist nicht abrufbar. Bitte Seite manuell aktualisieren.";
     } finally {
-      running = false;
+      polling = false;
     }
-  };
-  const timer = setInterval(poll, 5000);
+  }
+  function usePolling() {
+    source?.close();
+    source = null;
+    if (pollTimer !== null) return;
+    poll();
+    pollTimer = setInterval(poll, 3500);
+  }
+
+  if (typeof EventSource === "function") {
+    try {
+      source = new EventSource(eventsUrl);
+      source.onmessage = (event) => {
+        try {
+          render(JSON.parse(event.data));
+        } catch (_) {
+          usePolling();
+        }
+      };
+      source.addEventListener("access-lost", () => {
+        source?.close();
+        source = null;
+        if (status) status.textContent = "Berechtigung beendet – bitte Seite neu laden.";
+      });
+      source.onerror = () => {
+        if (!finished) usePolling();
+      };
+    } catch (_) {
+      usePolling();
+    }
+  } else {
+    usePolling();
+  }
+  window.addEventListener("pagehide", () => {
+    source?.close();
+    if (pollTimer !== null) clearInterval(pollTimer);
+  }, { once: true });
 })();
