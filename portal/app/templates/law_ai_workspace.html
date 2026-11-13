@@ -168,6 +168,7 @@
                       {% if analysis.stream_active %}{{ analysis.stream_characters }} Zeichen in {{ analysis.stream_chunks }} Streaming-Teilen empfangen{% else %}Warten auf Modellantwort{% endif %}
                     </span>
                     <span data-law-ai-validated>{{ analysis.validated_items }} quellengeprüfte Vorschläge</span>
+                    <span data-law-ai-retries>{{ analysis.retry_attempts }} automatische Verkleinerungen</span>
                   </div>
                   <p class="small mb-2">Streaming zeigt den laufenden <strong>Antwortfortschritt</strong>, keine ungeprüften Rechtsaussagen. Ergebnisse erscheinen erst nach vollständiger JSON- und Fundstellenprüfung. Die Ursprungsdatei, der Entwurf und der Veröffentlichungsstatus bleiben unverändert.</p>
                   <form action="/laws-assistant/{{ selected.id }}/agents/{{ analysis.id }}/cancel" method="post">
