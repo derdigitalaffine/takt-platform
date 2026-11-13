@@ -50,6 +50,36 @@ def sections(source: str) -> list[Section]:
     return pieces
 
 
+MIN_RECOVERY_CHARS = 600  # don't split tiny passages into meaningless snippets
+MAX_RECOVERY_SPLITS = 1   # per originally consented model section
+
+
+def bisect(section: Section) -> tuple[Section, Section] | None:
+    """Deterministic one-level output-error recovery, preserving every char.
+
+    Only used for invalid/truncated model output (not network/permission
+    errors). We never silently delete or summarize normative source text.
+    """
+    size = len(section.text)
+    if size < 2 * MIN_RECOVERY_CHARS:
+        return None
+    middle = size // 2
+    # Prefer a nearby paragraph break to avoid cutting a provision in two.
+    low = max(MIN_RECOVERY_CHARS, middle - size // 7)
+    high = min(size - MIN_RECOVERY_CHARS, middle + size // 7)
+    newline = section.text.rfind("\n", low, high)
+    pivot = newline + 1 if newline >= 0 else middle
+    if not MIN_RECOVERY_CHARS <= pivot <= size - MIN_RECOVERY_CHARS:
+        return None
+    left = Section(section.number, section.start, section.start + pivot,
+                   section.text[:pivot], section.split_line or newline < 0)
+    right = Section(section.number, section.start + pivot, section.end,
+                    section.text[pivot:], section.split_line or newline < 0)
+    if left.text + right.text != section.text or left.end != right.start:
+        raise ValueError("Fehler bei der verlustfreien Teilung der Rechtsquelle.")
+    return left, right
+
+
 def count_calls(source: str, mode: str) -> int:
     if mode == "advanced":
         return len(sections(source)) * len(law_ai_agents.STAGES)
