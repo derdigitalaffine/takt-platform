@@ -6,7 +6,7 @@
   const select = form.querySelector("#passkey-admin-user");
   const updateTarget = () => {
     const target = select?.value || "";
-    form.action = /^\\d+$/.test(target) ? "/admin/users/" + target + "/passkeys/revoke" : "";
+    form.action = /^\d+$/.test(target) ? "/admin/users/" + target + "/passkeys/revoke" : "";
   };
   select?.addEventListener("change", updateTarget);
   form.addEventListener("submit", event => {
