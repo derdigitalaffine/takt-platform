@@ -45,7 +45,6 @@ def compare(source: str, working: str) -> dict:
 
     old = source.splitlines(keepends=True)
     new = working.splitlines(keepends=True)
-    matcher = difflib.SequenceMatcher(a=old, b=new, autojunk=True)
     critical = set()
     output = []
     full_count = 0
