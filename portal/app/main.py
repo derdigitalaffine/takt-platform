@@ -3208,6 +3208,7 @@ from . import routes_leave  # noqa: E402,F401
 from . import routes_calendars  # noqa: E402,F401
 from . import routes_birthdays  # noqa: E402,F401
 from . import routes_prwahl  # noqa: E402,F401  (separate protected election Fachdomäne)
+from . import routes_prwahl_workflow  # noqa: E402,F401
 
 from . import routes_calendar_devices  # noqa: E402,F401
 
