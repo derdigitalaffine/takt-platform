@@ -222,6 +222,16 @@ def test_deactivation_revokes_qr_and_existing_grants(aid_env):
 def test_frontend_key_setup_is_admin_only_and_persistent(aid_env, monkeypatch, tmp_path):
     monkeypatch.delenv("VERBANDBUCH_ENCRYPTION_KEY", raising=False)
     monkeypatch.setattr(aid, "_key_path", lambda: tmp_path / "private" / "fachschluessel.key")
+    # Andere Tests teilen die Datenbank und können bereits Fälle erzeugt haben.
+    # Für die isolierte Erstinitialisierung nur den Count-Guard simulieren.
+    class EmptyCases:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_):
+            return False
+        def scalar(self, *_):
+            return 0
+    monkeypatch.setattr(aid, "SessionLocal", EmptyCases)
     admin = login("admin@example.org", "admin-passwort-123")
     page = admin.get("/verbandbuch/standorte")
     assert "Sicheren Fachschlüssel jetzt erzeugen" in page.text
