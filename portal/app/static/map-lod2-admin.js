@@ -1,6 +1,14 @@
 /* Admin-only, opt-in local CityGML mesh management for TAKT Karten. */
 (function () {
   'use strict';
+  var advanced3d = document.getElementById('map-admin-3d');
+  function revealDeepLink() {
+    if (advanced3d && /^#(?:lod2-preview|dgm-preview|map-admin-3d)$/.test(location.hash)) {
+      advanced3d.open = true;
+    }
+  }
+  revealDeepLink();
+  window.addEventListener('hashchange', revealDeepLink);
   var form = document.getElementById('lod2-import-form');
   var status = document.getElementById('lod2-admin-state');
   var submit = document.getElementById('lod2-import-submit');
