@@ -61,6 +61,21 @@ def test_portal_readiness_passes_after_compatible_migration(tmp_path, monkeypatc
         engine.dispose()
 
 
+def test_portal_readiness_detects_missing_json_recovery_migration(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'missing-retry.db'}")
+    try:
+        _schema(engine)
+        with engine.begin() as connection:
+            connection.execute(text(
+                "ALTER TABLE law_ai_analyses DROP COLUMN retry_attempts"))
+        monkeypatch.setattr(main, "SessionLocal", sessionmaker(bind=engine))
+        response = client().get("/readyz")
+        assert response.status_code == 503
+        assert response.text == "not ready"
+    finally:
+        engine.dispose()
+
+
 def test_liveness_and_favicon_survive_domain_mapping_database_failure(monkeypatch):
     def fail_db_lookup():
         raise RuntimeError("Module-domain mapping DB unavailable")
