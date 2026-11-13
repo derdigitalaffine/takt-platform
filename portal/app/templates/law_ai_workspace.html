@@ -196,6 +196,9 @@
                             <div class="py-2 border-bottom"><span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
                               <code class="d-block text-break mt-1">{{ entry.markdown_suggestion }}</code>
                               <div class="small text-secondary">Original: {{ entry.quote }}</div>
+                              <button class="btn btn-outline-secondary btn-sm mt-1" type="button"
+                                      data-law-ai-apply-heading="{{ entry.quote }}"
+                                      data-law-ai-heading-level="{{ entry.level }}">Überschrift gezielt im Entwurf formatieren</button>
                             </div>
                           {% else %}<p class="small text-secondary">Keine zusätzlichen Gliederungsvorschläge.</p>{% endfor %}
                           <div class="small text-secondary mt-2">Diese Vorschläge werden nicht automatisch in den Rechtstext übernommen. Markdown kann nach Sichtprüfung manuell angepasst werden.</div>
@@ -212,6 +215,8 @@
                             <div class="border-start border-warning ps-3 py-2 mb-2">
                               <span class="badge text-bg-{{ 'danger' if finding.severity in ('critical', 'high') else 'warning' }}">{{ finding.severity }}</span>
                               <blockquote class="small mt-1 mb-1 text-break">{{ finding.quote }}</blockquote>
+                              <button type="button" class="btn btn-link btn-sm p-0"
+                                      data-law-ai-locate="{{ finding.quote }}">Fundstelle im Entwurf markieren</button>
                               <div class="small">{{ finding.reason }}</div>
                               {% if finding.suggestion %}<div class="small text-secondary">{{ finding.suggestion }}</div>{% endif %}
                             </div>
