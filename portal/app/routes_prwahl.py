@@ -64,6 +64,12 @@ def _doc(db: Session, election_id: int, document_id: int, user: User, capability
     return election, role, doc
 
 
+@app.get("/personalratswahl/demo")
+def prwahl_demo(request: Request, user: User = Depends(current_user)):
+    """Read-only fictional demonstration, completely separate from election data."""
+    return render(request, "prwahl_demo.html", user, demo=True)
+
+
 @app.get("/personalratswahl")
 def prwahl_index(request: Request, q: str = "", user: User = Depends(current_user),
                  db: Session = Depends(get_db)):
