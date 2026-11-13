@@ -32,6 +32,7 @@ def toc_ranges(source: str) -> list[tuple[int, int]]:
         entries = 0
         page_entries = 0
         repeated = False
+        blank_after_entries = False
         end = start + 1
         for index in range(start + 1, min(len(lines), start + 130)):
             clean = lines[index].strip()
@@ -41,7 +42,11 @@ def toc_ranges(source: str) -> list[tuple[int, int]]:
                 break
             is_entry = bool(_TOC_ENTRY.match(clean))
             # A repeated entry is most likely the beginning of the real law.
-            token = _PAGE_SUFFIX.sub("", clean).strip()
+            token = re.sub(r"^#{1,6}\\s+", "", _PAGE_SUFFIX.sub("", clean).strip())
+            if not clean and entries >= 2:
+                blank_after_entries = True
+            if is_entry and entries >= 2 and blank_after_entries and not _PAGE_SUFFIX.search(clean):
+                break
             if is_entry and first and token == first and entries >= 2:
                 repeated = True
                 break
