@@ -169,6 +169,13 @@ def test_correction_preserves_immutable_original_and_audits(aid_env):
         assert corrected["injury"] == "Weitere Schürfwunde"
         assert "Weitere Schürfwunde" not in original.payload_enc
     assert "Weitere Schürfwunde" in reviewer.get("/verbandbuch/fall/" + case_id).text
+    conflict = reviewer.post(
+        "/verbandbuch/fall/" + case_id + "/korrektur",
+        data=dict(FORM, injury="Korrektur zwei", reason="Widersprechende Berichtigung",
+                  expected_revision="0", csrf=token),
+    )
+    assert conflict.status_code == 409
+    assert 'name="expected_revision" value="1"' in reviewer.get("/verbandbuch/fall/" + case_id).text
 
 
 def test_retention_deletes_case_and_respects_holds(aid_env):
