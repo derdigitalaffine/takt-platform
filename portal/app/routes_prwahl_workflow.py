@@ -118,6 +118,11 @@ def prwahl_count_save(request: Request, election_id: int,
     seats = _integer(seats, "Sitze", minimum=1, maximum=200)
     parsed = parse_entries(entries)
     check_count(mode, seats, ballots_cast, invalid_ballots, abstentions, parsed)
+    existing = db.scalars(select(PRCountRound).where(PRCountRound.election_id == election.id, PRCountRound.group_name == group_name)).all()
+    if any(item.status == "confirmed" for item in existing):
+        raise HTTPException(409, "Für diese Gruppe existiert bereits eine bestätigte Erfassung. Eine Korrektur benötigt einen gesonderten dokumentierten Berichtigungsprozess.")
+    if existing:
+        raise HTTPException(409, "Für diese Gruppe existiert bereits eine Erfassung. Bitte zuerst den vorhandenen Entwurf klären, damit keine mehrfachen Ergebnisse entstehen.")
     round_ = PRCountRound(election_id=election.id, group_name=group_name, mode=mode,
                           seats=seats, eligible=eligible, voters=voters,
                           ballots_cast=ballots_cast, invalid_ballots=invalid_ballots,
@@ -138,6 +143,8 @@ def prwahl_count_confirm(request: Request, election_id: int, round_id: int,
                          count_reference: str = Form(...),
                          user: User = Depends(current_user), db: Session = Depends(get_db)):
     election, role = scope(db, election_id, user, "board")
+    if role != "chair":
+        raise HTTPException(403, "Nur der Vorsitz des Wahlvorstands darf eine Auszählung bestätigen.")
     round_ = _round(db, election.id, round_id)
     if round_.status != "draft":
         raise HTTPException(409, "Diese Auszählung wurde bereits bestätigt.")
