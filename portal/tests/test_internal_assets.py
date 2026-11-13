@@ -72,7 +72,7 @@ def test_inventory_booking_issue_return_http():
     c = login("admin@example.org", "admin-passwort-123")
     page = c.get("/interne-ressourcen")
     assert page.status_code == 200, page.text[:500]
-    assert "Interner Gerätepool" in page.text
+    assert "Interne Ressourcen" in page.text
     csrf = csrf_of(page.text)
     res = c.post("/interne-ressourcen/lagerorte",
                  data={"csrf": csrf, "name": "Lager Test Pool", "building": "Rathaus"})
@@ -151,7 +151,7 @@ def test_week_plan_keeps_personal_details_private():
     c = login("admin@example.org", "admin-passwort-123")
     response = c.get("/interne-ressourcen/plan")
     assert response.status_code == 200, response.text[:400]
-    assert "Material-Belegungsplan" in response.text
+    assert "Materialplan" in response.text
     assert "Vorige Woche" in response.text
 
 
