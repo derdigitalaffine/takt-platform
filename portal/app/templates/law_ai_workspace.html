@@ -503,6 +503,16 @@
                     <div class="small text-secondary mt-2">Klicke auf einen Eintrag, um die Stelle im Editor zu öffnen.</div>
                   </aside>
                 </div>
+                <section id="law-original-diff" class="law-diff-panel mt-3" aria-label="Original und Bearbeitung vergleichen">
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                    <div>
+                      <h4 class="h6 mb-1"><i class="fa-solid fa-code-compare me-1" aria-hidden="true"></i>Original mit Entwurf vergleichen</h4>
+                      <p class="small text-secondary mb-0">Zeigt Änderungen seit dem Import. Es werden keine Inhalte an den KI-Server übertragen.</p>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-law-diff-run>Änderungen vergleichen</button>
+                  </div>
+                  <div data-law-diff-result aria-live="polite"><p class="small text-secondary mb-0">Zum Vergleichen klicken.</p></div>
+                </section>
                 <p class="small text-warning mt-2 mb-0" data-law-editor-dirty hidden>Du hast ungespeicherte Änderungen. Verlasse diese Seite nicht, bevor du den geprüften Entwurf übernommen hast.</p>
               </div>
               <div class="col-12">
@@ -548,6 +558,7 @@
 {% block scripts %}
 <script src="/static/law-ai-workspace.js" defer></script>
 <script src="/static/law-md-quality.js" defer></script>
+<script src="/static/law-ai-diff.js" defer></script>
 {% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}
 {% if selected and ai_enabled %}<script src="/static/law-ai-agents.js" defer></script>{% endif %}
 {% endblock %}
