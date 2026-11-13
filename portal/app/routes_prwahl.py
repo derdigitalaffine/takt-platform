@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from . import prwahl as pw
 from . import organization as org_access
 from .org_models import OrgMembership
-from .db import Organization, User, utcnow
+from .db import Organization, User, Group, GroupMember, utcnow
 from .prwahl_models import PRElection, PRMandate, PRTask, PRDocument, PRAudit
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
 
@@ -32,9 +32,16 @@ def _eligible_staff_ids(db: Session, org_id: int) -> set[int]:
                    if org_id in org_access.active_path(db, node_id, nodes)}
     if not descendants:
         return set()
-    return set(db.scalars(select(OrgMembership.user_id).join(
+    staff = set(db.scalars(select(OrgMembership.user_id).join(
         User, User.id == OrgMembership.user_id).where(
         OrgMembership.org_id.in_(descendants), User.active.is_(True))))
+    # Native group nodes are part of the same organizational tree, but their
+    # canonical memberships are stored separately from OrgMembership.
+    staff.update(db.scalars(select(GroupMember.user_id).join(
+        Group, Group.id == GroupMember.group_id).join(
+        User, User.id == GroupMember.user_id).where(
+        Group.org_id.in_(descendants), User.active.is_(True))))
+    return staff
 
 
 def _setup(user: User):
