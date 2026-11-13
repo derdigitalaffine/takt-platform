@@ -2259,9 +2259,10 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
                 per_page: int = 25, user: User = Depends(users_manager), db: Session = Depends(get_db)):
     """Server-filtered directory: render a bounded page instead of every user/editor."""
     from . import absence, organization
+    from .passkey_models import PasskeyCredential
     from sqlalchemy import or_
     q = " ".join(q.strip().split())[:160]
-    status = status if status in {"all", "active", "blocked", "invited", "mfa"} else "all"
+    status = status if status in {"all", "active", "blocked", "invited", "mfa", "passkeys"} else "all"
     role = role if role in {"all", "admin", "member"} else "all"
     sort = sort if sort in {"name", "email", "newest"} else "name"
     per_page = per_page if per_page in (25, 50, 100) else 25
@@ -2280,6 +2281,8 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
         conditions.append(User.password_set.is_(False))
     elif status == "mfa":
         conditions.append(or_(User.totp_enabled.is_(True), User.mfa_email.is_(True)))
+    elif status == "passkeys":
+        conditions.append(User.id.in_(select(PasskeyCredential.user_id)))
     if role != "all":
         conditions.append(User.is_admin.is_(role == "admin"))
     if group is not None:
@@ -2297,7 +2300,6 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
         select(User).options(joinedload(User.groups))
         .where(*conditions).order_by(*order).offset((page - 1) * per_page).limit(per_page)
     ).unique().all()
-    from .passkey_models import PasskeyCredential
     passkey_counts = dict(db.execute(
         select(PasskeyCredential.user_id, func.count(PasskeyCredential.id))
         .where(PasskeyCredential.user_id.in_([u.id for u in users]))
