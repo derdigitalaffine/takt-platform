@@ -61,3 +61,32 @@ def test_ai_heading_validation_uses_canonical_markdown():
     parsed = validate("law_structure", answer, source)
     assert parsed["headings"][0]["markdown_suggestion"] == "### § 1 Name"
     assert parsed["headings"][1]["markdown_suggestion"] == "## Erster Teil"
+
+
+def test_review_endpoint_requires_auth_and_does_not_persist():
+    from conftest import client, csrf_of, login, settings
+
+    settings(module_laws="1")
+    anon = client()
+    response = anon.post("/laws-assistant/markdown/review",
+                         data={"body_md": "# Satzung\\n\\n§ 1 Name"})
+    assert response.status_code in (302, 303, 401, 403)
+
+    c = login("admin@example.org", "admin-passwort-123")
+    csrf = csrf_of(c.get("/laws-assistant").text)
+    response = c.post("/laws-assistant/markdown/review",
+                      data={"csrf": csrf, "body_md": "# Satzung\\n\\n§ 1 Name\\n(1) Test"})
+    assert response.status_code == 200, response.text
+    assert response.json()["proposed_md"].startswith("# Satzung")
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_workspace_subviews_are_addressable():
+    from conftest import login, settings
+
+    settings(module_laws="1")
+    c = login("admin@example.org", "admin-passwort-123")
+    for tab in ("uebersicht", "import", "ki", "editor"):
+        response = c.get("/laws-assistant?bereich=" + tab)
+        assert response.status_code == 200
+        assert 'data-view="' + tab + '"' in response.text
