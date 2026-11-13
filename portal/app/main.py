@@ -106,6 +106,9 @@ async def lifespan(_app: FastAPI):
     # Bounded, independent background processing of legal-text embeddings.
     from . import ai_law_vector_jobs
     law_index_task = asyncio.create_task(ai_law_vector_jobs.run_forever())
+    # Read-only Ortsrecht LLM agent pipeline; no publication rights.
+    from . import law_ai_agent_jobs
+    law_agent_task = asyncio.create_task(law_ai_agent_jobs.run_forever())
     try:
         yield
     finally:
