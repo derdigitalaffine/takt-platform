@@ -89,9 +89,9 @@
     </div>
   </section>
   {% if can_manage %}
-  <section class="pr-panel"><div class="pr-panel-head"><div><h2>Person zuordnen</h2><p>Einzelberechtigung mit nachweisbarer Funktion. Bereits zugeordnete Personen können geändert werden.</p></div></div>
+  <section class="pr-panel"><div class="pr-panel-head"><div><h2>Person zuordnen</h2><p>Personen aus der ausgewählten Organisationseinheit und allen aktiven Untereinheiten, einschließlich zugeordneter Gruppen, können ausgewählt werden. Bereits zugeordnete Fachrollen lassen sich ändern.</p></div></div>
     <form method="post" action="/personalratswahl/{{election.id}}/team" class="row g-3"><input type="hidden" name="csrf" value="{{csrf}}">
-    <div class="col-md-5"><label class="form-label" for="pr-member-user">Person</label><select class="form-select" id="pr-member-user" name="user_id" required><option value="">Person wählen</option>{% for p in users %}<option value="{{p.id}}">{{p.name}} ({{p.email}})</option>{% endfor %}</select></div>
+    <div class="col-md-5"><label class="form-label" for="pr-member-user">Person aus der gesamten Organisationshierarchie ({{users|length}} verfügbar)</label><select class="form-select" id="pr-member-user" name="user_id" required><option value="">Person wählen</option>{% for p in users %}<option value="{{p.id}}">{{p.name}} ({{p.email}})</option>{% endfor %}</select><div class="form-text">Aktive Beschäftigte der Dienststelle und ihrer Untereinheiten; Mehrfachzuordnungen erscheinen nur einmal.</div></div>
     <div class="col-md-4"><label class="form-label" for="pr-member-role">Fachrolle</label><select class="form-select" id="pr-member-role" name="role">{% for key,label in roles.items() %}<option value="{{key}}">{{label}}</option>{% endfor %}</select></div>
     <div class="col-md-3"><label class="form-label" for="pr-member-ref">Bestellungs-/Benennungsnachweis</label><input class="form-control" id="pr-member-ref" name="appointment_reference" maxlength="250" placeholder="Beschluss vom …"></div>
     <div class="col-12"><button class="btn btn-primary" type="submit">Fachrolle zuordnen</button></div></form>
