@@ -152,7 +152,10 @@ def record(db, user_id: int, election_id: int, action: str, target: str = ""):
 
 def document_values(doc: PRDocument) -> dict[str, str]:
     try:
-        raw = json.loads(decrypt(doc.payload_enc) or "{}")
+        decrypted = decrypt(doc.payload_enc)
+        if not decrypted:
+            raise HTTPException(500, "Das Dokument konnte nicht entschlüsselt werden.")
+        raw = json.loads(decrypted)
     except (ValueError, TypeError):
         raise HTTPException(500, "Das Dokument kann nicht entschlüsselt werden.")
     if not isinstance(raw, dict):
