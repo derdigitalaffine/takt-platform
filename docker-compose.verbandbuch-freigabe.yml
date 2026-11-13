@@ -1,0 +1,13 @@
+# Explicit deployment overlay for the digitally approved first-aid register.
+# Operator confirmation: external legal, data protection and operational checks
+# have been completed. This file does not change the safe default for other
+# environments and is applied only when explicitly supplied to docker compose.
+#
+# Apply after verifying the deployment's key persistence, backup and site grants:
+# docker compose -f docker-compose.yml -f docker-compose.verbandbuch-freigabe.yml up -d portal
+#
+# Also enable 'Digitales Verbandbuch' in Administration > Module.
+services:
+  portal:
+    environment:
+      VERBANDBUCH_PRODUCTION_APPROVED: "1"

@@ -74,3 +74,15 @@ Regressionstest: `test_disabled_parent_organization_revokes_site_qr_and_case_acc
 Unter **Digitales Verbandbuch → Standorte & Zugriffe → Einsicht für ganze Organisationseinheiten** kann eine Administration einer benannten Person ein *explizites* Einsichtsmandat für eine aktive Organisationseinheit erteilen. **Alle aktiven Untereinheiten einschließen** vererbt das Fachmandat ausschließlich innerhalb dieses Zweigs. Der Schalter ist für jeden Grant abwählbar; Mandate sind einzeln sofort entziehbar. Es wird zusätzlich das Benutzerrecht `verbandbuch_review` benötigt. Weder Administrationsrechte, normale Organisationsrollen noch Beschäftigtenzuordnung gewähren automatisch Einsicht. Die Regeln gelten serverseitig für Aktenlisten, Direktlinks, Ausdrucke und Berichtigungen. Deaktivierte Vorfahren sperren den Zweig. Neue Tabelle `first_aid_org_grants` wird beim regulären Schema-Setup hinzugefügt; bestehende Mandate werden nicht verbreitert.
 
 **Produktivsetzung:** Das Modul-Flag und das separate `VERBANDBUCH_PRODUCTION_APPROVED` bleiben zwei unabhängige Voraussetzungen. Ein Code-Merge oder ein administrativ vergebener Grant ersetzt keine dokumentierte Datenschutz-, Sicherheits-, Backup- und Organisationsfreigabe. Eine bestehende produktive Umgebung wird deshalb nicht automatisch auf `1` umgestellt. Nach erfolgreichem Go/No-Go erst die Betreiberkonfiguration schalten und Container neu starten; Freigabemeldungen verschwinden bei tatsächlich freigegebenem Betrieb.
+
+## Betreiberbestätigte Freigabe – 13.11.2026
+
+Der Betreiber hat am 13.11.2026 bestätigt, dass die zuvor geforderten Prüfungen **extern vorliegen**. Diese Bestätigung ist hier als Betreiberangabe dokumentiert; die externen Prüfberichte liegen nicht im Repository und wurden durch diese Änderung nicht unabhängig eingesehen. Das separate, ausdrücklich zu verwendende Deployment-Overlay `docker-compose.verbandbuch-freigabe.yml` setzt ausschließlich für die damit gestartete Portal-Instanz `VERBANDBUCH_PRODUCTION_APPROVED=1`. Die sichere Standardkonfiguration bleibt unverändert.
+
+**Produktive Aktivierung durch den Betreiber:** Vor Verwendung prüfen, dass ein dauerhafter Fachschlüssel eingerichtet und gesichert ist, Standorte und Fachberechtigungen korrekt hinterlegt sind und der vorgesehene Deployment-Stack betroffen ist. Danach im Projektverzeichnis ausführen:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.verbandbuch-freigabe.yml up -d portal
+```
+
+Anschließend unter **Administration → Module** das Modul **Digitales Verbandbuch** einschalten und einen autorisierten End-to-End-Test inklusive Schreib- und Einsichtsschutz mit synthetischen Daten durchführen. Die Betriebsfreigabe wird nicht durch den Merge und nicht für sonstige Installationen automatisch eingeschaltet. Kein echter Gesundheitsdatensatz darf als Testdatensatz verwendet werden. Bei Go/No-Go-Abbruch das Overlay entfernen, mit dem Standard-Stack neu ausrollen und das Modul deaktivieren. Der Betreiber muss den tatsächlichen Laufzeitstatus nach Deployment bestätigen.
