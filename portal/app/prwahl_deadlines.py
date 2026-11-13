@@ -39,3 +39,39 @@ def suggestions(election, *, notice_effective_on=None):
                 "legal": True,
             })
     return sorted(rows, key=lambda row: (row["on"], row["code"]))
+
+
+def diagnose(election, *, notice_effective_on=None, planned_events=()):
+    """Non-binding, actionable consistency hints for the protected calendar.
+
+    Returns only facts that can be grounded in the election's own data. The
+    warnings are not decisions on the legal validity of an election.
+    """
+    problems = []
+    first = election.election_day
+    last = election.election_end_day or first
+    if not first:
+        return [{"kind": "info", "title": "Wahltag fehlt",
+                 "detail": "Ersten und gegebenenfalls letzten Wahltag in den Wahldaten eintragen."}]
+    if last < first:
+        return [{"kind": "warning", "title": "Wahlzeitraum widersprüchlich",
+                 "detail": "Der letzte Wahltag liegt vor dem ersten. Stammdaten korrigieren."}]
+    if election.body_type != "personalrat":
+        problems.append({"kind": "info", "title": "Sonderwahlkörper: juristische Fristenprüfung",
+                         "detail": "Für diesen Wahlkörper liegen keine freigegebenen automatischen Fristregeln vor."})
+        return problems
+    latest_notice = last - timedelta(days=42)
+    if notice_effective_on is None:
+        problems.append({"kind": "info", "title": "Erlass des Wahlausschreibens nicht dokumentiert",
+                         "detail": "Den tatsächlichen Erlasstag erst nach Beschluss und Bekanntgabe im Wahlfahrplan nachweisen; Vorschlagsfrist erst dann berechnen."})
+    else:
+        if notice_effective_on > latest_notice:
+            problems.append({"kind": "warning", "title": "Erlasstag später als die Sechswochen-Orientierung",
+                             "detail": "Den in der Wahlakte dokumentierten Erlasstag mit § 6 Abs. 1 WOLPersVG und eventuellen Sonderregeln dringend juristisch prüfen."})
+        if notice_effective_on >= first:
+            problems.append({"kind": "warning", "title": "Erlass nicht vor der Wahl",
+                             "detail": "Wahlausschreiben und tatsächlichen Wahlbeginn abgleichen. Es wird keine automatische Freigabe erteilt."})
+        elif notice_effective_on + timedelta(days=18) >= first:
+            problems.append({"kind": "warning", "title": "Vorschlagsfrist reicht bis an die Stimmabgabe",
+                             "detail": "Die rechnerische Standardfrist und den Wahltermin unabhängig überprüfen; Sonderfälle und Fristbeginn-Verschiebung bleiben offen."})
+    return problems
