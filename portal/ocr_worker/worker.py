@@ -103,7 +103,7 @@ def _tsv_words(tsv: str) -> tuple[str, float | None, list[dict]]:
         lines.setdefault(key, []).append(text)
         if 0 <= confidence <= 100:
             scores.append(confidence)
-        if len(positions) < 2500:
+        if len(positions) < 450:
             positions.append({"text": text[:80], "x": left, "y": top,
                               "w": width, "h": height,
                               "confidence": round(confidence, 1) if confidence >= 0 else None})
@@ -186,6 +186,7 @@ def _pdf(path: Path, language: str) -> tuple[str, list[dict], list[str]]:
 def _image(path: Path, language: str) -> tuple[str, list[dict], list[str]]:
     try:
         from PIL import Image
+        Image.MAX_IMAGE_PIXELS = MAX_PIXELS
         with Image.open(path) as picture:
             count = getattr(picture, "n_frames", 1)
             if count > MAX_PAGES:
@@ -238,7 +239,7 @@ def _atomic_json(path: Path, value: dict) -> None:
     payload = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(payload) > 15 * 1024 * 1024:
         raise OcrFailure("OCR-Ergebnis überschreitet die Ausgabegrenze.")
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(path.name + "." + os.urandom(8).hex() + ".tmp")
     with tmp.open("xb") as destination:
         destination.write(payload)
     os.replace(tmp, path)
@@ -252,8 +253,9 @@ def process(job_path: Path) -> None:
         if not KEY_RE.fullmatch(key) or job_path.stat().st_size > 8192:
             raise OcrFailure("Ungültige Jobdatei.")
         job = json.loads(job_path.read_text("utf-8"))
+        if isinstance(job, dict) and isinstance(job.get("sha256"), str):
+            result["sha256"] = job["sha256"]
         original, suffix = _check_input(job, key, ORIGINALS)
-        result["sha256"] = job["sha256"]
         output = extract(original, suffix, job.get("language", "deu"))
         result.update({"status": "done", **output})
         result.pop("message", None)
