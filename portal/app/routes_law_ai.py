@@ -257,7 +257,7 @@ def law_ai_queue_ocr(
         temporary.unlink(missing_ok=True)
         submitted.unlink(missing_ok=True)
         raise
-    return redirect(f"/laws-assistant/{row.id}")
+    return redirect(f"/laws-assistant/{row.id}?bereich={'ki' if status == 'staged' else 'import'}")
 
 
 def _ocr_phase(draft: LawAiDraft) -> dict:
@@ -472,6 +472,10 @@ def law_ai_discard(
         raise HTTPException(409, "Ein bereits übernommener Originalnachweis darf nicht entfernt werden.")
     if row.status == "ocr_queued":
         raise HTTPException(409, "OCR-Auftrag läuft noch. Nach Abschluss kann der Entwurf verworfen werden.")
+    if db.scalar(select(LawAiAnalysis.id).where(
+            LawAiAnalysis.draft_id == draft_id,
+            LawAiAnalysis.status.in_(("queued", "running"))).limit(1)) is not None:
+        raise HTTPException(409, "Laufende KI-Analyse zuerst abschließen oder abbrechen.")
     path = _original_path(row)
     db.delete(row)
     db.commit()
