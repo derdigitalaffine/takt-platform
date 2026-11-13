@@ -333,7 +333,10 @@ def law_ai_accept(
     request: Request, draft_id: int,
     title: str = Form(""), body_md: str = Form(""),
     doc_type: str = Form("satzung"), level_id: str = Form(""),
-    confirmed: str = Form(""), user: User = Depends(law_user),
+    short_title: str = Form(""), version_note: str = Form(""),
+    issued_on: str = Form(""), valid_from: str = Form(""),
+    valid_until: str = Form(""), confirmed: str = Form(""),
+    user: User = Depends(law_user),
     db: Session = Depends(get_db),
 ):
     """Only explicit human confirmation creates a NEW UNPUBLISHED law draft."""
@@ -367,8 +370,9 @@ def law_ai_accept(
     values = {
         "title": title.strip(), "doc_type": doc_type,
         "level_id": level_id, "published": "0", "internal": "0",
-        "issued_on": "", "valid_from": "", "valid_until": "",
-        "version_note": "Redaktionell übernommener Import",
+        "short_title": short_title[:80],
+        "issued_on": issued_on, "valid_from": valid_from, "valid_until": valid_until,
+        "version_note": version_note[:255] or "Redaktionell übernommener Import",
     }
     failure = _apply(db, law, values, body_md, user)
     if failure:
