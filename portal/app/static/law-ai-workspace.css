@@ -248,6 +248,33 @@
   padding: .75rem .9rem;
   box-shadow: 0 7px 28px rgba(0,0,0,.1);
 }
+.law-workspace .law-diff-output {
+  max-height: min(46vh, 480px);
+  overflow: auto;
+  border: 1px solid var(--law-line);
+  border-radius: .7rem;
+  background: var(--bs-body-bg);
+  font: .8rem/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.law-workspace .law-diff-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: .15rem .65rem;
+  border-bottom: 1px solid var(--law-line);
+}
+.law-workspace .law-diff-add {
+  color: var(--bs-success-text-emphasis);
+  background: var(--bs-success-bg-subtle);
+}
+.law-workspace .law-diff-remove {
+  color: var(--bs-danger-text-emphasis);
+  background: var(--bs-danger-bg-subtle);
+}
+.law-workspace .law-diff-meta {
+  color: var(--bs-secondary-color);
+  background: var(--bs-tertiary-bg);
+  font-weight: 700;
+}
 @media (max-width: 767px) {
   .law-workspace .law-steps { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .law-workspace .law-card-head { padding: .8rem; }
