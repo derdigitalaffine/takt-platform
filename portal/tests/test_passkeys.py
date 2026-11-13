@@ -124,3 +124,27 @@ def test_configured_rp_origin_must_match_browser_host(monkeypatch):
         assert c.post("/auth/passkeys/login/options", headers=token, json={}).status_code == 503
     finally:
         monkeypatch.setattr(pk.settings, "portal_base_url", "https://portal.example.org")
+
+
+def test_invalid_attestation_is_rejected_once_without_storing_key():
+    c = login("admin@example.org", "admin-passwort-123")
+    headers = _header(c, "/profile/security")
+    started = c.post("/profile/passkeys/options",
+                     headers=headers, json={"password": "admin-passwort-123"})
+    assert started.status_code == 200
+    forged = {"credential": {
+        "type": "public-key", "id": "AAECAw",
+        "rawId": "AAECAw", "response": {
+            "attestationObject": "AQID", "clientDataJSON": "AQID"
+        }}}
+    first = c.post("/profile/passkeys/verify", headers=headers, json=forged)
+    assert first.status_code == 400
+    second = c.post("/profile/passkeys/verify", headers=headers, json=forged)
+    assert second.status_code == 400
+
+
+def test_revoke_does_not_accept_wrong_csrf_or_unauthenticated_user():
+    c = client()
+    assert c.post("/profile/passkeys/options", json={"password": "any"}).status_code == 400
+    assert c.post("/admin/users/1/passkeys/revoke",
+                  data={"confirm": "1", "password": "any"}).status_code == 400
