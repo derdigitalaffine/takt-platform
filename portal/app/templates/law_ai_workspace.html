@@ -8,7 +8,16 @@
 <a href="/laws/new" class="btn btn-outline-secondary">Manuell anlegen</a>
 {% endcall %}
 
-<div class="law-workspace">
+<div class="law-workspace" data-view="{{ bereich }}">
+  <nav class="law-area-tabs mb-3" aria-label="Ortsrecht-Arbeitsbereiche">
+    {% set workurl = '/laws-assistant/' ~ selected.id if selected else '/laws-assistant' %}
+    <a class="{{ 'active' if bereich == 'uebersicht' else '' }}" href="{{ workurl }}?bereich=uebersicht" {% if bereich == 'uebersicht' %}aria-current="page"{% endif %}><i class="fa-solid fa-table-cells-large me-1" aria-hidden="true"></i>Übersicht</a>
+    <a class="{{ 'active' if bereich == 'import' else '' }}" href="{{ workurl }}?bereich=import" {% if bereich == 'import' %}aria-current="page"{% endif %}><i class="fa-solid fa-file-arrow-up me-1" aria-hidden="true"></i>Import &amp; Original</a>
+    {% if selected %}
+    <a class="{{ 'active' if bereich == 'ki' else '' }}" href="{{ workurl }}?bereich=ki" {% if bereich == 'ki' %}aria-current="page"{% endif %}><i class="fa-solid fa-brain me-1" aria-hidden="true"></i>KI-Agenten</a>
+    <a class="{{ 'active' if bereich == 'editor' else '' }}" href="{{ workurl }}?bereich=editor" {% if bereich == 'editor' %}aria-current="page"{% endif %}><i class="fa-solid fa-pen-to-square me-1" aria-hidden="true"></i>Editor &amp; Übernahme</a>
+    {% endif %}
+  </nav>
   <div class="law-trust mb-3" role="note">
     <i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i>
     <div class="flex-grow-1">
@@ -33,7 +42,7 @@
   </nav>
   {% endif %}
   <div class="row g-3">
-  <div class="col-12 col-xl-3">
+  <div class="col-12 col-xl-3 law-layout-side">
     <section class="law-surface mb-3" aria-labelledby="law-upload-title">
       <div class="law-card-head">
         <h2 class="h6" id="law-upload-title"><i class="fa-solid fa-file-circle-plus me-2 text-primary" aria-hidden="true"></i>Neues Dokument</h2>
@@ -97,7 +106,7 @@
       {% endif %}
     </section>
   </div>
-  <div class="col-12 col-xl-9">
+  <div class="col-12 col-xl-9 law-layout-main">
     {% if selected %}
     <article class="law-surface" aria-labelledby="law-review-title">
       <header class="law-card-head">
@@ -205,7 +214,7 @@
           {% endif %}
 
           {% if ai_enabled %}
-          <section class="law-surface mb-4" aria-labelledby="law-agent-heading">
+          <section class="law-surface mb-4" aria-labelledby="law-agent-heading" data-law-agent-panel>
             <div class="law-card-head">
               <div class="law-section-title"><span class="law-section-icon"><i class="fa-solid fa-brain" aria-hidden="true"></i></span><h3 class="h6" id="law-agent-heading">KI-Redaktionsprüfung <span class="badge text-bg-secondary ms-1">Optional</span></h3></div>
               <span class="small text-secondary">3 spezialisierte Agenten</span>
@@ -417,7 +426,7 @@
           {% elif selected.status in ('staged', 'ocr_review') %}
             <div class="small alert alert-secondary">Der KI-Agent ist für diesen Benutzer oder die Organisation deaktiviert. Die manuelle Ortsrecht-Bearbeitung bleibt uneingeschränkt möglich.</div>
           {% endif %}
-          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form">
+          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form" data-law-editor-panel>
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="row g-3">
               <div class="col-12">
