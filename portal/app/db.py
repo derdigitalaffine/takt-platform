@@ -3220,6 +3220,7 @@ def init_db() -> None:
     from . import law_ai_agent_models  # noqa: F401 – versioned read-only agent reviews
     from . import knowledge_models  # noqa: F401 – register additive knowledge tables
     from . import prwahl_models  # noqa: F401 – scoped RLP paper-election workspace tables
+    from . import prwahl_workflow  # noqa: F401 – election lifecycle and paper count tables
     from . import signage_models  # noqa: F401 – additive signage models
     from . import anliegen_models  # noqa: F401 – register additive internal request tables
     from . import anliegen_process_models  # noqa: F401 – register opt-in process binding tables
