@@ -15,10 +15,11 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from . import laws as lx
+from . import laws as lx, law_ai_agents, law_ai_agent_jobs
 from .config import settings
-from .db import LawText, User, utcnow
+from .db import LawText, User, utcnow, get_settings
 from .law_ai_models import LawAiDraft
+from .law_ai_agent_models import LawAiAnalysis
 from .main import app, check_csrf, get_db, rate_limit, redirect, render, require
 
 law_user = require("laws")
@@ -97,10 +98,34 @@ def _render(request, db, user, selected=None):
         ocr_warnings = json.loads(selected.ocr_warnings_json or "[]") if selected else []
     except (ValueError, TypeError):
         ocr_pages, ocr_warnings = [], []
+    cfg = get_settings(db)
+    ai_enabled = user.can("ai_chat") and cfg.get("module_ai") == "1" and cfg.get("module_laws") == "1"
+    agent_routes = law_ai_agent_jobs.configured_routes(db) if ai_enabled else {}
+    analysis = (db.scalar(select(LawAiAnalysis).where(
+        LawAiAnalysis.draft_id == selected.id,
+        LawAiAnalysis.requested_by == user.id,
+    ).order_by(LawAiAnalysis.id.desc()).limit(1)) if selected else None)
+    analysis_current = bool(
+        analysis and selected and
+        analysis.source_sha256 == law_ai_agents.source_hash(selected.proposed_md or "")
+    )
+    analysis_results = {}
+    if analysis and analysis.status == "done" and analysis_current:
+        for key, field in (("structure", "outline_json"), ("metadata", "metadata_json"),
+                           ("verification", "verification_json")):
+            try:
+                decoded = json.loads(getattr(analysis, field) or "{}")
+                analysis_results[key] = decoded if isinstance(decoded, dict) else {}
+            except ValueError:
+                analysis_results[key] = {}
     response = render(request, "law_ai_workspace.html", user,
                       drafts=rows, selected=selected, doc_types=lx.DOC_TYPES,
                       ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
                       ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
+                      analysis=analysis, analysis_current=analysis_current,
+                      analysis_results=analysis_results, ai_enabled=ai_enabled,
+                      agent_routes=agent_routes, agent_stages=law_ai_agents.STAGES,
+                      ai_source_limit=law_ai_agents.MAX_SOURCE_CHARS,
                       level_options=lx.level_options(db))
     response.headers["Cache-Control"] = "private, no-store"
     return response
@@ -323,6 +348,10 @@ def law_ai_accept(
         raise HTTPException(422, "Bitte einen Titel mit maximal 400 Zeichen eingeben.")
     if not body_md.strip() or len(body_md.encode("utf-8")) > TEXT_LIMIT:
         raise HTTPException(422, "Bitte einen geprüften Text mit höchstens 2 MB eintragen.")
+    if db.scalar(select(LawAiAnalysis.id).where(
+        LawAiAnalysis.draft_id == draft_id,
+        LawAiAnalysis.status.in_(("queued", "running"))).limit(1)) is not None:
+        raise HTTPException(409, "Eine KI-Analyse läuft noch. Bitte vorher abschließen oder abbrechen.")
     from .routes_laws import _apply
     # Atomic compare-and-swap: repeated/parallel submissions cannot create
     # a second law from the same draft. The database transaction owns the lock.
