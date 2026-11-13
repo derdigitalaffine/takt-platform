@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Digitales Verbandbuch{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/vendor/mantine/styles.css"><link rel="stylesheet" href="/static/verbandbuch.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/mantine/styles.css"><link rel="stylesheet" href="/static/verbandbuch.css"><script src="/static/verbandbuch-list.js" defer></script>{% endblock %}
 {% block content %}
 <div class="vb-root">
   <header class="vb-hero">
@@ -36,8 +36,8 @@
   </div>
   {% if review %}<section class="vb-card mt-3" aria-labelledby="vb-review-title">
     <div class="vb-card-head"><div><h2 id="vb-review-title">Vertrauliche Fachablage</h2><p>Nur ausdrücklich zugewiesene Standorte. Jeder Fallaufruf wird protokolliert.</p></div><span class="vb-chip"><i class="fa-solid fa-user-shield"></i> Fachzugriff</span></div>
-    {% if cases %}<div class="table-responsive"><table class="table vb-table"><thead><tr><th>Aktenzeichen</th><th>Erfasst</th><th>Standort</th><th>Aufbewahrung bis</th><th>Vorgang</th></tr></thead><tbody>
-    {% for entry in cases %}<tr><td><code>EH-{{ entry.id[:8]|upper }}</code></td><td>{{ entry.created_at|local }}</td><td>{{ sites[entry.site_id].title if entry.site_id in sites else "–" }}</td><td>{{ entry.retention_due_at|local('%d.%m.%Y') }}{% if entry.legal_hold %} <span class="vb-chip">Löschsperre</span>{% endif %}</td><td><a class="btn btn-sm btn-outline-primary" href="/verbandbuch/fall/{{ entry.id }}">Geschützt öffnen</a></td></tr>{% endfor %}
+    {% if cases %}<div class="vb-list-tools"><label for="vb-case-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Aktenzeichen oder Standort suchen</label><input type="search" id="vb-case-search" class="form-control" autocomplete="off" placeholder="z. B. Rathaus oder EH-…" aria-controls="vb-review-table"><label for="vb-case-site">Standort filtern</label><select id="vb-case-site" class="form-select" aria-controls="vb-review-table"><option value="">Alle berechtigten Standorte</option>{% for site in review %}<option value="{{site.id}}">{{site.title}}</option>{% endfor %}</select><p class="vb-filter-count" id="vb-filter-count" role="status" aria-live="polite"></p><button type="button" id="vb-filter-reset" class="btn btn-outline-secondary btn-sm" hidden>Filter zurücksetzen</button></div><p id="vb-filter-empty" class="vb-filter-empty" role="status" hidden>Keine passenden Einträge. Ändere die Suche oder setze die Filter zurück.</p><div class="table-responsive"><table id="vb-review-table" class="table vb-table"><thead><tr><th>Aktenzeichen</th><th>Erfasst</th><th>Standort</th><th>Aufbewahrung bis</th><th>Vorgang</th></tr></thead><tbody>
+    {% for entry in cases %}<tr data-vb-case-row data-site-id="{{entry.site_id}}"><td data-label="Aktenzeichen"><code>EH-{{ entry.id[:8]|upper }}</code></td><td data-label="Erfasst">{{ entry.created_at|local }}</td><td data-label="Standort">{{ sites[entry.site_id].title if entry.site_id in sites else "–" }}</td><td data-label="Aufbewahrung bis">{{ entry.retention_due_at|local('%d.%m.%Y') }}{% if entry.legal_hold %} <span class="vb-chip">Löschsperre</span>{% endif %}</td><td data-label="Aktion"><a class="btn btn-sm btn-outline-primary" href="/verbandbuch/fall/{{ entry.id }}">Geschützt öffnen</a></td></tr>{% endfor %}
     </tbody></table></div>{% else %}<div class="vb-empty">Für deine Fachstandorte liegen noch keine Einträge vor.</div>{% endif %}
   </section>{% endif %}
 </div>

@@ -143,3 +143,27 @@
 
 /* Navigation appears only when the progressive enhancement initializes. */
 .vb-form:not([data-vb-enhanced]) [data-vb-next],.vb-form:not([data-vb-enhanced]) [data-vb-prev]{display:none!important}
+
+/* Mobile-first Fachablage and keyboard/screenreader affordances */
+.vb-list-tools{display:grid;grid-template-columns:minmax(200px,1fr) minmax(200px,1fr);gap:.5rem 1rem;align-items:end;padding:1rem 1.25rem;border-bottom:1px solid var(--vb-line)}
+.vb-list-tools label{font-size:.82rem;font-weight:700}
+.vb-list-tools .form-control,.vb-list-tools .form-select{width:100%}
+.vb-filter-count{grid-column:1/-1;margin:.2rem 0 0;color:var(--vb-muted);font-size:.8rem}
+.vb-root [hidden]{display:none!important}
+.vb-root .vb-wizard-steps li[aria-current="step"]{outline:2px solid color-mix(in srgb,var(--vb-primary) 35%,transparent);outline-offset:1px}
+.vb-root .vb-form-section h2:focus{outline:3px solid var(--vb-primary);outline-offset:4px;border-radius:2px}
+@media(max-width:670px){
+  .vb-list-tools{grid-template-columns:minmax(0,1fr)}
+  #vb-review-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+  #vb-review-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr);gap:.35rem;padding:1rem;border-bottom:1px solid var(--vb-line)}
+  #vb-review-table tbody tr[hidden]{display:none!important}
+  #vb-review-table tbody td{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;border:0;padding:.15rem 0;overflow-wrap:anywhere}
+  #vb-review-table tbody td::before{content:attr(data-label);font-size:.78rem;font-weight:750;color:var(--vb-muted);flex:0 0 39%}
+  #vb-review-table tbody td:last-child{margin-top:.35rem}
+  #vb-review-table tbody td:last-child .btn{min-height:2.65rem}
+}
+
+/* Filterzustände der vertraulichen Fachablage */
+.vb-filter-empty {margin:1rem 1.35rem;padding:1.2rem;border:1px dashed var(--vb-line);border-radius:.75rem;background:var(--vb-tint);color:var(--vb-muted);text-align:center}
+.vb-root [hidden] {display:none!important}
+@media (max-width:640px) {.vb-list-tools {align-items:stretch}.vb-list-tools .btn {width:100%}}
