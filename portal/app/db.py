@@ -3001,6 +3001,9 @@ _NEW_COLUMNS = {
     # Existing law_ai_analyses from earlier releases must gain these columns;
     # create_all() does not alter an existing table.
     "law_ai_analyses": {
+        "selected_tasks_json": """TEXT NOT NULL DEFAULT '["law_structure","law_metadata","law_verify"]'""",
+        "quality_profile": "VARCHAR(20) NOT NULL DEFAULT 'standard'",
+        "json_mode": "BOOLEAN NOT NULL DEFAULT 0",
         "progress_total": "INTEGER NOT NULL DEFAULT 0",
         "progress_done": "INTEGER NOT NULL DEFAULT 0",
         "retry_attempts": "INTEGER NOT NULL DEFAULT 0",

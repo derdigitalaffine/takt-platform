@@ -34,6 +34,26 @@ Alle Antworten müssen **maschinenlesbare JSON-Objekte** mit eng begrenzten Arra
 - **Vollständige Textübermittlung bedeutet keineswegs vollständige juristische Prüfung**. Jedes Modell kann Fehler übersehen; Eingangsquelle ist der OCR-/MarkItDown-Text, nicht notwendig eine geprüfte amtliche Fassung. Bei Abbruch, Serverfehler, Änderung von Rechten/Modellen oder fehlender Textabdeckung darf nie ein scheinbar vollständiges Ergebnis entstehen.
 - Der asynchrone Task startet automatisch mit dem Portal. **Anders als der abgeschottete MarkItDown-/Tesseract-OCR-Container** findet die LLM-Orchestrierung derzeit im Portalprozess statt; sie führt dort aber keine schwere OCR aus. Horizontale Skalierung, umfassende Leases und separater KI-Worker bleiben spätere Betriebsaufgaben.
 
+## Einzelagenten und lokale 24B–30B-Modelle
+
+Ortsrecht-KI kann seit diesem Stand **gezielt nur für die benötigten Schritte** ausgeführt werden: `law_structure` (Gliederung), `law_metadata` (Stammdaten) und `law_verify` (kritische Fundstellen/Texttreue). Die Bedienoberfläche bietet die Schnellwahl **Nur Stammdaten** oder **Alle verfügbaren**. Eine nicht konfigurierte Stufe ist deaktiviert, blockiert aber andere fertig konfigurierte Agenten nicht.
+
+Jeder neue KI-Auftrag speichert unveränderlich die gewählten Stufen, das Modellprofil sowie einen Snapshot der exakten Anbieter und Modelle. Das Backend prüft pro Anfrage und bei jedem Stream-Heartbeat die Eigentümer-, Modul- und Modellberechtigungen. Ungewählte Agenten bekommen **keinen** Dokumenttext, erzeugen keine externen Modellaufrufe und erscheinen nicht als scheinbar vollständig durchgeführte Ergebnisse.
+
+### Modellprofile
+
+- **Lokales 24B–30B-Profil**: empfohlen für lokal gehostete mittelgroße Sprachmodelle mit begrenzter verfügbarer Kontext-/GPU-Kapazität. Im Modus `Gesamter Text` verarbeitet jeder gewählte Agent verlustfreie Teilstücke von höchstens 6.000 Zeichen; maximal 30 Teile. Reguläre Antworten werden auf 1.536 Ausgabetokens begrenzt, bei exakt einem sicheren Korrekturversuch auf 3.072 Tokens. Für langsame lokale Inferenz gelten 130 Sekunden pro Modellaufruf und ein Gesamtlimit von 45 Minuten, damit der Auftrag nicht endlos läuft. Im Schnellcheck werden höchstens 6.000 Quellzeichen pro Agent als ausdrücklich **nicht vollständige** Stichprobe genutzt.
+- **Standardprofil**: bestehende Semantik mit bis zu 14.000 Zeichen pro Volltextabschnitt, bis zu 10 Abschnitten, regulär bis zu 3.072 und bei Korrekturen bis zu 4.096 Ausgabetokens; bisheriges Zeitbudget bleibt erhalten.
+- **Optionaler JSON-Modus**: Ein zusätzlicher expliziter Haken sendet `{"type":"json_object"}` als `response_format` an die OpenAI-kompatible Chat-API. Das ist **kein** unbedingter Automatismus: Nicht jeder Modellserver unterstützt die Option. Falls er sie ablehnt, folgt ein klarer Fehler und **kein** stiller Aufruf an einen anderen Provider. Die bisherige strikte JSON-/Fundstellenvalidierung bleibt auch bei aktiviertem Format unverändert.
+
+Die Oberfläche zeigt die zu erwartenden Anfragen bei der Kombination von ausgewählten Agenten, Prüfmodus und Profil, einschließlich einer begrenzten möglichen Nachprüfung. Eine längere Modelllaufzeit ist bei 24B–30B nicht ausgeschlossen; Zahl der Parameter allein ist keine Garantie für Kontextgröße, Durchsatz oder strukturierte Ausgabe.
+
+### Technische Referenzen zu lokalen strukturierten Antworten
+
+- [Ollama: Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs)
+- [LM Studio: Structured Output](https://lmstudio.ai/docs/developer/openai-compat/structured-output)
+- [llama.cpp: Server-/Chat-Completions-Dokumentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
+
 ## Diagnose und automatische JSON-Fehlerbehandlung
 
 **Problem vor dem Hotfix:** Die Prüfung brach bereits dann mit der Meldung „KI lieferte keine gültige strukturierte JSON-Antwort“ ab, wenn das Modell ein gültiges JSON mit Einleitung oder Markdown-Zäunen ausgab. Außerdem wurde die Provider-Antwort bei einem Tokenlimit (finish_reason=length) bisher nicht als abgeschnitten erkannt. Dies sind nachweisbare Codeprobleme; ohne Produktionslogs lässt sich nicht feststellen, welche Ursache im Einzelfall vorlag.

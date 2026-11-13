@@ -85,6 +85,7 @@ def test_old_agent_analysis_table_gains_stream_progress_without_data_loss(tmp_pa
     engine = create_engine(f"sqlite:///{tmp_path / 'pre-stream.db'}")
     progress_columns = (
         "progress_total", "progress_done", "retry_attempts", "stream_characters",
+        "selected_tasks_json", "quality_profile", "json_mode",
         "stream_chunks", "stream_active", "validated_items",
     )
     try:
@@ -120,6 +121,9 @@ def test_old_agent_analysis_table_gains_stream_progress_without_data_loss(tmp_pa
             assert old.progress_total == 0
             assert old.progress_done == 0
             assert old.retry_attempts == 0
+            assert old.selected_tasks_json == '["law_structure","law_metadata","law_verify"]'
+            assert old.quality_profile == "standard"
+            assert old.json_mode is False
             assert old.stream_chunks == 0
             assert old.stream_characters == 0
             assert old.stream_active is False

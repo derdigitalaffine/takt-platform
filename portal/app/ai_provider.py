@@ -210,13 +210,18 @@ async def list_model_details(provider) -> list[dict]:
     return models
 
 
-async def complete(provider, messages: list[dict], *, image: bool = False, max_tokens: int = 1024) -> str:
+async def complete(provider, messages: list[dict], *, image: bool = False,
+                   max_tokens: int = 1024, response_format: dict | None = None) -> str:
     payload = {
         "model": provider.model_id,
         "stream": False,  # OpenWebUI/Gemma profiles may require this.
         "max_tokens": max(64, min(int(max_tokens), 4096)),
         "messages": messages,
     }
+    if response_format is not None:
+        if response_format != {"type": "json_object"}:
+            raise AIProviderError("Unbekanntes JSON-Ausgabeformat.")
+        payload["response_format"] = response_format
     result = await _request(provider, "chat/completions",
                             provider.image_key_enc if image else provider.text_key_enc, payload=payload)
     choices = result.get("choices")
@@ -235,7 +240,7 @@ async def complete(provider, messages: list[dict], *, image: bool = False, max_t
 
 
 async def stream_completion(provider, messages: list[dict], *, image: bool = False,
-                            max_tokens: int = 1024):
+                            max_tokens: int = 1024, response_format: dict | None = None):
     """Yield OpenAI-compatible SSE content tokens from a streaming provider.
 
     The caller is responsible for saving the complete answer. Non-streaming
@@ -249,6 +254,10 @@ async def stream_completion(provider, messages: list[dict], *, image: bool = Fal
     await validate_destination(provider.base_url, provider.allow_private)
     payload = {"model": provider.model_id, "stream": True,
                "max_tokens": max(64, min(int(max_tokens), 4096)), "messages": messages}
+    if response_format is not None:
+        if response_format != {"type": "json_object"}:
+            raise AIProviderError("Unbekanntes JSON-Ausgabeformat.")
+        payload["response_format"] = response_format
     headers = {"Authorization": "Bearer " + token,
                "Accept": "text/event-stream", "Content-Type": "application/json"}
     timeout = max(5, min(int(provider.timeout_seconds or 180), 180))

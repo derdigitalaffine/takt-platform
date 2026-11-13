@@ -100,7 +100,13 @@ def _render(request, db, user, selected=None):
         ocr_pages, ocr_warnings = [], []
     cfg = get_settings(db)
     ai_enabled = user.can("ai_chat") and cfg.get("module_ai") == "1" and cfg.get("module_laws") == "1"
-    agent_routes = law_ai_agent_jobs.configured_routes(db) if ai_enabled else {}
+    # Each individual assistant can be used independently; an absent third
+    # provider must not disable a configured Stammdaten-Agent.
+    agent_routes = ({
+        task: route
+        for task, _ in law_ai_agents.STAGES
+        if (route := law_ai_agent_jobs.configured_routes(db, tasks=(task,)).get(task))
+    } if ai_enabled else {})
     analysis = (db.scalar(select(LawAiAnalysis).where(
         LawAiAnalysis.draft_id == selected.id,
         LawAiAnalysis.requested_by == user.id,
@@ -110,10 +116,17 @@ def _render(request, db, user, selected=None):
         analysis.source_sha256 == law_ai_agents.source_hash(selected.proposed_md or "")
     )
     analysis_results = {}
+    analysis_tasks = (
+        law_ai_agent_jobs.parse_tasks(analysis.selected_tasks_json) if analysis
+        else law_ai_agent_jobs.ALL_TASKS
+    )
     advanced_sections = 0
+    local_sections = 0
     if selected and selected.status in ("staged", "ocr_review") and selected.proposed_md:
         try:
             advanced_sections = len(law_ai_coverage.sections(selected.proposed_md))
+            local_sections = len(law_ai_coverage.sections(
+                selected.proposed_md, profile="local_24b"))
         except ValueError:
             pass
     if analysis and analysis.status == "done" and analysis_current:
@@ -129,7 +142,9 @@ def _render(request, db, user, selected=None):
                       ocr_pages=ocr_pages if isinstance(ocr_pages, list) else [],
                       ocr_warnings=ocr_warnings if isinstance(ocr_warnings, list) else [],
                       analysis=analysis, analysis_current=analysis_current,
+                      analysis_tasks=analysis_tasks,
                       analysis_results=analysis_results, advanced_sections=advanced_sections,
+                      local_sections=local_sections,
                       max_model_calls=advanced_sections * len(law_ai_agents.STAGES),
                       ai_enabled=ai_enabled,
                       agent_routes=agent_routes, agent_stages=law_ai_agents.STAGES,

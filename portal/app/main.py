@@ -772,6 +772,7 @@ def readyz():
         "law_ai_analyses": {
             "id", "draft_id", "source_sha256",
             "provider_map_json", "status", "retry_attempts",
+            "selected_tasks_json", "quality_profile", "json_mode",
         },
     }
     try:

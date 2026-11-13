@@ -77,21 +77,54 @@
   search?.addEventListener("input", updateDrafts);
   status?.addEventListener("change", updateDrafts);
 
-  // Display the model traffic cost before the user consents to sending data.
+  // Every selected agent is a distinct consented model call. Cost estimates
+  // reflect the chosen model profile and avoid claiming precise money/token cost.
   const analyzeForm = $("[data-law-analysis-form]");
   if (analyzeForm) {
     const budget = $("[data-law-analysis-budget]");
-    const advancedCalls = Number(budget?.getAttribute("data-law-advanced-calls") || 0);
+    const standardSections = Number(budget?.getAttribute("data-law-standard-sections") || 0);
+    const localSections = Number(budget?.getAttribute("data-law-local-sections") || 0);
+    const stages = $$('input[name="tasks"]', analyzeForm);
+    const submit = $("[data-law-analysis-submit]", analyzeForm);
+    const notice = $("[data-law-stage-required]", analyzeForm);
     const showBudget = () => {
+      const chosen = stages.filter((input) => input.checked && !input.disabled).length;
       const mode = $('input[name="mode"]:checked', analyzeForm)?.value;
-      if (!budget) return;
-      budget.textContent = mode === "advanced"
-        ? "Gesamter Text: " + advancedCalls + " reguläre Anfragen, bei Nachprüfung höchstens " +
-          (advancedCalls * 3) + ". Mehr Laufzeit und mögliche API-Kosten."
-        : "Schnellcheck: 3 reguläre Anfragen, bei Nachprüfung höchstens 9. Lange Texte nur auszugsweise.";
+      const profile = $('input[name="quality_profile"]:checked', analyzeForm)?.value;
+      const segments = profile === "local_24b" ? localSections : standardSections;
+      const calls = mode === "advanced" ? segments * chosen : chosen;
+      if (budget) {
+        budget.textContent = chosen === 0
+          ? "Wähle mindestens einen verfügbaren Prüfschritt."
+          : (mode === "advanced" ? "Gesamter Text" : "Schnellcheck") + ": " +
+            chosen + " Agent" + (chosen === 1 ? "" : "en") + " · " +
+            calls + " reguläre Anfragen, maximal " + (calls * 3) +
+            " bei JSON-/Kontextkorrektur. " +
+            (profile === "local_24b"
+              ? "Kompakte Abschnitte für lokale 24B–30B-Modelle."
+              : "Standard-Kontextprofil.");
+      }
+      if (submit) submit.disabled = chosen === 0;
+      if (notice) notice.hidden = chosen > 0;
     };
-    $$('input[name="mode"]', analyzeForm).forEach((input) =>
-      input.addEventListener("change", showBudget));
+    const select = (task) => {
+      stages.forEach((input) => {
+        input.checked = !input.disabled && (task === "all" || input.value === task);
+      });
+      showBudget();
+    };
+    $("[data-law-select-metadata]", analyzeForm)?.addEventListener("click", () =>
+      select("law_metadata"));
+    $("[data-law-select-all]", analyzeForm)?.addEventListener("click", () =>
+      select("all"));
+    [...stages, ...$$('input[name="mode"], input[name="quality_profile"]', analyzeForm)]
+      .forEach((input) => input.addEventListener("change", showBudget));
+    analyzeForm.addEventListener("submit", (event) => {
+      if (!stages.some((input) => input.checked && !input.disabled)) {
+        event.preventDefault();
+        if (notice) notice.hidden = false;
+      }
+    });
     showBudget();
   }
 

@@ -125,9 +125,9 @@
   const bar = panel.querySelector("[data-law-ai-progress]");
   const fill = panel.querySelector("[data-law-ai-progress-bar]");
   const names = {
-    law_structure: "Gliederungsagent (1/3)",
-    law_metadata: "Stammdatenagent (2/3)",
-    law_verify: "Texttreueagent (3/3)",
+    law_structure: "Gliederungsagent",
+    law_metadata: "Stammdatenagent",
+    law_verify: "Texttreueagent",
     waiting: "Warteschlange",
     preparing: "Quellen- und Berechtigungsprüfung",
   };
@@ -149,9 +149,13 @@
       return;
     }
     const match = /^(law_structure|law_metadata|law_verify):(\d+)\/(\d+)$/.exec(value.step || "");
+    const stages = Array.isArray(value.selected_tasks)
+      ? value.selected_tasks.filter((task) => Object.prototype.hasOwnProperty.call(names, task))
+      : ["law_structure", "law_metadata", "law_verify"];
     if (status) {
       status.textContent = match
-        ? names[match[1]] + " · Abschnitt " + match[2] + " von " + match[3]
+        ? names[match[1]] + " · Schritt " + (stages.indexOf(match[1]) + 1) +
+          " von " + stages.length + " · Abschnitt " + match[2] + " von " + match[3]
         : names[value.step] || "KI-Auftrag wird vorbereitet";
     }
     const total = Number.isSafeInteger(value.progress_total) && value.progress_total > 0

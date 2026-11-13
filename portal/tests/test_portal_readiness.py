@@ -17,7 +17,10 @@ def _schema(engine, *, draft_ocr=True, agents=True):
                 CREATE TABLE law_ai_analyses (
                     id INTEGER PRIMARY KEY, draft_id INTEGER,
                     source_sha256 VARCHAR(64), provider_map_json TEXT,
-                    status VARCHAR(16), retry_attempts INTEGER NOT NULL DEFAULT 0
+                    status VARCHAR(16), retry_attempts INTEGER NOT NULL DEFAULT 0,
+                    selected_tasks_json TEXT NOT NULL DEFAULT '["law_structure","law_metadata","law_verify"]',
+                    quality_profile VARCHAR(20) NOT NULL DEFAULT 'standard',
+                    json_mode BOOLEAN NOT NULL DEFAULT 0
                 )
             """))
 

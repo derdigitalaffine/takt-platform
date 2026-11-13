@@ -216,23 +216,78 @@
               {% if selected.status == 'ocr_queued' %}
                 <div class="alert alert-secondary small mb-0">Bitte zuerst die laufende OCR abschließen.</div>
               {% elif selected.status in ('staged', 'ocr_review') %}
-                {% if not agent_routes or agent_routes|length != 3 %}
-                  <div class="alert alert-warning small">Die drei Ortsrecht-Profile <code>law_structure</code>, <code>law_metadata</code> und <code>law_verify</code> müssen vor der Nutzung in <a href="/admin/ai#ai-task-profiles">KI-Administration</a> jeweils einem freigegebenen aktiven Modell zugewiesen werden. Es wird kein fremder Provider als stiller Ersatz genutzt.</div>
+                {% if not agent_routes %}
+                  <div class="alert alert-warning small">Für die KI-Prüfung muss mindestens eines der drei Ortsrecht-Profile in der <a href="/admin/ai#ai-task-profiles">KI-Administration</a> einem aktiven Modell zugewiesen sein. Nicht konfigurierte Prüfschritte bleiben gesperrt; es gibt keinen stillen Providerwechsel.</div>
                 {% else %}
                   <div class="border rounded-3 p-3 mb-3" aria-label="Empfänger und KI-Modelle">
-                    <div class="small fw-semibold mb-1">Diese drei KI-Server/Modelle erhalten den Text:</div>
+                    <div class="small fw-semibold mb-1">Verfügbare KI-Empfänger – übermittelt wird nur an die unten ausgewählten:</div>
                     <dl class="row small mb-0">
                       {% for task,label in agent_stages %}
                         <dt class="col-sm-5">{{ label }}</dt>
-                        <dd class="col-sm-7 text-break">{{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}
-                          <span class="badge text-bg-light border text-dark">{{ 'Streaming aktiviert' if agent_routes[task].stream_enabled else 'Antwort nach Abschluss' }}</span>
-                          <div class="text-secondary small">{{ agent_routes[task].destination }}</div>
+                        <dd class="col-sm-7 text-break">
+                          {% if agent_routes.get(task) %}
+                            {{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}
+                            <span class="badge text-bg-light border text-dark">{{ 'Streaming' if agent_routes[task].stream_enabled else 'Ohne Streaming' }}</span>
+                            <div class="text-secondary small">{{ agent_routes[task].destination }}</div>
+                          {% else %}
+                            <span class="badge text-bg-warning">Nicht konfiguriert</span>
+                            <a href="/admin/ai#ai-task-profiles" class="small">Modell zuweisen</a>
+                          {% endif %}
                         </dd>
                       {% endfor %}
                     </dl>
                   </div>
                   <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3" data-law-analysis-form>
                     <input type="hidden" name="csrf" value="{{ csrf }}">
+                    <input type="hidden" name="tasks_present" value="1">
+                    <fieldset class="mb-3" data-law-stage-picker>
+                      <legend class="form-label fw-semibold fs-6">Was möchtest du prüfen?</legend>
+                      <p class="small text-secondary mb-2">Jede Aufgabe ist einzeln wählbar. Nur ausgewählte Agenten bekommen den importierten Dokumenttext.</p>
+                      <div class="row g-2 mb-2">
+                        {% for task,label in agent_stages %}
+                          {% set configured = agent_routes.get(task) %}
+                          <div class="col-12 col-lg-4">
+                            <label class="law-choice law-agent-choice d-block" data-law-stage-card>
+                              <span class="d-flex gap-2 align-items-center">
+                                <input class="form-check-input" type="checkbox" name="tasks" value="{{ task }}"
+                                       {% if configured %}checked{% else %}disabled{% endif %}>
+                                <span class="law-choice-title">{{ 'Gliederung' if task == 'law_structure' else 'Stammdaten' if task == 'law_metadata' else 'Texttreue' }}</span>
+                              </span>
+                              <small>{{ 'Überschriften und Markdown' if task == 'law_structure' else 'Titel, Daten, Art und Fundstellen' if task == 'law_metadata' else 'Beträge, Fristen, Verweise und kritische Stellen' }}</small>
+                              <span class="badge text-bg-{{ 'light border text-dark' if configured else 'warning' }} mt-2">{{ 'Bereit' if configured else 'Modell fehlt' }}</span>
+                            </label>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <div class="law-actions">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-law-select-metadata>Nur Stammdaten</button>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-law-select-all>Alle verfügbaren</button>
+                      </div>
+                    </fieldset>
+                    <fieldset class="mb-3">
+                      <legend class="form-label fw-semibold fs-6">Modellprofil</legend>
+                      <div class="row g-2">
+                        <div class="col-12 col-lg-6">
+                          <label class="law-choice d-block">
+                            <input class="form-check-input me-2" type="radio" name="quality_profile" value="local_24b" checked>
+                            <span class="law-choice-title">Lokales Modell · 24B–30B</span>
+                            <small>Bis 6.000 Textzeichen je Teil, kompakte JSON-Antwort, mehr Zeit für lokale Inferenz.</small>
+                            <span class="badge text-bg-primary mt-2">Für lokale Modelle empfohlen</span>
+                          </label>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                          <label class="law-choice d-block">
+                            <input class="form-check-input me-2" type="radio" name="quality_profile" value="standard">
+                            <span class="law-choice-title">Standardprofil</span>
+                            <small>Größere Abschnitte, geringere Aufrufzahl; sinnvoll bei Servern mit großem Kontextfenster.</small>
+                          </label>
+                        </div>
+                      </div>
+                      <label class="form-check small mt-3">
+                        <input class="form-check-input" type="checkbox" name="json_mode" value="1">
+                        <span class="form-check-label">Striktes JSON beim Modellserver anfordern <span class="text-secondary">(optional; nur aktivieren, wenn dein OpenAI-kompatibler Server <code>response_format: json_object</code> unterstützt)</span></span>
+                      </label>
+                    </fieldset>
                     <fieldset class="mb-3">
                       <legend class="form-label fw-semibold fs-6">Wie gründlich soll geprüft werden?</legend>
                       <div class="row g-2">
@@ -240,7 +295,7 @@
                           <label class="law-choice d-block">
                             <input class="form-check-input me-2" type="radio" name="mode" value="simple" checked>
                             <span class="law-choice-title">Schnellcheck</span>
-                            <small>3 Modellaufrufe. Gute erste Orientierung; lange Texte nur in Auszügen.</small>
+                            <small>Eine Modellanfrage pro ausgewähltem Agenten. Lange Texte nur in nachvollziehbaren Auszügen.</small>
                             <span class="badge text-bg-light border text-dark mt-2">Schneller · weniger API-Aufwand</span>
                           </label>
                         </div>
@@ -248,7 +303,7 @@
                           <label class="law-choice d-block">
                             <input class="form-check-input me-2" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}>
                             <span class="law-choice-title">Gesamter Text</span>
-                            <small>{{ advanced_sections }} Textabschnitte für jeden Agenten; {{ max_model_calls }} reguläre Modellaufrufe.</small>
+                            <small>Gesamter importierter Text in Abschnitten. {{ local_sections }} Abschnitte beim Lokalprofil; regulär {{ max_model_calls }} Modellaufrufe im Standardprofil mit allen Agenten.</small>
                             <span class="badge text-bg-light border text-dark mt-2">Ausführlicher · mehr Aufwand</span>
                           </label>
                         </div>
@@ -256,13 +311,14 @@
                     </fieldset>
                     <label class="form-check small mb-2">
                       <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
-                      <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
+                      <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext an die von mir ausgewählten, oben genannten KI-Anbieter übermitteln darf. Die Auswahl gilt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
                     </label>
-                    <p class="small fw-semibold mb-2" id="law-analysis-budget" data-law-analysis-budget data-law-advanced-calls="{{ max_model_calls }}" aria-live="polite">Schnellcheck: 3 Anfragen, bei fehlerhaftem JSON bis zu 9.</p>
+                    <p class="small fw-semibold mb-2" id="law-analysis-budget" data-law-analysis-budget data-law-advanced-calls="{{ max_model_calls }}" data-law-standard-sections="{{ advanced_sections }}" data-law-local-sections="{{ local_sections }}" aria-live="polite">Schnellcheck: 1–3 Anfragen, nur für ausgewählte Prüfschritte. Bei JSON-Fehlern sind begrenzte Zusatzaufrufe möglich.</p>
                     <details class="small text-secondary mb-3">
                       <summary>Verarbeitung, Grenzen und mögliche Zusatzkosten</summary>
-                      <p class="mt-2 mb-0">Im Schnellcheck werden bei langen Dokumenten Textauszüge geprüft. Im Volltextmodus wird der gesamte importierte Text abschnittsweise übermittelt, regulär {{ max_model_calls }} Aufrufe. Bei ungültigem oder abgeschnittenem JSON darf ein Abschnitt einmal am gleichen Modell nachgeprüft werden (maximal {{ max_model_calls * 3 }} Aufrufe insgesamt). Das verursacht ggf. zusätzliche Kosten. Kein KI-Ergebnis ist eine vollständige juristische Prüfung oder garantiert korrekte OCR. Maximal {{ ai_source_limit }} Textzeichen; das Original bleibt unverändert.</p>
+                      <p class="mt-2 mb-0">Im Schnellcheck werden bei langen Dokumenten Textauszüge geprüft. Im Volltextmodus wird der gesamte importierte Text abschnittsweise übermittelt. Für alle drei Agenten sind im Standardprofil regulär {{ max_model_calls }} Modellaufrufe möglich, im lokalen Profil mit drei Agenten bis zu {{ local_sections * 3 }}. Nur die ausgewählten Agenten werden tatsächlich gestartet. Bei ungültigem oder abgeschnittenem JSON darf ein Abschnitt einmal am gleichen Modell nachgeprüft werden (höchstens dreimal so viele Aufrufe). Das verursacht ggf. zusätzliche Kosten. Kein KI-Ergebnis ist eine vollständige juristische Prüfung oder garantiert korrekte OCR. Maximal {{ ai_source_limit }} Textzeichen; das Original bleibt unverändert.</p>
                     </details>
+                    <div class="alert alert-warning small py-2 mb-3" data-law-stage-required hidden role="alert">Wähle mindestens einen verfügbaren KI-Prüfschritt.</div>
                     <button class="btn btn-primary" type="submit" data-law-analysis-submit><i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>KI-Prüfung starten</button>
                   </form>
                 {% endif %}
@@ -322,13 +378,14 @@
                     Fundstellen sind Zeichenpositionen des OCR-/MarkItDown-Textes, keine amtlichen PDF-Seitenbelege.
                   </p>
                   <div class="law-results-summary" aria-label="Zusammenfassung der KI-Fundstellen">
-                    <span><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i><strong>{{ metadata.get('fields', [])|length }}</strong> Stammdaten</span>
-                    <span><i class="fa-solid fa-list-ol me-1" aria-hidden="true"></i><strong>{{ structure.get('headings', [])|length }}</strong> Gliederungen</span>
-                    <span><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>{{ verification.get('findings', [])|length }}</strong> Prüfhinweise</span>
+                    {% if 'law_metadata' in analysis_tasks %}                    <span><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i><strong>{{ metadata.get('fields', [])|length }}</strong> Stammdaten</span>{% endif %}
+                    {% if 'law_structure' in analysis_tasks %}                    <span><i class="fa-solid fa-list-ol me-1" aria-hidden="true"></i><strong>{{ structure.get('headings', [])|length }}</strong> Gliederungen</span>{% endif %}
+                    {% if 'law_verify' in analysis_tasks %}                    <span><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>{{ verification.get('findings', [])|length }}</strong> Prüfhinweise</span>{% endif %}
                   </div>
                   <p class="small text-secondary">Öffne die passende Gruppe und übertrage nur nach Abgleich mit der Originaldatei. Die KI bietet keine OCR-Texttreue und keine amtliche oder juristische Richtigkeitsgarantie.</p>
                   {% set law_field_names = {'title': 'Titel', 'short_title': 'Kurztitel', 'doc_type': 'Dokumentart', 'level': 'Körperschaft', 'version_note': 'Fassungshinweis', 'issued_on': 'Ausfertigungsdatum', 'valid_from': 'Inkrafttreten', 'valid_until': 'Außerkrafttreten'} %}
                   <div class="accordion mb-2" id="law-agent-results-{{ analysis.id }}">
+                    {% if 'law_metadata' in analysis_tasks %}
                     <div class="accordion-item">
                       <h4 class="accordion-header"><button class="accordion-button {{ '' if analysis.mode == 'advanced' else 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="{{ 'true' if analysis.mode == 'advanced' else 'false' }}"><i class="fa-solid fa-id-card me-2" aria-hidden="true"></i>Stammdaten · {{ metadata.get('fields', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-metadata-{{ analysis.id }}" class="accordion-collapse collapse {{ 'show' if analysis.mode == 'advanced' else '' }}" data-bs-parent="#law-agent-results-{{ analysis.id }}">
@@ -352,6 +409,8 @@
                         </div>
                       </div>
                     </div>
+                    {% endif %}
+                    {% if 'law_structure' in analysis_tasks %}
                     <div class="accordion-item">
                       <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-outline-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-list-ol me-2" aria-hidden="true"></i>Gliederung · {{ structure.get('headings', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-outline-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
@@ -378,6 +437,8 @@
                         </div>
                       </div>
                     </div>
+                    {% endif %}
+                    {% if 'law_verify' in analysis_tasks %}
                     <div class="accordion-item">
                       <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-verify-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Texttreue · {{ verification.get('findings', [])|length }} Hinweise</button></h4>
                       <div id="law-agent-verify-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
@@ -401,10 +462,12 @@
                         </div>
                       </div>
                     </div>
+                    {% endif %}
                   </div>
                   <details class="small text-secondary mt-2">
                     <summary>Prüfprotokoll und Modellzuweisung</summary>
-                    <div>Prüf-ID: {{ analysis.id }} · Modus: {{ analysis.mode }} · Stand: {{ analysis.updated_at|local }}</div>
+                    <div>Prüf-ID: {{ analysis.id }} · Modus: {{ analysis.mode }} · Profil: {{ 'Lokales 24B–30B' if analysis.quality_profile == 'local_24b' else 'Standard' }} · Stand: {{ analysis.updated_at|local }}</div>
+                    <div>Ausgewählte Agenten: {{ analysis_tasks|join(', ') }} · JSON-Modus: {{ 'aktiviert' if analysis.json_mode else 'aus' }}</div>
                     <div class="font-monospace text-break">Text-SHA-256: {{ analysis.source_sha256 }}</div>
                     {% for task,label in agent_stages %}
                       {% if agent_routes.get(task) %}<div>{{ label }}: {{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}</div>{% endif %}

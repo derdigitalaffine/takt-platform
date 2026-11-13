@@ -22,13 +22,32 @@ from .law_ai_models import LawAiDraft
 logger = logging.getLogger("portal.law_ai_agents")
 POLL_SECONDS = 4
 STAGE_TIMEOUT = 70
-MAX_JOB_SECONDS = 18 * 60  # bounded recovery for slow/verbose models; fail closed
+MAX_JOB_SECONDS = 18 * 60  # legacy/default budget
+LOCAL_JOB_SECONDS = 45 * 60  # slower local 24B–30B execution; still bounded
 
 
-def configured_routes(db) -> dict:
-    """Explicit law task assignments only; no default public AI provider."""
+ALL_TASKS = tuple(task for task, _ in law_ai_agents.STAGES)
+
+
+def parse_tasks(value: str) -> tuple[str, ...]:
+    """Read stored, canonical selected stages. Reject edits to the job plan."""
+    try:
+        data = json.loads(value)
+    except (TypeError, ValueError):
+        raise ValueError("Ungültiger gespeicherter KI-Prüfplan.") from None
+    if (not isinstance(data, list) or not data
+            or len(set(data)) != len(data) or any(task not in ALL_TASKS for task in data)):
+        raise ValueError("Ungültige Auswahl der KI-Prüfschritte.")
+    return tuple(task for task in ALL_TASKS if task in data)
+
+
+def configured_routes(db, tasks=None) -> dict:
+    """Explicit assigned providers, optionally only the selected tasks."""
+    requested = ALL_TASKS if tasks is None else tuple(tasks)
+    if not requested or any(task not in ALL_TASKS for task in requested):
+        return {}
     result = {}
-    for task, _label in law_ai_agents.STAGES:
+    for task in requested:
         assignment = db.get(AITaskProfile, task)
         if assignment is None:
             return {}
@@ -78,7 +97,7 @@ def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) 
         if job is None or job.status != "running" or job.step != step:
             raise ValueError("Der KI-Auftrag wurde abgebrochen oder geändert.")
         _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-        if json.loads(job.provider_map_json) != configured_routes(db):
+        if json.loads(job.provider_map_json) != configured_routes(db, tasks=parse_tasks(job.selected_tasks_json)):
             raise ValueError("Der KI-Provider wurde während des Streams geändert.")
         db.execute(update(LawAiAnalysis).where(
             LawAiAnalysis.id == job_id,
@@ -90,17 +109,20 @@ def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) 
 
 
 async def _answer(provider, messages: list[dict], job_id: int, step: str,
-                  *, remaining: float, max_tokens: int = 3072) -> str:
+                  *, remaining: float, max_tokens: int = 3072,
+                  stage_timeout: int = STAGE_TIMEOUT,
+                  json_mode: bool = False) -> str:
     """Use server SSE only when explicitly enabled; never resend on stream error.
 
     Raw chunks are kept inside the worker and validated as a complete JSON
     object before being persisted. Browser gets progress counters, not legal
     prose or partial/possibly malicious output.
     """
+    options = {"response_format": {"type": "json_object"}} if json_mode else {}
     if not provider.stream_enabled:
         return await asyncio.wait_for(
-            ai_provider.complete(provider, messages, max_tokens=max_tokens),
-            timeout=min(STAGE_TIMEOUT, remaining),
+            ai_provider.complete(provider, messages, max_tokens=max_tokens, **options),
+            timeout=min(stage_timeout, remaining),
         )
 
     async def receive() -> str:
@@ -109,7 +131,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
         count = 0
         last = time.monotonic()
         async for fragment in ai_provider.stream_completion(
-            provider, messages, max_tokens=max_tokens,
+            provider, messages, max_tokens=max_tokens, **options,
         ):
             if not isinstance(fragment, str):
                 raise ValueError("Der Modellstream hat ein ungültiges Format.")
@@ -129,7 +151,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
             raise ValueError("Der Modellserver lieferte keine Textantwort.")
         return "".join(parts)
 
-    return await asyncio.wait_for(receive(), timeout=min(STAGE_TIMEOUT, remaining))
+    return await asyncio.wait_for(receive(), timeout=min(stage_timeout, remaining))
 
 async def process_one(job_id: int) -> None:
     """Run read-only agents against complete sections only in advanced mode.
@@ -145,16 +167,21 @@ async def process_one(job_id: int) -> None:
         try:
             source = _allowed(db, job, db.get(LawAiDraft, job.draft_id))
             routes = json.loads(job.provider_map_json)
-            if routes != configured_routes(db):
+            tasks = parse_tasks(job.selected_tasks_json)
+            quality_profile = job.quality_profile
+            json_mode_enabled = bool(job.json_mode)
+            if quality_profile not in ("standard", "local_24b"):
+                raise ValueError("Ungültiges Modellprofil.")
+            if routes != configured_routes(db, tasks=tasks):
                 raise ValueError("Ein KI-Anbieter oder Modell wurde nach der Freigabe geändert.")
             if job.mode == "advanced":
-                sections = law_ai_coverage.sections(source)
+                sections = law_ai_coverage.sections(source, profile=quality_profile)
             elif job.mode == "simple":
                 sections = [law_ai_coverage.Section(1, 0, len(source), source)]
             else:
                 raise ValueError("Unbekannter KI-Analysemodus.")
             mode = job.mode
-            job.progress_total = len(sections) * len(law_ai_agents.STAGES)
+            job.progress_total = len(sections) * len(tasks)
             job.progress_done = 0
             job.retry_attempts = 0
             job.stream_characters = 0
@@ -167,7 +194,7 @@ async def process_one(job_id: int) -> None:
             _fail(db, job, str(exc))
             return
 
-    for task, _label in law_ai_agents.STAGES:
+    for task in tasks:
         stage_parts = []
         # Adaptively bisect only if a model returned invalid/incomplete JSON.
         # The original source remains untouched, with a single retry depth.
@@ -175,7 +202,8 @@ async def process_one(job_id: int) -> None:
         while pending:
             section, depth = pending.pop(0)
             try:
-                remaining = MAX_JOB_SECONDS - (time.monotonic() - started)
+                remaining = (LOCAL_JOB_SECONDS if quality_profile == "local_24b"
+                             else MAX_JOB_SECONDS) - (time.monotonic() - started)
                 if remaining < 1:
                     raise ValueError("Das sichere Zeitbudget ist erschöpft; keine unvollständige Analyse freigegeben.")
                 with SessionLocal() as db:
@@ -183,7 +211,7 @@ async def process_one(job_id: int) -> None:
                     if not job or job.status != "running":
                         return
                     source_now = _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                    if source_now != source or json.loads(job.provider_map_json) != configured_routes(db):
+                    if source_now != source or json.loads(job.provider_map_json) != configured_routes(db, tasks=parse_tasks(job.selected_tasks_json)):
                         raise ValueError("Text oder KI-Modellzuweisung wurde geändert; neue Freigabe erforderlich.")
                     provider = ai_task_routing.select_provider(db, task)
                     if (provider.id != routes[task]["provider_id"] or
@@ -193,6 +221,7 @@ async def process_one(job_id: int) -> None:
                     messages, sampled = law_ai_agents.prompt(
                         task, section.text,
                         context_limit=(6000 if depth and mode == "simple"
+                                       else 6000 if quality_profile == "local_24b"
                                        else law_ai_agents.MAX_CONTEXT_CHARS),
                     )
                     if depth:
@@ -211,9 +240,14 @@ async def process_one(job_id: int) -> None:
                     db.commit()
                     step = job.step
 
-                answer = await _answer(provider, messages, job_id, step,
-                                       remaining=remaining,
-                                       max_tokens=4096 if depth else 3072)
+                answer = await _answer(
+                    provider, messages, job_id, step, remaining=remaining,
+                    max_tokens=(3072 if depth else 1536) if quality_profile == "local_24b"
+                               else (4096 if depth else 3072),
+                    stage_timeout=(law_ai_coverage.LOCAL_MODEL_TIMEOUT
+                                   if quality_profile == "local_24b" else STAGE_TIMEOUT),
+                    json_mode=json_mode_enabled,
+                )
                 result = law_ai_agents.validate(task, answer, section.text)
                 # Number only *successfully* validated sections, in document
                 # order, for unambiguous global character offsets.
@@ -224,7 +258,7 @@ async def process_one(job_id: int) -> None:
                     if not job or job.status != "running":
                         return
                     _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                    if json.loads(job.provider_map_json) != configured_routes(db):
+                    if json.loads(job.provider_map_json) != configured_routes(db, tasks=parse_tasks(job.selected_tasks_json)):
                         raise ValueError("Das KI-Profil wurde während der Analyse verändert.")
                     job.progress_done += 1
                     field_key = {"law_structure": "headings",
@@ -248,7 +282,7 @@ async def process_one(job_id: int) -> None:
                             return
                         try:
                             _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                            if json.loads(job.provider_map_json) != configured_routes(db):
+                            if json.loads(job.provider_map_json) != configured_routes(db, tasks=parse_tasks(job.selected_tasks_json)):
                                 raise ValueError("Anbieterzuweisung nach Freigabe geändert.")
                         except ValueError as permission_error:
                             _fail(db, job, str(permission_error))
@@ -307,7 +341,7 @@ async def process_one(job_id: int) -> None:
                 return
             try:
                 source_now = _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                if source_now != source or json.loads(job.provider_map_json) != configured_routes(db):
+                if source_now != source or json.loads(job.provider_map_json) != configured_routes(db, tasks=parse_tasks(job.selected_tasks_json)):
                     raise ValueError("Quelltext oder Modellzuweisung wurde zwischenzeitlich verändert.")
             except ValueError as exc:
                 _fail(db, job, str(exc))
@@ -326,7 +360,7 @@ async def process_one(job_id: int) -> None:
             return
         try:
             _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-            if json.loads(job.provider_map_json) != configured_routes(db):
+            if json.loads(job.provider_map_json) != configured_routes(db, tasks=parse_tasks(job.selected_tasks_json)):
                 raise ValueError("Die Freigabe für das KI-Modell ist nicht mehr aktuell.")
         except ValueError as exc:
             _fail(db, job, str(exc))

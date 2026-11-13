@@ -29,6 +29,8 @@ def _ai_permission(user: User, db: Session):
 def start_law_ai_agents(
     request: Request, draft_id: int, mode: str = Form("simple"),
     transmission_confirmed: str = Form(""),
+    tasks: list[str] = Form(default=[]), tasks_present: str = Form(""),
+    quality_profile: str = Form("standard"), json_mode: str = Form(""),
     user: User = Depends(law_user), db: Session = Depends(get_db),
 ):
     """An explicit click authorizes only this exact source and these providers."""
@@ -42,17 +44,32 @@ def start_law_ai_agents(
         raise HTTPException(413, "Für diese KI-Analyse sind 1 bis 120.000 Textzeichen zulässig.")
     if mode not in ("simple", "advanced"):
         raise HTTPException(422, "Unbekannter Analysemodus.")
+    if quality_profile not in ("standard", "local_24b"):
+        raise HTTPException(422, "Unbekanntes Modellprofil.")
+    if json_mode not in ("", "1"):
+        raise HTTPException(422, "Unbekannter JSON-Modus.")
+    all_tasks = law_ai_agent_jobs.ALL_TASKS
+    if tasks_present == "1":
+        if not tasks or len(set(tasks)) != len(tasks) or any(task not in all_tasks for task in tasks):
+            raise HTTPException(422, "Mindestens einen gültigen KI-Prüfschritt auswählen.")
+        selected_tasks = tuple(task for task in all_tasks if task in tasks)
+    elif tasks_present == "":
+        # Older clients and existing automated workflows retain all stages.
+        selected_tasks = all_tasks
+    else:
+        raise HTTPException(422, "Ungültige Prüfauftragsauswahl.")
     try:
         # Bound external calls and fail before authorization/queue creation
         # if the entire source cannot be divided without omissions.
-        law_ai_coverage.count_calls(source, mode)
+        law_ai_coverage.count_calls(
+            source, mode, profile=quality_profile, tasks=len(selected_tasks))
     except ValueError as exc:
         raise HTTPException(413, str(exc)) from exc
     if transmission_confirmed != "1":
         raise HTTPException(422, "Bitte die Übermittlung an die ausgewählten KI-Server bestätigen.")
-    selected = law_ai_agent_jobs.configured_routes(db)
-    if len(selected) != len(law_ai_agents.STAGES):
-        raise HTTPException(503, "Bitte zuerst alle drei Ortsrecht-KI-Profile in der Administration konfigurieren.")
+    selected = law_ai_agent_jobs.configured_routes(db, tasks=selected_tasks)
+    if len(selected) != len(selected_tasks):
+        raise HTTPException(503, "Bitte die ausgewählten Ortsrecht-KI-Profile in der Administration konfigurieren.")
     if db.scalar(select(LawAiAnalysis.id).where(
             LawAiAnalysis.draft_id == draft_id,
             LawAiAnalysis.status.in_(("queued", "running"))).limit(1)) is not None:
@@ -61,7 +78,9 @@ def start_law_ai_agents(
         draft_id=draft_id, requested_by=user.id,
         source_sha256=law_ai_agents.source_hash(source),
         source_chars=len(source), provider_map_json=json.dumps(selected, ensure_ascii=False),
-        mode=mode, status="queued", step="waiting",
+        mode=mode, quality_profile=quality_profile, json_mode=json_mode == "1",
+        selected_tasks_json=json.dumps(selected_tasks),
+        status="queued", step="waiting",
     )
     db.add(job)
     try:
@@ -92,6 +111,8 @@ def _progress_payload(job: LawAiAnalysis | None) -> dict:
         "stream_characters": job.stream_characters,
         "stream_chunks": job.stream_chunks,
         "validated_items": job.validated_items,
+        "selected_tasks": law_ai_agent_jobs.parse_tasks(job.selected_tasks_json),
+        "quality_profile": job.quality_profile,
     }
 
 
