@@ -335,7 +335,9 @@ def prwahl_document_new(request: Request, election_id: int, kind: str,
     values, sources = prefill_fields(election, kind, mandates=mandates, events=events, rounds=rounds)
     return render(request, "prwahl_document.html", user, election=election,
                   role=role, versions=[], form_kind=kind, form_def=pw.FORM_KINDS[kind],
-                  values=values, prefill_sources=sources, document=None, mode="new")
+                  values=values, prefill_sources=sources,
+                  field_summary=pw.document_field_summary(kind, values),
+                  document=None, mode="new")
 
 
 @app.get("/personalratswahl/{election_id:int}/dokumente/{document_id:int}")
@@ -346,9 +348,11 @@ def prwahl_document_edit(request: Request, election_id: int, document_id: int,
         PRDocument.election_id == election.id,
         PRDocument.document_key == doc.document_key,
     ).order_by(PRDocument.revision.desc())).all()
+    values = pw.document_values(doc)
     return render(request, "prwahl_document.html", user, election=election,
                   role=role, versions=versions, form_kind=doc.kind, form_def=pw.FORM_KINDS[doc.kind],
-                  values=pw.document_values(doc), prefill_sources={}, document=doc,
+                  values=values, prefill_sources={},
+                  field_summary=pw.document_field_summary(doc.kind, values), document=doc,
                   mode="edit" if role in pw.EDIT_ROLES and doc.current else "readonly")
 
 
@@ -396,6 +400,8 @@ def prwahl_document_review(request: Request, election_id: int, document_id: int,
         raise HTTPException(409, "Nur der aktuelle, ungeprüfte Entwurf kann geprüft werden.")
     if len(reference) < 8:
         raise HTTPException(422, "Bitte einen aussagekräftigen Beschluss- oder Prüfvermerk angeben.")
+    if not pw.document_field_summary(doc.kind, pw.document_values(doc))["has_content"]:
+        raise HTTPException(409, "Ein vollständig leerer Vordruck kann nicht als intern geprüft gekennzeichnet werden.")
     doc.review_status, doc.reviewed_by, doc.resolution_reference = "checked", user.id, reference
     pw.record(db, user.id, election.id, "document_checked", f"document:{doc.id}")
     db.commit()
