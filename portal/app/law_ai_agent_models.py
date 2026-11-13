@@ -23,6 +23,7 @@ class LawAiAnalysis(Base):
     # Untrusted/unfinished model JSON is never persisted or sent to browsers.
     progress_total: Mapped[int] = mapped_column(Integer, default=0)
     progress_done: Mapped[int] = mapped_column(Integer, default=0)
+    retry_attempts: Mapped[int] = mapped_column(Integer, default=0)
     stream_characters: Mapped[int] = mapped_column(Integer, default=0)
     stream_chunks: Mapped[int] = mapped_column(Integer, default=0)
     stream_active: Mapped[bool] = mapped_column(Boolean, default=False)
