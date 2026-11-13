@@ -308,7 +308,7 @@
                     <span><i class="fa-solid fa-list-ol me-1" aria-hidden="true"></i><strong>{{ structure.get('headings', [])|length }}</strong> Gliederungen</span>
                     <span><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>{{ verification.get('findings', [])|length }}</strong> Prüfhinweise</span>
                   </div>
-                  <p class="small text-secondary">Öffne die passende Gruppe und übertrage nur nach Abgleich mit der Originaldatei. Die Liste ist keine amtliche Richtigkeitsbescheinigung.</p>
+                  <p class="small text-secondary">Öffne die passende Gruppe und übertrage nur nach Abgleich mit der Originaldatei. Die KI bietet keine OCR-Texttreue und keine amtliche oder juristische Richtigkeitsgarantie.</p>
                   {% set law_field_names = {'title': 'Titel', 'short_title': 'Kurztitel', 'doc_type': 'Dokumentart', 'level': 'Körperschaft', 'version_note': 'Fassungshinweis', 'issued_on': 'Ausfertigungsdatum', 'valid_from': 'Inkrafttreten', 'valid_until': 'Außerkrafttreten'} %}
                   <div class="accordion mb-2" id="law-agent-results-{{ analysis.id }}">
                     <div class="accordion-item">
