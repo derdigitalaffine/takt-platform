@@ -3155,6 +3155,7 @@ from . import routes_surveys  # noqa: E402,F401
 from . import routes_live  # noqa: E402,F401
 from . import routes_public  # noqa: E402,F401
 from . import routes_absences  # noqa: E402,F401
+from . import routes_passkeys  # noqa: E402,F401 (WebAuthn passwordless login + credential management)
 from . import routes_sessions  # noqa: E402,F401
 from . import routes_circulations  # noqa: E402,F401
 from . import routes_laws  # noqa: E402,F401
