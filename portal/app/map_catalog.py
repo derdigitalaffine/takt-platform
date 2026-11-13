@@ -151,6 +151,37 @@ for key, title, layer_id, topic, role in [
              'Maßstab, Aktualität und Nutzbarkeit beachten.',
         attribution=RLP_ATTR)
 
+# Further official free data sources, taken from the LVermGeo Open Data
+# Capabilities links. These are curated *service* URLs rather than private
+# cadastral records; the actual advertised feature names are fetched lazily.
+for key, title, layer_id, topic in [
+    ('afis-fixedpoints', 'RP · AFIS Festpunktübersicht', 76140, 'Vermessung'),
+    ('properties-wms', 'RP · Liegenschaften (Übersicht)', 61680, 'Kataster'),
+]:
+    add('rp-'+key, title, RLP_WMS.format(id=layer_id),
+        'Rheinland-Pfalz', topic, 'LVermGeo Rheinland-Pfalz',
+        RLP_OPEN, 'DL-DE BY 2.0', BY,
+        note='Amtliche Darstellungsdaten. Aktualität, Maßstab, '
+             'Datenumfang und Eignung für den Einsatzzweck prüfen.',
+        attribution=RLP_ATTR)
+
+for key, title, endpoint, topic in [
+    ('alkis-points-wfs', 'RP · ALKIS-Punkte (WFS)',
+     'https://www.geoportal.rlp.de/registry/wfs/669', 'Kataster'),
+    ('alkis-simplified-wfs', 'RP · ALKIS vereinfacht (WFS)',
+     'https://www.geoportal.rlp.de/registry/wfs/519', 'Kataster'),
+    ('soil-wfs', 'RP · Bodenschätzung (WFS)',
+     'https://www.geoportal.rlp.de/registry/wfs/571', 'Boden und Geologie'),
+]:
+    add('rp-'+key, title, endpoint, 'Rheinland-Pfalz',
+        topic, 'LVermGeo Rheinland-Pfalz', RLP_OPEN,
+        'DL-DE BY 2.0', BY, kind='wfs',
+        note='Die amtliche WFS-Schnittstelle und angebotene Geometrien '
+             'werden erst beim Öffnen geprüft. Große Datenmengen sowie '
+             'nicht unterstützte Koordinatenreferenzsysteme erfordern '
+             'die Nutzung des offiziellen Downloadangebotes.',
+        attribution=RLP_ATTR)
+
 # Landesfachdaten beyond cadastral/topographic data. The original
 # licensing is different: do not relabel third-party sectoral data
 # under the LVermGeo data licence.
