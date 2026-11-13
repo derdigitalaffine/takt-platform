@@ -160,6 +160,7 @@
   .map-easy-tabs {margin:.65rem 0 .75rem;gap:.2rem;padding:.2rem}
   .map-easy-tab {min-height:3.15rem;font-size:.74rem;line-height:1.28}
   .map-easy-block {padding:.7rem}
+  .map-easy-block .form-select {min-height:44px}
   .map-easy-discover-link {padding:.75rem .65rem}
   .map-easy-action,.map-easy-active-item,.map-easy-discover-link,
   .map-easy-details > summary,.map-easy-catalog-more > summary {min-height:44px}
