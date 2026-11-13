@@ -13,6 +13,12 @@
     <section class="pr-panel">
       <div class="pr-panel-head"><div><span class="pr-eyebrow">Strukturiert statt Freitext-Chaos</span><h2>Vordruck ausfüllen</h2><p>Die Felder gliedern das spätere PDF. Leere Werte werden als zu prüfen gekennzeichnet.</p></div></div>
       {% if mode=='new' %}<div class="pr-autofill-note" role="status"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span><strong>{{prefill_sources|length}} bekannte Angaben vorbelegt</strong> · Nur nachprüfbare TAKT-Planungsdaten, bestehende Fachmandate oder bestätigte aggregierte Auszählungen. Jede Vorbelegung ist änderbar und muss fachlich kontrolliert werden. Leere Felder werden bewusst nicht geraten.</span></div>{% endif %}
+      <section class="pr-quality" aria-label="Vollständigkeit des Vordrucks">
+        <div class="pr-quality-header"><strong>Angaben im Entwurf</strong><span>{{field_summary.filled}} von {{field_summary.total}} Feldern ausgefüllt</span></div>
+        <progress max="{{field_summary.total}}" value="{{field_summary.filled}}" aria-label="Anteil der ausgefüllten Dokumentfelder">{{field_summary.filled}} / {{field_summary.total}}</progress>
+        {% if field_summary.missing %}<details class="pr-quality-missing"><summary>{{field_summary.missing|length}} noch offene Feldangaben anzeigen</summary><ul>{% for label in field_summary.missing %}<li>{{label}}</li>{% endfor %}</ul></details>{% else %}<p class="pr-quality-good"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Alle vorgesehenen Eingabefelder enthalten Angaben – eine Rechtsprüfung ist trotzdem erforderlich.</p>{% endif %}
+        <p class="pr-quality-disclaimer">Diese Anzeige ist eine Bearbeitungshilfe: Auch vollständige Felder bestätigen weder Inhalt noch rechtliche Wirksamkeit. Felder dürfen in begründeten Fällen leer bleiben.</p>
+      </section>
       <form method="post" action="/personalratswahl/{{election.id}}/dokumente/speichern" id="pr-doc-form">
         <input type="hidden" name="csrf" value="{{csrf}}">
         <input type="hidden" name="kind" value="{{form_kind}}">
