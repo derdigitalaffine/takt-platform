@@ -491,7 +491,7 @@
                 <label class="form-label" for="law-ai-outline-mode">Unterste Gliederungsebene</label>
                 <select class="form-select" name="outline" id="law-ai-outline-mode">
                   {% for key,label in outline_modes.items() %}
-                    <option value="{{ key }}" {% if key == 'paragraf' %}selected{% endif %}>{{ label }}</option>
+                    <option value="{{ key }}" {% if key == '' %}selected{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
                 <p class="small text-secondary mt-1 mb-0">Für Satzungen sind § und Artikel normalerweise Einzelvorschriften. Bei Richtlinien können es auch Nummern oder Ziffern sein.</p>
