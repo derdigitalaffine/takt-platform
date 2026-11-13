@@ -260,7 +260,7 @@ def law_ai_queue_ocr(
         temporary.unlink(missing_ok=True)
         submitted.unlink(missing_ok=True)
         raise
-    return redirect(f"/laws-assistant/{row.id}?bereich={'ki' if status == 'staged' else 'import'}")
+    return redirect(f"/laws-assistant/{row.id}?bereich=import")
 
 
 def _ocr_phase(draft: LawAiDraft) -> dict:
@@ -353,7 +353,7 @@ async def law_ai_import(request: Request, file: UploadFile = File(...),
         db.rollback()
         path.unlink(missing_ok=True)
         raise
-    return redirect(f"/laws-assistant/{row.id}")
+    return redirect(f"/laws-assistant/{row.id}?bereich={'ki' if status == 'staged' else 'import'}")
 
 
 @app.get("/laws-assistant/{draft_id:int}")
