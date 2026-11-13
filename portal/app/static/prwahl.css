@@ -103,3 +103,13 @@
 .pr-page a:focus-visible,.pr-page button:focus-visible,.pr-page input:focus-visible,.pr-page select:focus-visible,.pr-page summary:focus-visible{outline:3px solid var(--bs-primary);outline-offset:3px}
 @media(max-width:900px){.pr-quick-nav{grid-template-columns:1fr}.pr-quick-nav>a{min-height:4.5rem}}
 @media(prefers-reduced-motion:reduce){.pr-quick-nav>a{transition:none}.pr-quick-nav>a:hover{transform:none}}
+
+/* Clearer paper-election lifecycle, including screen-reader labels and print. */
+.pr-life-step{scroll-margin-top:5rem}
+.pr-life-main{min-width:0}
+.pr-life-heading h3{line-height:1.35}
+.pr-life-action summary{display:inline-flex;align-items:center;min-height:2.75rem;padding:.5rem .85rem;border-radius:.65rem;border:1px solid var(--pr-stroke);color:var(--bs-primary);font-weight:650;cursor:pointer}
+.pr-life-action[open] summary{background:var(--pr-subtle);border-color:var(--bs-primary)}
+.pr-life-action form{margin-top:.45rem}
+.pr-life-evidence{overflow-wrap:anywhere;border-left:3px solid var(--ds-success-fg);padding:.65rem .85rem;background:var(--pr-subtle);border-radius:.25rem .65rem .65rem .25rem}
+@media print{.pr-life-action,.pr-header .ds-page-actions,.pr-quick-nav,.pr-tabs{display:none!important}.pr-life-step{break-inside:avoid}.pr-page{max-width:none}.pr-panel{box-shadow:none}}
