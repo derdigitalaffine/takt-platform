@@ -1,6 +1,5 @@
 {% extends "auth.html" %}
-{% block title %}Anmelden<script src="/static/passkeys.js" defer></script>
-{% endblock %}
+{% block title %}Anmelden{% endblock %}
 {% block auth %}
 {% if ui.login_text %}<p class="text-center text-secondary">{{ ui.login_text }}</p>{% endif %}
 <div class="card shadow-sm">
@@ -44,4 +43,5 @@
 </div>
 {% endif %}
 <p class="text-center small text-secondary mt-3">Als Gast brauchen Sie kein Konto – öffnen Sie einfach den Einladungslink.</p>
+<script src="/static/passkeys.js" defer></script>
 {% endblock %}
