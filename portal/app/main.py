@@ -2052,7 +2052,10 @@ def profile_security(request: Request, user: User = Depends(current_user), db: S
         stash_put(request, "totp_setup", secret)
         uri = twofa.provisioning_uri(secret, user)
         setup = {"secret": " ".join(secret[i:i + 4] for i in range(0, len(secret), 4)), "qr": twofa.qr_svg(uri)}
-    return render(request, "profile_security.html", user, allowed=twofa.allowed(cfg), required=twofa.required(user, cfg),
+    from .passkey_models import PasskeyCredential
+    passkeys = list(db.scalars(select(PasskeyCredential).where(PasskeyCredential.user_id == user.id)
+                              .order_by(PasskeyCredential.created_at.desc())))
+    return render(request, "profile_security.html", user, passkeys=passkeys, allowed=twofa.allowed(cfg), required=twofa.required(user, cfg),
                   methods=twofa.methods(user, cfg), setup=setup, recovery_left=twofa.recovery_left(user),
                   new_codes=stash_get(request, "recovery_codes", pop=True), mail_ready=notify.mail_configured(cfg),
                   my_sessions=sessions.rows(request, sessions.for_user(db, user.id)))
@@ -2256,9 +2259,10 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
                 per_page: int = 25, user: User = Depends(users_manager), db: Session = Depends(get_db)):
     """Server-filtered directory: render a bounded page instead of every user/editor."""
     from . import absence, organization
+    from .passkey_models import PasskeyCredential
     from sqlalchemy import or_
     q = " ".join(q.strip().split())[:160]
-    status = status if status in {"all", "active", "blocked", "invited", "mfa"} else "all"
+    status = status if status in {"all", "active", "blocked", "invited", "mfa", "passkeys"} else "all"
     role = role if role in {"all", "admin", "member"} else "all"
     sort = sort if sort in {"name", "email", "newest"} else "name"
     per_page = per_page if per_page in (25, 50, 100) else 25
@@ -2277,6 +2281,8 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
         conditions.append(User.password_set.is_(False))
     elif status == "mfa":
         conditions.append(or_(User.totp_enabled.is_(True), User.mfa_email.is_(True)))
+    elif status == "passkeys":
+        conditions.append(User.id.in_(select(PasskeyCredential.user_id)))
     if role != "all":
         conditions.append(User.is_admin.is_(role == "admin"))
     if group is not None:
@@ -2294,6 +2300,10 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
         select(User).options(joinedload(User.groups))
         .where(*conditions).order_by(*order).offset((page - 1) * per_page).limit(per_page)
     ).unique().all()
+    passkey_counts = dict(db.execute(
+        select(PasskeyCredential.user_id, func.count(PasskeyCredential.id))
+        .where(PasskeyCredential.user_id.in_([u.id for u in users]))
+        .group_by(PasskeyCredential.user_id)).all()) if users else {}
     org_user_roles = organization.role_directory(db)
     counts = {
         "total": total,
@@ -2304,7 +2314,7 @@ def admin_users(request: Request, q: str = "", status: str = "all", role: str = 
     }
     filters = {"q": q, "status": status, "role": role, "group": group,
                "sort": sort, "per_page": per_page}
-    return render(request, "admin_users.html", user, users=users, groups=groups,
+    return render(request, "admin_users.html", user, users=users, passkey_counts=passkey_counts, groups=groups,
                   org_directory=organization.directory(db), org_user_roles=org_user_roles,
                   org_group_roles=set(db.scalars(select(organization.OrgRoleGrant.group_id)
                                      .where(organization.OrgRoleGrant.group_id.is_not(None)))),
@@ -3155,6 +3165,7 @@ from . import routes_surveys  # noqa: E402,F401
 from . import routes_live  # noqa: E402,F401
 from . import routes_public  # noqa: E402,F401
 from . import routes_absences  # noqa: E402,F401
+from . import routes_passkeys  # noqa: E402,F401 (WebAuthn passwordless login + credential management)
 from . import routes_sessions  # noqa: E402,F401
 from . import routes_circulations  # noqa: E402,F401
 from . import routes_laws  # noqa: E402,F401

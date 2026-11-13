@@ -3225,6 +3225,7 @@ def init_db() -> None:
     from . import internal_asset_models  # noqa: F401 – separater interner Gerätepool
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
+    from . import passkey_models  # noqa: F401 – passkey credentials and one-time WebAuthn challenges
     from . import law_ai_models  # noqa: F401 – isolated, unpublished law-import drafts
     from . import law_ai_agent_models  # noqa: F401 – versioned read-only agent reviews
     from . import knowledge_models  # noqa: F401 – register additive knowledge tables

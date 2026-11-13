@@ -54,7 +54,7 @@
     </div>
     <form class="admin-user-filters" method="get" action="/admin/users" role="search" aria-label="Benutzer filtern">
       <div class="admin-filter-search"><label for="admin-user-query" class="form-label">Name oder E-Mail</label><input id="admin-user-query" name="q" type="search" class="form-control" value="{{filters.q}}" placeholder="Person suchen …" autocomplete="off"></div>
-      <div><label for="admin-user-status" class="form-label">Status</label><select id="admin-user-status" name="status" class="form-select">{% for key,label in [('all','Alle'),('active','Aktiv'),('invited','Einladung offen'),('blocked','Gesperrt'),('mfa','Mit Zwei-Faktor')] %}<option value="{{key}}" {{'selected' if filters.status==key}}>{{label}}</option>{% endfor %}</select></div>
+      <div><label for="admin-user-status" class="form-label">Status</label><select id="admin-user-status" name="status" class="form-select">{% for key,label in [('all','Alle'),('active','Aktiv'),('invited','Einladung offen'),('blocked','Gesperrt'),('mfa','Mit Zwei-Faktor'),('passkeys','Mit Passkey')] %}<option value="{{key}}" {{'selected' if filters.status==key}}>{{label}}</option>{% endfor %}</select></div>
       <div><label for="admin-user-role" class="form-label">Rolle</label><select id="admin-user-role" name="role" class="form-select">{% for key,label in [('all','Alle'),('admin','Administrator'),('member','Normale Konten')] %}<option value="{{key}}" {{'selected' if filters.role==key}}>{{label}}</option>{% endfor %}</select></div>
       <div><label for="admin-user-group" class="form-label">Gruppe</label><select id="admin-user-group" name="group" class="form-select"><option value="">Alle Gruppen</option>{% for g in groups %}<option value="{{g.id}}" {{'selected' if filters.group==g.id}}>{{g.name}}</option>{% endfor %}</select></div>
       <div><label for="admin-user-sort" class="form-label">Sortieren</label><select id="admin-user-sort" name="sort" class="form-select">{% for key,label in [('name','Name A–Z'),('email','E-Mail A–Z'),('newest','Neueste zuerst')] %}<option value="{{key}}" {{'selected' if filters.sort==key}}>{{label}}</option>{% endfor %}</select></div>
@@ -69,7 +69,7 @@
   {% for u in users %}
   <tr class="admin-user-row">
     <td data-label="Person"><div class="d-flex align-items-center gap-2"><span class="avatar">{{ m.initials(u.name) }}</span><span class="fw-semibold">{{ u.name }}</span></div></td>
-    <td data-label="Kontakt & Organisation">{{ u.email }}{% for role in org_user_roles.get(u.id,[]) if role.role in ('Leitung','Stellvertretende Leitung') %}<span class="badge {{'text-bg-primary' if role.role=='Leitung' else 'text-bg-info'}} ms-1" title="{{role.org}} · {{'einschließlich Untereinheiten' if role.children else 'nur diese Einheit'}}">{{role.role}}</span>{% endfor %}{% for item in org_directory.get(u.id,[]) %}<div class="small"><a href="/admin/organization?unit={{item.id}}&amp;person={{u.id}}">{{item.name}}</a>{{' · Hauptzuordnung' if item.primary else ' · zusätzlich'}}</div>{% endfor %}</td>
+    <td data-label="Kontakt & Organisation">{{ u.email }}{% if passkey_counts.get(u.id,0) %}<div><span class="badge text-bg-success mt-1" title="Für dieses Konto registrierte Passkeys"><i class="fa-solid fa-fingerprint me-1" aria-hidden="true"></i>{{ passkey_counts[u.id] }} Passkey{{ "" if passkey_counts[u.id] == 1 else "s" }}</span></div>{% endif %}{% for role in org_user_roles.get(u.id,[]) if role.role in ('Leitung','Stellvertretende Leitung') %}<span class="badge {{'text-bg-primary' if role.role=='Leitung' else 'text-bg-info'}} ms-1" title="{{role.org}} · {{'einschließlich Untereinheiten' if role.children else 'nur diese Einheit'}}">{{role.role}}</span>{% endfor %}{% for item in org_directory.get(u.id,[]) %}<div class="small"><a href="/admin/organization?unit={{item.id}}&amp;person={{u.id}}">{{item.name}}</a>{{' · Hauptzuordnung' if item.primary else ' · zusätzlich'}}</div>{% endfor %}</td>
     <td data-label="Berechtigungen">{% if u.is_admin %}<span class="badge text-bg-primary"><i class="fa-solid fa-user-shield me-1"></i>Admin</span>
         {% else %}<span class="badge text-bg-light border">{{ u.perms|length }} {{ 'Recht' if u.perms|length == 1 else 'Rechte' }}</span>
         {% if u.perms %}<details class="perm-inline-details d-inline-block ms-1"><summary class="small">Anzeigen</summary>
@@ -244,6 +244,27 @@
     </details>
     {% if user.is_admin %}
 <a class="btn btn-outline-primary mb-3" href="/admin/oidc"><i class="fa-solid fa-key me-2" aria-hidden="true"></i>Nextcloud / OIDC-Anmeldung einrichten</a>
+<div class="card mb-4"><div class="card-header"><i class="fa-solid fa-fingerprint me-2" aria-hidden="true"></i>Passkey-Verwaltung &amp; Wiederherstellung</div>
+<div class="card-body">
+  <p class="small text-secondary">Jede Person kann unter <strong>Profil → Sicherheit → Passkeys</strong> selbst einen Anmeldeschlüssel hinzufügen und entfernen. Hier werden nur die Anzahlen angezeigt, keine privaten Schlüssel. Bei einem verlorenen Gerät kannst du nach Prüfung der Identität die Passkeys eines Kontos widerrufen; das Passwort oder OIDC bleiben erhalten.</p>
+  <form method="post" action="" id="passkey-admin-revoke" class="row g-2 align-items-end" data-passkey-admin-form>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="confirm" value="1">
+    <div class="col-12 col-lg-5"><label class="form-label" for="passkey-admin-user">Konto mit Passkeys auswählen</label>
+      <select class="form-select" id="passkey-admin-user" required>
+        <option value="">Benutzerkonto auswählen …</option>
+        {% for u in users if passkey_counts.get(u.id,0) %}<option value="{{ u.id }}">{{ u.name }} · {{ u.email }} ({{ passkey_counts[u.id] }})</option>{% endfor %}
+      </select>
+      <p class="form-text mb-0">Angezeigt werden Konten der aktuellen Ergebnisseite.</p>
+    </div>
+    <div class="col-12 col-lg-4"><label class="form-label" for="passkey-admin-password">Admin-Passwort</label>
+      <input class="form-control" id="passkey-admin-password" type="password" name="password" autocomplete="current-password" {% if user.password_set %}required{% endif %}>
+      {% if not user.password_set %}<p class="form-text mb-0">Alternativ: aktuelle OIDC-Anmeldung (max. 10 Minuten).</p>{% endif %}
+    </div>
+    <div class="col-12 col-lg-3"><button class="btn btn-outline-danger w-100" type="submit" data-confirm="Alle Passkeys des ausgewählten Kontos endgültig widerrufen? Eine Anmeldung mit diesen Passkeys ist anschließend unmöglich." data-confirm-button="Passkeys widerrufen">Passkeys widerrufen</button></div>
+  </form>
+</div></div>
+<script src="/static/passkeys-admin.js" defer></script>
 <div class="card mb-4" id="sicherheit"><div class="card-header"><i class="fa-solid fa-shield-halved me-2"></i>Anmeldung &amp; Zwei-Faktor</div><div class="card-body">
   <form method="post" action="/admin/security" class="row g-3 align-items-end">
     <input type="hidden" name="csrf" value="{{ csrf }}">

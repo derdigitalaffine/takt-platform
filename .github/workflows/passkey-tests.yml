@@ -1,0 +1,48 @@
+name: Passkey WebAuthn security
+
+on:
+  pull_request:
+    paths:
+      - "portal/app/routes_passkeys.py"
+      - "portal/app/passkey_models.py"
+      - "portal/app/static/passkeys.js"
+      - "portal/app/static/passkeys-admin.js"
+      - "portal/app/templates/login.html"
+      - "portal/app/templates/profile_security.html"
+      - "portal/app/templates/admin_users.html"
+      - "portal/tests/test_passkeys.py"
+      - "portal/requirements.txt"
+      - ".github/workflows/passkey-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "portal/app/routes_passkeys.py"
+      - "portal/app/passkey_models.py"
+      - "portal/tests/test_passkeys.py"
+      - "portal/requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  passkeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: portal/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Python syntax checks
+        run: python -m compileall -q app/routes_passkeys.py app/passkey_models.py
+      - name: Browser JavaScript syntax checks
+        run: node --check app/static/passkeys.js && node --check app/static/passkeys-admin.js
+      - name: Passkey and session regression tests
+        run: python -m pytest -q tests/test_passkeys.py tests/test_security.py
