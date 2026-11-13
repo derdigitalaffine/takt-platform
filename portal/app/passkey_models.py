@@ -13,6 +13,7 @@ class PasskeyCredential(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     credential_id: Mapped[str] = mapped_column(String(1024), unique=True, index=True)
+    user_handle: Mapped[str] = mapped_column(String(128))  # random opaque WebAuthn account handle
     public_key: Mapped[str] = mapped_column(Text)
     sign_count: Mapped[int] = mapped_column(Integer, default=0)
     name: Mapped[str] = mapped_column(String(100), default="Passkey")
@@ -28,6 +29,7 @@ class PasskeyCeremony(Base):
     id: Mapped[str] = mapped_column(String(90), primary_key=True)
     purpose: Mapped[str] = mapped_column(String(16))
     challenge: Mapped[str] = mapped_column(String(128))
+    user_handle: Mapped[str | None] = mapped_column(String(128), nullable=True)
     rp_id: Mapped[str] = mapped_column(String(253))
     origin: Mapped[str] = mapped_column(String(350))
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
