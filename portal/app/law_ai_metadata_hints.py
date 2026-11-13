@@ -31,7 +31,7 @@ def hints(source: str, *, allow_header: bool = True) -> list[dict[str, str]]:
             continue
         # Title only from the document's opening header, not later citations.
         if allow_header and index < 16 and "title" not in found:
-            match = re.fullmatch(r"#{1,2}\s+(.{8,200})", line)
+            match = re.fullmatch(r"#\s+(.{8,200})", line)
             if match and not line.lower().endswith("inhaltsverzeichnis"):
                 found["title"] = {"field": "title", "value": match.group(1), "evidence": line}
             elif (index < 10 and len(line) >= 18 and len(line) <= 200
