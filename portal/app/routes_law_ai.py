@@ -444,6 +444,7 @@ def law_ai_accept(
     request: Request, draft_id: int,
     title: str = Form(""), body_md: str = Form(""),
     doc_type: str = Form("satzung"), level_id: str = Form(""),
+    outline: str = Form(""),
     short_title: str = Form(""), version_note: str = Form(""),
     issued_on: str = Form(""), valid_from: str = Form(""),
     valid_until: str = Form(""), confirmed: str = Form(""),
