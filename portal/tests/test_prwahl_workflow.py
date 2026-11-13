@@ -112,3 +112,34 @@ def test_direct_allocation_normalizes_surrounding_whitespace():
     result = dhondt([(" Liste A ", 100), ("Liste B", 60)], 1)
     assert result["complete"] is True
     assert result["assigned"] == {"Liste A": 1, "Liste B": 0}
+
+
+@pytest.mark.parametrize("entries", [
+    [("Person A", -1)],
+    [("Person A", True)],
+    [("Person A", "3")],
+    [("Person A", 2), ("person a", 3)],
+    [("Person A", 2), (" Person A ", 3)],
+    [("Person A", 2, 3)],
+    [],
+])
+def test_person_count_rejects_malformed_direct_entries(entries):
+    with pytest.raises(HTTPException) as exc:
+        check_count("person", 2, 10, 0, 0, entries)
+    assert exc.value.status_code == 422
+
+
+@pytest.mark.parametrize("ballots,invalid,abstain", [
+    (10, 11, 0), (10, -1, 0), (10, 0, 11),
+    (True, 0, 0), (10.5, 0, 0), (10, 0, -1),
+])
+def test_direct_count_rejects_invalid_ballot_totals(ballots, invalid, abstain):
+    with pytest.raises(HTTPException) as exc:
+        check_count("person", 2, ballots, invalid, abstain, [("Person A", 1)])
+    assert exc.value.status_code == 422
+
+
+def test_person_count_does_not_count_abstentions_as_vote_capacity():
+    with pytest.raises(HTTPException) as exc:
+        check_count("person", 2, 10, 0, 5, [("Person A", 11)])
+    assert exc.value.status_code == 422
