@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}KI-Prüfprotokoll · Ortsrecht{% endblock %}
+{% block head %}
+<style>
+.law-report {max-width: 1040px; margin: 0 auto; --l-border: var(--bs-border-color);}
+.law-report h1 {font-size: 1.75rem; line-height: 1.2;}
+.law-report h2 {font-size: 1.1rem; margin: 0;}
+.law-report .law-report-section {border: 1px solid var(--l-border); border-radius: .85rem; margin: 1rem 0; overflow: hidden; break-inside: avoid;}
+.law-report .law-report-section > header {padding: .8rem 1rem; background: var(--bs-tertiary-bg); border-bottom: 1px solid var(--l-border);}
+.law-report .law-report-section > .law-report-content {padding: .8rem 1rem;}
+.law-report .law-report-row {padding: .7rem 0; border-bottom: 1px solid var(--l-border); break-inside: avoid;}
+.law-report .law-report-row:last-child {border-bottom: 0;}
+.law-report blockquote {padding: .6rem .85rem; border-left: 3px solid var(--bs-primary); background: var(--bs-tertiary-bg); white-space: pre-wrap; overflow-wrap: anywhere; margin: .45rem 0;}
+.law-report .law-print-value {font-family: ui-monospace, monospace; font-size: .84rem; overflow-wrap: anywhere;}
+@page {size: A4; margin: 14mm;}
+@media print {
+  nav.navbar,.sidebar,.app-sidebar,.app-footer,.law-report-actions,.app-navbar,.offcanvas {display: none !important;}
+  .app-body,.container-fluid,.col-lg-10,.col-xl-10,.main-content, main {padding: 0 !important; margin: 0 !important; max-width: none !important;}
+  body {font-size: 10pt !important; background: white !important; color: black !important;}
+  .law-report {max-width: none;}
+  .law-report .law-report-section {border-color: #999;}
+  .law-report .law-report-section > header, .law-report blockquote {background: #f4f4f4 !important; color: #111 !important;}
+  .badge {border: 1px solid #777 !important; color: #111 !important; background: #fff !important;}
+}
+</style>
+{% endblock %}
+{% block content %}
+<article class="law-report" aria-labelledby="law-report-title">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <div class="text-uppercase text-secondary small fw-bold mb-2">TAKT · Ortsrecht · interne Redaktionshilfe</div>
+      <h1 id="law-report-title">KI-Prüfprotokoll</h1>
+      <p class="text-secondary mb-0">Unverbindliche Hinweise zum importierten Textstand · Auftragsnummer {{ analysis.id }}</p>
+    </div>
+    <div class="law-report-actions d-flex flex-wrap gap-2">
+      <a href="/laws-assistant/{{ selected.id }}" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Zum Prüfplatz
+      </a>
+      <button type="button" class="btn btn-primary" onclick="window.print()">
+        <i class="fa-solid fa-print me-1" aria-hidden="true"></i>Drucken / als PDF sichern
+      </button>
+    </div>
+  </div>
+  <div class="alert alert-warning" role="note">
+    <strong>Kein amtlicher Rechtstext und keine juristische Freigabe.</strong>
+    Dieser Bericht enthält KI-Vorschläge und technische Fundstellen aus dem importierten OCR-/MarkItDown-Text.
+    Er ist kein Beleg für die Richtigkeit des Original-PDFs, keine amtliche Bekanntmachung und keine Prüfung des Inkrafttretens.
+    Rechtsänderungen und Freigaben erfordern weiterhin die Prüfung durch zuständige Personen.
+  </div>
+
+  <section class="law-report-section" aria-labelledby="law-report-source">
+    <header><h2 id="law-report-source">Quellenstand und Nachweis</h2></header>
+    <div class="law-report-content">
+      <dl class="row small mb-0">
+        <dt class="col-sm-3">Importdatei</dt><dd class="col-sm-9 text-break">{{ selected.original_filename }}</dd>
+        <dt class="col-sm-3">Analysezeitpunkt</dt><dd class="col-sm-9">{{ analysis.updated_at|local }}</dd>
+        <dt class="col-sm-3">Modus</dt><dd class="col-sm-9">{{ 'Gesamter Text, abschnittsweise' if analysis.mode == 'advanced' else 'Schnellcheck mit möglichen Auszügen' }}</dd>
+        <dt class="col-sm-3">Original SHA-256</dt><dd class="col-sm-9 law-print-value">{{ selected.original_sha256 }}</dd>
+        <dt class="col-sm-3">Importtext SHA-256</dt><dd class="col-sm-9 law-print-value">{{ analysis.source_sha256 }}</dd>
+      </dl>
+    </div>
+  </section>
+
+  {% set coverage = results.verification.coverage %}
+  <section class="law-report-section" aria-labelledby="law-report-coverage">
+    <header><h2 id="law-report-coverage">Abdeckung und Modelle</h2></header>
+    <div class="law-report-content">
+      <p class="small mb-2">
+        {% if coverage.get('mode') == 'full_text_submitted' %}
+          Gesamter importierter Text wurde abschnittsweise an das Modell übermittelt.
+        {% else %}
+          Nur Auszüge / Stichproben. Eine vollständige KI-Textprüfung wurde nicht durchgeführt.
+        {% endif %}
+        {{ coverage.get('sections_analyzed', 0) }} von {{ coverage.get('sections_total', '?') }} Abschnitten;
+        {{ coverage.get('source_chars', 0) }} Zeichen der Textquelle.
+      </p>
+      <table class="table table-sm small mb-0">
+        <thead><tr><th scope="col">Prüfstufe</th><th scope="col">Freigegebener Anbieter und Modell beim Start</th></tr></thead>
+        <tbody>
+          {% for task, label in agent_stages %}
+          <tr><th scope="row">{{ label }}</th><td class="text-break">
+            {% set profile = models.get(task, {}) %}
+            {{ profile.get('name', 'Nicht dokumentiert') }} · {{ profile.get('model_id', 'Unbekannt') }}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="small text-secondary mb-0 mt-2">Ein vollständig übermittelter Text ist nicht automatisch vollständig oder zutreffend juristisch geprüft.</p>
+    </div>
+  </section>
+
+  <section class="law-report-section" aria-labelledby="law-report-fields">
+    <header><h2 id="law-report-fields">Stammdatenvorschläge ({{ results.metadata.fields|length }})</h2></header>
+    <div class="law-report-content">
+      {% for entry in results.metadata.fields %}
+      <div class="law-report-row">
+        <strong>{{ entry.field }}</strong>: {{ entry.value }}
+        <blockquote class="small">{{ entry.evidence }}</blockquote>
+        {% if entry.source_start is defined %}<small class="text-secondary">Importzeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}</small>{% endif %}
+      </div>
+      {% else %}<p class="small text-secondary mb-0">Keine belegten Stammdatenvorschläge.</p>{% endfor %}
+      {% for warning in results.metadata.warnings %}<p class="small text-warning">{{ warning }}</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="law-report-section" aria-labelledby="law-report-headings">
+    <header><h2 id="law-report-headings">Gliederungsvorschläge ({{ results.structure.headings|length }})</h2></header>
+    <div class="law-report-content">
+      {% for entry in results.structure.headings %}
+      <div class="law-report-row">
+        <span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
+        <div class="law-print-value mt-1">{{ entry.markdown_suggestion }}</div>
+        <blockquote class="small">{{ entry.quote }}</blockquote>
+        {% if entry.source_start is defined %}<small class="text-secondary">Importzeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}</small>{% endif %}
+      </div>
+      {% else %}<p class="small text-secondary mb-0">Keine Gliederungsvorschläge.</p>{% endfor %}
+      {% for warning in results.structure.warnings %}<p class="small text-warning">{{ warning }}</p>{% endfor %}
+    </div>
+  </section>
+
+  <section class="law-report-section" aria-labelledby="law-report-findings">
+    <header><h2 id="law-report-findings">Prüfhinweise ({{ results.verification.findings|length }})</h2></header>
+    <div class="law-report-content">
+      {% for entry in results.verification.findings %}
+      <div class="law-report-row">
+        <span class="badge text-bg-{{ 'danger' if entry.severity in ('critical', 'high') else 'warning' }}">{{ entry.severity }}</span>
+        <blockquote class="small">{{ entry.quote }}</blockquote>
+        <p class="small mb-1"><strong>Prüfgrund:</strong> {{ entry.reason }}</p>
+        {% if entry.suggestion %}<p class="small mb-1"><strong>KI-Vorschlag:</strong> {{ entry.suggestion }}</p>{% endif %}
+        {% if entry.source_start is defined %}<small class="text-secondary">Importzeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}</small>{% endif %}
+      </div>
+      {% else %}<p class="small text-secondary mb-0">Keine belegten Hinweise gefunden. Das bestätigt weder Fehlerfreiheit noch OCR-Texttreue.</p>{% endfor %}
+      {% for warning in results.verification.warnings %}<p class="small text-warning">{{ warning }}</p>{% endfor %}
+    </div>
+  </section>
+
+  <footer class="small text-secondary mt-4 border-top pt-2">
+    Bericht ausschließlich zur internen redaktionellen Unterstützung. Prüf-ID {{ analysis.id }} ·
+    Fundstellen sind Zeichenpositionen des importierten Texts, keine amtlichen PDF-Seitenbelege.
+    Das Drucken erzeugt keine Veröffentlichung und keine Freigabe.
+  </footer>
+</article>
+{% endblock %}
