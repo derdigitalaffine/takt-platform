@@ -5,11 +5,19 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .db import User, Notification, utcnow
-from .calendar_models import Calendar, CalendarGrant, CalendarEvent
+from .calendar_models import Calendar, CalendarEvent
 from .main import app, check_csrf, current_user, get_db, render, redirect, flash
 from .prwahl import scope, record, clean
 from .prwahl_models import PRMandate
 from .prwahl_schedule import PRScheduleEvent, KINDS, local_to_utc, display_local, calendar_file
+
+def _redacted_event(event):
+    """Prevent sensitive event titles and locations leaking through CalDAV feeds."""
+    from types import SimpleNamespace
+    return SimpleNamespace(uid=event.uid, updated_at=event.updated_at, created_at=event.created_at,
+        starts_at=event.starts_at, ends_at=event.ends_at, sequence=event.sequence,
+        status=event.status, title="Wahlteam-Termin (Details im geschützten Modul)", location="")
+
 
 def _event(db, election_id, event_id):
     event = db.scalar(select(PRScheduleEvent).where(PRScheduleEvent.election_id == election_id, PRScheduleEvent.id == event_id))
@@ -86,9 +94,9 @@ def prwahl_schedule_notify(request: Request, election_id: int, event_id: int,
         address = getattr(member,"email",None)
         if not address:
             continue
-        # No nomination, roll or count details in e-mail: metadata only.
+        # Only generic metadata in e-mail: even event titles can contain sensitive data.
         body = ("Du hast einen Termin im geschützten Wahl-Arbeitsbereich.\n"
-                f"Termin: {event.title}\nBeginn: {display_local(event.starts_at)} (Europe/Berlin)\n"
+                f"Beginn: {display_local(event.starts_at)} (Europe/Berlin)\n"
                 f"Ende: {display_local(event.ends_at)} (Europe/Berlin)\n"
                 "Bitte melde dich im TAKT-Portal an, um die Einzelheiten zu prüfen.\n"
                 "Eine Kalendereinladung ersetzt keine rechtlich vorgeschriebene Zustellung oder Bekanntmachung.")
@@ -119,22 +127,15 @@ def prwahl_schedule_calendar(request: Request, election_id: int, event_id: int,
                             include_children=False)
         db.add(calendar)
         db.flush()
-    members = db.scalars(select(PRMandate).join(User, User.id == PRMandate.user_id).where(
-        PRMandate.election_id == election.id, User.active.is_(True),
-        PRMandate.role.in_(["chair", "member", "clerk"]))).all()
-    for mandate in members:
-        if mandate.user_id != user.id and not db.scalar(select(CalendarGrant.id).where(
-            CalendarGrant.calendar_id == calendar.id, CalendarGrant.user_id == mandate.user_id)):
-            db.add(CalendarGrant(calendar_id=calendar.id, user_id=mandate.user_id, can_write=False))
     existing = db.scalar(select(CalendarEvent).where(CalendarEvent.calendar_id == calendar.id,
                                                       CalendarEvent.uid == event.uid))
     if existing:
         raise HTTPException(409, "Der Termin ist bereits im Wahlteam-Kalender vorhanden.")
     db.add(CalendarEvent(calendar_id=calendar.id, uid=event.uid,
-        title=event.title, location=event.location, description="Geschützter Wahlteam-Termin.",
+        title="Wahlteam-Termin (Details im geschützten Modul)", location="", description="Details nur im geschützten Personalratswahl-Modul.",
         org_id=None, include_children=False, starts_at=event.starts_at.isoformat()+"Z",
-        ends_at=event.ends_at.isoformat()+"Z", ical_data=calendar_file(event)))
+        ends_at=event.ends_at.isoformat()+"Z", ical_data=calendar_file(_redacted_event(event))))
     record(db, user.id, election.id, "calendar_exported", f"event:{event.id}")
     db.commit()
-    flash(request, "Termin im privaten TAKT-Wahlteam-Kalender angelegt. Nur ausdrücklich berechtigte Mitglieder haben Zugriff.")
+    flash(request, "Termin in deinem privaten TAKT-Kalender angelegt. Vertrauliche Titel und Orte werden nicht übertragen.")
     return redirect(f"/personalratswahl/{election.id}/termine")
