@@ -144,6 +144,7 @@
       finished = true;
       source?.close();
       if (pollTimer !== null) clearInterval(pollTimer);
+      if (window.LawReviewUX?.deferRefresh?.()) return;
       window.location.reload();
       return;
     }
