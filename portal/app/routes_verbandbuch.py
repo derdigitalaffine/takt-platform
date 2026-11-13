@@ -54,8 +54,11 @@ def verbandbuch_home(
     _open(user)
     capture = aid.sites_for(db, user, "capture")
     review = aid.sites_for(db, user, "review")
+    # Eigene Belege nur bei weiterhin bestehender Standort-Erfassungsberechtigung.
+    # Entzug, Deaktivierung oder Organisationssperre wirkt unmittelbar.
     my_rows = db.scalars(select(FirstAidCase).where(
-        FirstAidCase.created_by_id == user.id
+        FirstAidCase.created_by_id == user.id,
+        FirstAidCase.site_id.in_([site.id for site in capture]),
     ).order_by(FirstAidCase.created_at.desc()).limit(40)).all()
     cases = db.scalars(select(FirstAidCase).where(
         FirstAidCase.site_id.in_([s.id for s in review])
