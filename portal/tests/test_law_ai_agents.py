@@ -266,7 +266,7 @@ def _model_context(messages):
 def test_advanced_agents_cover_every_source_character_without_publication(monkeypatch, agent_routes):
     admin = login(*ADMIN)
     source = ("# Satzung\n§ 1 Gebühren 10 €\n§ 2 Keine Ausnahmen\n" * 900)
-    assert len(source) > law_ai_coverage.MAX_CONTEXT_CHARS
+    assert len(source) > law_ai_agents.MAX_CONTEXT_CHARS
     sections = law_ai_coverage.sections(source)
     did = _upload_long_md(admin, source)
     page = admin.get(f"/laws-assistant/{did}")
