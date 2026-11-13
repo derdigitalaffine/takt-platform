@@ -75,13 +75,15 @@ def prompt(stage: str, source: str) -> tuple[list[dict], bool]:
         "Keine externen Quellen. Keine erfundenen Tatsachen, Fundstellen, Datumsangaben oder Zitate. "
         "Ausgabe ausschließlich EIN JSON-Objekt ohne Markdown-Zaun. "
         "Jede Fundstelle muss eine wörtliche, zusammenhängende Teilzeichenfolge der Dokumentdaten sein. "
-        "Unbekanntes weglassen; Vorschläge dürfen den amtlichen Quelltext niemals verändern."
+        "Unbekanntes weglassen; Vorschläge dürfen den amtlichen Quelltext niemals verändern. "
+        "Antworte möglichst kurz; statt vieler Hinweise gib lieber leere Arrays aus. "
+        "Beende das vollständige JSON-Objekt rechtzeitig und füge keinen Fließtext an."
     )
     if stage == "law_structure":
         instructions = (
             'Antworte exakt nach Schema {"headings":[{"quote":"wörtliche Überschriftszeile",'
             '"level":2}],"warnings":["kurzer Prüfhinweis"]}. '
-            "Schlage maximal 25 Überschriften aus tatsächlich vorhandenen Zeilen vor; "
+            "Schlage maximal 6 besonders relevante Überschriften aus vorhandenen Zeilen vor; "
             "level 1–5. Keine neuen Formulierungen. Änderungen an Wörtern, Satzzeichen "
             "oder Rechtsfolgen sind verboten. Markdown-Ebene ist nur ein Darstellungsvorschlag."
         )
@@ -93,14 +95,14 @@ def prompt(stage: str, source: str) -> tuple[list[dict], bool]:
             "issued_on, valid_from, valid_until. "
             "Niemals Veröffentlichungsstatus, amtliche Wirksamkeit oder Geltungsbeginn "
             "aus bloßer Vermutung angeben. Datum nur bei explizitem Beleg; "
-            "Feldwert muss mit dem Beleg vereinbar sein. Höchstens 12 Vorschläge."
+            "Feldwert muss mit dem Beleg vereinbar sein. Höchstens 6 knappe Vorschläge."
         )
     elif stage == "law_verify":
         instructions = (
             'Antworte exakt nach Schema {"findings":[{"severity":"high",'
             '"quote":"wörtliches Zitat","reason":"...","suggestion":"..."}],'
             '"warnings":["..."]}. '
-            "Maximal 18 konkrete Risiken: Beträge, Negationen, Fristen, "
+            "Maximal 6 knappe konkrete Risiken: Beträge, Negationen, Fristen, "
             "Anlagen, Verweise, Lesereihenfolge oder erkennbare OCR-Unsicherheiten. "
             "Keine ungeprüften Berichtigungen; alles als Prüfhinweis formulieren."
         )
@@ -117,20 +119,42 @@ def prompt(stage: str, source: str) -> tuple[list[dict], bool]:
             {"role": "user", "content": user}], sampled
 
 
-def _json_object(response: str) -> dict:
+class InvalidAgentJSON(ValueError):
+    """The provider finished but returned no complete matching JSON document."""
+
+
+def _json_object(response: str, stage: str) -> dict:
+    """Read exactly one complete stage-specific JSON object, even with preamble.
+
+    Some otherwise OpenAI-compatible models wrap the result in a markdown
+    fence or introductory text. We accept a *complete* matching object only.
+    We never repair, autocomplete, or infer missing keys in truncated JSON.
+    """
     if not isinstance(response, str) or len(response) > 40_000:
-        raise ValueError("KI-Antwort überschreitet die maximale Länge.")
+        raise InvalidAgentJSON("Die strukturierte KI-Ausgabe ist zu umfangreich.")
+    expected = {"law_structure": "headings", "law_metadata": "fields",
+                "law_verify": "findings"}.get(stage)
+    if expected is None:
+        raise ValueError("Unbekannte KI-Prüfstufe.")
     text = response.strip()
-    if text.startswith("\x60\x60\x60"):
-        text = re.sub(r"^" + "\x60\x60\x60" + r"(?:json)?\s*", "", text, count=1, flags=re.I)
-        text = re.sub(r"\s*" + "\x60\x60\x60" + r"$", "", text, count=1)
-    try:
-        data = json.loads(text)
-    except ValueError as exc:
-        raise ValueError("KI lieferte keine gültige strukturierte JSON-Antwort.") from exc
-    if not isinstance(data, dict):
-        raise ValueError("KI-Antwort ist kein JSON-Objekt.")
-    return data
+    decoder = json.JSONDecoder()
+    candidates: list[dict] = []
+    # A few model families prepend a sentence or a Markdown code fence.
+    # Limit the number of search positions to bound malicious model outputs.
+    for match in list(re.finditer(r"\{", text))[:32]:
+        try:
+            value, _end = decoder.raw_decode(text, match.start())
+        except ValueError:
+            continue
+        if isinstance(value, dict) and expected in value:
+            candidates.append(value)
+            if len(candidates) > 1:
+                break
+    if len(candidates) != 1:
+        raise InvalidAgentJSON(
+            "Das Modell lieferte kein eindeutig auswertbares vollständiges JSON-Objekt."
+        )
+    return candidates[0]
 
 
 def _warnings(value) -> list[str]:
@@ -147,7 +171,7 @@ def _verified_quote(quote: object, source: str) -> str | None:
 
 def validate(stage: str, answer: str, source: str) -> dict:
     """Reject invented quotes/fields. Never return raw model output to templates."""
-    result = _json_object(answer)
+    result = _json_object(answer, stage)
     warnings = _warnings(result.get("warnings"))
     discarded = 0
     out = []
