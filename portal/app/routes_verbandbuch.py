@@ -33,7 +33,7 @@ def _open(user: User) -> None:
 
 def _site(db: Session, site_id: int) -> FirstAidSite:
     site = db.get(FirstAidSite, site_id)
-    if site is None or not site.active:
+    if site is None or not site.active or not (org := db.get(Organization, site.org_id)) or not org.active:
         raise HTTPException(404, "Standort nicht verfügbar.")
     return site
 
@@ -128,7 +128,9 @@ def verbandbuch_receipt(
     user: User = Depends(current_user), db: Session = Depends(get_db),
 ):
     entry = _case(db, case_id)
-    if entry.created_by_id != user.id and not aid.may(db, user, entry.site_id, "review"):
+    if not user.active or not aid.may(db, user, entry.site_id, "review") and not (
+        entry.created_by_id == user.id and aid.may(db, user, entry.site_id, "capture")
+    ):
         raise HTTPException(404)
     site = db.get(FirstAidSite, entry.site_id)
     return _private(render(request, "verbandbuch_receipt.html", user,
@@ -297,6 +299,9 @@ async def verbandbuch_grant(
     target = db.get(User, target_id)
     if role not in ("capture", "review") or not target or not target.active:
         raise HTTPException(422, "Gültige Person und Fachrolle auswählen.")
+    needed = "verbandbuch_capture" if role == "capture" else "verbandbuch_review"
+    if needed not in target.perms:
+        raise HTTPException(422, "Der Person fehlt das entsprechende Fachrecht in der TAKT-Benutzerverwaltung.")
     if role == "review" and target.id == user.id:
         raise HTTPException(403, "Selbstfreigabe zur Einsicht in Gesundheitsdaten ist nicht zulässig.")
     existing = db.scalar(select(FirstAidGrant).where(
