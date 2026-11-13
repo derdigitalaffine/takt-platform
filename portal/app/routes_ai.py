@@ -250,8 +250,9 @@ def admin_ai_task_profile_save(
         return redirect("/admin/ai#ai-task-profiles")
 
     provider = _provider(db, provider_id, active=True)
-    chosen_model = model_id.strip() or provider.model_id
-    if not 1 <= len(chosen_model) <= 200 or any(ord(ch) < 32 for ch in chosen_model):
+    chosen_model = model_id.strip()
+    # Blank means inherit this provider's default model, even after later edits.
+    if len(chosen_model) > 200 or any(ord(ch) < 32 for ch in chosen_model):
         raise HTTPException(400, "Ungültige Modell-ID.")
     if existing is None:
         existing = AITaskProfile(task=task, provider_id=provider.id, model_id=chosen_model)
