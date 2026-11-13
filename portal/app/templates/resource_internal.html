@@ -4,7 +4,7 @@
 {% block head %}{{ super() }}<link rel="stylesheet" href="/static/internal-assets.css">{% endblock %}
 {% block content %}
 {% call iam.head('catalog', [], 'Interne Ressourcen', 'Inventar, Lagerorte und interne Reservierungen für den Dienstbetrieb.') %}
-  <a href="/interne-ressourcen/plan" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-calendar-week me-1"></i>Wochenplan</a>
+  {% if manager %}<a href="#lagerorte" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus me-1"></i>Inventar erfassen</a>{% endif %}
 {% endcall %}
 <div class="res-pool">
   <div class="res-pool-intro d-flex align-items-start gap-3 mb-4">

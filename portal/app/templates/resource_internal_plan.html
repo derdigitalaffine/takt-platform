@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% import "_internal_asset_macros.html" as iam with context %}
-{% block title %}Wochenplan · Interner Gerätepool{% endblock %}
+{% block title %}Materialplan · Interne Ressourcen{% endblock %}
 {% block head %}{{ super() }}<link rel="stylesheet" href="/static/internal-assets.css">{% endblock %}
 {% block content %}
 {% call iam.head('plan', [], 'Materialplan', 'Kapazitäten und Sperrzeiten für interne Gegenstände im Wochenüberblick.') %}
-  <a href="/interne-ressourcen" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i>Zum Katalog</a>
 {% endcall %}
 <div class="res-pool">
   <div class="res-pool-intro mb-4"><strong>Verfügbarkeit nach Tagen</strong><p class="small mb-0 mt-1">Die Tabelle zeigt den kleinsten freien Bestand je Tag. Auch stundenweise belegte Gegenstände können zu anderen Zeiten des Tages verfügbar sein. Für die genaue Prüfung wähle im Katalog einen Zeitraum. Persönliche Buchungsdetails werden hier nicht angezeigt.</p></div>

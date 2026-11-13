@@ -300,3 +300,13 @@ def test_legacy_calendar_link_redirect_keeps_bookings_private():
             response = c.get(f"/resources/intern/buchungen/{book.id}/termin.ics")
             assert response.status_code == 308
             assert response.headers["location"] == f"/interne-ressourcen/buchungen/{book.id}/termin.ics"
+
+
+def test_admin_module_overview_lists_both_independently():
+    c = login("admin@example.org", "admin-passwort-123")
+    page = c.get("/admin/modules")
+    assert page.status_code == 200, page.text[:400]
+    assert "Interne Ressourcen" in page.text
+    assert "Räume &amp; Vermietung" in page.text or "Räume & Vermietung" in page.text
+    assert "module_internal_assets" in page.text or 'name="internal_assets"' in page.text
+    assert "module_resources" in page.text or 'name="resources"' in page.text
