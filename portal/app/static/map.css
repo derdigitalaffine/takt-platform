@@ -135,3 +135,9 @@
 .map-compare-toolbar label{display:block}
 .map-compare-layer[hidden],.map-compare-divider[hidden],.map-compare-toolbar[hidden]{display:none!important}
 @media(max-width:767.98px){.map-compare-toolbar{top:.5rem;left:auto;right:.5rem;transform:none;width:min(19rem,calc(100% - 1rem))}.map-compare-toolbar button{min-width:44px;min-height:44px}}
+
+/* Opt-in native LoD2 visualisation; shared palette and accessible touch target. */
+.map-lod2-panel{border:1px solid var(--bs-border-color);background:var(--bs-body-bg);border-radius:.85rem;padding:.85rem}
+.map-lod2-panel .btn{min-height:40px}
+.map-lod2-panel .small{line-height:1.4;overflow-wrap:anywhere}
+@media(max-width:767.98px){.map-lod2-panel{padding:.7rem}.map-lod2-panel .btn{min-height:44px}}

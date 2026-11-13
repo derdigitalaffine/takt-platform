@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from . import maps as mp
 from . import map_lifecycle
 from . import map_catalog as catalog_library
+from . import map_lod2
 from .db import MapLayer, TrashItem, SessionLocal, User, UserMap, Group, get_settings, set_setting
 from .main import (
     app, check_csrf, enabled_modules, flash, get_db, rate_limit, redirect, render, require,
@@ -139,6 +140,65 @@ def map_shared(request: Request, token: str, db: Session = Depends(get_db)):
 @app.get(EMBED + "/m/{token}")
 def map_shared_embed(request: Request, token: str, db: Session = Depends(get_db)):
     return _browser(request, db, True, _shared(db, token))
+
+
+# --- Bounded native LoD2 building preview -----------------------------------------
+# This preview never fetches external GML or exposes private filesystem paths.
+# A small manually imported CityGML excerpt is stored under DATA_DIR.
+
+@app.get("/maps/lod2/status")
+def maps_lod2_status(user: User = Depends(map_user)):
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    return JSONResponse(map_lod2.status(), headers={"Cache-Control": "private, no-store"})
+
+
+@app.get("/maps/lod2/mesh")
+def maps_lod2_mesh(user: User = Depends(map_user)):
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    target = map_lod2.mesh_path()
+    if not map_lod2.status()["available"]:
+        raise HTTPException(404, "Noch kein LoD2-3D-Modell importiert.")
+    try:
+        content = target.read_bytes()
+    except OSError:
+        raise HTTPException(404, "3D-Vorschau derzeit nicht verfügbar.") from None
+    if len(content) > map_lod2.MAX_RENDER_BYTES:
+        raise HTTPException(413)
+    return Response(content, media_type="application/json",
+                    headers={"Cache-Control": "private, no-store",
+                             "X-Content-Type-Options": "nosniff"})
+
+
+@app.post("/admin/maps/lod2/import", dependencies=[Depends(check_csrf)])
+async def admin_maps_lod2_import(request: Request, file: UploadFile = File(...),
+                                user: User = Depends(maps_admin_user)):
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    rate_limit(request, "map-lod2-import", limit=5, window=3600)
+    if not file.filename or not file.filename.lower().endswith((".gml", ".xml")):
+        raise HTTPException(422, "Bitte eine örtlich begrenzte .gml-CityGML-Datei auswählen.")
+    raw = await file.read(map_lod2.MAX_UPLOAD + 1)
+    await file.close()
+    if len(raw) > map_lod2.MAX_UPLOAD:
+        raise HTTPException(413, "CityGML-Vorschaudatei darf höchstens 4 MiB groß sein.")
+    try:
+        model = await run_in_threadpool(map_lod2.convert, raw)
+        await run_in_threadpool(map_lod2.save, model)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    return JSONResponse({"ok": True, "status": map_lod2.status()},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/maps/lod2/delete", dependencies=[Depends(check_csrf)])
+def admin_maps_lod2_delete(request: Request, user: User = Depends(maps_admin_user)):
+    if "maps" not in enabled_modules():
+        raise HTTPException(404)
+    map_lod2.remove()
+    flash(request, "Die lokale LoD2-Vorschau wurde entfernt.")
+    return redirect("/admin/maps#lod2-preview")
 
 
 # --- Proxy -------------------------------------------------------------------------------
