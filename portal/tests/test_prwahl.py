@@ -300,3 +300,16 @@ def test_document_field_coverage_is_advisory_and_empty_review_is_blocked():
     assert denied.status_code == 409
     with SessionLocal() as db:
         assert db.get(PRDocument, did).review_status == "draft"
+
+
+def test_election_overview_exposes_actionable_but_nonbinding_next_steps():
+    coordinator = _user(setup=True)
+    eid = _create(coordinator)
+    page = coordinator.get(f"/personalratswahl/{eid}")
+    assert page.status_code == 200
+    assert "Was als Nächstes sinnvoll ist" in page.text
+    assert "Vorsitz des Wahlvorstands zuordnen" in page.text
+    assert "Wahlausschreiben vorbereiten" in page.text
+    assert "Offene Prüfpunkte" in page.text
+    assert "Alle offenen Prüfpunkte ansehen" in page.text
+    assert "Keine Rechtsfreigabe" not in page.text  # The page gives explanatory warnings, not approvals.
