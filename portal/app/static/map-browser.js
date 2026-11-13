@@ -440,7 +440,7 @@
     catalogResults.hidden=true;catalogPreview.hidden=false;
     catalogActivation.textContent='';
     var button=document.getElementById('map-discovery-activate');
-    button.disabled=!meta.canEdit||spec.kind==='download';
+    button.disabled=spec.kind==='download'||(!meta.canEdit&&spec.kind!=='xyz');
     if(spec.kind==='download'){
       catalogChoices.innerHTML='<p class="small mb-2">'+esc(spec.note||'')+'</p>'+
         '<div class="d-grid gap-2"><a class="btn btn-sm btn-outline-primary" href="'+esc(spec.download_url)+'" target="_blank" rel="noopener noreferrer">Amtliche Daten beziehen <i class="fa-solid fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></a>'+
@@ -448,12 +448,15 @@
         (spec.viewer_url?'<a class="btn btn-sm btn-outline-success" href="'+esc(spec.viewer_url)+'" target="_blank" rel="noopener noreferrer">Rheinland-Pfalz in 3D ansehen <i class="fa-solid fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></a>':'')+'</div>';
       return;
     }
-    if(!meta.canEdit){
+    if(!meta.canEdit && spec.kind!=='xyz'){
       catalogChoices.innerHTML='<p class="small">Zum Einblenden zusätzlicher Ebenen bitte im Portal anmelden. Die Karte und die bereits freigegebenen öffentlichen Ebenen bleiben ohne Anmeldung nutzbar.</p>';
       return;
     }
     catalogChoices.textContent='Verfügbare Ebenen werden beim Anbieter geprüft …';
-    discoveryPost('/maps/library/'+encodeURIComponent(key)+'/layers',{}).then(function(data){
+    (meta.canEdit
+      ? discoveryPost('/maps/library/'+encodeURIComponent(key)+'/layers',{})
+      : Promise.resolve({ok:true,type:'xyz',url:spec.url,source:spec,
+          layers:[{name:key,title:spec.name,template:spec.url,supported:true}]})).then(function(data){
       if(!catalogSelected||catalogSelected.key!==key)return;
       catalogCaps=data;
       var layers=(data.layers||[]).filter(function(l){return l.name&&l.supported!==false;});
@@ -483,7 +486,7 @@
     });
   }
   document.getElementById('map-discovery-activate').addEventListener('click',function(){
-    if(!catalogSelected||!catalogCaps||!meta.canEdit)return;
+    if(!catalogSelected||!catalogCaps||(!meta.canEdit&&catalogSelected.spec.kind!=='xyz'))return;
     var spec=catalogSelected.spec,cap=catalogCaps;
     var chosen=Array.prototype.map.call(catalogChoices.querySelectorAll('[data-layer-idx]:checked'),function(input){
       return cap.supported[Number(input.dataset.layerIdx)];
@@ -510,7 +513,11 @@
           (l.custom.layers||'')===(def.layers||'');
       });
       if(exists){skipped++;return Promise.resolve();}
-      return discoveryPost('/maps/sign',{layer:JSON.stringify(def)}).then(function(result){
+      return (meta.canEdit
+        ? discoveryPost('/maps/sign',{layer:JSON.stringify(def)})
+        : fetch('/maps/library/'+encodeURIComponent(catalogSelected.key)+'/overlay',
+            {credentials:'same-origin'}).then(function(r){if(!r.ok)throw Error();return r.json();}))
+        .then(function(result){
         kit.addOverlay(result.layer);added++;
       }).catch(function(){failed++;});
     })).then(function(){
