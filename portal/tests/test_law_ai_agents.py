@@ -194,7 +194,7 @@ def test_three_agents_run_with_distinct_models_and_no_publishing(monkeypatch, ag
     assert result.json()["status"] == "done"
     assert result.json()["ready"] is True
     review = admin.get(f"/laws-assistant/{draft_id}")
-    assert "Hausordnung" in review.text and "Stammdaten-Vorschläge" in review.text
+    assert "Hausordnung" in review.text and "Stammdaten ·" in review.text
     assert "Die Gebühr beträgt 10 €." in review.text
     with SessionLocal() as db:
         row = db.get(LawAiDraft, draft_id)
@@ -270,8 +270,8 @@ def test_advanced_agents_cover_every_source_character_without_publication(monkey
     sections = law_ai_coverage.sections(source)
     did = _upload_long_md(admin, source)
     page = admin.get(f"/laws-assistant/{did}")
-    assert "Erweitert" in page.text
-    assert f"{len(sections) * 3} Modellaufrufe" in page.text
+    assert "Gesamter Text" in page.text
+    assert f"{len(sections) * 3} reguläre Modellaufrufe" in page.text
     csrf = csrf_of(page.text)
     submitted = admin.post(f"/laws-assistant/{did}/agents", data={
         "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
