@@ -43,7 +43,8 @@ def hints(source: str, *, allow_header: bool = True) -> list[dict[str, str]]:
             match = _KIND.search(line)
             if match:
                 kind = match.group(1).casefold()
-                key = {"geschäftsordnung": "geschaeftsordnung"}.get(kind,\n                      "satzung" if kind.endswith("satzung") else kind)
+                key = {"geschäftsordnung": "geschaeftsordnung"}.get(kind,
+                      "satzung" if kind.endswith("satzung") else kind)
                 found["doc_type"] = {"field": "doc_type", "value": key,
                                      "evidence": line[:300]}
         for field, pattern in _EVENTS:
