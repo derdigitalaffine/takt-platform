@@ -191,6 +191,12 @@ async def process_one(job_id: int) -> None:
                             provider.base_url != routes[task]["destination"]):
                         raise ValueError("Der freigegebene KI-Datenempfänger wurde geändert.")
                     messages, sampled = law_ai_agents.prompt(task, section.text)
+                    if depth:
+                        messages[0]["content"] += (
+                            " KORREKTURVERSUCH: Gib ausschließlich EIN vollständiges "
+                            "kompaktes JSON-Objekt mit dem vorgegebenen Schema aus, "
+                            "maximal 3 Fundstellen, keine Einleitung und keinen Markdown-Zaun."
+                        )
                     if mode == "advanced" and sampled:
                         raise ValueError("Mindestens ein Textabschnitt würde unvollständig übertragen.")
                     job.step = f"{task}:{len(stage_parts) + 1}/{len(stage_parts) + 1 + len(pending)}"
@@ -229,7 +235,7 @@ async def process_one(job_id: int) -> None:
                 # provider changes; only malformed/length-limited responses.
                 halves = (law_ai_coverage.bisect(section)
                           if depth < law_ai_coverage.MAX_RECOVERY_SPLITS else None)
-                if halves is not None:
+                if depth < law_ai_coverage.MAX_RECOVERY_SPLITS:
                     with SessionLocal() as db:
                         job = db.get(LawAiAnalysis, job_id)
                         if not job or job.status != "running":
@@ -244,12 +250,19 @@ async def process_one(job_id: int) -> None:
                         # A failed original call plus its two smaller
                         # replacements means at most 3 requests/section.
                         job.retry_attempts += 1
-                        job.progress_total += 1
+                        if halves is not None:
+                            job.progress_total += 1
                         job.stream_active = False
                         job.updated_at = utcnow()
                         db.commit()
-                    pending = [(halves[0], depth + 1),
-                               (halves[1], depth + 1)] + pending
+                    # Short passages cannot be bisected sensibly. Re-ask
+                    # this same consented model just once with a compact
+                    # JSON-only prompt, without changing the source.
+                    if halves is None:
+                        pending.insert(0, (section, depth + 1))
+                    else:
+                        pending = [(halves[0], depth + 1),
+                                   (halves[1], depth + 1)] + pending
                     continue
                 with SessionLocal() as db:
                     job = db.get(LawAiAnalysis, job_id)
