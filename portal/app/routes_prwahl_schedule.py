@@ -62,9 +62,16 @@ def prwahl_schedule_cancel(request: Request, election_id: int, event_id: int,
     if event.status == "cancelled":
         raise HTTPException(409,"Termin bereits abgesagt.")
     event.status, event.sequence, event.updated_at = "cancelled", event.sequence+1, utcnow()
+    # Keep previously synchronized private TAKT calendar copies consistent.
+    synced = db.scalars(select(CalendarEvent).join(Calendar, Calendar.id == CalendarEvent.calendar_id).where(
+        Calendar.source == "prwahl", CalendarEvent.uid == event.uid)).all()
+    for copy in synced:
+        copy.ical_data = calendar_file(_redacted_event(event))
+        copy.updated_at = utcnow()
+        copy.version = (copy.version or 0) + 1
     record(db,user.id,election.id,"schedule_cancelled",f"event:{event.id}")
     db.commit()
-    flash(request,"Termin abgesagt. Bereits exportierte Kalenderdateien werden nicht automatisch aktualisiert.")
+    flash(request,"Termin abgesagt. TAKT-Kalenderkopien wurden aktualisiert; zuvor heruntergeladene ICS-Dateien nicht.")
     return redirect(f"/personalratswahl/{election.id}/termine")
 
 @app.get("/personalratswahl/{election_id:int}/termine/{event_id:int}.ics")
