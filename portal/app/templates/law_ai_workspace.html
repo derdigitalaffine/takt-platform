@@ -446,7 +446,8 @@
           {% endif %}
           {% endif %}
           {% if workspace_view in ('all','editor','ai') %}
-          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form">
+          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form"
+                data-law-canonical-url="/laws-assistant/{{ selected.id }}/markdown/preview">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="row g-3">
               <div class="col-12">
@@ -486,19 +487,58 @@
                   {% for level, depth in level_options %}<option value="{{ level.id }}">{{ '   ' * depth }}{{ level.name }}</option>{% endfor %}
                 </select>
               </div>
+              <div class="col-12 col-lg-6">
+                <label class="form-label" for="law-ai-outline-mode">Unterste Gliederungsebene</label>
+                <select class="form-select" name="outline" id="law-ai-outline-mode">
+                  {% for key,label in outline_modes.items() %}
+                    <option value="{{ key }}" {% if key == 'paragraf' %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <p class="small text-secondary mt-1 mb-0">Für Satzungen sind § und Artikel normalerweise Einzelvorschriften. Bei Richtlinien können es auch Nummern oder Ziffern sein.</p>
+              </div>
               <div class="col-12" id="law-editor">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                   <label class="form-label fw-semibold mb-0" for="law-ai-body">Redaktionell geprüfter Markdown-Text</label>
                   <span class="small text-secondary" data-law-editor-count aria-live="polite">Textstand aus Import</span>
                 </div>
+                <div class="law-editor-tools mb-3" role="toolbar" aria-label="Rechtstext-Markdown formatieren">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-law-insert="title"><i class="fa-solid fa-heading me-1" aria-hidden="true"></i>Titel</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-law-insert="group"><i class="fa-solid fa-layer-group me-1" aria-hidden="true"></i>Teil / Abschnitt</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-law-insert="norm"><i class="fa-solid fa-section me-1" aria-hidden="true"></i>§ / Artikel</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-law-insert="paragraph"><i class="fa-solid fa-align-left me-1" aria-hidden="true"></i>(1) Absatz</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-law-insert="appendix"><i class="fa-solid fa-paperclip me-1" aria-hidden="true"></i>Anlage</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-law-insert="reference"><i class="fa-solid fa-link me-1" aria-hidden="true"></i>[[§-Verweis]]</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" data-law-insert="table"><i class="fa-solid fa-table me-1" aria-hidden="true"></i>Tabelle</button>
+                  <span class="vr d-none d-md-inline"></span>
+                  <button type="button" class="btn btn-primary btn-sm" data-law-canonical-preview>
+                    <i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Rechtstext-Struktur erkennen
+                  </button>
+                </div>
+                <div class="law-canonical-panel border rounded-3 p-3 mb-3" data-law-canonical-panel hidden>
+                  <div class="d-flex flex-wrap justify-content-between gap-2">
+                    <h4 class="h6 mb-1"><i class="fa-solid fa-code-compare me-2" aria-hidden="true"></i>Vorschau: TAKT-konformes Markdown</h4>
+                    <span class="small text-secondary" data-law-canonical-count role="status" aria-live="polite"></span>
+                  </div>
+                  <p class="small text-secondary mb-2">Die Erkennung nutzt den internen Rechtstextparser. Sie fügt nur Überschriftsmarker hinzu; keinen Paragrapheninhalt, keine Zahlen und keine Rechtsfolgen. Auch diesen Vorschlag musst du fachlich kontrollieren.</p>
+                  <div class="law-canonical-changes mb-2" data-law-canonical-changes aria-label="Vorgeschlagene Überschriften"></div>
+                  <div class="small text-warning mb-2" data-law-canonical-warnings></div>
+                  <label class="form-label small fw-semibold" for="law-canonical-preview-text">Vorgeschlagener Markdown-Quelltext (nur lesen)</label>
+                  <textarea class="form-control font-monospace law-canonical-text" id="law-canonical-preview-text" data-law-canonical-text rows="8" readonly></textarea>
+                  <div class="form-check mt-3 mb-2">
+                    <input class="form-check-input" id="law-canonical-confirm" type="checkbox" data-law-canonical-confirm>
+                    <label class="form-check-label small" for="law-canonical-confirm">Ich habe die vorgeschlagene Gliederung mit dem importierten Originaltext abgeglichen.</label>
+                  </div>
+                  <button type="button" class="btn btn-outline-primary" data-law-canonical-apply disabled>Nur Markdown-Formatierung in den Editor laden</button>
+                  <p class="small text-secondary mt-2 mb-0">Die Vorschau wird nicht automatisch gespeichert oder veröffentlicht. Bereits ungespeicherte Editoränderungen können beim Übernehmen ersetzt werden.</p>
+                </div>
                 <div class="row g-3">
-                  <div class="col-12 col-xxl-9">
-                    <textarea class="form-control font-monospace law-editor" id="law-ai-body" name="body_md" rows="20"
+                  <div class="col-12 {{ 'col-xxl-10' if workspace_view == 'editor' else 'col-xxl-9' }}">
+                    <textarea class="form-control font-monospace law-editor" id="law-ai-body" name="body_md" rows="26"
                               maxlength="2097152" spellcheck="false" required
                               aria-describedby="law-editor-hint" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ selected.proposed_md }}</textarea>
                     <p class="form-text" id="law-editor-hint">Wortlaut, Paragraphen, Beträge, Fristen, Verneinungen und Anlagen mit dem Original abgleichen. Die Gliederung rechts ist nur eine Orientierung im bearbeiteten Text.</p>
                   </div>
-                  <aside class="col-12 col-xxl-3" aria-label="Gliederung im Entwurf">
+                  <aside class="col-12 {{ 'col-xxl-2' if workspace_view == 'editor' else 'col-xxl-3' }}" aria-label="Gliederung im Entwurf">
                     <div class="fw-semibold small mb-2"><i class="fa-solid fa-list-ul me-1" aria-hidden="true"></i>Dokumentnavigation</div>
                     <div class="law-outline" data-law-editor-outline aria-live="off">
                       <p class="text-secondary small mb-0">Überschriften werden beim Bearbeiten erkannt.</p>
