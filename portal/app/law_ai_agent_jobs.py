@@ -25,10 +25,18 @@ STAGE_TIMEOUT = 70
 MAX_JOB_SECONDS = 18 * 60  # bounded recovery for slow/verbose models; fail closed
 
 
-def configured_routes(db) -> dict:
-    """Explicit law task assignments only; no default public AI provider."""
+def configured_routes(db, required_tasks=None) -> dict:
+    """Only explicitly assigned tasks; default preserves all-stage contract.
+
+    A scoped request may proceed when unrelated agent profiles are missing.
+    """
+    allowed = {task for task, _label in law_ai_agents.STAGES}
+    required = list(required_tasks) if required_tasks is not None else [
+        task for task, _label in law_ai_agents.STAGES]
+    if not required or any(task not in allowed for task in required):
+        return {}
     result = {}
-    for task, _label in law_ai_agents.STAGES:
+    for task in required:
         assignment = db.get(AITaskProfile, task)
         if assignment is None:
             return {}
@@ -78,7 +86,7 @@ def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) 
         if job is None or job.status != "running" or job.step != step:
             raise ValueError("Der KI-Auftrag wurde abgebrochen oder geändert.")
         _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-        if json.loads(job.provider_map_json) != configured_routes(db):
+        if json.loads(job.provider_map_json) != configured_routes(db, routes.keys()):
             raise ValueError("Der KI-Provider wurde während des Streams geändert.")
         db.execute(update(LawAiAnalysis).where(
             LawAiAnalysis.id == job_id,
