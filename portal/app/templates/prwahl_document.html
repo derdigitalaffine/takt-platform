@@ -12,13 +12,14 @@
   <div class="pr-doc-layout">
     <section class="pr-panel">
       <div class="pr-panel-head"><div><span class="pr-eyebrow">Strukturiert statt Freitext-Chaos</span><h2>Vordruck ausfüllen</h2><p>Die Felder gliedern das spätere PDF. Leere Werte werden als zu prüfen gekennzeichnet.</p></div></div>
+      {% if mode=='new' %}<div class="pr-autofill-note" role="status"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span><strong>{{prefill_sources|length}} bekannte Angaben vorbelegt</strong> · Nur nachprüfbare TAKT-Planungsdaten, bestehende Fachmandate oder bestätigte aggregierte Auszählungen. Jede Vorbelegung ist änderbar und muss fachlich kontrolliert werden. Leere Felder werden bewusst nicht geraten.</span></div>{% endif %}
       <form method="post" action="/personalratswahl/{{election.id}}/dokumente/speichern" id="pr-doc-form">
         <input type="hidden" name="csrf" value="{{csrf}}">
         <input type="hidden" name="kind" value="{{form_kind}}">
         <input type="hidden" name="document_id" value="{{document.id if document else 0}}">
         {% for field,label,field_type in form_def[2] %}
         <div class="pr-field">
-          <label for="pr-field-{{field}}" class="form-label">{{loop.index}}. {{label}}</label>
+          <label for="pr-field-{{field}}" class="form-label">{{loop.index}}. {{label}}{% if prefill_sources.get(field) %} <span class="pr-autofill-tag">Automatisch übernommen</span>{% endif %}</label>{% if prefill_sources.get(field) %}<p class="pr-autofill-source">Quelle: {{prefill_sources[field]}}</p>{% endif %}
           {% if field_type=='multiline' %}
           <textarea class="form-control" id="pr-field-{{field}}" name="{{field}}" rows="4" maxlength="3000" placeholder="Hier die geprüften Angaben eintragen …" {% if mode=='readonly' %}readonly{% endif %}>{{values.get(field,'')}}</textarea>
           {% else %}
