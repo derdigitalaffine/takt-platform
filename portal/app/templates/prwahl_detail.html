@@ -19,6 +19,11 @@
     <div><small>Fachteam</small><strong>{{mandates|length}} <span>Person(en)</span></strong></div>
     <div><small>Vordrucke</small><strong>{{documents|length}} <span>aktuelle</span></strong></div>
   </div>
+  <nav class="pr-quick-nav" aria-label="Schnellzugriff auf Wahlfunktionen">
+    <a href="/personalratswahl/{{election.id}}/ablauf"><i class="fa-solid fa-route" aria-hidden="true"></i><span><strong>Wahlfahrplan</strong><small>Neun Phasen mit Nachweisen</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a href="/personalratswahl/{{election.id}}/termine"><i class="fa-regular fa-calendar" aria-hidden="true"></i><span><strong>Terminplanung</strong><small>Wahlteam & Einladungen</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+    <a href="/personalratswahl/{{election.id}}/auszaehlung"><i class="fa-solid fa-calculator" aria-hidden="true"></i><span><strong>Auszählung</strong><small>Aggregierte Papierstimmen</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+  </nav>
   <nav class="pr-tabs" aria-label="Wahlarbeitsbereich">
     {% for key, label, icon in [('overview','Übersicht','fa-house'),('tasks','Ablauf & Fristen','fa-list-check'),('board','Wahlvorstand','fa-users'),('docs','Formulare & PDF','fa-file-lines'),('audit','Nachweise','fa-shield-halved')] %}
     <a class="{{'active' if tab==key else ''}}" href="/personalratswahl/{{election.id}}?tab={{key}}" {% if tab==key %}aria-current="page"{% endif %}><i class="fa-solid {{icon}}" aria-hidden="true"></i><span>{{label}}</span></a>
