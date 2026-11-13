@@ -231,6 +231,20 @@ def document_values(doc: PRDocument) -> dict[str, str]:
         raise HTTPException(500, "Das Dokumentformat ist ungültig.")
     return {k: str(v) for k,v in raw.items() if isinstance(k,str) and isinstance(v,str)}
 
+def document_field_summary(kind: str, values: dict[str, str]) -> dict:
+    """Explain draft completeness without claiming formal or legal validity.
+
+    Empty fields may be legally appropriate in certain forms; this is only a
+    document editing hint. A wholly empty document cannot be marked reviewed.
+    """
+    if kind not in FORM_KINDS:
+        raise HTTPException(422, "Unbekannter Vordruck.")
+    fields = FORM_KINDS[kind][2]
+    missing = [label for key, label, _ in fields if not str(values.get(key, "") or "").strip()]
+    return {"total": len(fields), "filled": len(fields) - len(missing),
+            "missing": missing, "has_content": len(missing) < len(fields)}
+
+
 def secure_payload(form: dict, kind: str) -> str:
     if kind not in FORM_KINDS:
         raise HTTPException(422, "Unbekannter Vordruck.")
