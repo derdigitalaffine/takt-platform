@@ -17,7 +17,10 @@
     const status = form.querySelector("[data-ai-model-status]");
     if (!provider || !input || !status) return;
     const startValue = input.value;
-    const select = window.TomSelect ? new window.TomSelect(input, {
+    let models = new Map();
+    let requestNo = 0;
+    let select = null;
+    select = window.TomSelect ? new window.TomSelect(input, {
       maxItems: 1,
       create: (text) => {
         const value = String(text || "").trim();
@@ -31,8 +34,6 @@
       placeholder: "Modell suchen oder Kennung eingeben",
       onChange: updateDescription,
     }) : null;
-    let models = new Map();
-    let requestNo = 0;
 
     function currentValue() {
       return select ? select.getValue() : input.value;
