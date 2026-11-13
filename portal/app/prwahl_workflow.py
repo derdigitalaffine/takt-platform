@@ -4,7 +4,7 @@ No voter-level ballot or voting token. All counts are aggregate, manually
 entered and require an explicit board confirmation before finalization.
 """
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from fastapi import HTTPException
@@ -29,11 +29,11 @@ class PRMilestone(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     election_id: Mapped[int] = mapped_column(ForeignKey("pr_elections.id", ondelete="RESTRICT"), index=True)
     stage: Mapped[str] = mapped_column(String(28))
-    completed_at: Mapped[DateTime | None] = mapped_column(DateTime)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     completed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     evidence: Mapped[str] = mapped_column(String(500), default="")
     effective_on: Mapped[date | None] = mapped_column(Date)
-    updated_at: Mapped[DateTime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 class PRCountRound(Base):
     __tablename__ = "pr_count_rounds"
@@ -50,9 +50,9 @@ class PRCountRound(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     count_reference: Mapped[str] = mapped_column(String(250), default="")
     confirmed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
-    confirmed_at: Mapped[DateTime | None] = mapped_column(DateTime)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
-    created_at: Mapped[DateTime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 class PRCountEntry(Base):
     __tablename__ = "pr_count_entries"
