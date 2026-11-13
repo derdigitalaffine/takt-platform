@@ -283,3 +283,41 @@ def test_verbandbuch_org_inactivation_and_disabled_user_remove_access(aid_env):
             aid.qr_site(db, aid.qr_token(site_id))
         # QR site verification is guarded independently in the route.
         assert exc.value.status_code == 404
+
+
+def test_disabled_parent_organization_revokes_site_qr_and_case_access(aid_env):
+    """Disabling a parent must immediately hide every descendant first-aid site."""
+    site_id, email, reviewer_email, _ = fixture_site(grant_review=True)
+    with SessionLocal() as db:
+        parent = Organization(name="Verbandbuch Elternknoten " + uuid.uuid4().hex[:8], active=True)
+        db.add(parent)
+        db.flush()
+        site = db.get(FirstAidSite, site_id)
+        db.get(Organization, site.org_id).parent_id = parent.id
+        parent_id = parent.id
+        db.commit()
+    session, saved = send_form(email, site_id)
+    assert saved.status_code == 303
+    case_id = saved.headers["location"].rsplit("/", 1)[-1]
+    reviewer = login(reviewer_email, PASSWORD)
+    assert reviewer.get("/verbandbuch/fall/" + case_id).status_code == 200
+    with SessionLocal() as db:
+        db.get(Organization, parent_id).active = False
+        db.commit()
+        creator_user = db.scalar(select(User).where(User.email == email))
+        reviewer_user = db.scalar(select(User).where(User.email == reviewer_email))
+        assert aid.sites_for(db, creator_user, "capture") == []
+        assert not aid.may(db, creator_user, site_id, "capture")
+        assert not aid.may(db, reviewer_user, site_id, "review")
+        with pytest.raises(HTTPException) as exc:
+            aid.qr_site(db, aid.qr_token(site_id))
+        assert exc.value.status_code == 404
+    assert session.get("/verbandbuch/neu?s=" + aid.qr_token(site_id)).status_code == 404
+    assert session.get("/verbandbuch/beleg/" + case_id).status_code == 404
+    assert reviewer.get("/verbandbuch/fall/" + case_id).status_code == 404
+    admin = login("admin@example.org", "admin-passwort-123")
+    page = admin.get("/verbandbuch/standorte")
+    blocked = admin.post("/verbandbuch/standorte/" + str(site_id) + "/berechtigungen", data={
+        "csrf": csrf_of(page.text), "role": "capture", "user_id": 1,
+    })
+    assert blocked.status_code == 404
