@@ -98,6 +98,10 @@
         </div>
         <p class="small text-secondary mb-0 mt-3">Quellen werden erst nach Auswahl abgefragt. Verfügbarkeit, Maßstab und Nutzungsbedingungen richten sich nach dem jeweiligen Anbieter. 3D-CityGML ist ein Download, kein unmittelbar ladbarer Kartenlayer.</p>
       </section>
+      <div class="map-compare-switch mt-3">
+        <button class="btn btn-sm btn-outline-secondary w-100" id="map-compare-toggle" type="button" aria-pressed="false"><i class="fa-solid fa-code-compare me-2" aria-hidden="true"></i>Grundkarten vergleichen</button>
+        <div class="small text-secondary mt-1" id="map-compare-status" role="status"></div>
+      </div>
       <div class="map-view-switch mt-3">
         <button class="btn btn-sm btn-outline-secondary w-100" type="button" id="map-3d-view" aria-pressed="false"><i class="fa-solid fa-cube me-2" aria-hidden="true"></i>Karte schräg betrachten (3D-Ansicht)</button>
         <div class="small text-secondary mt-1">Die Schrägansicht allein zeigt noch keine amtlichen CityGML-Gebäudedächer.</div>
@@ -116,6 +120,21 @@
   <div class="map-main">
     <button class="btn btn-light btn-sm shadow-sm map-panel-open" type="button" id="panel-open" aria-label="Seitenleiste öffnen"><i class="fa-solid fa-layer-group me-1"></i>Kartenwerkzeuge</button>
     <div id="map" class="map-canvas" role="application" aria-label="Karte"></div>
+    <div class="map-compare-layer" id="map-compare-layer" hidden aria-label="Vergleichsgrundkarte rechts">
+      <div id="map-compare-canvas" class="map-compare-canvas"></div>
+    </div>
+    <div class="map-compare-divider" id="map-compare-divider" aria-hidden="true" hidden></div>
+    <div class="map-compare-toolbar" id="map-compare-toolbar" role="group" aria-label="Grundkartenvergleich" hidden>
+      <div class="map-compare-toolbar-head">
+        <strong>Grundkartenvergleich</strong>
+        <button type="button" id="map-compare-close" class="btn btn-sm btn-outline-secondary" aria-label="Vergleich beenden"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      </div>
+      <label for="map-compare-base" class="small">Grundkarte rechts</label>
+      <select class="form-select form-select-sm" id="map-compare-base"></select>
+      <label for="map-compare-position" class="small mt-2">Trennlinie verschieben</label>
+      <input type="range" min="10" max="90" step="1" value="50" class="form-range" id="map-compare-position" aria-label="Anteil der linken Kartenansicht">
+      <p class="small text-secondary mb-0">Links: aktuelle Karte inklusive Fachebenen. Rechts: gewählte Grundkarte.</p>
+    </div>
     <div class="map-coords small" id="map-coords" aria-live="off"></div>
     <div class="map-measure small" id="map-measure" hidden></div>
   </div>
@@ -173,5 +192,5 @@
 <script type="module" src="/static/map-core.js"></script>
 <script type="module" src="/static/map-draw.js"></script>
 <script src="/static/geo-search.js"></script>
-<script src="/static/map-parcels.js"></script><script type="module" src="/static/map-browser.js"></script><script src="/static/map-print.js" defer></script><script src="/static/map-ui.js" defer></script>
+<script src="/static/map-parcels.js"></script><script type="module" src="/static/map-browser.js"></script><script type="module" src="/static/map-compare.js"></script><script src="/static/map-print.js" defer></script><script src="/static/map-ui.js" defer></script>
 {% endblock %}
