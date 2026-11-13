@@ -163,7 +163,7 @@
                     <div class="progress-bar" data-law-ai-progress-bar style="width: 0%"></div>
                   </div>
                   <div class="d-flex flex-wrap gap-3 small mb-2">
-                    <span data-law-ai-call-count>{{ analysis.progress_done }} von {{ analysis.progress_total }} Modellaufrufen geprüft</span>
+                    <span data-law-ai-call-count>{{ analysis.progress_done }} von {{ analysis.progress_total }} Prüfabschnitten abgeschlossen</span>
                     <span data-law-ai-stream-stats>
                       {% if analysis.stream_active %}{{ analysis.stream_characters }} Zeichen in {{ analysis.stream_chunks }} Streaming-Teilen empfangen{% else %}Warten auf Modellantwort{% endif %}
                     </span>
