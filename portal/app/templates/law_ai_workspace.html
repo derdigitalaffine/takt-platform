@@ -375,7 +375,7 @@
                           {% for entry in metadata.get('fields', []) %}
                             <div class="law-result-row">
                               <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                                <span><span class="badge text-bg-secondary">{{ law_field_names.get(entry.field, entry.field) }}</span> <strong class="text-break">{{ entry.value }}</strong></span>
+                                <span><span class="badge text-bg-secondary">{{ law_field_names.get(entry.field, entry.field) }}</span> <strong class="text-break">{{ entry.value }}</strong> {% if entry.origin|default("") == "rule_based" %}<span class="badge text-bg-info">Regelbasiert erkannt</span>{% else %}<span class="badge text-bg-light border text-body">KI-Fundstelle</span>{% endif %}</span>
                                 <button type="button" class="btn btn-outline-primary btn-sm" data-law-ai-apply-field="{{ entry.field }}" data-law-ai-value="{{ entry.value }}" title="Vorschlag manuell ins Formular übertragen">Ins Formular übernehmen</button>
                               </div>
                               <blockquote class="law-quote small text-secondary mt-2 mb-0">{{ entry.evidence }}</blockquote>
