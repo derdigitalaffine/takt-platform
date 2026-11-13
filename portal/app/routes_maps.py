@@ -385,7 +385,8 @@ def _clean_state(raw) -> dict:
         if isinstance(item, dict) and re.fullmatch(r"[sc][0-9a-f]{1,12}", str(item.get("id", ""))):
             layers.append({"id": item["id"], "visible": bool(item.get("visible")),
                            "opacity": max(0.0, min(1.0, float(item.get("opacity", 1) or 0))),
-                           "time": str(item.get("time") or "")[:40]})
+                           "time": str(item.get("time") or "")[:40],
+                           "extrude": bool(item.get("extrude", False))})
     out["layers"] = layers
     custom = []
     for item in raw.get("custom", [])[:30] if isinstance(raw.get("custom"), list) else []:
