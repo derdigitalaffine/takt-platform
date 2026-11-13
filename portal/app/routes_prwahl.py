@@ -298,6 +298,23 @@ def prwahl_document_review(request: Request, election_id: int, document_id: int,
     return redirect(f"/personalratswahl/{election.id}/dokumente/{doc.id}")
 
 
+@app.get("/personalratswahl/{election_id:int}/dokumente/{document_id:int}/docx")
+def prwahl_document_docx(election_id: int, document_id: int,
+                         user: User = Depends(current_user), db: Session = Depends(get_db)):
+    election, _, doc = _doc(db, election_id, document_id, user)
+    from .prwahl_docx import build
+    content = build(election, doc)
+    pw.record(db, user.id, election.id, "document_downloaded_docx", f"document:{doc.id}")
+    db.commit()
+    return Response(content, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    headers={
+                        "Cache-Control": "private, no-store, max-age=0",
+                        "Pragma": "no-cache",
+                        "X-Content-Type-Options": "nosniff",
+                        "Content-Disposition": f'attachment; filename="prwahl-{election.id}-dokument-{doc.id}-v{doc.revision}.docx"',
+                    })
+
+
 @app.get("/personalratswahl/{election_id:int}/dokumente/{document_id:int}/pdf")
 def prwahl_document_pdf(election_id: int, document_id: int,
                         user: User = Depends(current_user), db: Session = Depends(get_db)):
