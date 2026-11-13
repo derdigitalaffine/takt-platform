@@ -38,7 +38,18 @@
         {% if user.id and mode!='readonly' %}<a href="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pdf" class="btn btn-outline-primary w-100 mt-2"><i class="fa-regular fa-file-pdf me-2" aria-hidden="true"></i>PDF herunterladen</a>{% endif %}
         {% endif %}
       </div>
-      {% if document and document.current and document.review_status=='draft' %}
+      {% if document and versions %}
+      <div class="pr-panel">
+        <h2>Dokumentversionen</h2>
+        <p class="small text-secondary">Alle gespeicherten Fassungen sind einzeln nachvollziehbar und können als Prüf-PDF abgerufen werden.</p>
+        <ol class="pr-revision-list">
+          {% for version in versions %}
+          <li><a href="/personalratswahl/{{election.id}}/dokumente/{{version.id}}">Fassung {{version.revision}}{{' · aktuell' if version.current else ''}}</a><small>{{version.created_at|local}}</small></li>
+          {% endfor %}
+        </ol>
+      </div>
+      {% endif %}
+      {% if document and document.current and document.review_status=='draft' and role=='chair' %}
       <div class="pr-panel"><h2>Fachliche Kontrolle</h2><p class="small text-secondary">Nur der Wahlvorstandsvorsitz kann den eigenen Prüfvermerk dokumentieren; eine amtliche oder juristische Freigabe entsteht dadurch nicht.</p>
         <form method="post" action="/personalratswahl/{{election.id}}/dokumente/{{document.id}}/pruefen"><input type="hidden" name="csrf" value="{{csrf}}">
           <label for="pr-resolution" class="form-label">Beschluss-/Prüfvermerk</label><input class="form-control" id="pr-resolution" name="resolution_reference" required minlength="8" maxlength="250" placeholder="Niederschrift vom … / TOP …">
