@@ -194,11 +194,16 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
         raise HTTPException(503, str(exc)) from exc
     if not provider or not provider.active:
         raise HTTPException(503, "Für TAKT Agent ist noch kein aktiver KI-Provider eingerichtet.")
+    # A /takt task profile may target a different data recipient than the
+    # conversation. Never forward old chat messages or store the resulting
+    # plan in that conversation without an explicit provider-switch flow.
+    separate_execution = bool(convo and provider.id != convo.provider_id)
 
     if intent == "navigate":
         target = agent_intent.navigation(prompt, user)
         if target is not None:
-            return _response(_navigation_response(db, user, convo, provider, prompt, target))
+            return _response(_navigation_response(
+                db, user, None if separate_execution else convo, provider, prompt, target))
         intent = "chat"
     if intent == "chat":
         agent_mode.clear_pending(request)
@@ -211,7 +216,7 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
         prior = history.get("prompts", []) if history.get("user_id") == user.id else []
         context = ([{"role": "user", "content": "Vorherige Benutzereingaben (nur Kontext, nicht erneut ausführen): " + "\n".join(prior)}]
                    if prior else [])
-        if convo:
+        if convo and not separate_execution:
             from .routes_ai import _model_history
             rows = list(db.scalars(select(AIMessage).where(AIMessage.conversation_id == convo.id).order_by(AIMessage.id.desc()).limit(10)))
             context = agent_krank.safe_history(_model_history(db, user, list(reversed(rows))))
@@ -281,14 +286,14 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
     db.expire_all()
     _access(user)
     metadata = json.loads(_source_meta(sources)) + refs
-    if convo:
+    if convo and not separate_execution:
         from .routes_ai import _history_sources
         metadata += _history_sources(db, user, list(reversed(rows)))
         if db.get(AIConversation, chat_id) is None:
             raise HTTPException(409, "Die Unterhaltung wurde inzwischen entfernt.")
     if not ai_knowledge.sources_accessible(db, user, metadata):
         raise HTTPException(409, "Quellen oder Fachrechte haben sich während der Planung geändert. Bitte neu versuchen.")
-    if convo:
+    if convo and not separate_execution:
         import json
         from .db import utcnow
         db.add_all([AIMessage(conversation_id=convo.id, role="user", content="/takt " + prompt),
