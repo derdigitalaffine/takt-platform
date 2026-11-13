@@ -96,8 +96,8 @@ def test_validate_rejects_hallucinated_fields_and_preserves_text():
         ]
     }), SOURCE)
     assert structure["headings"] == [{
-        "quote": "§ 1 Geltungsbereich", "level": 2,
-        "markdown_suggestion": "## § 1 Geltungsbereich",
+        "quote": "§ 1 Geltungsbereich", "level": 3,
+        "markdown_suggestion": "### § 1 Geltungsbereich",
     }]
     assert SOURCE.startswith("# Hausordnung")
     verify = law_ai_agents.validate("law_verify", json.dumps({

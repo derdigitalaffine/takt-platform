@@ -6,7 +6,9 @@
 {% block content %}
 {% call m.page_head(law.title if law else 'Neuer Rechtstext', 'Text einfügen oder als Datei laden (Word, PDF, Markdown, Text). Die Gliederung (Bücher, Teile, Abschnitte, §§, Artikel – bei Verträgen und Regeln auch Ziffern oder Nummern wie 3.2) wird automatisch erkannt – die Vorschau zeigt sie sofort.') %}
 <a class="btn btn-outline-secondary" href="{{return_to}}"><i class="fa-solid fa-arrow-left me-1"></i>Zur Liste</a>
-<a class="btn btn-outline-primary" href="/laws-assistant"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Ortsrecht-Assistent</a>
+<a class="btn btn-primary" href="/laws-assistant"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>KI-Assistent starten</a>
+<a class="btn btn-outline-primary" href="#law-text-editor">Zum Texteditor</a>
+<a class="btn btn-outline-primary" href="#law-toc">Zur Gliederung</a>
 {% if law %}<a class="btn btn-outline-secondary" href="/recht/{{ law.slug }}" target="_blank"><i class="fa-regular fa-eye me-1"></i>Ansehen</a>
 <a class="btn btn-outline-secondary" href="/laws/{{ law.id }}/plan"><i class="fa-regular fa-calendar-plus me-1"></i>{{ 'Vorbereitete Fassung' if law.planned_valid_from else 'Neue Fassung vorbereiten' }}</a>{% endif %}
 {% endcall %}
@@ -47,7 +49,8 @@
         </div>
       </div></div>
 
-      <div class="card"><div class="card-header d-flex flex-wrap align-items-center gap-2"><i class="fa-brands fa-markdown"></i><strong>Text</strong>
+      <div class="card" id="law-text-editor"><div class="card-header d-flex flex-wrap align-items-center gap-2"><i class="fa-brands fa-markdown"></i><strong>Text</strong>
+        <button class="btn btn-sm btn-outline-primary" type="button" id="law-focus-toggle" aria-pressed="false"><i class="fa-solid fa-expand me-1" aria-hidden="true"></i>Schreibbereich maximieren</button>
         <div class="ds-view-switch btn-group btn-group-sm ms-2" role="group" aria-label="Ansicht">
           <input type="radio" class="btn-check" name="law-view" id="lv-edit" value="edit" autocomplete="off"><label class="btn btn-outline-secondary" for="lv-edit">Text</label>
           <input type="radio" class="btn-check" name="law-view" id="lv-split" value="split" autocomplete="off" checked><label class="btn btn-outline-secondary" for="lv-split">Geteilt</label>
@@ -63,6 +66,12 @@
           <button class="btn btn-sm btn-light" type="button" data-insert="\n1. \n2. \n" title="nummerierte Liste"><i class="fa-solid fa-list-ol"></i></button>
           <button class="btn btn-sm btn-light" type="button" data-insert="\n| Spalte | Spalte |\n| --- | --- |\n|  |  |\n" title="Tabelle"><i class="fa-solid fa-table"></i></button>
           <span class="small text-secondary align-self-center ms-auto" id="law-status"></span>
+        </div>
+        <div class="law-md-quality border-bottom px-3 py-2" id="law-md-quality">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" data-law-md-check><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>TAKT-Markdown prüfen und gliedern</button>
+            <span class="small text-secondary" data-law-md-status role="status" aria-live="polite">Markierungen werden nur nach Bestätigung übernommen. Der Rechtswortlaut bleibt unverändert.</span>
+          </div>
         </div>
         <div class="row g-0 law-split">
           <div class="col law-src"><textarea class="form-control border-0 rounded-0 font-monospace h-100" name="body_md" id="body_md" rows="28" spellcheck="true" style="font-size: .88rem" placeholder="# Hauptsatzung der Ortsgemeinde …
@@ -168,4 +177,5 @@ Präambel / Eingangsformel …
 {% block scripts %}
 <link rel="stylesheet" href="/static/laws.css">
 <script src="/static/law-edit.js"></script>
+<script src="/static/law-md-quality.js"></script>
 {% endblock %}

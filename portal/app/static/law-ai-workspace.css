@@ -260,3 +260,36 @@
   .law-workspace .law-draft,
   .law-workspace .law-choice { transition: none; }
 }
+
+/* OCR-/KI-Übernahme: mehr Arbeitsfläche für lange Satzungen. */
+@media (min-width: 768px) {
+  .law-workspace .law-editor { min-height: 68vh; font-size: 1rem; line-height: 1.7; }
+  .law-workspace .law-outline { max-height: 65vh; }
+}
+
+/* Guided subviews preserve existing secure endpoints and confirmation workflow. */
+.law-area-tabs { display:flex; flex-wrap:wrap; gap:.5rem; padding:.35rem; border:1px solid var(--law-line); border-radius:.85rem; background:var(--law-card); }
+.law-area-tabs a { display:inline-flex; align-items:center; min-height:2.7rem; padding:.5rem .85rem; border-radius:.6rem; text-decoration:none; color:var(--bs-body-color); font-weight:600; }
+.law-area-tabs a:hover,.law-area-tabs a:focus-visible { background:var(--law-soft); }
+.law-area-tabs a.active { background:var(--bs-primary); color:#fff; }
+.law-workspace[data-view="ki"] [data-law-editor-panel],
+.law-workspace[data-view="import"] [data-law-editor-panel],
+.law-workspace[data-view="editor"] [data-law-agent-panel],
+.law-workspace[data-view="import"] [data-law-agent-panel] { display:none!important; }
+@media(min-width:1200px) {
+  .law-workspace[data-view="editor"] .law-layout-side,
+  .law-workspace[data-view="ki"] .law-layout-side { display:none!important; }
+  .law-workspace[data-view="editor"] .law-layout-main,
+  .law-workspace[data-view="ki"] .law-layout-main { flex:0 0 100%; max-width:100%; }
+  .law-workspace[data-view="editor"] .law-editor { min-height:73vh; font-size:1rem; }
+}
+@media(max-width:767px) {
+  .law-area-tabs a { flex:1 1 42%; justify-content:center; text-align:center; }
+}
+
+/* Keep the document list from pushing the AI/editor workspace below the fold
+   on narrow phones. The overview/import tabs retain the complete list. */
+.law-workspace[data-view="editor"] .law-layout-side,
+.law-workspace[data-view="ki"] .law-layout-side { display:none!important; }
+.law-workspace[data-view="editor"] .law-layout-main,
+.law-workspace[data-view="ki"] .law-layout-main { flex:0 0 100%; max-width:100%; }

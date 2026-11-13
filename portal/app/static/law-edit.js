@@ -5,6 +5,15 @@
   var form = document.getElementById('law-form');
   if (!form) return;
   var text = document.getElementById('body_md');
+  var focusButton = document.getElementById('law-focus-toggle');
+  if (focusButton) focusButton.addEventListener('click', function () {
+    var enabled = document.body.classList.toggle('law-editor-focus');
+    focusButton.setAttribute('aria-pressed', String(enabled));
+    focusButton.innerHTML = enabled
+      ? '<i class="fa-solid fa-compress me-1" aria-hidden="true"></i>Normale Ansicht'
+      : '<i class="fa-solid fa-expand me-1" aria-hidden="true"></i>Schreibbereich maximieren';
+    if (enabled) text.focus();
+  });
   var box = document.getElementById('law-toc');
   var prev = document.getElementById('law-preview');
   var status = document.getElementById('law-status');
