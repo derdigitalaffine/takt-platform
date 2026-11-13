@@ -102,6 +102,14 @@
         <button class="btn btn-sm btn-outline-secondary w-100" id="map-compare-toggle" type="button" aria-pressed="false"><i class="fa-solid fa-code-compare me-2" aria-hidden="true"></i>Grundkarten vergleichen</button>
         <div class="small text-secondary mt-1" id="map-compare-status" role="status"></div>
       </div>
+      <section class="map-lod2-panel mt-3" id="map-lod2-panel" aria-label="Amtliche 3D-Gebäudedächer">
+        <h3 class="h6 mb-2"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Gebäudedächer Rheinland-Pfalz</h3>
+        <button class="btn btn-sm btn-outline-secondary w-100" type="button"
+                id="map-lod2-toggle" aria-pressed="false" disabled>LoD2-Dachformen in 3D anzeigen</button>
+        <div class="small text-secondary mt-2" id="map-lod2-info" role="status">Verfügbarkeit wird geprüft …</div>
+        <p class="small text-secondary mb-0 mt-1">Lokale, räumlich begrenzte CityGML-Vorschau mit echten Dachflächen;
+          ohne Höhenabgleich mit DGM. Import durch Kartenadministration erforderlich.</p>
+      </section>
       <div class="map-view-switch mt-3">
         <button class="btn btn-sm btn-outline-secondary w-100" type="button" id="map-3d-view" aria-pressed="false"><i class="fa-solid fa-cube me-2" aria-hidden="true"></i>Karte schräg betrachten (3D-Ansicht)</button>
         <div class="small text-secondary mt-1">Die Schrägansicht allein zeigt noch keine amtlichen CityGML-Gebäudedächer.</div>
@@ -192,5 +200,5 @@
 <script type="module" src="/static/map-core.js"></script>
 <script type="module" src="/static/map-draw.js"></script>
 <script src="/static/geo-search.js"></script>
-<script src="/static/map-parcels.js"></script><script type="module" src="/static/map-browser.js"></script><script type="module" src="/static/map-compare.js"></script><script src="/static/map-print.js" defer></script><script src="/static/map-ui.js" defer></script>
+<script src="/static/map-parcels.js"></script><script type="module" src="/static/map-browser.js"></script><script type="module" src="/static/map-compare.js"></script><script type="module" src="/static/map-lod2.js"></script><script src="/static/map-print.js" defer></script><script src="/static/map-ui.js" defer></script>
 {% endblock %}
