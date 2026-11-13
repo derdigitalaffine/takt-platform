@@ -266,17 +266,36 @@ DATASETS = {
                 'Der GeoShop meldet derzeit eingeschränkte Verfügbarkeit.'
     },
     'rp-dgm1': {
-        'name': 'RP · Digitales Geländemodell DGM1',
-        'topic': '3D-Gebäude', 'region': 'Rheinland-Pfalz',
+        'name': 'RP · Digitales Geländemodell DGM1 (1 m)',
+        'topic': 'Gelände', 'region': 'Rheinland-Pfalz',
         'provider': 'LVermGeo Rheinland-Pfalz',
         'source_url': RLP_OPEN,
-        'download_url': 'https://geoshop.rlp.de/',
+        'download_url': 'https://geoshop.rlp.de/opendata-dgm1.html',
         'license': 'DL-DE BY 2.0', 'license_url': BY,
-        'format': 'Raster / Höhenraster', 'kind': 'download',
-        'note': 'Höhenmodell zum Datenbezug und zur späteren '
-                'DEM-Aufbereitung; kein direktes Terrain-RGB.'
+        'format': 'ASCII XYZ / GeoTIFF', 'kind': 'download',
+        'note': 'Original-DGM1 wird als amtlicher Download angeboten. Eine '
+                'volle 1-km-Kachel kann die Grenzen des lokalen TAKT-Imports '
+                'überschreiten; keine direkten Terrain-RGB-Tiles.'
     }
 }
+
+# DGM5/DGM10 are valid official downloads and are typically more manageable
+# for local XYZ relief previews. They are NOT published as ready MapLibre tiles.
+for resolution in (5, 10):
+    DATASETS[f'rp-dgm{resolution}'] = {
+        'name': f'RP · Digitales Geländemodell DGM{resolution} ({resolution} m)',
+        'topic': 'Gelände', 'region': 'Rheinland-Pfalz',
+        'provider': 'LVermGeo Rheinland-Pfalz',
+        'source_url': RLP_OPEN,
+        'download_url': 'https://geoshop.rlp.de/digitale_gelaendemodelle/digitale_gelaendemodelle_dgm.html',
+        'license': 'DL-DE BY 2.0', 'license_url': BY,
+        'format': 'ASCII XYZ / GeoTIFF', 'kind': 'download',
+        'note': 'Amtlichen DGM-Datenausschnitt als ASCII-XYZ beziehen. '
+                'Nach manuellem Import in Kartenlayer → DGM kann er mit '
+                'einem LoD2-Modell vor Ort verglichen werden, wenn beide '
+                'den Lage- und Höhenbezug EPSG:25832 / DHHN2016 besitzen. '
+                'Keine automatisch streambare MapLibre-Datenquelle.'
+    }
 
 
 def discover(query='', region='', topic=''):
