@@ -286,3 +286,10 @@
 @media(max-width:767px) {
   .law-area-tabs a { flex:1 1 42%; justify-content:center; text-align:center; }
 }
+
+/* Keep the document list from pushing the AI/editor workspace below the fold
+   on narrow phones. The overview/import tabs retain the complete list. */
+.law-workspace[data-view="editor"] .law-layout-side,
+.law-workspace[data-view="ki"] .law-layout-side { display:none!important; }
+.law-workspace[data-view="editor"] .law-layout-main,
+.law-workspace[data-view="ki"] .law-layout-main { flex:0 0 100%; max-width:100%; }
