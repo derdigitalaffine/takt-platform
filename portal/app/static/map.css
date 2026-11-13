@@ -116,3 +116,11 @@
 #overlay-count{font-variant-numeric:tabular-nums}
 @media(max-width:767.98px){.map-discovery{padding:.7rem}.map-discovery-results{max-height:38vh}.map-source-row .source-title,.map-source-row .source-fav,.map-discovery-choice{min-height:44px}.map-discovery-filters .form-select{min-width:0}}
 @media(prefers-reduced-motion:reduce){.map-source-row{transition:none}}
+
+/* Discover public GIS data in one tap; horizontally scrollable on phones. */
+.map-discovery-shortcuts{display:flex;gap:.4rem;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;padding:.1rem 0 .35rem}
+.map-discovery-shortcuts button{flex:0 0 auto;min-height:36px;white-space:nowrap;border-radius:999px}
+.map-discovery-shortcuts button:focus-visible{outline:2px solid var(--bs-primary);outline-offset:2px}
+.map-discovery-source-links{display:flex;align-items:center;flex-wrap:wrap;gap:.35rem .8rem}
+.map-discovery-source-link{display:inline-flex;align-items:center;font-size:.78rem;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+@media(max-width:767.98px){.map-discovery-shortcuts button{min-height:44px}}
