@@ -137,6 +137,9 @@ def prwahl_team(request: Request, election_id: int, user_id: int = Form(...),
     person = db.get(User, user_id)
     if person is None or not person.active:
         raise HTTPException(422, "Die Person ist nicht verfügbar.")
+    if not db.scalar(select(OrgMembership.id).where(
+        OrgMembership.org_id == election.org_id, OrgMembership.user_id == person.id)):
+        raise HTTPException(422, "Die Person gehört nicht zur gewählten Organisationseinheit. Bitte die Dienststellenzugehörigkeit vor der Mandatsvergabe prüfen.")
     appointment_reference = pw.clean(appointment_reference, 250)
     if role in {"chair", "member", "clerk"} and len(appointment_reference) < 6:
         raise HTTPException(422, "Bitte einen konkreten Bestellungs- oder Benennungsnachweis angeben.")
