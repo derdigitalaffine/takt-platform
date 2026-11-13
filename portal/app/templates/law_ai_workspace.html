@@ -206,6 +206,7 @@
                               {% if entry.source_start is defined %}<div class="small text-secondary">Textabschnitt {{ entry.section }} · Zeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}</div>{% endif %}
                               <button class="btn btn-outline-secondary btn-sm mt-1" type="button"
                                       data-law-ai-apply-heading="{{ entry.quote }}"
+                                      data-law-ai-offset="{{ entry.source_start if entry.source_start is defined else '' }}"
                                       data-law-ai-heading-level="{{ entry.level }}">Überschrift gezielt im Entwurf formatieren</button>
                             </div>
                           {% else %}<p class="small text-secondary">Keine zusätzlichen Gliederungsvorschläge.</p>{% endfor %}
@@ -225,7 +226,8 @@
                               <blockquote class="small mt-1 mb-1 text-break">{{ finding.quote }}</blockquote>
                               {% if finding.source_start is defined %}<div class="small text-secondary">Textabschnitt {{ finding.section }} · Zeichen {{ finding.source_start + 1 }}–{{ finding.source_end }}</div>{% endif %}
                               <button type="button" class="btn btn-link btn-sm p-0"
-                                      data-law-ai-locate="{{ finding.quote }}">Fundstelle im Entwurf markieren</button>
+                                      data-law-ai-locate="{{ finding.quote }}"
+                                      data-law-ai-offset="{{ finding.source_start if finding.source_start is defined else '' }}">Fundstelle im Entwurf markieren</button>
                               <div class="small">{{ finding.reason }}</div>
                               {% if finding.suggestion %}<div class="small text-secondary">{{ finding.suggestion }}</div>{% endif %}
                             </div>
