@@ -1,11 +1,10 @@
 {% extends "base.html" %}
-{% import "_res_macros.html" as rm with context %}
+{% import "_internal_asset_macros.html" as iam with context %}
 {% block title %}Interner Gerätepool{% endblock %}
 {% block head %}{{ super() }}<link rel="stylesheet" href="/static/internal-assets.css">{% endblock %}
 {% block content %}
-{% call rm.head('internal', [('Interner Gerätepool', '')], 'Interner Gerätepool', 'Material, Technik, Mobiliar und Fahrzeuge für den Dienstbetrieb planen.') %}
-  <a href="/resources/intern/plan" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-calendar-week me-1"></i>Wochenplan</a>
-  {% if manager %}<a href="/resources/planner" class="btn btn-outline-secondary btn-sm">Raumplaner</a>{% endif %}
+{% call iam.head('catalog', [], 'Interne Ressourcen', 'Inventar, Lagerorte und interne Reservierungen für den Dienstbetrieb.') %}
+  <a href="/interne-ressourcen/plan" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-calendar-week me-1"></i>Wochenplan</a>
 {% endcall %}
 <div class="res-pool">
   <div class="res-pool-intro d-flex align-items-start gap-3 mb-4">
@@ -16,7 +15,7 @@
   </div>
   <nav class="res-pool-tabs mb-4" aria-label="Abschnitte des Gerätepools">
     <a href="#katalog"><i class="fa-solid fa-layer-group me-1"></i>Katalog</a>
-    <a href="/resources/intern/plan"><i class="fa-solid fa-calendar-week me-1"></i>Wochenplan</a>
+    <a href="/interne-ressourcen/plan"><i class="fa-solid fa-calendar-week me-1"></i>Wochenplan</a>
     <a href="#reservierungen"><i class="fa-solid fa-calendar-check me-1"></i>Reservierungen</a>
     {% if manager %}<a href="#lagerorte"><i class="fa-solid fa-location-dot me-1"></i>Lager &amp; Inventar</a>
     <a href="#wartungen"><i class="fa-solid fa-screwdriver-wrench me-1"></i>Wartungen</a>{% endif %}
@@ -31,7 +30,7 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
       <div><h2 class="h4 mb-1">Materialkatalog</h2><p class="text-secondary small mb-0">Wähle einen Gegenstand und prüfe die Menge direkt für deinen Zeitraum.</p></div>
     </div>
-    <form method="get" action="/resources/intern" class="card res-pool-filter mb-3" role="search">
+    <form method="get" action="/interne-ressourcen" class="card res-pool-filter mb-3" role="search">
       <div class="card-body row g-2 align-items-end">
         <div class="col-lg-7"><label class="form-label small" for="pool-search">Suche nach Gegenstand, Inventarnummer oder Lagerort</label>
           <input class="form-control" id="pool-search" name="q" value="{{ q }}" placeholder="Beamer, Pavillon, Lager A …"></div>
@@ -66,7 +65,7 @@
                 <i class="fa-solid fa-calendar-plus me-1"></i>Zeitraum reservieren
               </summary>
               {% if a.active %}
-              <form method="post" action="/resources/intern/{{a.id}}/reservieren" class="row g-2 pt-3" data-pool-availability>
+              <form method="post" action="/interne-ressourcen/{{a.id}}/reservieren" class="row g-2 pt-3" data-pool-availability>
                 <input type="hidden" name="csrf" value="{{csrf}}">
                 <input type="hidden" name="asset_id" value="{{a.id}}">
                 <div class="col-6"><label class="form-label small" for="pool-from-{{a.id}}">Von</label><input type="datetime-local" class="form-control form-control-sm" name="start" id="pool-from-{{a.id}}" min="{{today}}" required></div>
@@ -81,7 +80,7 @@
             {% if manager %}
             <details class="res-pool-details mt-2">
               <summary class="btn btn-outline-secondary btn-sm w-100"><i class="fa-solid fa-pen me-1"></i>Inventar pflegen</summary>
-              <form method="post" action="/resources/intern/{{a.id}}/bearbeiten" class="row g-2 pt-3">
+              <form method="post" action="/interne-ressourcen/{{a.id}}/bearbeiten" class="row g-2 pt-3">
                 <input type="hidden" name="csrf" value="{{csrf}}">
                 <div class="col-12"><label class="form-label small" for="pool-name-{{a.id}}">Bezeichnung</label><input name="name" id="pool-name-{{a.id}}" class="form-control form-control-sm" value="{{a.name}}" maxlength="200" required></div>
                 <div class="col-6"><label class="form-label small" for="pool-class-{{a.id}}">Kategorie</label><select name="category" id="pool-class-{{a.id}}" class="form-select form-select-sm">{% for c in categories %}<option value="{{c}}" {% if a.category==c %}selected{% endif %}>{{c}}</option>{% endfor %}</select></div>
@@ -97,7 +96,7 @@
             </details>
             <details class="res-pool-details mt-2">
               <summary class="btn btn-outline-secondary btn-sm w-100"><i class="fa-solid fa-screwdriver-wrench me-1"></i>Wartungszeit sperren</summary>
-              <form method="post" action="/resources/intern/{{a.id}}/wartung" class="row g-2 pt-3">
+              <form method="post" action="/interne-ressourcen/{{a.id}}/wartung" class="row g-2 pt-3">
                 <input type="hidden" name="csrf" value="{{csrf}}">
                 <div class="col-6"><label class="form-label small" for="pool-mfrom-{{a.id}}">Von</label><input type="datetime-local" class="form-control form-control-sm" name="start" id="pool-mfrom-{{a.id}}" min="{{today}}" required></div>
                 <div class="col-6"><label class="form-label small" for="pool-mto-{{a.id}}">Bis</label><input type="datetime-local" class="form-control form-control-sm" name="end" id="pool-mto-{{a.id}}" min="{{today}}" required></div>
@@ -113,13 +112,13 @@
       {% else %}
       <div class="col-12"><div class="card"><div class="card-body text-center py-5"><i class="fa-solid fa-box-open fs-2 text-secondary"></i>
         <h3 class="h6 mt-3">Keine Gegenstände gefunden</h3><p class="text-secondary small">Versuche einen anderen Filter oder lege als Gerätepool-Verantwortlicher Material an.</p>
-        {% if q or category %}<a href="/resources/intern" class="btn btn-outline-primary btn-sm">Alle Gegenstände anzeigen</a>{% endif %}
+        {% if q or category %}<a href="/interne-ressourcen" class="btn btn-outline-primary btn-sm">Alle Gegenstände anzeigen</a>{% endif %}
       </div></div></div>
       {% endfor %}
     </div>
   </section>
   <section id="reservierungen" class="mb-5">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h2 class="h4 mb-0">{{'Ausgabe- und Reservierungsübersicht' if manager else 'Meine Reservierungen'}}</h2><a class="btn btn-outline-secondary btn-sm" href="/resources/intern{{'#reservierungen' if history else '?verlauf=1#reservierungen'}}">{{'Nur offene Vorgänge' if history else 'Abgeschlossene Vorgänge anzeigen'}}</a></div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h2 class="h4 mb-0">{{'Ausgabe- und Reservierungsübersicht' if manager else 'Meine Reservierungen'}}</h2><a class="btn btn-outline-secondary btn-sm" href="/interne-ressourcen{{'#reservierungen' if history else '?verlauf=1#reservierungen'}}">{{'Nur offene Vorgänge' if history else 'Abgeschlossene Vorgänge anzeigen'}}</a></div>
     <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
       <thead><tr><th>Gegenstand</th>{% if manager %}<th>Buchende Person</th>{% endif %}<th>Zeitraum</th><th>Menge</th><th>Status</th><th>Aktionen</th></tr></thead>
       <tbody>{% for b in bookings %}<tr>
@@ -129,14 +128,14 @@
         <td>{{b.quantity}}</td>
         <td><span class="badge {{'text-bg-primary' if b.status=='issued' else 'text-bg-warning'}}">{{status_labels[b.status]}}</span></td>
         <td class="res-pool-actions">
-          {% if b.status != "cancelled" %}<a class="btn btn-sm btn-outline-secondary" href="/resources/intern/buchungen/{{b.id}}/termin.ics" title="Kalendertermin herunterladen"><i class="fa-solid fa-calendar-arrow-down" aria-hidden="true"></i> .ics</a>{% endif %}
+          {% if b.status != "cancelled" %}<a class="btn btn-sm btn-outline-secondary" href="/interne-ressourcen/buchungen/{{b.id}}/termin.ics" title="Kalendertermin herunterladen"><i class="fa-solid fa-calendar-arrow-down" aria-hidden="true"></i> .ics</a>{% endif %}
           {% if manager and b.status == 'reserved' %}
-          <form method="post" action="/resources/intern/buchungen/{{b.id}}/issue"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Ausgabehinweis" placeholder="Abholer / Zustand"><button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-hand-holding me-1"></i>Ausgeben</button></form>
+          <form method="post" action="/interne-ressourcen/buchungen/{{b.id}}/issue"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Ausgabehinweis" placeholder="Abholer / Zustand"><button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-hand-holding me-1"></i>Ausgeben</button></form>
           {% elif manager and b.status == 'issued' %}
-          <form method="post" action="/resources/intern/buchungen/{{b.id}}/return"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Rückgabehinweis" placeholder="Zustand / Rückgabehinweis"><button class="btn btn-sm btn-success" type="submit">Rücknahme</button></form>
+          <form method="post" action="/interne-ressourcen/buchungen/{{b.id}}/return"><input type="hidden" name="csrf" value="{{csrf}}"><input class="form-control form-control-sm" name="note" aria-label="Rückgabehinweis" placeholder="Zustand / Rückgabehinweis"><button class="btn btn-sm btn-success" type="submit">Rücknahme</button></form>
           {% endif %}
           {% if b.status == 'reserved' and (manager or b.user_id == user.id) %}
-          <form method="post" action="/resources/intern/buchungen/{{b.id}}/cancel"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-outline-secondary" type="submit">Stornieren</button></form>
+          <form method="post" action="/interne-ressourcen/buchungen/{{b.id}}/cancel"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-outline-secondary" type="submit">Stornieren</button></form>
           {% endif %}
         </td>
       </tr>{% else %}<tr><td colspan="{{6 if manager else 5}}" class="text-center text-secondary py-4">Keine offenen Vorgänge vorhanden.</td></tr>{% endfor %}</tbody>
@@ -148,7 +147,7 @@
     <section id="lagerorte" class="col-xl-5">
       <h2 class="h4 mb-3">Lagerorte</h2>
       <div class="card"><div class="card-body">
-        <form action="/resources/intern/lagerorte" method="post" class="row g-2">
+        <form action="/interne-ressourcen/lagerorte" method="post" class="row g-2">
           <input type="hidden" name="csrf" value="{{csrf}}">
           <div class="col-12"><label class="form-label small" for="pool-lname">Lagerort</label><input id="pool-lname" name="name" class="form-control" placeholder="Lagerraum 01" maxlength="160" required></div>
           <div class="col-sm-6"><label class="form-label small" for="pool-building">Gebäude</label><input id="pool-building" name="building" class="form-control" placeholder="Rathaus" maxlength="160"></div>
@@ -161,7 +160,7 @@
     <section class="col-xl-7">
       <h2 class="h4 mb-3">Gegenstand hinzufügen</h2>
       <div class="card"><div class="card-body">
-        <form action="/resources/intern/gegenstaende" method="post" class="row g-3">
+        <form action="/interne-ressourcen/gegenstaende" method="post" class="row g-3">
           <input type="hidden" name="csrf" value="{{csrf}}">
           <div class="col-sm-8"><label for="pool-new-name" class="form-label small">Bezeichnung</label><input id="pool-new-name" name="name" class="form-control" maxlength="200" placeholder="Leinwand mobil, Pavillon 3×3 m …" required></div>
           <div class="col-sm-4"><label for="pool-new-stock" class="form-label small">Bestand</label><input type="number" min="1" max="100000" value="1" id="pool-new-stock" name="quantity" class="form-control" required></div>
@@ -178,7 +177,7 @@
   <section id="wartungen" class="mb-5"><h2 class="h4 mb-3">Wartung &amp; Sperrzeiten</h2>
     <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead><tr><th>Gegenstand</th><th>Zeitraum</th><th>Menge</th><th>Grund</th><th>Aktion</th></tr></thead>
       <tbody>{% for m in maintenance %}<tr><td>{{assets|selectattr('id', 'equalto', m.asset_id)|map(attribute='name')|first|default('Inventar #' ~ m.asset_id)}}</td><td>{{m.starts_at|local}} – {{m.ends_at|local}}</td><td>{{m.quantity}}</td><td>{{m.reason}}</td>
-      <td><form method="post" action="/resources/intern/wartungen/{{m.id}}/loeschen"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-outline-secondary" type="submit">Sperre aufheben</button></form></td></tr>
+      <td><form method="post" action="/interne-ressourcen/wartungen/{{m.id}}/loeschen"><input type="hidden" name="csrf" value="{{csrf}}"><button class="btn btn-sm btn-outline-secondary" type="submit">Sperre aufheben</button></form></td></tr>
       {% else %}<tr><td colspan="5" class="text-center text-secondary py-4">Keine aktiven Sperrzeiten.</td></tr>{% endfor %}</tbody></table></div></div>
   </section>
   <section id="verlauf" class="mb-4"><h2 class="h4 mb-3">Änderungsjournal</h2><div class="card"><div class="table-responsive">

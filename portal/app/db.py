@@ -144,9 +144,9 @@ PERMISSIONS = {
     "ai_web": ("KI-Websuche", "fa-globe", "Öffentliche Webquellen auf ausdrücklichen Wunsch recherchieren"),
     "maps": ("Karten", "fa-map-location-dot", "Im Kartenbrowser eigene WMS/WFS-Layer hinzufügen, Karten speichern und teilen"),
     "payments": ("Zahlungen", "fa-euro-sign", "Zahlungsübersicht und Export, Zahlungen als bezahlt markieren, erstatten und stornieren"),
-    "internal_assets_book": ("Gerätepool: buchen", "fa-box-open", "Interne Gegenstände sehen und für eigene dienstliche Zwecke reservieren"),
-    "internal_assets_manage": ("Gerätepool: verwalten", "fa-warehouse", "Inventar, Lagerorte, Aus-/Rückgaben und Wartungen verwalten"),
-    "resources": ("Ressourcen", "fa-building", "Bürgerhäuser, Räume, Grillplätze, Geräte anlegen, Buchungen bearbeiten, Belegungskalender teilen"),
+    "internal_assets_book": ("Interne Ressourcen: buchen", "fa-box-open", "Interne Gegenstände sehen und für eigene dienstliche Zwecke reservieren"),
+    "internal_assets_manage": ("Interne Ressourcen: verwalten", "fa-warehouse", "Inventar, Lagerorte, Aus-/Rückgaben und Wartungen verwalten"),
+    "resources": ("Räume & Vermietung", "fa-building", "Extern und öffentlich buchbare Räume, Plätze und Ausstattung verwalten, Buchungen bearbeiten und Belegungskalender teilen"),
     "signage_manage": ("Digital Signage gestalten", "fa-display", "Gebäude, Räume, Displays, Freigaben und Geräte verwalten"),
     "krank": ("Krankmeldungen", "fa-notes-medical", "Krankmeldungen der Arbeitgeber bearbeiten, für die man (oder die eigene Gruppe) zuständig ist"),
     "krank_admin": ("Krankmelder verwalten", "fa-user-nurse", "Alle Krankmeldungen sehen; Arbeitgeber, Empfänger, Zuständige, Zugang, Texte, Löschfrist und Import verwalten"),
@@ -2925,6 +2925,7 @@ DEFAULT_SETTINGS = {
     "module_circulations": "1",
     "module_seminars": "1",
     "module_resources": "1",
+    "module_internal_assets": "1",  # Eigener interner Gerätepool; Aktivierung getrennt von der Vermietung.
     "holiday_state": "RP",            # Bundesland für Feiertagspreise
     "resources_embed": "1",
     "resources_embed_origins": "",

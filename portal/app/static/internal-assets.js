@@ -24,7 +24,7 @@
       }
       const args = new URLSearchParams({asset_id: asset.value, start: start.value, end: end.value});
       try {
-        const response = await fetch("/resources/intern/verfuegbarkeit?" + args, {credentials:"same-origin"});
+        const response = await fetch("/interne-ressourcen/verfuegbarkeit?" + args, {credentials:"same-origin"});
         if (revision !== run) return;
         if (!response.ok) throw new Error("Prüfung nicht möglich");
         const info = await response.json();

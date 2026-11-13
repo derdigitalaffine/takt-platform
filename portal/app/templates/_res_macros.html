@@ -6,14 +6,13 @@
 {% macro head(tab, crumbs, title, lede='') -%}
 <ul class="ds-nav nav nav-pills small res-nav" aria-label="Ressourcen">
   {% for key, href, icon, label, need in (('home', '/resources', 'fa-building', 'Übersicht', ''), ('planner', '/resources/planner', 'fa-table-cells', 'Planer', ''),
-     ('internal', '/resources/intern', 'fa-boxes-stacked', 'Gerätepool', 'internal_assets_book'),
      ('bookings', '/resources/bookings', 'fa-list', 'Buchungen', ''), ('stats', '/resources/stats', 'fa-chart-column', 'Auswertung', ''),
      ('clubs', '/resources/clubs', 'fa-people-group', 'Vereine', 'resources'), ('caretakers', '/resources/caretakers', 'fa-user-gear', 'Hausmeister', 'resources'), ('calendars', '/resources/calendars', 'fa-calendar-week', 'Kalender-Links', ''),
-     ('holidays', '/resources/holidays', 'fa-umbrella-beach', 'Feiertage', 'resources'), ('look', '/resources/darstellung', 'fa-palette', 'Darstellung', 'resources')) if (not need or user.can(need) or (need == 'internal_assets_book' and (user.can('internal_assets_manage') or user.can('resources')))) and (tab != 'internal' or key == 'internal' or user.can('resources')) %}
+     ('holidays', '/resources/holidays', 'fa-umbrella-beach', 'Feiertage', 'resources'), ('look', '/resources/darstellung', 'fa-palette', 'Darstellung', 'resources')) if not need or user.can(need) %}
   <li class="nav-item"><a class="nav-link text-nowrap {{ 'active' if tab == key }}" href="{{ href }}" {% if tab == key %}aria-current="page"{% endif %}><i class="fa-solid {{ icon }} me-1"></i>{{ label }}</a></li>
   {% endfor %}
 </ul>
-<nav class="ds-breadcrumb res-crumbs small text-truncate" aria-label="Pfad">{% if crumbs %}<a href="{{ '/resources/intern' if tab == 'internal' and not user.can('resources') else '/resources' }}">Ressourcen</a>{% else %}<span aria-current="page">Ressourcen</span>{% endif %}{% for label, href in crumbs %} <span class="text-secondary" aria-hidden="true">›</span> {% if href and not loop.last %}<a href="{{ href }}">{{ label }}</a>{% else %}<span aria-current="page">{{ label }}</span>{% endif %}{% endfor %}</nav>
+<nav class="ds-breadcrumb res-crumbs small text-truncate" aria-label="Pfad">{% if crumbs %}<a href="/resources">Ressourcen</a>{% else %}<span aria-current="page">Ressourcen</span>{% endif %}{% for label, href in crumbs %} <span class="text-secondary" aria-hidden="true">›</span> {% if href and not loop.last %}<a href="{{ href }}">{{ label }}</a>{% else %}<span aria-current="page">{{ label }}</span>{% endif %}{% endfor %}</nav>
 {% import '_macros.html' as m %}
 {% set actions=caller() if caller else '' %}
 {% call m.page_header(title, lede) %}{{ actions }}{% endcall %}
