@@ -270,7 +270,8 @@ def test_public_wizard_shows_one_day_and_paginates_available_days():
     assert "Worum geht es?" in choose and 'data-booking-type=' in choose
     assert 'name="slot"' not in choose
 
-    times = c.get(f"{base}?art={a_id}").text
+    # Use a full future service day instead of today's remaining hours.
+    times = c.get(f"{base}?art={a_id}&day={tomorrow().isoformat()}").text
     assert "Wann passt es Ihnen?" in times
     assert 'name="name"' not in times
     assert len(re.findall(r'class="bk-day-option[ "]', times)) == 7
