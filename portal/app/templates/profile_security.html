@@ -22,6 +22,57 @@
 </div>
 {% endif %}
 
+<section id="passkeys" class="card border-primary-subtle mb-4" aria-labelledby="passkeys-heading">
+  <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <h2 class="h6 mb-0" id="passkeys-heading"><i class="fa-solid fa-fingerprint me-2" aria-hidden="true"></i>Passkeys – ohne Passwort anmelden</h2>
+    <span class="badge text-bg-{{ 'success' if passkeys else 'secondary' }}">{{ passkeys|length }} eingerichtet</span>
+  </div>
+  <div class="card-body">
+    <p class="text-secondary small">Passkeys ermöglichen die Anmeldung über die Gerätesperre, Fingerabdruck oder Gesichtserkennung. Du kannst mehrere Geräte oder Passwortmanager registrieren. Passwort und bestehende Zwei-Faktor-Verfahren bleiben als Rückfalloption erhalten.</p>
+    <div data-passkey-panel class="border rounded-3 p-3 mb-3">
+      <h3 class="h6">Neuen Passkey hinzufügen</h3>
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-lg-4"><label class="form-label" for="passkey-name">Bezeichnung</label>
+          <input class="form-control" data-passkey-name id="passkey-name" maxlength="100" value="Mein Gerät" placeholder="z. B. Dienstlaptop oder Smartphone"></div>
+        {% if user.password_set %}
+        <div class="col-12 col-lg-4"><label class="form-label" for="passkey-register-password">Aktuelles Passwort zur Bestätigung</label>
+          <input class="form-control" data-passkey-password type="password" id="passkey-register-password" autocomplete="current-password"></div>
+        {% else %}
+        <div class="col-12 col-lg-4"><p class="form-text mb-1">Bitte zuvor über OIDC neu anmelden (höchstens 10 Minuten).</p></div>
+        {% endif %}
+        <div class="col-12 col-lg-4"><button class="btn btn-primary w-100" type="button" data-passkey-enroll><i class="fa-solid fa-key me-2" aria-hidden="true"></i>Passkey einrichten</button></div>
+      </div>
+      <p class="small text-secondary mt-2 mb-0" data-passkey-status role="status" aria-live="polite">Der Browser führt dich durch die Einrichtung. Private Schlüssel verlassen dein Gerät bzw. deinen Passwortmanager nicht.</p>
+    </div>
+    <h3 class="h6">Meine Passkeys</h3>
+    {% if passkeys %}
+    <div class="list-group">
+      {% for key in passkeys %}
+      <div class="list-group-item d-flex gap-3 flex-wrap align-items-center">
+        <span class="text-primary"><i class="fa-solid fa-shield-keyhole fa-lg" aria-hidden="true"></i></span>
+        <div class="flex-grow-1">
+          <strong>{{ key.name }}</strong>
+          <div class="small text-secondary">Eingerichtet {{ key.created_at|local }}{% if key.last_used_at %} · Zuletzt verwendet {{ key.last_used_at|local }}{% endif %}{% if key.backed_up %} · Synchronisierter Passkey{% endif %}</div>
+        </div>
+        <form method="post" action="/profile/passkeys/{{ key.id }}/delete" class="d-flex flex-wrap gap-2 align-items-center">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if user.password_set %}
+          <label class="visually-hidden" for="passkey-delete-password-{{ key.id }}">Passwort zum Entfernen von {{ key.name }}</label>
+          <input class="form-control form-control-sm" style="max-width:13rem" type="password" id="passkey-delete-password-{{ key.id }}" name="password" autocomplete="current-password" placeholder="Passwort bestätigen" required>
+          {% endif %}
+          <button class="btn btn-sm btn-outline-danger" type="submit"
+            data-confirm="Passkey „{{ key.name }}“ aus diesem Konto entfernen? Der Schlüssel kann danach nicht mehr zur Anmeldung verwendet werden."
+            data-confirm-button="Passkey entfernen"><i class="fa-solid fa-trash-can me-1" aria-hidden="true"></i>Entfernen</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="small text-secondary mb-0">Noch kein Passkey eingerichtet. Du kannst weiterhin Passwort oder OIDC verwenden.</p>
+    {% endif %}
+  </div>
+</section>
+<script src="/static/passkeys.js" defer></script>
 <div class="row g-4">
   {% if allowed.totp %}
   <div class="col-12 col-xl-6"><div class="card h-100">
