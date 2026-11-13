@@ -28,7 +28,7 @@ def _ai_permission(user: User, db: Session):
 @app.post("/laws-assistant/{draft_id:int}/agents", dependencies=[Depends(check_csrf)])
 def start_law_ai_agents(
     request: Request, draft_id: int, mode: str = Form("simple"),
-    transmission_confirmed: str = Form(""),
+    stage: str = Form("all"), transmission_confirmed: str = Form(""),
     user: User = Depends(law_user), db: Session = Depends(get_db),
 ):
     """An explicit click authorizes only this exact source and these providers."""
@@ -42,6 +42,11 @@ def start_law_ai_agents(
         raise HTTPException(413, "Für diese KI-Analyse sind 1 bis 120.000 Textzeichen zulässig.")
     if mode not in ("simple", "advanced"):
         raise HTTPException(422, "Unbekannter Analysemodus.")
+    stage_codes = {"all": "", "law_structure": "s",
+                   "law_metadata": "m", "law_verify": "v"}
+    if stage not in stage_codes:
+        raise HTTPException(422, "Unbekannter KI-Einzelauftrag.")
+    job_mode = mode if stage == "all" else mode + ":" + stage_codes[stage]
     try:
         # Bound external calls and fail before authorization/queue creation
         # if the entire source cannot be divided without omissions.
@@ -61,7 +66,7 @@ def start_law_ai_agents(
         draft_id=draft_id, requested_by=user.id,
         source_sha256=law_ai_agents.source_hash(source),
         source_chars=len(source), provider_map_json=json.dumps(selected, ensure_ascii=False),
-        mode=mode, status="queued", step="waiting",
+        mode=job_mode, status="queued", step="waiting",
     )
     db.add(job)
     try:
