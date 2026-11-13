@@ -37,7 +37,7 @@ def _reserved(db, asset_id, start, end, exclude=None):
         or_(InternalAssetReservation.status == "issued", and_(
             InternalAssetReservation.status == "reserved",
             InternalAssetReservation.starts_at < end,
-            InternalAssetReservation.ends_at > start))
+            InternalAssetReservation.ends_at > start)))
     if exclude:
         query = query.where(InternalAssetReservation.id != exclude)
     return int(db.scalar(query) or 0)
