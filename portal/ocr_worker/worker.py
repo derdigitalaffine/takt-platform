@@ -31,6 +31,7 @@ MAX_PAGES = 120
 MAX_PIXELS = 12_000_000
 MAX_WORDS = 30000
 MAX_TSV_BYTES = 3 * 1024 * 1024
+MAX_PAGE_TEXT = 25000
 
 
 class OcrFailure(Exception):
@@ -103,7 +104,7 @@ def _tsv_words(tsv: str) -> tuple[str, float | None, list[dict]]:
         lines.setdefault(key, []).append(text)
         if 0 <= confidence <= 100:
             scores.append(confidence)
-        if len(positions) < 450:
+        if len(positions) < 200:
             positions.append({"text": text[:80], "x": left, "y": top,
                               "w": width, "h": height,
                               "confidence": round(confidence, 1) if confidence >= 0 else None})
@@ -147,8 +148,10 @@ def _pdf(path: Path, language: str) -> tuple[str, list[dict], list[str]]:
         for i in range(pdf.page_count):
             page = pdf.load_page(i)
             native = page.get_text("text", sort=True).strip()
+            if len(native) > MAX_PAGE_TEXT:
+                raise OcrFailure("PDF-Seite enthält zu viel Text für einen sicheren automatischen Import.")
             if len(native) >= 80:
-                pages.append({"page": i + 1, "engine": "native-pdf", "text": native[:MAX_TEXT],
+                pages.append({"page": i + 1, "engine": "native-pdf", "text": native,
                               "confidence": None, "words": []})
                 continue
             width = int(page.rect.width * 2)
@@ -157,6 +160,8 @@ def _pdf(path: Path, language: str) -> tuple[str, list[dict], list[str]]:
                 raise OcrFailure("PDF-Seite hat eine unzulässige Bildgröße.")
             bitmap = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
             recognized, confidence, positions = _tesseract(bitmap.tobytes("png"), language)
+            if len(recognized) > MAX_PAGE_TEXT:
+                raise OcrFailure("OCR-Seite enthält zu viel Text für einen sicheren automatischen Import.")
             pages.append({"page": i + 1, "engine": "tesseract", "text": recognized,
                           "confidence": confidence, "words": positions})
             if confidence is None or confidence < 75:
@@ -199,6 +204,8 @@ def _image(path: Path, language: str) -> tuple[str, list[dict], list[str]]:
                 stream = io.BytesIO()
                 frame.save(stream, format="PNG")
                 text, score, positions = _tesseract(stream.getvalue(), language)
+                if len(text) > MAX_PAGE_TEXT:
+                    raise OcrFailure("OCR-Bildseite enthält zu viel Text für einen sicheren automatischen Import.")
                 pages.append({"page": i + 1, "engine": "tesseract", "text": text,
                               "confidence": score, "words": positions})
     except OcrFailure:
@@ -263,7 +270,15 @@ def process(job_path: Path) -> None:
         if isinstance(exc, OcrFailure):
             result["message"] = str(exc)[:180]
     if KEY_RE.fullmatch(key):
-        _atomic_json(RESULTS / (key + ".result.json"), result)
+        destination = RESULTS / (key + ".result.json")
+        try:
+            _atomic_json(destination, result)
+        except OcrFailure:
+            # An oversized result must not restart the worker forever.
+            _atomic_json(destination, {
+                "schema": 1, "job_key": key, "sha256": result.get("sha256"),
+                "status": "failed", "message": "OCR-Ausgabe überschreitet die Sicherheitsgrenze.",
+            })
     job_path.unlink(missing_ok=True)
 
 
