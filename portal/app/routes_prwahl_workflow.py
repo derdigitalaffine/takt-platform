@@ -3,8 +3,8 @@ from fastapi import Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db import User, get_db, utcnow
-from .main import app, current_user, check_csrf, render, redirect, flash
+from .db import User, utcnow
+from .main import app, current_user, check_csrf, render, redirect, flash, get_db
 from .prwahl import scope, record, clean, parse_date
 from .prwahl_workflow import (
     PRMilestone, PRCountRound, PRCountEntry, STAGES, STAGE_IDS,
