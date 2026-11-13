@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import agent, agent_intent, ai_provider, agent_mode
+from . import agent, agent_intent, ai_provider, agent_mode, ai_task_routing
 from .ai_models import AIProvider, AIConversation, AIMessage
 from .db import User
 from .main import app, check_csrf, current_user, get_db, rate_limit, stash_get, stash_put
@@ -185,7 +185,13 @@ async def takt_agent_plan(request: Request, prompt: str = Form(...),
                               open_url="/anliegen/neu?agent_private=" + private_nonce,
                               proposals=[], results=[], steps=[], plan_id=""))
     rate_limit(request, "takt-agent-plan", limit=24, window=60, key=str(user.id))
-    provider = db.get(AIProvider, convo.provider_id) if convo else db.scalar(select(AIProvider).where(AIProvider.active.is_(True)).order_by(AIProvider.id))
+    fallback_provider = db.get(AIProvider, convo.provider_id) if convo else db.scalar(
+        select(AIProvider).where(AIProvider.active.is_(True)).order_by(AIProvider.id))
+    try:
+        provider = (ai_task_routing.select_provider(db, "portal_plan", fallback=fallback_provider)
+                    if portal_command else fallback_provider)
+    except ai_provider.AIProviderError as exc:
+        raise HTTPException(503, str(exc)) from exc
     if not provider or not provider.active:
         raise HTTPException(503, "Für TAKT Agent ist noch kein aktiver KI-Provider eingerichtet.")
 
