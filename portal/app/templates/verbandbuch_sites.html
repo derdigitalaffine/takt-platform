@@ -37,6 +37,23 @@
       <p class="vb-note"><i class="fa-solid fa-user-shield"></i>Zusätzlich in der Benutzerverwaltung das Recht <strong>Verbandsbuch: erfassen</strong> bzw. <strong>Verbandsbuch: Fachakte einsehen</strong> vergeben.</p>
     </section>
   </div>
+  <section class="vb-card mt-3" aria-labelledby="vb-org-grant-title">
+    <div class="vb-card-head"><div><h2 id="vb-org-grant-title">Einsicht für ganze Organisationseinheiten</h2>
+      <p>Vertrauliche Fachakten für eine ausdrücklich bestimmte Person freigeben – auf Wunsch einschließlich aller untergeordneten aktiven Organisationseinheiten. Eine Organisationsrolle allein erteilt niemals Zugriff.</p></div><span class="vb-chip"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Zusätzliche Fachfreigabe</span></div>
+    <div class="vb-org-grants">
+      <form method="post" action="/verbandbuch/organisationen/berechtigungen" class="vb-fields vb-org-grant-form">
+        <input type="hidden" name="csrf" value="{{csrf}}">
+        <div class="vb-field"><label for="vb-review-org">Organisationseinheit</label><select class="form-select" id="vb-review-org" name="org_id" required><option value="">Organisation auswählen</option>{% for org in orgs %}<option value="{{org.id}}">{{org.name}}</option>{% endfor %}</select></div>
+        <div class="vb-field"><label for="vb-review-user">Berechtigte Person</label><select class="form-select" id="vb-review-user" name="user_id" required><option value="">Person mit Fachrecht auswählen</option>{% for person in users if 'verbandbuch_review' in person.perms %}<option value="{{person.id}}">{{person.name}} ({{person.email}})</option>{% endfor %}</select></div>
+        <div class="vb-field vb-full"><label class="vb-org-scope-label"><input type="checkbox" name="include_children" value="1" checked><span><strong>Alle aktiven Untereinheiten einschließen</strong><small>Vererbt die Einsicht auf jeden Standort unterhalb dieses Knotens. Ohne Häkchen gilt sie nur für Standorte unmittelbar in der gewählten Einheit.</small></span></label></div>
+        <div class="vb-full"><button type="submit" class="btn btn-primary"><i class="fa-solid fa-user-shield me-2" aria-hidden="true"></i>Einsicht gezielt freigeben</button></div>
+      </form>
+      <div class="vb-org-grant-list"><h3>Bestehende hierarchische Fachfreigaben</h3>
+        {% if org_grants %}<ul class="vb-grant-list">{% for grant in org_grants %}<li><span><strong>{% for p in users if p.id == grant.user_id %}{{p.name}}{% else %}Nutzerkonto #{{grant.user_id}}{% endfor %}</strong><small> · {% for org in orgs if org.id == grant.org_id %}{{org.name}}{% else %}Organisation #{{grant.org_id}}{% endfor %} · {{'Mit allen Untereinheiten' if grant.include_children else 'Nur gewählte Einheit'}}</small></span><form method="post" action="/verbandbuch/organisationen/berechtigungen/{{grant.id}}/entziehen"><input type="hidden" name="csrf" value="{{csrf}}"><button type="submit" class="btn btn-sm btn-outline-danger">Entziehen</button></form></li>{% endfor %}</ul>{% else %}<p class="text-secondary small">Noch keine übergreifenden Fachfreigaben. Einzelstandorte können weiterhin separat berechtigt werden.</p>{% endif %}
+      </div>
+    </div>
+    <div class="vb-note"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>Nur berechtigte, aktive Benutzerkonten mit globalem Fachrecht und gültigem Fachmandat können Meldungen öffnen. Globale Adminrechte allein berechtigen nicht zur Einsicht.</span></div>
+  </section>
   <section class="vb-card mt-3"><div class="vb-card-head"><div><h2>Standorte</h2><p>Die QR-Codes verwenden den bestehenden TAKT-Generator samt Druckaushang; sie enthalten ausschließlich den signierten Standort-Einstieg.</p></div></div>
     {% if sites %}<div class="vb-sites">
       {% for site in sites %}<article class="vb-site"><div class="vb-site-heading"><div><h3>{{site.title}} {% if not site.active %}<span class="badge text-bg-secondary">Gesperrt</span>{% endif %}</h3><span class="text-secondary small">{% for org in orgs if org.id == site.org_id %}{{org.name}}{% endfor %}</span></div><form method="post" action="/verbandbuch/standorte/{{site.id}}/status" class="d-inline-flex"><input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="active" value="{{'0' if site.active else '1'}}"><button type="submit" class="btn btn-outline-secondary btn-sm">{{'Deaktivieren' if site.active else 'Aktivieren'}}</button></form> {% if site.active %}<button type="button" class="btn btn-outline-primary btn-sm js-qr-open" data-qr-link="{{qr_base}}/verbandbuch/neu?s={{make_qr(site.id)|urlencode}}" data-qr-title="Erste Hilfe dokumentieren · {{site.title}}"><i class="fa-solid fa-qrcode me-1"></i>QR-Code & A4-Aushang</button>{% endif %}</div>
