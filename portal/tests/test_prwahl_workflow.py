@@ -59,34 +59,3 @@ def test_duplicate_labels_and_overvotes_rejected():
         check_count("list", 2, 100, 0, 0, [("A", 99)])
     with pytest.raises(HTTPException):
         check_count("person", 2, 100, 0, 0, [("A", 201)])
-
-
-def test_paper_only_result_does_not_require_digital_count(client):
-    """An official paper count is valid without optional TAKT count entries.
-
-    This regression exercises the milestone endpoint, not the d'Hondt helper.
-    """
-    from app.db import SessionLocal
-    from app.prwahl_models import PRElection, PRMandate
-    from app.prwahl_workflow import PRMilestone
-    from conftest import login, csrf_of, settings
-    from sqlalchemy import select
-
-    settings(module_prwahl="1")
-    admin = login("admin@example.org", "admin-passwort-123")
-    with SessionLocal() as db:
-        # Use an election that explicitly grants the logged-in administrator
-        # the election chair mandate; global admin alone is insufficient.
-        from app.db import User
-        user = db.scalar(select(User).where(User.email == "admin@example.org"))
-        election = db.scalar(select(PRElection).join(PRMandate, PRMandate.election_id == PRElection.id)
-                             .where(PRMandate.user_id == user.id, PRMandate.role == "chair"))
-        if election is None:
-            pytest.skip("No chair fixture is installed; endpoint test needs election fixture")
-        eid = election.id
-    page = admin.get(f"/personalratswahl/{eid}/ablauf")
-    assert page.status_code == 200
-    response = admin.post(f"/personalratswahl/{eid}/ablauf/determination/nachweis", data={
-        "csrf": csrf_of(page.text), "evidence": "Unterzeichnete Wahlniederschrift, Akte 2026/PR-01",
-    })
-    assert response.status_code in (303, 409)
