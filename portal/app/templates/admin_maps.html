@@ -38,6 +38,34 @@
 </form>
 
 {% include '_map_library.html' %}
+
+<section class="card mb-4" id="lod2-preview" aria-labelledby="lod2-admin-title">
+  <div class="card-header"><h2 class="h6 mb-0" id="lod2-admin-title"><i class="fa-solid fa-cubes-stacked me-2" aria-hidden="true"></i>Rheinland-Pfalz: LoD2-3D-Gebäudemodell</h2></div>
+  <div class="card-body">
+    <p class="small text-secondary">Importieren Sie einen <strong>räumlich begrenzten CityGML-Ausschnitt</strong> aus Rheinland-Pfalz.
+      Zulässig sind GML 2.0/3.0 mit EPSG:25832, Dach- und Wandpolygonen (maximal 4 MiB).
+      Dies ist eine Modellvorschau, kein landesweiter 3D-Tiles-Streamingdienst und kein DGM-Höhenmodell.
+      <a href="https://lvermgeo.rlp.de/produktinformationen/geotopografie/3d-geodaten/3d-gebaeudemodell"
+         target="_blank" rel="noopener noreferrer">Amtliche Produktinformationen</a>.</p>
+    <div id="lod2-admin-state" role="status" class="small mb-2">3D-Modellstatus wird geladen …</div>
+    <form id="lod2-import-form" method="post" enctype="multipart/form-data" action="/admin/maps/lod2/import" class="d-flex flex-wrap gap-2 align-items-end">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="flex-grow-1">
+        <label for="lod2-gml-file" class="form-label">CityGML (.gml oder .xml), max. 4 MiB</label>
+        <input id="lod2-gml-file" name="file" class="form-control" type="file" accept=".gml,.xml,application/xml,text/xml" required>
+      </div>
+      <button class="btn btn-primary" type="submit" id="lod2-import-submit">Vorschau importieren</button>
+    </form>
+    <form method="post" action="/admin/maps/lod2/delete" id="lod2-delete-form" class="mt-2">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="btn btn-sm btn-outline-danger"
+        data-confirm="Lokale LoD2-Vorschau wirklich entfernen?"
+        data-confirm-button="Entfernen">Vorschau entfernen</button>
+    </form>
+    <p class="small text-secondary mt-2 mb-0">Der Import wird ausschließlich auf Nutzeraktion ausgeführt. Nur angemeldete Benutzer können die Geometrien abrufen.
+      Datenquelle: ©GeoBasis-DE / LVermGeoRP, dl-de/by-2-0, www.lvermgeo.rlp.de [Daten bearbeitet].</p>
+  </div>
+</section>
 <div class="row g-3 mb-4">
   <div class="col-6 col-xl-3">{{ m.stat('fa-layer-group', layers | length, 'Layer gesamt') }}</div>
   <div class="col-6 col-xl-3">{{ m.stat('fa-toggle-on', layers | selectattr('enabled') | list | length, 'aktiv') }}</div>
@@ -175,4 +203,5 @@
   });
 })();
 </script>
+<script src="/static/map-lod2-admin.js" defer></script>
 {% endblock %}

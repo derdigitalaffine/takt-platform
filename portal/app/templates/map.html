@@ -34,9 +34,86 @@
       </div>
       <div class="d-flex flex-wrap gap-2 align-items-center mb-2"><label class="form-check form-switch small mb-0"><input type="checkbox" id="map-advanced" class="form-check-input">Erweiterte Ebenenoptionen</label></div>
       <input class="form-control form-control-sm mb-2" id="layer-filter" placeholder="Ebenen filtern …" aria-label="Ebenen filtern">
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+        <div class="small text-secondary" id="overlay-count" role="status"></div>
+        <label class="form-check small mb-0"><input class="form-check-input" id="overlay-only-active" type="checkbox"> Nur aktive</label>
+      </div>
       <div id="overlay-list"></div>
       <p class="small text-secondary mt-2 mb-0" id="overlay-empty" hidden>Keine Ebenen verfügbar.</p>
 
+      <section class="map-discovery mt-4" id="map-discovery" aria-labelledby="map-discovery-title">
+        <div class="map-discovery-header">
+          <div class="d-flex align-items-center gap-2">
+            <span class="map-discovery-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+            <div><h2 id="map-discovery-title" class="h6 mb-0">Geodaten entdecken</h2>
+              <div class="small text-secondary">Rheinland-Pfalz, Deutschland &amp; Open Data</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="map-discovery-reset" title="Filter zurücksetzen">Alle</button>
+        </div>
+        <div class="map-discovery-filters">
+          <label class="visually-hidden" for="map-discovery-search">Datenquellen durchsuchen</label>
+          <div class="input-group input-group-sm"><span class="input-group-text"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>
+            <input id="map-discovery-search" class="form-control" type="search" autocomplete="off" placeholder="Luftbilder, Gleise, Höhenlinien …">
+          </div>
+          <div class="map-discovery-shortcuts" role="group" aria-label="Themen-Schnellfilter">
+            <button type="button" class="btn btn-sm btn-primary" data-discovery-topic="" aria-pressed="true">Alle</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-discovery-topic="Luftbilder" aria-pressed="false">Luftbilder</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-discovery-topic="Kataster" aria-pressed="false">Kataster</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-discovery-topic="Wasser und Hochwasser" aria-pressed="false">Hochwasser</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-discovery-topic="Natur und Umwelt" aria-pressed="false">Umwelt</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-discovery-topic="Eisenbahn" aria-pressed="false">Bahn</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-discovery-topic="3D-Gebäude" aria-pressed="false">3D-Gebäude</button>
+          </div>
+          <div class="d-flex gap-2">
+            <label class="visually-hidden" for="map-discovery-region">Region</label>
+            <select id="map-discovery-region" class="form-select form-select-sm" aria-label="Gebiet">
+              <option value="">Alle Gebiete</option>
+            </select>
+            <label class="visually-hidden" for="map-discovery-topic">Thema</label>
+            <select id="map-discovery-topic" class="form-select form-select-sm" aria-label="Themenkategorie">
+              <option value="">Alle Themen</option>
+            </select>
+          </div>
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <label class="form-check small mb-0"><input class="form-check-input" type="checkbox" id="map-discovery-favorites-only"> Nur Favoriten</label>
+            <span id="map-discovery-count" class="small text-secondary" aria-live="polite"></span>
+          </div>
+        </div>
+        <div id="map-discovery-status" class="small text-secondary mt-2" role="status">Quellenverzeichnis wird geladen …</div>
+        <div id="map-discovery-results" class="map-discovery-results" aria-live="polite"></div>
+        <div id="map-discovery-preview" class="map-discovery-preview" hidden>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <button class="btn btn-sm btn-outline-secondary" id="map-discovery-back" type="button" aria-label="Zurück zu den Datenquellen">
+              <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+            <h3 class="h6 mb-0 flex-grow-1" id="map-discovery-preview-title"></h3>
+          </div>
+          <div class="small text-secondary mb-1" id="map-discovery-preview-info"></div>
+          <div class="map-discovery-source-links mb-2" id="map-discovery-source-links" aria-label="Originalquelle und Lizenz"></div>
+          <div id="map-discovery-choices" class="map-discovery-choices"></div>
+          <div class="d-flex gap-2 align-items-center mt-3">
+            <button class="btn btn-sm btn-primary" id="map-discovery-activate" type="button" {% if not can_edit %}disabled title="Zum Aktivieren anmelden"{% endif %}><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Auswahl zur Karte</button>
+            <span class="small text-secondary" id="map-discovery-activation-status" role="status"></span>
+          </div>
+        </div>
+        <p class="small text-secondary mb-0 mt-3">Quellen werden erst nach Auswahl abgefragt. Verfügbarkeit, Maßstab und Nutzungsbedingungen richten sich nach dem jeweiligen Anbieter. 3D-CityGML ist ein Download, kein unmittelbar ladbarer Kartenlayer.</p>
+      </section>
+      <div class="map-compare-switch mt-3">
+        <button class="btn btn-sm btn-outline-secondary w-100" id="map-compare-toggle" type="button" aria-pressed="false"><i class="fa-solid fa-code-compare me-2" aria-hidden="true"></i>Grundkarten vergleichen</button>
+        <div class="small text-secondary mt-1" id="map-compare-status" role="status"></div>
+      </div>
+      <section class="map-lod2-panel mt-3" id="map-lod2-panel" aria-label="Amtliche 3D-Gebäudedächer">
+        <h3 class="h6 mb-2"><i class="fa-solid fa-house me-1" aria-hidden="true"></i>Gebäudedächer Rheinland-Pfalz</h3>
+        <button class="btn btn-sm btn-outline-secondary w-100" type="button"
+                id="map-lod2-toggle" aria-pressed="false" disabled>LoD2-Dachformen in 3D anzeigen</button>
+        <div class="small text-secondary mt-2" id="map-lod2-info" role="status">Verfügbarkeit wird geprüft …</div>
+        <p class="small text-secondary mb-0 mt-1">Lokale, räumlich begrenzte CityGML-Vorschau mit echten Dachflächen;
+          ohne Höhenabgleich mit DGM. Import durch Kartenadministration erforderlich.</p>
+      </section>
+      <div class="map-view-switch mt-3">
+        <button class="btn btn-sm btn-outline-secondary w-100" type="button" id="map-3d-view" aria-pressed="false"><i class="fa-solid fa-cube me-2" aria-hidden="true"></i>Karte schräg betrachten (3D-Ansicht)</button>
+        <div class="small text-secondary mt-1">Die Schrägansicht allein zeigt noch keine amtlichen CityGML-Gebäudedächer.</div>
+      </div>
       </div><div id="map-parcel-pane" hidden><div id="parcel-browser" class="mt-3"></div></div><div id="map-workbench-actions"></div></div>
 <input type="file" id="draw-import" accept=".geojson,.json,application/geo+json,application/json" hidden>
 </div>
@@ -51,6 +128,21 @@
   <div class="map-main">
     <button class="btn btn-light btn-sm shadow-sm map-panel-open" type="button" id="panel-open" aria-label="Seitenleiste öffnen"><i class="fa-solid fa-layer-group me-1"></i>Kartenwerkzeuge</button>
     <div id="map" class="map-canvas" role="application" aria-label="Karte"></div>
+    <div class="map-compare-layer" id="map-compare-layer" hidden aria-label="Vergleichsgrundkarte rechts">
+      <div id="map-compare-canvas" class="map-compare-canvas"></div>
+    </div>
+    <div class="map-compare-divider" id="map-compare-divider" aria-hidden="true" hidden></div>
+    <div class="map-compare-toolbar" id="map-compare-toolbar" role="group" aria-label="Grundkartenvergleich" hidden>
+      <div class="map-compare-toolbar-head">
+        <strong>Grundkartenvergleich</strong>
+        <button type="button" id="map-compare-close" class="btn btn-sm btn-outline-secondary" aria-label="Vergleich beenden"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+      </div>
+      <label for="map-compare-base" class="small">Grundkarte rechts</label>
+      <select class="form-select form-select-sm" id="map-compare-base"></select>
+      <label for="map-compare-position" class="small mt-2">Trennlinie verschieben</label>
+      <input type="range" min="10" max="90" step="1" value="50" class="form-range" id="map-compare-position" aria-label="Anteil der linken Kartenansicht">
+      <p class="small text-secondary mb-0">Links: aktuelle Karte inklusive Fachebenen. Rechts: gewählte Grundkarte.</p>
+    </div>
     <div class="map-coords small" id="map-coords" aria-live="off"></div>
     <div class="map-measure small" id="map-measure" hidden></div>
   </div>
@@ -108,5 +200,5 @@
 <script type="module" src="/static/map-core.js"></script>
 <script type="module" src="/static/map-draw.js"></script>
 <script src="/static/geo-search.js"></script>
-<script src="/static/map-parcels.js"></script><script type="module" src="/static/map-browser.js"></script><script src="/static/map-print.js" defer></script><script src="/static/map-ui.js" defer></script>
+<script src="/static/map-parcels.js"></script><script type="module" src="/static/map-browser.js"></script><script type="module" src="/static/map-compare.js"></script><script type="module" src="/static/map-lod2.js"></script><script src="/static/map-print.js" defer></script><script src="/static/map-ui.js" defer></script>
 {% endblock %}
