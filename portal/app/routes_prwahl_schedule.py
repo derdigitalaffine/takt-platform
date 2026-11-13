@@ -10,7 +10,7 @@ from .main import app, check_csrf, current_user, get_db, render, redirect, flash
 from .prwahl import scope, record, clean
 from .prwahl_models import PRMandate
 from .prwahl_schedule import PRScheduleEvent, KINDS, local_to_utc, display_local, calendar_file
-from .prwahl_deadlines import suggestions
+from .prwahl_deadlines import suggestions, diagnose, mark_existing
 from .prwahl_workflow import PRMilestone
 
 def _redacted_event(event):
@@ -35,10 +35,13 @@ def prwahl_schedule(request: Request, election_id: int, suggest: str = "",
     published = db.scalar(select(PRMilestone).where(PRMilestone.election_id == election.id,
                          PRMilestone.stage == "announcement"))
     notice_date = published.effective_on if published and published.completed_at else None
-    proposals = suggestions(election, notice_effective_on=notice_date)
-    selected = next((item for item in proposals if item["code"] == suggest), None)
+    proposals = mark_existing(suggestions(election, notice_effective_on=notice_date), events)
+    warnings = diagnose(election, notice_effective_on=notice_date)
+    selected = next((item for item in proposals if item["code"] == suggest and
+                     not item["already_planned"]), None)
     return render(request, "prwahl_schedule.html", user, election=election, role=role,
-                  events=events, proposed=proposals, selected_proposal=selected,
+                  events=events, proposed=proposals, deadline_warnings=warnings,
+                  selected_proposal=selected,
                   kinds=KINDS, display_local=display_local,
                   can_edit=role in {"coordinator","chair","member","clerk"})
 
@@ -55,6 +58,11 @@ def prwahl_schedule_add(request: Request, election_id: int, kind: str = Form(...
     title, location = clean(title,180), clean(location,240)
     if not title:
         raise HTTPException(422, "Bitte eine Terminbezeichnung angeben.")
+    duplicate = db.scalar(select(PRScheduleEvent.id).where(
+        PRScheduleEvent.election_id == election.id, PRScheduleEvent.kind == kind,
+        PRScheduleEvent.starts_at == start, PRScheduleEvent.status == "planned").limit(1))
+    if duplicate is not None:
+        raise HTTPException(409, "Zu diesem Zeitpunkt ist bereits ein Termin dieser Art geplant. Bitte die Terminübersicht prüfen.")
     event = PRScheduleEvent(election_id=election.id, uid=str(uuid4())+"@takt-prwahl",
                             kind=kind, title=title, location=location, starts_at=start, ends_at=end, created_by=user.id)
     db.add(event)
