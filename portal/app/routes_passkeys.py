@@ -19,6 +19,7 @@ from webauthn import (
     base64url_to_bytes, generate_authentication_options, generate_registration_options,
     options_to_json, verify_authentication_response, verify_registration_response,
 )
+from webauthn.helpers.exceptions import WebAuthnException
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria, PublicKeyCredentialDescriptor,
     ResidentKeyRequirement, UserVerificationRequirement,
@@ -168,7 +169,10 @@ async def passkey_login_verify(request: Request, db: Session = Depends(get_db)):
     user = db.get(User, stored.user_id)
     if user is None or not user.active:
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.")
-    handle = credential.get("response", {}).get("userHandle")
+    response = credential.get("response")
+    if not isinstance(response, dict):
+        raise HTTPException(401, "Passkey-Anmeldung nicht möglich.")
+    handle = response.get("userHandle")
     if handle is not None and handle != _b64(user.id.to_bytes(8, "big")):
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.")
     try:
@@ -180,7 +184,7 @@ async def passkey_login_verify(request: Request, db: Session = Depends(get_db)):
             credential_current_sign_count=stored.sign_count,
             require_user_verification=True,
         )
-    except (ValueError, TypeError, KeyError):
+    except (WebAuthnException, ValueError, TypeError, KeyError):
         raise HTTPException(401, "Passkey-Anmeldung nicht möglich.") from None
     # Race-safe update: never let another parallel verification roll back a counter.
     previous = stored.sign_count
@@ -247,7 +251,8 @@ async def passkey_register_verify(request: Request, user: User = Depends(current
     if _b64(verified.credential_id) != credential["id"]:
         raise HTTPException(400, "Passkey-Kennung widerspricht der Attestierung.")
     name = str(data.get("name") or "Mein Passkey").strip()[:100] or "Mein Passkey"
-    transports = credential.get("response", {}).get("transports") or []
+    response = credential.get("response")
+    transports = response.get("transports") if isinstance(response, dict) else []
     if not isinstance(transports, list):
         transports = []
     db.add(PasskeyCredential(
