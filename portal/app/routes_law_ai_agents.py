@@ -123,6 +123,10 @@ async def law_ai_agents_events(
         raise HTTPException(404, "KI-Prüfauftrag nicht gefunden.")
     rate_limit(request, "law-ai-event-stream", limit=15, window=60, key=str(user.id))
     user_id = user.id
+    # FastAPI may retain yield dependencies for a StreamingResponse. Release
+    # the request's SQLite connection *before* the long-lived SSE loop, which
+    # opens short-lived independent sessions for every authorized snapshot.
+    db.close()
 
     async def events():
         last = None
