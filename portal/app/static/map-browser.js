@@ -444,7 +444,8 @@
     if(spec.kind==='download'){
       catalogChoices.innerHTML='<p class="small mb-2">'+esc(spec.note||'')+'</p>'+
         '<div class="d-grid gap-2"><a class="btn btn-sm btn-outline-primary" href="'+esc(spec.download_url)+'" target="_blank" rel="noopener noreferrer">Amtliche Daten beziehen <i class="fa-solid fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></a>'+
-        '<a class="btn btn-sm btn-outline-secondary" href="'+esc(spec.source_url)+'" target="_blank" rel="noopener noreferrer">Produkt- und Lizenzinformationen</a></div>';
+        '<a class="btn btn-sm btn-outline-secondary" href="'+esc(spec.source_url)+'" target="_blank" rel="noopener noreferrer">Produkt- und Lizenzinformationen</a>'+
+        (spec.viewer_url?'<a class="btn btn-sm btn-outline-success" href="'+esc(spec.viewer_url)+'" target="_blank" rel="noopener noreferrer">Rheinland-Pfalz in 3D ansehen <i class="fa-solid fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></a>':'')+'</div>';
       return;
     }
     if(!meta.canEdit){
