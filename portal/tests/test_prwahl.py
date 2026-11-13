@@ -3,6 +3,8 @@
 No online vote/token routes and no legal release are in scope. These tests exercise
 module gating, object ACL, form revisions, secure PDF, CSRF and board-role review.
 """
+import io
+from zipfile import ZipFile
 from uuid import uuid4
 from sqlalchemy import select
 from app.db import Organization, SessionLocal, User
@@ -97,6 +99,13 @@ def test_paper_form_encrypted_versioned_downloads_with_csrf_and_scope():
     assert pdf.content.startswith(b"%PDF")
     assert pdf.headers["content-type"].startswith("application/pdf")
     assert "no-store" in pdf.headers["cache-control"]
+    docx = owner.get(f"/personalratswahl/{eid}/dokumente/{docid}/docx")
+    assert docx.status_code == 200
+    assert docx.content.startswith(b"PK")
+    assert "no-store" in docx.headers["cache-control"]
+    with ZipFile(io.BytesIO(docx.content)) as archive:
+        assert "word/document.xml" in archive.namelist()
+        assert secret.encode() in archive.read("word/document.xml")
     update_data = dict(payload, document_id=str(docid), board_members="Geändert")
     update_data["csrf"] = csrf_of(owner.get(f"/personalratswahl/{eid}/dokumente/{docid}").text)
     saved2 = owner.post(document_url, data=update_data)
@@ -115,6 +124,7 @@ def test_paper_form_encrypted_versioned_downloads_with_csrf_and_scope():
     outsider = _user()
     assert outsider.get(f"/personalratswahl/{eid}/dokumente/{newer}").status_code == 404
     assert outsider.get(f"/personalratswahl/{eid}/dokumente/{newer}/pdf").status_code == 404
+    assert outsider.get(f"/personalratswahl/{eid}/dokumente/{newer}/docx").status_code == 404
 
 
 def test_form_review_requires_named_chair_and_traceable_reference():
