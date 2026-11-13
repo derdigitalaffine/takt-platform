@@ -235,7 +235,7 @@ def validate(stage: str, answer: str, source: str, *, with_hints: bool = False, 
                     for p in quote_offsets):
                 discarded += 1
                 continue
-            heading = re.sub(r"^#{1,6}\\s+", "", quote.strip())
+            heading = re.sub(r"^#{1,6}\s+", "", quote.strip())
             # Prevent invalid constructs such as "### # § 1" and force
             # the canonical hierarchy for statutory units.
             if laws.NORM_RE.match(heading):
