@@ -102,7 +102,7 @@
 
   const fields = review
     ? $$("input[name], select[name], textarea[name]", review)
-        .filter((input) => input.name !== "csrf" && input.name !== "confirmed")
+        .filter((input) => input.name !== "csrf" && input.name !== "confirmed" && input.name !== "edit_revision")
     : [];
   // Never store private legal content in localStorage/sessionStorage or logs.
   const initial = new Map(fields.map((input) => [input, input.value]));
@@ -113,6 +113,62 @@
     if (warning) warning.hidden = !dirty;
     const sourceNotice = $("[data-law-ai-source-warning]");
     if (sourceNotice) sourceNotice.hidden = !dirty;
+  }
+
+
+  const save = $("[data-law-save-button]");
+  const saveStatus = $("[data-law-save-status]");
+  const version = $('input[name="edit_revision"]', review || document);
+  let saving = false;
+  if (review && save) {
+    save.addEventListener("click", async () => {
+      if (saving) return;
+      const target = review.getAttribute("data-law-save-url") || "";
+      if (!/^\/laws-assistant\/\d+\/save-edit$/.test(target)) return;
+      saving = true;
+      save.disabled = true;
+      if (saveStatus) {
+        saveStatus.textContent = "Private Arbeitsfassung wird gespeichert …";
+        saveStatus.classList.remove("text-danger", "text-success");
+      }
+      try {
+        const payload = new FormData(review);
+        payload.set("revision", version?.value || "0");
+        payload.delete("confirmed"); // this is never a legal acceptance
+        const response = await fetch(target, {
+          method: "POST", body: payload,
+          credentials: "same-origin", cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) {
+          if (response.status === 409) {
+            throw new Error("Versionskonflikt: Der Entwurf wurde anderswo geändert. Bitte den anderen Arbeitsstand prüfen und danach neu laden.");
+          }
+          throw new Error(response.status === 422
+            ? "Titel, Inhalt oder Stammdaten sind ungültig. Bitte Eingaben prüfen."
+            : "Speichern fehlgeschlagen. Die Änderungen bleiben bis zum Verlassen in diesem Browserfenster.");
+        }
+        const data = await response.json();
+        if (data.saved !== true || !Number.isSafeInteger(data.revision)) {
+          throw new Error("Der Server hat den neuen Stand nicht eindeutig bestätigt.");
+        }
+        if (version) version.value = String(data.revision);
+        fields.forEach((input) => initial.set(input, input.value));
+        updateDirty();
+        if (saveStatus) {
+          saveStatus.textContent = "Privat gespeichert · Version " + data.revision + " · noch nicht übernommen";
+          saveStatus.classList.add("text-success");
+        }
+      } catch (error) {
+        if (saveStatus) {
+          saveStatus.textContent = error.message || "Zwischenspeichern nicht möglich.";
+          saveStatus.classList.add("text-danger");
+        }
+      } finally {
+        saving = false;
+        save.disabled = false;
+      }
+    });
   }
 
   const stats = $("[data-law-editor-count]");
