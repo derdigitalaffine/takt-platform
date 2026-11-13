@@ -102,7 +102,10 @@ def _render(request, db, user, selected=None, bereich="uebersicht"):
         ocr_pages, ocr_warnings = [], []
     cfg = get_settings(db)
     ai_enabled = user.can("ai_chat") and cfg.get("module_ai") == "1" and cfg.get("module_laws") == "1"
-    agent_routes = law_ai_agent_jobs.configured_routes(db) if ai_enabled else {}
+    agent_routes = {}
+    if ai_enabled:
+        for task, _label in law_ai_agents.STAGES:
+            agent_routes.update(law_ai_agent_jobs.configured_routes(db, (task,)))
     analysis = (db.scalar(select(LawAiAnalysis).where(
         LawAiAnalysis.draft_id == selected.id,
         LawAiAnalysis.requested_by == user.id,
