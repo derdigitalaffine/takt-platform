@@ -103,6 +103,8 @@ class User(Base):
 PERMISSIONS = {
     "calendars": ("Kalender anlegen und teilen", "fa-calendar-days", "Eigene und berechtigte Organisationskalender anlegen und teilen; keine fremden Kalender verwalten"),
     "calendar_publish": ("Kalender veröffentlichen", "fa-globe", "Eigene Kalender intern oder öffentlich veröffentlichen"),
+    "verbandbuch_capture": ("Verbandbuch: erfassen", "fa-kit-medical", "Erste-Hilfe-Leistungen nur an ausdrücklich zugewiesenen Standorten dokumentieren"),
+    "verbandbuch_review": ("Verbandbuch: Fachakte einsehen", "fa-user-shield", "Vertrauliche Erste-Hilfe-Akten nur mit gesondertem fall-/standortbezogenem Fachmandat einsehen"),
     "anliegen_submit": ("Interne Anliegen einreichen", "fa-inbox", "Interne Wünsche, Mängel, Beschwerden und Bestellungen melden"),
     "anliegen_manage": ("Interne Anliegen verwalten", "fa-user-gear", "Nicht vertrauliche Anliegen verwalten und Zuständigkeiten konfigurieren"),
     "anliegen_process_start": ("Anliegenprozesse starten", "fa-play", "Freigegebene Prozessstarts in eigenen oder zugewiesenen Anliegen auswählen"),
@@ -2799,6 +2801,7 @@ def seed_orgs(db) -> None:
 
 
 DEFAULT_SETTINGS = {
+    "module_verbandbuch": "0",  # Sensible Gesundheitsdaten: bis separate Betriebs-/Datenschutzfreigabe AUS.
     "module_anliegen": "0",
     "module_ai": "0",  # Optional; disabled until explicitly activated.
     "module_knowledge": "0",  # Organizational knowledge: disabled until explicitly activated.
@@ -3000,6 +3003,7 @@ _NEW_COLUMNS = {
     "law_ai_analyses": {
         "progress_total": "INTEGER NOT NULL DEFAULT 0",
         "progress_done": "INTEGER NOT NULL DEFAULT 0",
+        "retry_attempts": "INTEGER NOT NULL DEFAULT 0",
         "stream_characters": "INTEGER NOT NULL DEFAULT 0",
         "stream_chunks": "INTEGER NOT NULL DEFAULT 0",
         "stream_active": "BOOLEAN NOT NULL DEFAULT 0",
@@ -3214,6 +3218,7 @@ def _migrate() -> None:
 
 def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
+    from . import verbandbuch_models  # noqa: F401 – isolierte Erste-Hilfe-Fachtabellen
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
     from . import law_ai_models  # noqa: F401 – isolated, unpublished law-import drafts

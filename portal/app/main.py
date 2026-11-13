@@ -101,6 +101,9 @@ async def lifespan(_app: FastAPI):
             logging.getLogger("portal").exception("Rechtstexte: Neuzerlegen der Gliederung fehlgeschlagen")
     chat.prepare_dir()
     task = asyncio.create_task(worker.run_forever())
+    # Isolierte Löschfristen einzelner Erste-Hilfe-Einträge, auch bei deaktiviertem Modul.
+    from . import verbandbuch as _first_aid
+    first_aid_retention = asyncio.create_task(_first_aid.retention_loop())
     # Isolate potentially slow embedding calls from the central reminder worker.
     from . import ai_vector_jobs
     rag_task = asyncio.create_task(ai_vector_jobs.run_forever())
@@ -113,6 +116,7 @@ async def lifespan(_app: FastAPI):
     try:
         yield
     finally:
+        first_aid_retention.cancel()
         law_agent_task.cancel()
         law_index_task.cancel()
         rag_task.cancel()
@@ -150,7 +154,7 @@ templates.env.globals["form_constraints"] = lambda item: _forms_mod().validation
 templates.env.globals["form_rule_hint"] = lambda item: _forms_mod().validation_hint(item)
 templates.env.globals["perm_modules"] = {"processes": "applications", "app_create": "applications", "formblocks": "forms",
                                          "dms_admin": "dms", "seminars_manage": "seminars", "votes": "polls", "resources": "resources", "signage_manage": "signage",
-                                         "krank": "krank", "krank_admin": "krank", "tasks_manage": "tasks", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai", "ai_web": "ai", "anliegen_submit": "anliegen", "anliegen_manage": "anliegen",
+                                         "krank": "krank", "krank_admin": "krank", "verbandbuch_capture": "verbandbuch", "verbandbuch_review": "verbandbuch", "tasks_manage": "tasks", "ai_chat": "ai", "ai_knowledge": "ai", "ai_vision": "ai", "ai_web": "ai", "anliegen_submit": "anliegen", "anliegen_manage": "anliegen",
                                          "knowledge_read": "knowledge", "knowledge_edit": "knowledge",
                                          "knowledge_publish": "knowledge", "knowledge_manage": "knowledge",
                                          "knowledge_ai": "knowledge"}
@@ -209,9 +213,10 @@ MODULES = {
     "circulations": ("Umläufe & Aushänge", "module_circulations", ("/umlaeufe",)),
     "dms": ("Ablage (DMS)", "module_dms", ("/dms",)),
     "resources": ("Ressourcenbuchung", "module_resources", ("/resources", "/r/", "/r", "/r-embed")),
+    "prwahl": ("Personalratswahl", "module_prwahl", ("/personalratswahl",)),
     "signage": ("Digital Signage", "module_signage", ("/signage",)),
     "krank": ("BlueOtter Krankmelder", "module_krank", ("/krank", "/krankmelder")),
-    "prwahl": ("Personalratswahl", "module_prwahl", ("/personalratswahl",)),
+    "verbandbuch": ("Digitales Verbandbuch", "module_verbandbuch", ("/verbandbuch",)),
 }
 _module_cache: dict = {"at": 0.0, "enabled": set(MODULES)}
 
@@ -766,7 +771,7 @@ def readyz():
         },
         "law_ai_analyses": {
             "id", "draft_id", "source_sha256",
-            "provider_map_json", "status",
+            "provider_map_json", "status", "retry_attempts",
         },
     }
     try:
@@ -3163,6 +3168,7 @@ from . import routes_resources_public  # noqa: E402,F401
 from . import routes_signage  # noqa: E402,F401
 from . import routes_caretakers  # noqa: E402,F401
 from . import routes_qr  # noqa: E402,F401
+from . import routes_verbandbuch  # noqa: E402,F401  (medizinische Fachdaten isoliert)
 from . import routes_trash  # noqa: E402,F401
 from . import routes_krank  # noqa: E402,F401
 from . import routes_orgs  # noqa: E402,F401
@@ -3207,10 +3213,10 @@ from . import routes_leave  # noqa: E402,F401
 
 from . import routes_calendars  # noqa: E402,F401
 from . import routes_birthdays  # noqa: E402,F401
+
 from . import routes_prwahl  # noqa: E402,F401  (separate protected election Fachdomäne)
 from . import routes_prwahl_workflow  # noqa: E402,F401
 from . import routes_prwahl_schedule  # noqa: E402,F401
-
 from . import routes_calendar_devices  # noqa: E402,F401
 
 from . import routes_caldav  # noqa: E402,F401

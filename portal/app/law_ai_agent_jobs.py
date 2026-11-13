@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import time
+from dataclasses import replace
 from datetime import timedelta
 
 from sqlalchemy import select, update
@@ -21,7 +22,7 @@ from .law_ai_models import LawAiDraft
 logger = logging.getLogger("portal.law_ai_agents")
 POLL_SECONDS = 4
 STAGE_TIMEOUT = 70
-MAX_JOB_SECONDS = 12 * 60  # fail closed when a slow server exhausts the budget
+MAX_JOB_SECONDS = 18 * 60  # bounded recovery for slow/verbose models; fail closed
 
 
 def configured_routes(db) -> dict:
@@ -89,7 +90,7 @@ def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) 
 
 
 async def _answer(provider, messages: list[dict], job_id: int, step: str,
-                  *, remaining: float) -> str:
+                  *, remaining: float, max_tokens: int = 3072) -> str:
     """Use server SSE only when explicitly enabled; never resend on stream error.
 
     Raw chunks are kept inside the worker and validated as a complete JSON
@@ -98,7 +99,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
     """
     if not provider.stream_enabled:
         return await asyncio.wait_for(
-            ai_provider.complete(provider, messages, max_tokens=3072),
+            ai_provider.complete(provider, messages, max_tokens=max_tokens),
             timeout=min(STAGE_TIMEOUT, remaining),
         )
 
@@ -108,7 +109,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
         count = 0
         last = time.monotonic()
         async for fragment in ai_provider.stream_completion(
-            provider, messages, max_tokens=3072,
+            provider, messages, max_tokens=max_tokens,
         ):
             if not isinstance(fragment, str):
                 raise ValueError("Der Modellstream hat ein ungültiges Format.")
@@ -155,6 +156,7 @@ async def process_one(job_id: int) -> None:
             mode = job.mode
             job.progress_total = len(sections) * len(law_ai_agents.STAGES)
             job.progress_done = 0
+            job.retry_attempts = 0
             job.stream_characters = 0
             job.stream_chunks = 0
             job.stream_active = False
@@ -167,7 +169,11 @@ async def process_one(job_id: int) -> None:
 
     for task, _label in law_ai_agents.STAGES:
         stage_parts = []
-        for section in sections:
+        # Adaptively bisect only if a model returned invalid/incomplete JSON.
+        # The original source remains untouched, with a single retry depth.
+        pending = [(piece, 0) for piece in sections]
+        while pending:
+            section, depth = pending.pop(0)
             try:
                 remaining = MAX_JOB_SECONDS - (time.monotonic() - started)
                 if remaining < 1:
@@ -184,10 +190,20 @@ async def process_one(job_id: int) -> None:
                             provider.model_id != routes[task]["model_id"] or
                             provider.base_url != routes[task]["destination"]):
                         raise ValueError("Der freigegebene KI-Datenempfänger wurde geändert.")
-                    messages, sampled = law_ai_agents.prompt(task, section.text)
+                    messages, sampled = law_ai_agents.prompt(
+                        task, section.text,
+                        context_limit=(6000 if depth and mode == "simple"
+                                       else law_ai_agents.MAX_CONTEXT_CHARS),
+                    )
+                    if depth:
+                        messages[0]["content"] += (
+                            " KORREKTURVERSUCH: Gib ausschließlich EIN vollständiges "
+                            "kompaktes JSON-Objekt mit dem vorgegebenen Schema aus, "
+                            "maximal 3 Fundstellen, keine Einleitung und keinen Markdown-Zaun."
+                        )
                     if mode == "advanced" and sampled:
                         raise ValueError("Mindestens ein Textabschnitt würde unvollständig übertragen.")
-                    job.step = f"{task}:{section.number}/{len(sections)}"
+                    job.step = f"{task}:{len(stage_parts) + 1}/{len(stage_parts) + 1 + len(pending)}"
                     job.stream_active = bool(provider.stream_enabled)
                     job.stream_characters = 0
                     job.stream_chunks = 0
@@ -196,9 +212,13 @@ async def process_one(job_id: int) -> None:
                     step = job.step
 
                 answer = await _answer(provider, messages, job_id, step,
-                                       remaining=remaining)
+                                       remaining=remaining,
+                                       max_tokens=4096 if depth else 3072)
                 result = law_ai_agents.validate(task, answer, section.text)
-                stage_parts.append((section, result, sampled))
+                # Number only *successfully* validated sections, in document
+                # order, for unambiguous global character offsets.
+                stage_parts.append((replace(section, number=len(stage_parts) + 1),
+                                    result, sampled))
                 with SessionLocal() as db:
                     job = db.get(LawAiAnalysis, job_id)
                     if not job or job.status != "running":
@@ -212,12 +232,59 @@ async def process_one(job_id: int) -> None:
                                  "law_verify": "findings"}[task]
                     job.validated_items += len(result.get(field_key, []))
                     job.stream_active = False
-                    job.updated_at = utcnow()  # no unvalidated output persisted
+                    job.updated_at = utcnow()
                     db.commit()
 
+            except (law_ai_agents.InvalidAgentJSON, ai_provider.AIOutputTruncated,
+                    ai_provider.AIContextLimit) as exc:
+                # No automatic retries for 401/403/429, network failures or
+                # provider changes; only malformed/length-limited responses.
+                halves = (law_ai_coverage.bisect(section)
+                          if depth < law_ai_coverage.MAX_RECOVERY_SPLITS else None)
+                if depth < law_ai_coverage.MAX_RECOVERY_SPLITS:
+                    with SessionLocal() as db:
+                        job = db.get(LawAiAnalysis, job_id)
+                        if not job or job.status != "running":
+                            return
+                        try:
+                            _allowed(db, job, db.get(LawAiDraft, job.draft_id))
+                            if json.loads(job.provider_map_json) != configured_routes(db):
+                                raise ValueError("Anbieterzuweisung nach Freigabe geändert.")
+                        except ValueError as permission_error:
+                            _fail(db, job, str(permission_error))
+                            return
+                        # A failed original call plus its two smaller
+                        # replacements means at most 3 requests/section.
+                        job.retry_attempts += 1
+                        if halves is not None:
+                            job.progress_total += 1
+                        job.stream_active = False
+                        job.updated_at = utcnow()
+                        db.commit()
+                    # Short passages cannot be bisected sensibly. Re-ask
+                    # this same consented model just once with a compact
+                    # JSON-only prompt, without changing the source.
+                    if halves is None:
+                        pending.insert(0, (section, depth + 1))
+                    else:
+                        pending = [(halves[0], depth + 1),
+                                   (halves[1], depth + 1)] + pending
+                    continue
+                with SessionLocal() as db:
+                    job = db.get(LawAiAnalysis, job_id)
+                    if job is not None and job.status == "running":
+                        cause = ("Antwort am Tokenlimit abgeschnitten."
+                                 if isinstance(exc, ai_provider.AIOutputTruncated)
+                                 else "Eingabe überschreitet die Kontextgrenze des Modells."
+                                 if isinstance(exc, ai_provider.AIContextLimit)
+                                 else "Kein vollständiges gültiges JSON erhalten.")
+                        _fail(db, job, "KI-Ausgabe von " + task +
+                              " konnte auch nach begrenzter Abschnittsverkleinerung "
+                              "nicht sicher ausgewertet werden: " + cause +
+                              " Bitte Modell oder Ausgabelimit prüfen.")
+                return
             except (ai_provider.AIProviderError, ValueError, TypeError, KeyError,
                     asyncio.TimeoutError) as exc:
-                # Never log document text, provider response, or prompt.
                 reason = (str(exc) if isinstance(exc, (ValueError, ai_provider.AIProviderError))
                           else "Eine KI-Antwort ist ausgefallen oder hat zu lange gedauert.")
                 with SessionLocal() as db:

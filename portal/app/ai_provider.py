@@ -21,6 +21,14 @@ class AIProviderError(Exception):
     """A deliberately redacted error safe to display to end users."""
 
 
+class AIOutputTruncated(AIProviderError):
+    """Model stopped at token/output limit; partial JSON must never be used."""
+
+
+class AIContextLimit(AIProviderError):
+    """Provider explicitly rejected the submitted input context length."""
+
+
 def _host_check(url: str, allow_private: bool = False) -> None:
     try:
         p = urlsplit(url)
@@ -53,6 +61,35 @@ def endpoint(base_url: str, operation: str) -> str:
     return base_url.rstrip("/") + "/" + operation.lstrip("/")
 
 
+
+
+async def _known_context_error(response) -> bool:
+    """Inspect only bounded error *codes*, never echo provider diagnostics.
+
+    Some OpenAI-compatible gateways report prompt/context overflow as HTTP
+    400 instead of 413. Do not retry all 400s or parse arbitrary error prose.
+    """
+    if response.status_code == 413:
+        return True
+    if response.status_code != 400 or "json" not in response.headers.get("content-type", "").lower():
+        return False
+    pieces = bytearray()
+    async for part in response.aiter_bytes():
+        if len(pieces) + len(part) > 8192:
+            return False
+        pieces.extend(part)
+    try:
+        parsed = json.loads(pieces)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    error = parsed.get("error") if isinstance(parsed, dict) else None
+    if not isinstance(error, dict):
+        return False
+    return any(error.get(name) in {
+        "context_length_exceeded", "context_window_exceeded",
+        "max_context_length_exceeded", "input_too_long",
+    } for name in ("code", "type"))
+
 async def _request(provider, operation: str, key_enc: str, *, payload: dict | None = None) -> dict:
     if not provider.active:
         raise AIProviderError("Der gewählte KI-Provider ist deaktiviert.")
@@ -80,6 +117,8 @@ async def _request(provider, operation: str, key_enc: str, *, payload: dict | No
                     raise AIProviderError("Der KI-Provider hat den Zugriff verweigert (403).")
                 if response.status_code == 429:
                     raise AIProviderError("Das Anfragelimit des KI-Providers ist erreicht (429).")
+                if response.status_code in (400, 413) and await _known_context_error(response):
+                    raise AIContextLimit("Das KI-Modell hat das Eingabekontextlimit überschritten.")
                 if response.status_code >= 400:
                     raise AIProviderError(f"Der KI-Provider meldet einen Fehler (HTTP {response.status_code}).")
                 if "json" not in response.headers.get("content-type", "").lower():
@@ -183,11 +222,15 @@ async def complete(provider, messages: list[dict], *, image: bool = False, max_t
     choices = result.get("choices")
     if not isinstance(choices, list) or not choices:
         raise AIProviderError("Der KI-Provider hat keine Textantwort zurückgegeben.")
+    if isinstance(choices[0], dict) and choices[0].get("finish_reason") in ("length", "max_tokens"):
+        raise AIOutputTruncated("Das KI-Modell hat die Antwort am Tokenlimit abgeschnitten.")
     msg = choices[0].get("message") if isinstance(choices[0], dict) else None
     content = msg.get("content") if isinstance(msg, dict) else None
     if not isinstance(content, str):
         raise AIProviderError("Der KI-Provider hat kein lesbares Nachrichtenfeld geliefert.")
-    return content[:40_000]
+    if len(content) > 40_000:
+        raise AIOutputTruncated("Die KI-Antwort hat das sichere Ausgabelimit überschritten.")
+    return content
 
 
 
@@ -226,6 +269,8 @@ async def stream_completion(provider, messages: list[dict], *, image: bool = Fal
                     raise AIProviderError("Der KI-Provider hat den Zugriff verweigert (403).")
                 if response.status_code == 429:
                     raise AIProviderError("Das Anfragelimit des KI-Providers ist erreicht (429).")
+                if response.status_code in (400, 413) and await _known_context_error(response):
+                    raise AIContextLimit("Das KI-Modell hat das Eingabekontextlimit überschritten.")
                 if response.status_code >= 400:
                     raise AIProviderError(f"Der KI-Provider meldet einen Fehler (HTTP {response.status_code}).")
                 if "text/event-stream" not in response.headers.get("content-type", "").lower():
@@ -262,8 +307,10 @@ async def stream_completion(provider, messages: list[dict], *, image: bool = Fal
                         if isinstance(content, str) and content:
                             total += len(content)
                             if total > 40_000:
-                                raise AIProviderError("Die Textantwort überschreitet das Ausgabelimit.")
+                                raise AIOutputTruncated("Die Streaming-Antwort überschreitet das Ausgabelimit.")
                             yield content
+                        if choice.get("finish_reason") in ("length", "max_tokens"):
+                            raise AIOutputTruncated("Das Streaming-Modell hat die Antwort am Tokenlimit abgeschnitten.")
                         if choice.get("finish_reason"):
                             done = True
                 if not done:
