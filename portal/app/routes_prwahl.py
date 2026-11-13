@@ -77,7 +77,14 @@ def prwahl_index(request: Request, q: str = "", user: User = Depends(current_use
     elections = [e for e in db.scalars(select(PRElection).where(PRElection.id.in_(election_ids))
                            .order_by(PRElection.updated_at.desc()).limit(100)).all()
                  if org_access.active_path(db, e.org_id)]
-    # Search only among already authorized elections; never expose other tenants.\n    q = pw.clean(q, 100).strip()\n    if q:\n        needle = q.casefold()\n        elections = [e for e in elections if needle in e.title.casefold() or\n                     needle in e.service_name.casefold() or\n                     needle in pw.BODY_TYPES.get(e.body_type, e.body_type).casefold()]\n    orgs = [org for org in db.scalars(select(Organization).where(Organization.active.is_(True))
+    # Search only among already authorized elections; never expose other tenants.
+    q = pw.clean(q, 100).strip()
+    if q:
+        needle = q.casefold()
+        elections = [e for e in elections if needle in e.title.casefold() or
+                     needle in e.service_name.casefold() or
+                     needle in pw.BODY_TYPES.get(e.body_type, e.body_type).casefold()]
+    orgs = [org for org in db.scalars(select(Organization).where(Organization.active.is_(True))
                       .order_by(Organization.name)).all() if org_access.active_path(db, org.id) and
                       (user.is_admin or db.scalar(select(OrgMembership.id).where(
                           OrgMembership.user_id == user.id, OrgMembership.org_id == org.id)) is not None or
