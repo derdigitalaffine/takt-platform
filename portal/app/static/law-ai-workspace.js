@@ -171,6 +171,82 @@
     });
   }
 
+
+  const diffButton = $("[data-law-diff-button]");
+  const diffPanel = $("[data-law-diff-panel]");
+  const diffSummary = $("[data-law-diff-summary]");
+  const diffWarnings = $("[data-law-diff-warnings]");
+  const diffLines = $("[data-law-diff-lines]");
+  const diffNote = $("[data-law-diff-note]");
+  let comparing = false;
+  if (review && diffButton && diffPanel) {
+    diffButton.addEventListener("click", async () => {
+      if (comparing) return;
+      const target = review.getAttribute("data-law-diff-url") || "";
+      if (!/^\/laws-assistant\/\d+\/compare$/.test(target)) return;
+      comparing = true;
+      diffButton.disabled = true;
+      diffPanel.hidden = false;
+      if (diffSummary) diffSummary.textContent = "Vergleich wird vorbereitet …";
+      if (diffWarnings) diffWarnings.replaceChildren();
+      if (diffLines) diffLines.replaceChildren();
+      if (diffNote) diffNote.textContent = "";
+      try {
+        const data = new FormData(review);
+        data.delete("confirmed");
+        const response = await fetch(target, {
+          method: "POST", body: data,
+          credentials: "same-origin", cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(
+          response.status === 413
+            ? "Der Text ist zu groß. Bitte manuell am Original gegenprüfen."
+            : "Quellvergleich derzeit nicht möglich."
+        );
+        const result = await response.json();
+        if (result.same === true) {
+          if (diffSummary) diffSummary.textContent =
+            "Keine Textunterschiede zum importierten Vorschlag erkannt.";
+        } else if (result.preview_available !== true) {
+          if (diffSummary) diffSummary.textContent =
+            "Der Text wurde verändert. Eine sichere Vorschau ist bei diesem Umfang nicht verfügbar.";
+        } else {
+          if (diffSummary) diffSummary.textContent =
+            (result.added_lines || 0) + " hinzugefügte und " +
+            (result.removed_lines || 0) + " entfernte Textzeilen.";
+        }
+        if (Array.isArray(result.sensitive_categories) && result.sensitive_categories.length) {
+          if (diffWarnings) diffWarnings.textContent =
+            "Besonders genau prüfen: " + result.sensitive_categories.join(", ") +
+            ". Die Markierungen sind technische Muster, keine juristische Bewertung.";
+        }
+        if (diffLines && Array.isArray(result.lines)) {
+          result.lines.forEach((line) => {
+            if (!line || typeof line.text !== "string") return;
+            const el = document.createElement("div");
+            const kind = ["add", "remove", "context", "meta"].includes(line.kind)
+              ? line.kind : "context";
+            el.className = "law-diff-line law-diff-" + kind;
+            el.textContent = line.text;
+            diffLines.append(el);
+          });
+        }
+        if (diffNote) diffNote.textContent =
+          (result.note || "") +
+          (result.truncated ? " Die Vorschau ist gekürzt; weitere Änderungen bitte im Original prüfen." : "");
+      } catch (error) {
+        if (diffSummary) diffSummary.textContent = error.message || "Vergleich fehlgeschlagen.";
+      } finally {
+        comparing = false;
+        diffButton.disabled = false;
+      }
+    });
+    fields.forEach((input) => input.addEventListener("input", () => {
+      diffPanel.hidden = true; // comparison must never appear current after editing
+    }));
+  }
+
   const stats = $("[data-law-editor-count]");
   const outline = $("[data-law-editor-outline]");
   let outlineTimeout = null;

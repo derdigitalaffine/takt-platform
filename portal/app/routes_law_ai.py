@@ -16,7 +16,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import laws as lx, law_ai_agents, law_ai_agent_jobs, law_ai_coverage
+from . import laws as lx, law_ai_agents, law_ai_agent_jobs, law_ai_coverage, law_ai_editorial_diff
 from .config import settings
 from .db import LawText, User, utcnow, get_settings
 from .law_ai_models import LawAiDraft, LawAiEditorialDraft
@@ -392,6 +392,26 @@ def law_ai_original(draft_id: int, user: User = Depends(law_user),
 
 _EDITOR_FIELDS = ("title", "short_title", "doc_type", "level_id",
                   "version_note", "issued_on", "valid_from", "valid_until")
+
+
+@app.post("/laws-assistant/{draft_id:int}/compare", dependencies=[Depends(check_csrf)])
+def law_ai_compare_working_text(
+    request: Request, draft_id: int, body_md: str = Form(""),
+    user: User = Depends(law_user), db: Session = Depends(get_db),
+):
+    """Owner-scoped preview only, never persisted or treated as legal proof."""
+    rate_limit(request, "law-ai-compare", limit=40, window=3600,
+               key=str(user.id))
+    row = _own(db, draft_id, user)
+    if row.status == "accepted":
+        raise HTTPException(409, "Der Import ist bereits übernommen.")
+    if len(body_md.encode("utf-8")) > TEXT_LIMIT:
+        raise HTTPException(413, "Der redaktionelle Text ist zu umfangreich.")
+    summary = law_ai_editorial_diff.compare(row.proposed_md or "", body_md)
+    return JSONResponse(summary, headers={
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 @app.post("/laws-assistant/{draft_id:int}/save-edit",

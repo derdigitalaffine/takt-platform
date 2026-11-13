@@ -418,7 +418,8 @@
             <div class="small alert alert-secondary">Der KI-Agent ist für diesen Benutzer oder die Organisation deaktiviert. Die manuelle Ortsrecht-Bearbeitung bleibt uneingeschränkt möglich.</div>
           {% endif %}
           <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form"
-                data-law-save-url="/laws-assistant/{{ selected.id }}/save-edit">
+                data-law-save-url="/laws-assistant/{{ selected.id }}/save-edit"
+                data-law-diff-url="/laws-assistant/{{ selected.id }}/compare">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <input type="hidden" name="edit_revision" value="{{ editorial.revision if editorial else 0 }}">
             <div class="row g-3">
@@ -488,7 +489,24 @@
                     <div class="small text-secondary mt-2">Klicke auf einen Eintrag, um die Stelle im Editor zu öffnen.</div>
                   </aside>
                 </div>
-                <p class="small text-warning mt-2 mb-0" data-law-editor-dirty hidden>Du hast ungespeicherte Änderungen. Speichere die private Arbeitsfassung oder übernimm den fertig geprüften Entwurf.</p>
+                <p class="small text-warning mt-2 mb-2" data-law-editor-dirty hidden>Du hast ungespeicherte Änderungen. Speichere die private Arbeitsfassung oder übernimm den fertig geprüften Entwurf.</p>
+                <div class="border rounded-3 p-3 mt-3" aria-labelledby="law-diff-title">
+                  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                      <h4 class="h6 mb-1" id="law-diff-title"><i class="fa-solid fa-code-compare me-2" aria-hidden="true"></i>Quelltextvergleich</h4>
+                      <p class="small text-secondary mb-0">Vergleicht die aktuelle Arbeitsfassung mit dem importierten OCR-/Markdown-Text – nicht mit dem amtlichen Original.</p>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-law-diff-button>
+                      <i class="fa-solid fa-magnifying-glass-chart me-1" aria-hidden="true"></i>Unterschiede prüfen
+                    </button>
+                  </div>
+                  <div class="mt-3" data-law-diff-panel hidden aria-live="polite">
+                    <p class="small mb-2" data-law-diff-summary></p>
+                    <div class="small text-warning mb-2" data-law-diff-warnings></div>
+                    <div class="law-diff-output" data-law-diff-lines role="region" aria-label="Zeilenunterschiede"></div>
+                    <p class="small text-secondary mt-2 mb-0" data-law-diff-note></p>
+                  </div>
+                </div>
               </div>
               <div class="col-12">
                 <div class="law-sticky-actions">
