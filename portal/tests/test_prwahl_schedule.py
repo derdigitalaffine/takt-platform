@@ -27,3 +27,7 @@ def test_calendar_export_escapes_text_and_uses_utc():
     assert "DTSTART:20261113T090000Z" in result
     assert "Sitzung\\, Wahlvorstand\\; intern" in result
     assert result.endswith("\r\n")
+
+def test_ambiguous_autumn_time_is_rejected():
+    with pytest.raises(HTTPException):
+        local_to_utc("2026-10-25T02:30")
