@@ -111,6 +111,60 @@ async def list_models(provider, *, image: bool = False) -> list[str]:
             and isinstance(item.get("id"), str) and len(item["id"]) < 200]
 
 
+async def list_model_details(provider) -> list[dict]:
+    """Sanitize provider-reported model capabilities for the admin model picker.
+
+    OpenAI-compatible /models typically has *no* reliable capabilities. Unknown
+    values remain unknown, never inferred from model names. This is deliberately
+    a bounded, read-only call with the same destination restrictions as completions.
+    """
+    result = await _request(provider, "models", provider.text_key_enc)
+    data = result.get("data")
+    if not isinstance(data, list):
+        raise AIProviderError("Der Modellkatalog hat ein unerwartetes Format.")
+
+    models = []
+    seen = set()
+    for row in data[:200]:
+        if not isinstance(row, dict):
+            continue
+        identifier = row.get("id")
+        if not isinstance(identifier, str) or not 1 <= len(identifier) <= 200:
+            continue
+        if identifier in seen:
+            continue
+        seen.add(identifier)
+        capabilities = row.get("capabilities")
+        capabilities = capabilities if isinstance(capabilities, dict) else {}
+        modalities = row.get("modalities")
+        modalities = modalities if isinstance(modalities, list) else []
+        features = {}
+        for feature, aliases in (
+            ("vision", ("vision", "supports_vision")),
+            ("tools", ("tools", "tool_calling", "supports_tool_calls")),
+            ("json", ("json", "structured_output", "supports_json")),
+            ("streaming", ("streaming", "stream", "supports_streaming")),
+        ):
+            evidence = next((capabilities[key] for key in aliases
+                             if type(capabilities.get(key)) is bool), None)
+            if evidence is None:
+                evidence = next((row[key] for key in aliases
+                                 if type(row.get(key)) is bool), None)
+            if evidence is None and feature == "vision" and "image" in modalities:
+                evidence = True
+            features[feature] = ("reported" if evidence else "unsupported") if evidence is not None else "unknown"
+        context = next((row[key] for key in ("context_length", "context_window", "max_context_tokens")
+                        if type(row.get(key)) is int and 0 < row[key] <= 100_000_000), None)
+        models.append({
+            "id": identifier,
+            "owner": str(row.get("owned_by") or "")[:100],
+            "context_tokens": context,
+            "features": features,
+            "source": "provider",
+        })
+    return models
+
+
 async def complete(provider, messages: list[dict], *, image: bool = False, max_tokens: int = 1024) -> str:
     payload = {
         "model": provider.model_id,

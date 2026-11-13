@@ -349,12 +349,11 @@ async def ai_draft_anliegen(request: Request, category_id: int = Form(...),
         raise HTTPException(403, "Vertrauliche Beschwerden können nur manuell formuliert werden.")
     if not 8 <= len(text.strip()) <= 4000:
         raise HTTPException(422, "Bitte 8 bis 4.000 Zeichen Beschreibung eingeben.")
-    from . import ai_provider
-    from .ai_models import AIProvider
-    provider = db.scalar(select(AIProvider).where(AIProvider.active.is_(True))
-                         .order_by(AIProvider.id))
-    if not provider:
-        raise HTTPException(503, "Kein KI-Provider eingerichtet.")
+    from . import ai_provider, ai_task_routing
+    try:
+        provider = ai_task_routing.select_provider(db, "anliegen_draft")
+    except ai_provider.AIProviderError as exc:
+        raise HTTPException(503, str(exc)) from exc
     rate_limit(request, "anliegen-ai", limit=10, window=3600, key=str(user.id))
     allowed = list(db.scalars(select(AnliegenCategory).where(
         AnliegenCategory.enabled.is_(True),

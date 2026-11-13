@@ -88,6 +88,57 @@
   </div>
 </div>
 
+
+<section id="ai-task-profiles" class="mt-4" aria-labelledby="ai-task-profiles-title">
+  <div class="card">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <h2 id="ai-task-profiles-title" class="h6 m-0"><i class="fa-solid fa-diagram-project me-2" aria-hidden="true"></i>Agenten und Modellzuweisungen</h2>
+      <span class="badge text-bg-secondary">8 Aufgabenprofile</span>
+    </div>
+    <div class="card-body">
+      <p class="text-secondary small mb-3">Jede KI-Aufgabe kann einen eigenen aktiven Provider und ein konkretes Modell verwenden. Ohne Zuweisung bleibt das bisherige Standardverhalten erhalten. Ein fehlerhaftes fest zugewiesenes Modell wird nicht stillschweigend an einen anderen Anbieter gesendet.</p>
+      <div class="row g-3">
+        {% for task, label in task_names.items() %}
+        {% set profile = task_profiles.get(task) %}
+        <div class="col-12 col-xl-6">
+          <form method="post" action="/admin/ai/task-profile" class="border rounded-3 p-3 h-100" data-ai-task-form>
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="task" value="{{ task }}">
+            <div class="fw-semibold mb-2">{{ label }}</div>
+            <div class="row g-2">
+              <div class="col-sm-5">
+                <label class="form-label small" for="ai-task-provider-{{ task }}">Provider</label>
+                <select class="form-select form-select-sm" name="provider_id" id="ai-task-provider-{{ task }}" data-ai-task-provider>
+                  <option value="0" {% if not profile %}selected{% endif %}>Standard / unverändert</option>
+                  {% for provider in providers if provider.active %}
+                  <option value="{{ provider.id }}" {% if profile and profile.provider_id == provider.id %}selected{% endif %}>{{ provider.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-sm-7">
+                <label class="form-label small" for="ai-task-model-{{ task }}">Modell auf diesem Server</label>
+                <select class="form-select form-select-sm" name="model_id" id="ai-task-model-{{ task }}" data-ai-task-model>
+                  <option value="">Standardmodell des Providers</option>
+                  {% if profile and profile.model_id %}
+                  <option value="{{ profile.model_id }}" selected>{{ profile.model_id }}</option>
+                  {% endif %}
+                </select>
+              </div>
+            </div>
+            <div class="form-text" data-ai-model-status role="status" aria-live="polite">Modellkatalog wird bei der Providerwahl geladen; nicht gemeldete Fähigkeiten bleiben unbekannt.</div>
+            <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+              <button type="submit" class="btn btn-primary btn-sm"><i class="fa-solid fa-floppy-disk me-1" aria-hidden="true"></i>Zuordnung speichern</button>
+              <span class="small text-secondary">{% if profile %}Explizite Modellroute{% else %}Bisherige Standardroute{% endif %}</span>
+            </div>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="form-text mt-3 mb-0">Der Modellkatalog stammt live vom ausgewählten Server. Vision, Tools, JSON und Streaming werden nur dann als unterstützt angezeigt, wenn der Provider dies ausdrücklich meldet. Modellnamen sind keine Fähigkeitsnachweise. Für neue Provider bitte zuerst die Verbindung oben speichern und aktivieren.</p>
+    </div>
+  </div>
+</section>
+
 <section id="ai-diagnostics" class="mt-4">
   <div class="card">
     <div class="card-header"><i class="fa-solid fa-vial me-2" aria-hidden="true"></i><strong>KI-Sprachmodell direkt testen</strong></div>
@@ -466,4 +517,4 @@
   </details>
 </section>
 {% endblock %}
-{% block scripts %}<script src="/static/ai-admin-knowledge.js" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/ai-admin-knowledge.js" defer></script><script src="/static/ai-task-profiles.js" defer></script>{% endblock %}
