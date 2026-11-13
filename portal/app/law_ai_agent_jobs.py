@@ -73,6 +73,12 @@ def _allowed(db, job: LawAiAnalysis, draft: LawAiDraft | None) -> str:
 def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) -> None:
     """Short transaction, no text or tokens stored; cancellation stops updates."""
     with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, job_id)
+        if job is None or job.status != "running" or job.step != step:
+            raise ValueError("Der KI-Auftrag wurde abgebrochen oder geändert.")
+        _allowed(db, job, db.get(LawAiDraft, job.draft_id))
+        if json.loads(job.provider_map_json) != configured_routes(db):
+            raise ValueError("Der KI-Provider wurde während des Streams geändert.")
         db.execute(update(LawAiAnalysis).where(
             LawAiAnalysis.id == job_id,
             LawAiAnalysis.status == "running",
