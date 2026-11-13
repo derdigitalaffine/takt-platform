@@ -12,6 +12,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from . import prwahl as pw
+from . import organization as org_access
+from .org_models import OrgMembership
 from .db import Organization, User, utcnow
 from .prwahl_models import PRElection, PRMandate, PRTask, PRDocument, PRAudit
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
@@ -43,8 +45,11 @@ def prwahl_index(request: Request, user: User = Depends(current_user),
     election_ids = select(PRMandate.election_id).where(PRMandate.user_id == user.id)
     elections = db.scalars(select(PRElection).where(PRElection.id.in_(election_ids))
                            .order_by(PRElection.updated_at.desc()).limit(100)).all()
-    orgs = db.scalars(select(Organization).where(Organization.active.is_(True))
-                      .order_by(Organization.name)).all() if user.can("prwahl_setup") else []
+    orgs = [org for org in db.scalars(select(Organization).where(Organization.active.is_(True))
+                      .order_by(Organization.name)).all() if org_access.active_path(db, org.id) and
+                      (user.is_admin or db.scalar(select(OrgMembership.id).where(
+                          OrgMembership.user_id == user.id, OrgMembership.org_id == org.id)) is not None or
+                       org_access.allows(db, user, org.id, "settings"))] if user.can("prwahl_setup") else []
     return render(request, "prwahl_index.html", user, elections=elections,
                   orgs=orgs, bodies=pw.BODY_TYPES, can_create=user.can("prwahl_setup"))
 
@@ -57,8 +62,13 @@ def prwahl_create(request: Request,
                   user: User = Depends(current_user), db: Session = Depends(get_db)):
     _setup(user)
     org = db.get(Organization, org_id)
-    if org is None or not org.active:
-        raise HTTPException(422, "Bitte eine gültige Dienststelle auswählen.")
+    if org is None or not org_access.active_path(db, org.id):
+        raise HTTPException(422, "Bitte eine aktive Dienststelle mit aktiven übergeordneten Einheiten auswählen.")
+    # A global setup permission is necessary but never sufficient to choose an arbitrary tenant.
+    own_org = db.scalar(select(OrgMembership.id).where(OrgMembership.user_id == user.id,
+                                                      OrgMembership.org_id == org.id))
+    if not (user.is_admin or own_org is not None or org_access.allows(db, user, org.id, "settings")):
+        raise HTTPException(403, "Die Wahl darf nur für eine eigene oder zur Verwaltung freigegebene Organisationseinheit angelegt werden.")
     if body_type not in pw.BODY_TYPES:
         raise HTTPException(422, "Unbekannte Wahlart.")
     start, end = pw.parse_date(election_day), pw.parse_date(election_end_day)
