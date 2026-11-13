@@ -61,3 +61,40 @@ def test_discard_unused_draft_from_list_without_accepting():
     with SessionLocal() as db:
         assert db.get(LawAiDraft, draft_id) is None
     assert admin.get(f"/laws-assistant/{draft_id}").status_code == 404
+
+
+def test_single_agent_worker_only_runs_selected_step(monkeypatch, agent_routes):
+    import asyncio
+    import json
+    from app import law_ai_agent_jobs
+
+    admin = login(*ADMIN)
+    did = _upload(admin)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    response = admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "simple", "stage": "law_metadata",
+        "transmission_confirmed": "1",
+    })
+    assert response.status_code == 303
+    with SessionLocal() as db:
+        job = db.scalar(select(LawAiAnalysis).where(
+            LawAiAnalysis.draft_id == did).order_by(LawAiAnalysis.id.desc()))
+        assert set(json.loads(job.provider_map_json)) == {"law_metadata"}
+        job.status = "running"
+        job_id = job.id
+        db.commit()
+
+    calls = []
+    async def model_answer(provider, messages, job_id, step, **kwargs):
+        calls.append(step)
+        return '{"fields":[]}'
+    monkeypatch.setattr(law_ai_agent_jobs, "_answer", model_answer)
+    asyncio.run(law_ai_agent_jobs.process_one(job_id))
+    with SessionLocal() as db:
+        row = db.get(LawAiAnalysis, job_id)
+        assert row.status == "done", row.failure
+        assert row.progress_done == row.progress_total == 1
+        assert json.loads(row.metadata_json)["schema"] == 2
+        assert json.loads(row.outline_json) == {}
+        assert json.loads(row.verification_json) == {}
+    assert len(calls) == 1
