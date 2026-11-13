@@ -86,7 +86,7 @@ def _stream_progress(job_id: int, step: str, char_count: int, chunk_count: int) 
         if job is None or job.status != "running" or job.step != step:
             raise ValueError("Der KI-Auftrag wurde abgebrochen oder geändert.")
         _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-        if json.loads(job.provider_map_json) != configured_routes(db, routes.keys()):
+        if json.loads(job.provider_map_json) != configured_routes(db, json.loads(job.provider_map_json).keys()):
             raise ValueError("Der KI-Provider wurde während des Streams geändert.")
         db.execute(update(LawAiAnalysis).where(
             LawAiAnalysis.id == job_id,
@@ -153,7 +153,7 @@ async def process_one(job_id: int) -> None:
         try:
             source = _allowed(db, job, db.get(LawAiDraft, job.draft_id))
             routes = json.loads(job.provider_map_json)
-            if routes != configured_routes(db):
+            if routes != configured_routes(db, json.loads(job.provider_map_json).keys()):
                 raise ValueError("Ein KI-Anbieter oder Modell wurde nach der Freigabe geändert.")
             mode, sep, stage_code = job.mode.partition(":")
             stage_map = {"s": "law_structure", "m": "law_metadata",
@@ -198,7 +198,7 @@ async def process_one(job_id: int) -> None:
                     if not job or job.status != "running":
                         return
                     source_now = _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                    if source_now != source or json.loads(job.provider_map_json) != configured_routes(db):
+                    if source_now != source or json.loads(job.provider_map_json) != configured_routes(db, json.loads(job.provider_map_json).keys()):
                         raise ValueError("Text oder KI-Modellzuweisung wurde geändert; neue Freigabe erforderlich.")
                     provider = ai_task_routing.select_provider(db, task)
                     if (provider.id != routes[task]["provider_id"] or
@@ -229,7 +229,8 @@ async def process_one(job_id: int) -> None:
                 answer = await _answer(provider, messages, job_id, step,
                                        remaining=remaining,
                                        max_tokens=4096 if depth else 3072)
-                result = law_ai_agents.validate(task, answer, section.text, with_hints=True,\n                                                allow_header=section.start == 0)
+                result = law_ai_agents.validate(task, answer, section.text, with_hints=True,
+                                                allow_header=section.start == 0)
                 # Number only *successfully* validated sections, in document
                 # order, for unambiguous global character offsets.
                 stage_parts.append((replace(section, number=len(stage_parts) + 1),
@@ -239,7 +240,7 @@ async def process_one(job_id: int) -> None:
                     if not job or job.status != "running":
                         return
                     _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                    if json.loads(job.provider_map_json) != configured_routes(db):
+                    if json.loads(job.provider_map_json) != configured_routes(db, json.loads(job.provider_map_json).keys()):
                         raise ValueError("Das KI-Profil wurde während der Analyse verändert.")
                     job.progress_done += 1
                     field_key = {"law_structure": "headings",
@@ -263,7 +264,7 @@ async def process_one(job_id: int) -> None:
                             return
                         try:
                             _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                            if json.loads(job.provider_map_json) != configured_routes(db):
+                            if json.loads(job.provider_map_json) != configured_routes(db, json.loads(job.provider_map_json).keys()):
                                 raise ValueError("Anbieterzuweisung nach Freigabe geändert.")
                         except ValueError as permission_error:
                             _fail(db, job, str(permission_error))
@@ -322,7 +323,7 @@ async def process_one(job_id: int) -> None:
                 return
             try:
                 source_now = _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-                if source_now != source or json.loads(job.provider_map_json) != configured_routes(db):
+                if source_now != source or json.loads(job.provider_map_json) != configured_routes(db, json.loads(job.provider_map_json).keys()):
                     raise ValueError("Quelltext oder Modellzuweisung wurde zwischenzeitlich verändert.")
             except ValueError as exc:
                 _fail(db, job, str(exc))
@@ -341,7 +342,7 @@ async def process_one(job_id: int) -> None:
             return
         try:
             _allowed(db, job, db.get(LawAiDraft, job.draft_id))
-            if json.loads(job.provider_map_json) != configured_routes(db):
+            if json.loads(job.provider_map_json) != configured_routes(db, json.loads(job.provider_map_json).keys()):
                 raise ValueError("Die Freigabe für das KI-Modell ist nicht mehr aktuell.")
         except ValueError as exc:
             _fail(db, job, str(exc))
