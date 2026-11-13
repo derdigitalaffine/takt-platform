@@ -147,14 +147,21 @@ async def process_one(job_id: int) -> None:
             routes = json.loads(job.provider_map_json)
             if routes != configured_routes(db):
                 raise ValueError("Ein KI-Anbieter oder Modell wurde nach der Freigabe geändert.")
-            if job.mode == "advanced":
+            mode, sep, stage_code = job.mode.partition(":")
+            stage_map = {"s": "law_structure", "m": "law_metadata",
+                         "v": "law_verify"}
+            if sep and stage_code not in stage_map:
+                raise ValueError("Unbekannter KI-Einzelauftrag.")
+            stages = ([item for item in law_ai_agents.STAGES
+                       if item[0] == stage_map[stage_code]]
+                      if sep else list(law_ai_agents.STAGES))
+            if mode == "advanced":
                 sections = law_ai_coverage.sections(source)
-            elif job.mode == "simple":
+            elif mode == "simple":
                 sections = [law_ai_coverage.Section(1, 0, len(source), source)]
             else:
                 raise ValueError("Unbekannter KI-Analysemodus.")
-            mode = job.mode
-            job.progress_total = len(sections) * len(law_ai_agents.STAGES)
+            job.progress_total = len(sections) * len(stages)
             job.progress_done = 0
             job.retry_attempts = 0
             job.stream_characters = 0
@@ -167,7 +174,7 @@ async def process_one(job_id: int) -> None:
             _fail(db, job, str(exc))
             return
 
-    for task, _label in law_ai_agents.STAGES:
+    for task, _label in stages:
         stage_parts = []
         # Adaptively bisect only if a model returned invalid/incomplete JSON.
         # The original source remains untouched, with a single retry depth.
