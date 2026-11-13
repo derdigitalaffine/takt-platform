@@ -103,24 +103,36 @@ def test_metadata_only_local_profile_calls_only_consented_model(monkeypatch, age
 
 
 def test_selected_agent_list_does_not_require_other_configured_profiles(monkeypatch, agent_routes):
+    removed = []
     with SessionLocal() as db:
-        db.delete(db.get(AITaskProfile, "law_structure"))
-        db.delete(db.get(AITaskProfile, "law_verify"))
+        for task in ("law_structure", "law_verify"):
+            profile = db.get(AITaskProfile, task)
+            removed.append((task, profile.provider_id, profile.model_id))
+            db.delete(profile)
         db.commit()
-    admin = login(*ADMIN)
-    did = _draft(admin)
-    html = admin.get(f"/laws-assistant/{did}").text
-    assert "Modell fehlt" in html
-    assert "Nur Stammdaten" in html
-    assert _start(admin, did, tasks=["law_metadata"]).status_code == 303
-    jid = _claim(did)
-    async def fake(provider, messages, *, max_tokens=1024, **kwargs):
-        assert provider.model_id == "model-step-2"
-        return '{"fields":[]}'
-    monkeypatch.setattr(ai_provider, "complete", fake)
-    asyncio.run(law_ai_agent_jobs.process_one(jid))
-    with SessionLocal() as db:
-        assert db.get(LawAiAnalysis, jid).status == "done"
+    try:
+        admin = login(*ADMIN)
+        did = _draft(admin)
+        html = admin.get(f"/laws-assistant/{did}").text
+        assert "Modell fehlt" in html
+        assert "Nur Stammdaten" in html
+        assert _start(admin, did, tasks=["law_metadata"]).status_code == 303
+        jid = _claim(did)
+
+        async def fake(provider, messages, *, max_tokens=1024, **kwargs):
+            assert provider.model_id == "model-step-2"
+            return '{"fields":[]}'
+        monkeypatch.setattr(ai_provider, "complete", fake)
+        asyncio.run(law_ai_agent_jobs.process_one(jid))
+        with SessionLocal() as db:
+            assert db.get(LawAiAnalysis, jid).status == "done"
+    finally:
+        with SessionLocal() as db:
+            for task, provider_id, model_id in removed:
+                if db.get(AITaskProfile, task) is None:
+                    db.add(AITaskProfile(task=task, provider_id=provider_id,
+                                         model_id=model_id))
+            db.commit()
 
 
 @pytest.mark.parametrize("tasks", [
