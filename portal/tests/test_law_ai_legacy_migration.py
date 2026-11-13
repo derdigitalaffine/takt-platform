@@ -35,9 +35,10 @@ def test_old_ortsrecht_draft_schema_is_extended_without_losing_work(tmp_path, mo
                  proposed_md, proposed_title, status, created_at, updated_at)
                 VALUES
                 (77, 1, 'Hausordnung.md', :storage, :sha, 28, 'text/markdown',
-                 '# Hausordnung\n\n§ 1 Test', 'Hausordnung', 'staged',
+                 :body, 'Hausordnung', 'staged',
                  '2026-11-13 09:00:00', '2026-11-13 09:00:00')
-            """), {"storage": "a" * 48, "sha": "b" * 64})
+            """), {"storage": "a" * 48, "sha": "b" * 64,
+                    "body": "# Hausordnung\n\n§ 1 Test"})
 
         old = {c["name"] for c in inspect(engine).get_columns("law_ai_drafts")}
         assert not old.intersection(OCR_COLUMNS)
