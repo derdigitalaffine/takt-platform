@@ -184,3 +184,16 @@
 .pr-autofill-note>i{color:var(--bs-primary);margin-top:.18rem;font-size:1.1rem}
 .pr-autofill-tag{display:inline-block;margin-left:.3rem;vertical-align:middle;font-size:.7rem;font-weight:700;color:var(--bs-primary);padding:.15rem .5rem;background:var(--pr-subtle);border-radius:100px}
 .pr-autofill-source{font-size:.76rem;color:var(--bs-secondary-color);line-height:1.45;margin:-.2rem 0 .45rem}
+
+/* Non-binding deadline calculations with explicit legal provenance. */
+.pr-proposal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+.pr-proposal-card{display:flex;gap:1rem;min-width:0;padding:1rem;border:1px solid var(--pr-stroke);border-radius:.9rem;background:var(--pr-subtle)}
+.pr-proposal-date{min-width:8.4rem;display:flex;flex-direction:column;gap:.25rem}
+.pr-proposal-date strong{font-size:1.02rem;color:var(--bs-primary);font-variant-numeric:tabular-nums}
+.pr-proposal-date small{color:var(--bs-secondary-color);font-size:.74rem}
+.pr-proposal-body{flex:1;min-width:0}.pr-proposal-body h3{font-size:.94rem;font-weight:750;line-height:1.4;margin:0 0 .4rem}
+.pr-proposal-body p{color:var(--bs-secondary-color);font-size:.81rem;line-height:1.45;margin-bottom:.5rem}
+.pr-proposal-body .pr-proposal-rule{color:var(--bs-body-color);font-weight:650}
+.pr-proposal-body .btn{margin-top:.3rem}
+@media(max-width:880px){.pr-proposal-grid{grid-template-columns:1fr}}
+@media(max-width:500px){.pr-proposal-card{flex-direction:column}.pr-proposal-date{min-width:0}}
