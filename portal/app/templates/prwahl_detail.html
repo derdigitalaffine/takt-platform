@@ -24,6 +24,15 @@
     <a href="/personalratswahl/{{election.id}}/termine"><i class="fa-regular fa-calendar" aria-hidden="true"></i><span><strong>Terminplanung</strong><small>Wahlteam & Einladungen</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
     <a href="/personalratswahl/{{election.id}}/auszaehlung"><i class="fa-solid fa-calculator" aria-hidden="true"></i><span><strong>Auszählung</strong><small>Aggregierte Papierstimmen</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
   </nav>
+  <section class="pr-panel pr-integration-panel" aria-labelledby="pr-integration-title">
+    <div class="pr-panel-head"><div><span class="pr-eyebrow">Modulübergreifender Arbeitsablauf</span><h2 id="pr-integration-title">Bekanntmachungen & Abstimmung</h2><p>Wahlunterlagen fachlich prüfen, eine interne Umlaufabstimmung vorbereiten und eine zulässige Bekanntmachung anschließend separat veranlassen.</p></div><span class="pr-pill">Manuelle Freigabe</span></div>
+    <div class="pr-integration-grid">
+      <div class="pr-integration-step"><span class="pr-step-number">1</span><div><strong>Wahlunterlagen prüfen</strong><p>Dokumententwürfe und Beschlussnachweise im geschützten Wahlbereich kontrollieren.</p><a href="/personalratswahl/{{election.id}}?tab=docs">Vordrucke öffnen</a></div></div>
+      <div class="pr-integration-step"><span class="pr-step-number">2</span><div><strong>Internen Umlauf vorbereiten</strong><p>Im Umlaufmodul einen eigenständigen Vorgang anlegen. Vertrauliche Wahlakten nicht automatisch übernehmen.</p><a href="/umlaeufe">Zum Umlaufmodul</a></div></div>
+      <div class="pr-integration-step"><span class="pr-step-number">3</span><div><strong>Bekanntgabe nachweisen</strong><p>Rechtsgrundlage, Adressatenkreis, Veröffentlichungsweg und tatsächlichen Aushang manuell prüfen und dokumentieren.</p><a href="/personalratswahl/{{election.id}}/ablauf">Im Wahlfahrplan dokumentieren</a></div></div>
+    </div>
+    <p class="pr-integration-disclaimer"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Ein Umlauf ersetzt weder die gesetzlich vorgeschriebene Bekanntmachung noch einen Wahlvorstandsbeschluss. Es erfolgt keine automatische Veröffentlichung oder Übermittlung personenbezogener Wahldaten.</p>
+  </section>
   <nav class="pr-tabs" aria-label="Wahlarbeitsbereich">
     {% for key, label, icon in [('overview','Übersicht','fa-house'),('tasks','Ablauf & Fristen','fa-list-check'),('board','Wahlvorstand','fa-users'),('docs','Formulare & PDF','fa-file-lines'),('audit','Nachweise','fa-shield-halved')] %}
     <a class="{{'active' if tab==key else ''}}" href="/personalratswahl/{{election.id}}?tab={{key}}" {% if tab==key %}aria-current="page"{% endif %}><i class="fa-solid {{icon}}" aria-hidden="true"></i><span>{{label}}</span></a>
