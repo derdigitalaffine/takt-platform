@@ -134,12 +134,16 @@ def prwahl_team(request: Request, election_id: int, user_id: int = Form(...),
     if person is None or not person.active:
         raise HTTPException(422, "Die Person ist nicht verfügbar.")
     appointment_reference = pw.clean(appointment_reference, 250)
-    if role in {"chair", "member"} and len(appointment_reference) < 6:
+    if role in {"chair", "member", "clerk"} and len(appointment_reference) < 6:
         raise HTTPException(422, "Bitte einen konkreten Bestellungs- oder Benennungsnachweis angeben.")
     existing = db.scalar(select(PRMandate).where(PRMandate.election_id == election.id,
                                                 PRMandate.user_id == person.id))
     if existing and existing.role == "coordinator" and existing.user_id == election.created_by:
         raise HTTPException(409, "Das technische Einrichtungsmandat kann nicht überschrieben werden.")
+    # The technical coordinator must not appoint themselves to the chair role.
+    # A separate already-mandated chair may document the appointment instead.
+    if role == "chair" and person.id == user.id and not (existing and existing.role == "chair"):
+        raise HTTPException(403, "Der Wahlvorstandsvorsitz darf nicht durch Selbstzuweisung eingerichtet werden.")
     if existing:
         existing.role, existing.appointment_reference = role, appointment_reference
         existing.assigned_by, existing.assigned_at = user.id, utcnow()
