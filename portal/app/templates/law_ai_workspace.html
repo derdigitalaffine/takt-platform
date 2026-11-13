@@ -134,15 +134,15 @@
                     <input type="hidden" name="csrf" value="{{ csrf }}">
                     <fieldset class="mb-2"><legend class="form-label fw-semibold fs-6">Analyseumfang</legend>
                       <div class="d-flex flex-wrap gap-3">
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="simple" checked><span class="form-check-label">Einfach – 3 Modellaufrufe, bei langen Texten Stichproben</span></label>
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}><span class="form-check-label">Erweitert – alle {{ advanced_sections }} Textabschnitte mit 3 Agenten ({{ max_model_calls }} Modellaufrufe)</span></label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="simple" checked><span class="form-check-label">Einfach – normalerweise 3 Modellaufrufe (bei JSON-Fehlern bis zu 9), bei langen Texten Stichproben</span></label>
+                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}><span class="form-check-label">Erweitert – {{ advanced_sections }} Textabschnitte, 3 Agenten ({{ max_model_calls }} Aufrufe regulär, höchstens {{ max_model_calls * 3 }} bei JSON-Nachprüfung)</span></label>
                       </div>
                     </fieldset>
                     <label class="form-check small mb-2">
                       <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
                       <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
                     </label>
-                    <p class="small text-secondary">Im einfachen Modus werden bei langen Texten Auszüge analysiert. Im erweiterten Modus werden alle Zeichen des importierten Textes einmal pro Agent in {{ advanced_sections }} überprüfbaren Abschnitten übertragen – insgesamt bis zu {{ max_model_calls }} Modellaufrufe. Das erhöht Laufzeit und mögliche API-Kosten. <strong>Vollständige Textübermittlung ist keine vollständige juristische Prüfung</strong> und garantiert keine OCR-Texttreue. Maximal {{ ai_source_limit }} Zeichen; keine Änderung an MarkItDown-/Tesseract-Originalen.</p>
+                    <p class="small text-secondary">Im einfachen Modus werden bei langen Texten Auszüge analysiert. Im erweiterten Modus erhält jeder Agent alle Zeichen des importierten Textes in {{ advanced_sections }} überprüfbaren Abschnitten. Regulär sind {{ max_model_calls }} Modellaufrufe vorgesehen. Bei fehlerhaftem oder am Tokenlimit abgeschnittenem JSON darf ein Abschnitt einmal in zwei kleinere Teile zerlegt und beim <strong>gleichen freigegebenen Modell</strong> erneut analysiert werden: maximal {{ max_model_calls * 3 }} Aufrufe insgesamt. Die zusätzlichen Aufrufe können Kosten und Laufzeit erhöhen; der gesamte Auftrag bleibt zeitlich begrenzt. <strong>Vollständige Textübermittlung ist keine vollständige juristische Prüfung</strong> und garantiert keine OCR-Texttreue. Maximal {{ ai_source_limit }} Zeichen; keine Änderung an MarkItDown-/Tesseract-Originalen.</p>
                     <button class="btn btn-outline-primary btn-sm" type="submit"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Drei KI-Prüfagenten starten</button>
                   </form>
                 {% endif %}
