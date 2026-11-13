@@ -18,9 +18,17 @@ from conftest import csrf_of, login, settings
 def _user(*, admin=False, setup=False):
     email = f"prwahl-{uuid4().hex[:16]}@example.org"
     with SessionLocal() as db:
-        db.add(User(email=email, name="Test Wahlberechtigung", password_hash=hash_password("passwort-1234"),
-                    is_admin=admin, active=True, must_change_password=False,
-                    permissions="video,prwahl_setup" if setup else "video"))
+        person = User(email=email, name="Test Wahlberechtigung",
+                      password_hash=hash_password("passwort-1234"),
+                      is_admin=admin, active=True, must_change_password=False,
+                      permissions="video,prwahl_setup" if setup else "video")
+        db.add(person)
+        db.flush()
+        org = db.scalar(select(Organization).where(Organization.active.is_(True)))
+        if org is not None:
+            # Simulate an employed person in the election organization. The
+            # object-level PRMandate is still required for confidential access.
+            db.add(OrgMembership(user_id=person.id, org_id=org.id))
         db.commit()
     return login(email, "passwort-1234")
 
