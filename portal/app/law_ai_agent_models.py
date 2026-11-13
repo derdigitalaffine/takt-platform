@@ -3,7 +3,7 @@
 A review is *never* a LawText or a planned legal revision; the three
 read-only agents can only store evidence-backed, explicitly untrusted hints.
 """
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base, utcnow
 
