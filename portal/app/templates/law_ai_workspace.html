@@ -1,64 +1,146 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Ortsrecht-Assistent{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/law-ai-workspace.css">{% endblock %}
 {% block content %}
 {% call m.page_head('Ortsrecht-Assistent', 'Dokumente sicher vorbereiten und rechtlich unverändert zur manuellen Prüfung bereitstellen.') %}
 <a href="/laws" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Rechtstexte</a>
 <a href="/laws/new" class="btn btn-outline-secondary">Manuell anlegen</a>
 {% endcall %}
 
-<div class="alert alert-info" role="note">
-  <i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>
-  <strong>Nur redaktionelle Vorbereitung:</strong>
-  Das Original wird unverändert mit SHA-256-Nachweis archiviert. KI- oder OCR-Text ist kein amtlicher Text.
-  Kein Import führt automatisch zu einer Veröffentlichung oder zum Inkrafttreten.
-  Das <strong>optionale OCR-Profil</strong> nutzt MarkItDown 0.1.9 für PDF/DOCX und Tesseract für Scanseiten/Bilder. OCR läuft ausschließlich im offline isolierten Worker, niemals im Portalprozess. Die mehrstufige KI-Auswertung ist ein nachfolgender, gesondert freizugebender Schritt.
-</div>
-<div class="row g-3">
-  <div class="col-12 col-xl-4">
-    <div class="card mb-3">
-      <div class="card-header"><i class="fa-solid fa-file-arrow-up me-2" aria-hidden="true"></i>Original hochladen</div>
-      <div class="card-body">
-        <form method="post" action="/laws-assistant/import" enctype="multipart/form-data">
-          <input type="hidden" name="csrf" value="{{ csrf }}">
-          <label class="form-label" for="law-ai-file">Rechtstext-Datei</label>
-          <input class="form-control" type="file" name="file" id="law-ai-file" required
-                 accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.tif,.tiff,.webp">
-          <p class="form-text">Höchstens 25 MB. Markdown und UTF-8-Text stehen sofort als Vorschlag bereit. PDF, Word und Bilder bleiben bis zur ausdrücklich beauftragten Offline-Texterkennung als Originale vorgemerkt.</p>
-          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Sicher vorbereiten</button>
-        </form>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">Meine Arbeitsentwürfe</div>
-      <div class="list-group list-group-flush">
-        {% for item in drafts %}
-          <a href="/laws-assistant/{{ item.id }}" class="list-group-item list-group-item-action {% if selected and selected.id == item.id %}active{% endif %}">
-            <span class="d-block fw-semibold text-break">{{ item.original_filename }}</span>
-            <span class="small">{{ {'staged': 'Zur Prüfung', 'needs_ocr': 'OCR möglich', 'ocr_queued': 'OCR beauftragt', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') }}</span>
-          </a>
-        {% else %}
-          <p class="text-secondary small p-3 mb-0">Noch keine Importentwürfe vorhanden.</p>
-        {% endfor %}
-      </div>
+<div class="law-workspace">
+  <div class="law-trust mb-3" role="note">
+    <i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i>
+    <div class="flex-grow-1">
+      <strong>Geschützter Redaktionsbereich – keine automatische Veröffentlichung.</strong>
+      <div class="small text-secondary mt-1">Originale bleiben unverändert. OCR und KI liefern Vorschläge, die du selbst mit der Quelle abgleichen musst.</div>
+      <details class="small mt-2">
+        <summary>Verarbeitung und Sicherheit im Detail</summary>
+        <p class="mb-0 mt-2">Das Original wird mit SHA-256-Nachweis archiviert. Das optionale, netzwerkisolierte OCR-Profil verwendet MarkItDown 0.1.9 und Tesseract. Die KI erhält nur den extrahierten Text und startet erst nach gesonderter Übermittlungsbestätigung. Weder die OCR noch die KI stellen amtliche Richtigkeit oder Inkrafttreten fest.</p>
+      </details>
     </div>
   </div>
-  <div class="col-12 col-xl-8">
-    {% if selected %}
-    <div class="card">
-      <div class="card-header d-flex align-items-center justify-content-between gap-2">
-        <span><i class="fa-solid fa-clipboard-check me-2" aria-hidden="true"></i>Original überprüfen</span>
-        <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status == 'needs_ocr' else 'secondary' }}">{{ {'staged': 'Prüfung offen', 'needs_ocr': 'OCR möglich', 'ocr_queued': 'OCR beauftragt', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
+  {% if selected %}
+  {% set law_has_text = (selected.proposed_md or '')|length > 0 %}
+  {% set law_analysis_done = analysis and analysis.status == 'done' and analysis_current %}
+  <nav aria-label="Bearbeitungsschritte">
+    <ol class="law-steps">
+      <li class="is-done"><span class="law-step-number"><i class="fa-solid fa-check" aria-hidden="true"></i></span><div><div class="law-step-title">Original</div><div class="law-step-note">Gesichert</div></div></li>
+      <li class="{{ 'is-done' if law_has_text else 'is-active' }}"><span class="law-step-number">{{ '✓' if law_has_text else '2' }}</span><div><div class="law-step-title">Text erfassen</div><div class="law-step-note">{{ 'Text liegt vor' if law_has_text else 'OCR oder manuell' }}</div></div></li>
+      <li class="{{ 'is-done' if law_analysis_done else 'is-active' if analysis and analysis.status in ('queued','running') else '' }}"><span class="law-step-number">{{ '✓' if law_analysis_done else '3' }}</span><div><div class="law-step-title">KI-Prüfung</div><div class="law-step-note">{{ 'Ergebnisse vorhanden' if law_analysis_done else 'Optional' }}</div></div></li>
+      <li class="{{ 'is-done' if selected.status == 'accepted' else 'is-active' if law_has_text else '' }}"><span class="law-step-number">{{ '✓' if selected.status == 'accepted' else '4' }}</span><div><div class="law-step-title">Übernehmen</div><div class="law-step-note">{{ 'Unveröffentlicht' if selected.status == 'accepted' else 'Nur manuell' }}</div></div></li>
+    </ol>
+  </nav>
+  {% endif %}
+  <div class="row g-3">
+  <div class="col-12 col-xl-3">
+    <section class="law-surface mb-3" aria-labelledby="law-upload-title">
+      <div class="law-card-head">
+        <h2 class="h6" id="law-upload-title"><i class="fa-solid fa-file-circle-plus me-2 text-primary" aria-hidden="true"></i>Neues Dokument</h2>
       </div>
-      <div class="card-body">
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-          <a class="btn btn-outline-secondary btn-sm" href="/laws-assistant/{{ selected.id }}/original"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Unverändertes Original</a>
-          <span class="small text-secondary">{{ (selected.original_size / 1024) | round(1) }} KB · {{ selected.original_mime }}</span>
+      <div class="law-card-body">
+        <form method="post" action="/laws-assistant/import" enctype="multipart/form-data" data-law-upload-form>
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <div class="law-drop" data-law-upload-zone>
+            <label class="form-label fw-semibold" for="law-ai-file">Originaldatei auswählen</label>
+            <input class="form-control" type="file" name="file" id="law-ai-file" required
+                   accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.tif,.tiff,.webp">
+            <p class="small text-secondary mt-2 mb-0" data-law-upload-feedback>PDF, Word, Bild oder Textdatei hier ablegen oder auswählen.</p>
+          </div>
+          <p class="form-text">Maximal 25 MB. Text/Markdown ist sofort bearbeitbar; PDF, DOCX und Bilder benötigen den OCR-Schritt.</p>
+          <button class="btn btn-primary w-100" type="submit" data-law-upload-submit><i class="fa-solid fa-lock me-2" aria-hidden="true"></i>Original sicher importieren</button>
+        </form>
+      </div>
+    </section>
+    <section class="law-surface" aria-labelledby="law-drafts-title">
+      <div class="law-card-head">
+        <h2 class="h6" id="law-drafts-title">Meine Arbeitsentwürfe</h2>
+        <span class="badge text-bg-secondary">{{ drafts|length }}</span>
+      </div>
+      {% if drafts %}
+      <div class="px-3 pt-3 pb-2">
+        <label class="visually-hidden" for="law-drafts-search">Entwürfe durchsuchen</label>
+        <div class="input-group input-group-sm mb-2">
+          <span class="input-group-text"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></span>
+          <input class="form-control" type="search" id="law-drafts-search" data-law-drafts-search placeholder="Datei suchen …" autocomplete="off">
         </div>
-        <dl class="row small">
-          <dt class="col-sm-3">Datei</dt><dd class="col-sm-9 text-break">{{ selected.original_filename }}</dd>
-          <dt class="col-sm-3">SHA-256</dt><dd class="col-sm-9 text-break font-monospace">{{ selected.original_sha256 }}</dd>
-        </dl>
+        <label class="visually-hidden" for="law-drafts-filter">Arbeitsstatus filtern</label>
+        <select class="form-select form-select-sm" id="law-drafts-filter" data-law-drafts-filter>
+          <option value="all">Alle Arbeitsstände</option>
+          <option value="review">Zur Bearbeitung</option>
+          <option value="processing">OCR / KI in Bearbeitung</option>
+          <option value="accepted">Bereits übernommen</option>
+        </select>
+      </div>
+      <div class="law-draft-list" data-law-draft-list>
+        {% for item in drafts %}
+          {% set draft_status = {'staged': 'Text bereit', 'needs_ocr': 'OCR erforderlich', 'ocr_queued': 'OCR läuft', 'ocr_review': 'OCR prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(item.status, 'In Bearbeitung') %}
+          <a href="/laws-assistant/{{ item.id }}" class="law-draft {{ 'is-selected' if selected and selected.id == item.id else '' }}"
+             data-law-draft data-law-draft-name="{{ item.original_filename|lower }}" data-law-draft-status="{{ item.status }}"
+             {% if selected and selected.id == item.id %}aria-current="page"{% endif %}>
+            <span class="law-draft-icon"><i class="fa-solid {{ 'fa-file-pdf' if item.original_filename.lower().endswith('.pdf') else 'fa-file-word' if item.original_filename.lower().endswith('.docx') else 'fa-file-lines' }}" aria-hidden="true"></i></span>
+            <span class="law-draft-meta">
+              <span class="law-draft-name">{{ item.original_filename }}</span>
+              <span class="law-draft-date">{{ item.created_at|local }}</span>
+              <span class="d-block mt-1"><span class="badge text-bg-{{ 'success' if item.status == 'accepted' else 'warning' if item.status in ('ocr_failed', 'needs_ocr') else 'secondary' }}">{{ draft_status }}</span></span>
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+      <div class="p-3 border-top small text-secondary" data-law-drafts-count aria-live="polite">{{ drafts|length }} Entwürfe angezeigt</div>
+      <p class="p-3 small text-secondary mb-0" data-law-drafts-empty hidden>Keine passenden Arbeitsentwürfe gefunden.</p>
+      {% else %}
+      <div class="p-4 text-center text-secondary small">
+        <i class="fa-regular fa-folder-open fa-xl d-block mb-3" aria-hidden="true"></i>
+        Noch kein Import vorhanden. Lade oben ein Dokument hoch, um zu beginnen.
+      </div>
+      {% endif %}
+    </section>
+  </div>
+  <div class="col-12 col-xl-9">
+    {% if selected %}
+    <article class="law-surface" aria-labelledby="law-review-title">
+      <header class="law-card-head">
+        <div>
+          <div class="law-kicker mb-1">Geschützter Arbeitsbereich · Import #{{ selected.id }}</div>
+          <h2 class="h5 text-break" id="law-review-title">{{ selected.original_filename }}</h2>
+        </div>
+        <span class="badge text-bg-{{ 'success' if selected.status == 'accepted' else 'warning' if selected.status in ('needs_ocr', 'ocr_failed') else 'secondary' }}">{{ {'staged': 'Text zur Prüfung', 'needs_ocr': 'Texterkennung nötig', 'ocr_queued': 'OCR läuft', 'ocr_review': 'OCR-Vorschlag prüfen', 'ocr_failed': 'OCR fehlgeschlagen', 'accepted': 'Unveröffentlicht übernommen'}.get(selected.status, 'In Bearbeitung') }}</span>
+      </header>
+      <div class="law-card-body">
+        <div class="law-action-hint mb-3">
+          <div class="small text-secondary fw-semibold mb-1">Nächster sinnvoller Schritt</div>
+          {% if selected.status == 'accepted' %}
+            <strong>Unveröffentlichten Rechtstextentwurf öffnen und fachlich weiterbearbeiten.</strong>
+          {% elif selected.status in ('needs_ocr', 'ocr_failed') %}
+            <strong>Originaltext erkennen lassen oder manuell im Editor erfassen.</strong>
+          {% elif selected.status == 'ocr_queued' %}
+            <strong>Offline-Texterkennung läuft. Bearbeitung nach Abschluss fortsetzen.</strong>
+          {% elif analysis and analysis.status in ('queued', 'running') %}
+            <strong>KI-Prüfung läuft. Den Originaltext kannst du währenddessen weiter prüfen.</strong>
+          {% elif analysis and analysis.status == 'done' and analysis_current %}
+            <strong>KI-Hinweise mit dem Original vergleichen und einzelne Vorschläge prüfen.</strong>
+          {% else %}
+            <strong>Text und Stammdaten am Original prüfen. Die KI-Prüfung ist optional.</strong>
+          {% endif %}
+          <div class="law-actions mt-2">
+            <a class="btn btn-sm btn-outline-primary" href="/laws-assistant/{{ selected.id }}/original"><i class="fa-solid fa-file-arrow-down me-1" aria-hidden="true"></i>Original herunterladen</a>
+            {% if selected.status in ('staged', 'ocr_review', 'needs_ocr', 'ocr_failed') %}
+              <a class="btn btn-sm btn-outline-secondary" href="#law-editor"><i class="fa-solid fa-pen-to-square me-1" aria-hidden="true"></i>Zum Texteditor</a>
+            {% endif %}
+            {% if ai_enabled and selected.status in ('staged', 'ocr_review') %}
+              <a class="btn btn-sm btn-outline-secondary" href="#law-agent-heading"><i class="fa-solid fa-brain me-1" aria-hidden="true"></i>Zur KI-Prüfung</a>
+            {% endif %}
+          </div>
+        </div>
+        <details class="small mb-3">
+          <summary class="text-secondary">Originaldetails und SHA-256-Prüfsumme</summary>
+          <dl class="row mt-2 mb-0">
+            <dt class="col-sm-3">Datei</dt><dd class="col-sm-9 text-break">{{ selected.original_filename }}</dd>
+            <dt class="col-sm-3">Umfang</dt><dd class="col-sm-9">{{ (selected.original_size / 1024)|round(1) }} KB · {{ selected.original_mime }}</dd>
+            <dt class="col-sm-3">SHA-256</dt><dd class="col-sm-9 text-break font-monospace">{{ selected.original_sha256 }}</dd>
+          </dl>
+        </details>
         {% if selected.status == 'accepted' %}
           <div class="alert alert-success">Dieser Import wurde durch eine menschliche Entscheidung als <strong>unveröffentlichter Rechtstext</strong> übernommen.
             {% if selected.accepted_law_id %}<a href="/laws/{{ selected.accepted_law_id }}/edit">Rechtstextentwurf öffnen</a>{% endif %}
@@ -105,20 +187,21 @@
           {% endif %}
 
           {% if ai_enabled %}
-          <section class="card mb-4" aria-labelledby="law-agent-heading">
-            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-              <h3 class="h6 mb-0" id="law-agent-heading"><i class="fa-solid fa-brain me-2" aria-hidden="true"></i>KI-Redaktionsprüfung</h3>
-              <span class="badge text-bg-secondary">3 spezialisierte Agenten</span>
+          <section class="law-surface mb-4" aria-labelledby="law-agent-heading">
+            <div class="law-card-head">
+              <div class="law-section-title"><span class="law-section-icon"><i class="fa-solid fa-brain" aria-hidden="true"></i></span><h3 class="h6" id="law-agent-heading">KI-Redaktionsprüfung <span class="badge text-bg-secondary ms-1">Optional</span></h3></div>
+              <span class="small text-secondary">3 spezialisierte Agenten</span>
             </div>
-            <div class="card-body">
-              <p class="small text-secondary">Die KI liest ausschließlich den importierten <strong>Textvorschlag</strong>; Original-PDF und Bilder werden nicht an Sprachmodelle versendet. Die Analyse führt keine Rechtsänderung durch. Vorschläge sind mit wörtlichen Fundstellen zu belegen; fehlende Belege werden verworfen.</p>
+            <div class="law-card-body">
+              <p class="small text-secondary">Die Agenten untersuchen nur den <strong>importierten Textstand</strong>, nicht ungespeicherte Änderungen im Editor. Originaldateien bleiben lokal. Kein Ergebnis wird automatisch in den Rechtstext übernommen.</p>
+              <div class="alert alert-warning small py-2" role="status" data-law-ai-source-warning hidden>Du hast den Text im Editor verändert. Eine neue KI-Analyse verwendet trotzdem den importierten Original-Textvorschlag, nicht deine noch nicht übernommenen Änderungen.</div>
               {% if selected.status == 'ocr_queued' %}
                 <div class="alert alert-secondary small mb-0">Bitte zuerst die laufende OCR abschließen.</div>
               {% elif selected.status in ('staged', 'ocr_review') %}
                 {% if not agent_routes or agent_routes|length != 3 %}
                   <div class="alert alert-warning small">Die drei Ortsrecht-Profile <code>law_structure</code>, <code>law_metadata</code> und <code>law_verify</code> müssen vor der Nutzung in <a href="/admin/ai#ai-task-profiles">KI-Administration</a> jeweils einem freigegebenen aktiven Modell zugewiesen werden. Es wird kein fremder Provider als stiller Ersatz genutzt.</div>
                 {% else %}
-                  <div class="border rounded-3 p-2 mb-3" aria-label="Empfänger und KI-Modelle">
+                  <div class="border rounded-3 p-3 mb-3" aria-label="Empfänger und KI-Modelle">
                     <div class="small fw-semibold mb-1">Diese drei KI-Server/Modelle erhalten den Text:</div>
                     <dl class="row small mb-0">
                       {% for task,label in agent_stages %}
@@ -130,20 +213,39 @@
                       {% endfor %}
                     </dl>
                   </div>
-                  <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3">
+                  <form method="post" action="/laws-assistant/{{ selected.id }}/agents" class="border rounded-3 p-3 mb-3" data-law-analysis-form>
                     <input type="hidden" name="csrf" value="{{ csrf }}">
-                    <fieldset class="mb-2"><legend class="form-label fw-semibold fs-6">Analyseumfang</legend>
-                      <div class="d-flex flex-wrap gap-3">
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="simple" checked><span class="form-check-label">Einfach – normalerweise 3 Modellaufrufe (bei JSON-Fehlern bis zu 9), bei langen Texten Stichproben</span></label>
-                        <label class="form-check"><input class="form-check-input" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}><span class="form-check-label">Erweitert – {{ advanced_sections }} Textabschnitte, 3 Agenten ({{ max_model_calls }} Aufrufe regulär, höchstens {{ max_model_calls * 3 }} bei JSON-Nachprüfung)</span></label>
+                    <fieldset class="mb-3">
+                      <legend class="form-label fw-semibold fs-6">Wie gründlich soll geprüft werden?</legend>
+                      <div class="row g-2">
+                        <div class="col-12 col-lg-6">
+                          <label class="law-choice d-block">
+                            <input class="form-check-input me-2" type="radio" name="mode" value="simple" checked>
+                            <span class="law-choice-title">Schnellcheck</span>
+                            <small>3 Modellaufrufe. Gute erste Orientierung; lange Texte nur in Auszügen.</small>
+                            <span class="badge text-bg-light border text-dark mt-2">Schneller · weniger API-Aufwand</span>
+                          </label>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                          <label class="law-choice d-block">
+                            <input class="form-check-input me-2" type="radio" name="mode" value="advanced" {% if not advanced_sections %}disabled{% endif %}>
+                            <span class="law-choice-title">Gesamter Text</span>
+                            <small>{{ advanced_sections }} Textabschnitte für jeden Agenten; {{ max_model_calls }} reguläre Modellaufrufe.</small>
+                            <span class="badge text-bg-light border text-dark mt-2">Ausführlicher · mehr Aufwand</span>
+                          </label>
+                        </div>
                       </div>
                     </fieldset>
                     <label class="form-check small mb-2">
                       <input class="form-check-input" type="checkbox" name="transmission_confirmed" value="1" required>
                       <span class="form-check-label">Ich bestätige, dass ich den Dokumenttext zur Analyse an die drei oben angezeigten KI-Anbieter übermitteln darf. Die Übermittlung erfolgt nur für diesen Auftrag; bei einem Anbieterwechsel ist eine neue Zustimmung erforderlich.</span>
                     </label>
-                    <p class="small text-secondary">Im einfachen Modus werden bei langen Texten Auszüge analysiert. Im erweiterten Modus erhält jeder Agent alle Zeichen des importierten Textes in {{ advanced_sections }} überprüfbaren Abschnitten. Regulär sind {{ max_model_calls }} Modellaufrufe vorgesehen. Bei fehlerhaftem oder am Tokenlimit abgeschnittenem JSON darf ein Abschnitt einmal in zwei kleinere Teile zerlegt und beim <strong>gleichen freigegebenen Modell</strong> erneut analysiert werden: maximal {{ max_model_calls * 3 }} Aufrufe insgesamt. Die zusätzlichen Aufrufe können Kosten und Laufzeit erhöhen; der gesamte Auftrag bleibt zeitlich begrenzt. <strong>Vollständige Textübermittlung ist keine vollständige juristische Prüfung</strong> und garantiert keine OCR-Texttreue. Maximal {{ ai_source_limit }} Zeichen; keine Änderung an MarkItDown-/Tesseract-Originalen.</p>
-                    <button class="btn btn-outline-primary btn-sm" type="submit"><i class="fa-solid fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Drei KI-Prüfagenten starten</button>
+                    <p class="small fw-semibold mb-2" id="law-analysis-budget" data-law-analysis-budget data-law-advanced-calls="{{ max_model_calls }}" aria-live="polite">Schnellcheck: 3 Anfragen, bei fehlerhaftem JSON bis zu 9.</p>
+                    <details class="small text-secondary mb-3">
+                      <summary>Verarbeitung, Grenzen und mögliche Zusatzkosten</summary>
+                      <p class="mt-2 mb-0">Im Schnellcheck werden bei langen Dokumenten Textauszüge geprüft. Im Volltextmodus wird der gesamte importierte Text abschnittsweise übermittelt, regulär {{ max_model_calls }} Aufrufe. Bei ungültigem oder abgeschnittenem JSON darf ein Abschnitt einmal am gleichen Modell nachgeprüft werden (maximal {{ max_model_calls * 3 }} Aufrufe insgesamt). Das verursacht ggf. zusätzliche Kosten. Kein KI-Ergebnis ist eine vollständige juristische Prüfung oder garantiert korrekte OCR. Maximal {{ ai_source_limit }} Textzeichen; das Original bleibt unverändert.</p>
+                    </details>
+                    <button class="btn btn-primary" type="submit" data-law-analysis-submit><i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>KI-Prüfung starten</button>
                   </form>
                 {% endif %}
               {% endif %}
@@ -177,14 +279,20 @@
                   </form>
                 </div>
                 {% elif analysis.status == 'failed' %}
-                  <div class="alert alert-warning mb-2" role="alert">Die KI-Analyse wurde nicht abgeschlossen: {{ analysis.failure }}. Es wurden keine Vorschläge automatisch übernommen.</div>
+                  <div class="alert alert-warning mb-3" role="alert">
+                  <div class="fw-semibold mb-1"><i class="fa-solid fa-triangle-exclamation me-2" aria-hidden="true"></i>KI-Prüfung konnte nicht abgeschlossen werden</div>
+                  <p class="small mb-2">{{ analysis.failure }}</p>
+                  <p class="small mb-2">Es wurden keine Vorschläge automatisch übernommen. Prüfe die Modellkonfiguration oder starte einen neuen, ausdrücklich bestätigten Prüflauf.</p>
+                  <a class="btn btn-outline-secondary btn-sm" href="#law-agent-heading">Erneut konfigurieren</a>
+                </div>
                 {% elif analysis.status == 'cancelled' %}
                   <div class="alert alert-secondary mb-2">KI-Analyse abgebrochen. Eine bereits erfolgte Übertragung an den Anbieter lässt sich dadurch nicht rückgängig machen.</div>
                 {% elif analysis.status == 'done' and not analysis_current %}
                   <div class="alert alert-warning mb-2">Dieser KI-Befund bezieht sich auf eine ältere OCR-Textversion und wird daher nicht angezeigt. Bitte neu analysieren.</div>
                 {% elif analysis.status == 'done' and analysis_current %}
                   <div class="alert alert-success small">
-                    KI-Prüflauf abgeschlossen. <strong>Alle Ergebnisse sind unverbindliche Vorschläge</strong>; Fundstellen belegen nur das Vorkommen im importierten Text, nicht seine amtliche Richtigkeit.
+                    <strong><i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>KI-Prüfung abgeschlossen.</strong>
+                    Hinweise sind Vorschläge mit Fundstellen im importierten Text – keine amtliche oder juristische Bestätigung.
                   </div>
                   {% set structure = analysis_results.get('structure', {}) %}
                   {% set metadata = analysis_results.get('metadata', {}) %}
@@ -195,19 +303,26 @@
                     {{ coverage.get('sections_analyzed', 0) }} von {{ coverage.get('sections_total', '?') }} Abschnitt(en), {{ coverage.get('source_chars', 0) }} Quellzeichen.
                     Fundstellen sind Zeichenpositionen des OCR-/MarkItDown-Textes, keine amtlichen PDF-Seitenbelege.
                   </p>
+                  <div class="law-results-summary" aria-label="Zusammenfassung der KI-Fundstellen">
+                    <span><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i><strong>{{ metadata.get('fields', [])|length }}</strong> Stammdaten</span>
+                    <span><i class="fa-solid fa-list-ol me-1" aria-hidden="true"></i><strong>{{ structure.get('headings', [])|length }}</strong> Gliederungen</span>
+                    <span><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>{{ verification.get('findings', [])|length }}</strong> Prüfhinweise</span>
+                  </div>
+                  <p class="small text-secondary">Öffne die passende Gruppe und übertrage nur nach Abgleich mit der Originaldatei. Die KI bietet keine OCR-Texttreue und keine amtliche oder juristische Richtigkeitsgarantie.</p>
+                  {% set law_field_names = {'title': 'Titel', 'short_title': 'Kurztitel', 'doc_type': 'Dokumentart', 'level': 'Körperschaft', 'version_note': 'Fassungshinweis', 'issued_on': 'Ausfertigungsdatum', 'valid_from': 'Inkrafttreten', 'valid_until': 'Außerkrafttreten'} %}
                   <div class="accordion mb-2" id="law-agent-results-{{ analysis.id }}">
                     <div class="accordion-item">
-                      <h4 class="accordion-header"><button class="accordion-button {{ '' if analysis.mode == 'advanced' else 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="{{ 'true' if analysis.mode == 'advanced' else 'false' }}">Stammdaten-Vorschläge · {{ metadata.get('fields', [])|length }} Fundstellen</button></h4>
+                      <h4 class="accordion-header"><button class="accordion-button {{ '' if analysis.mode == 'advanced' else 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="{{ 'true' if analysis.mode == 'advanced' else 'false' }}"><i class="fa-solid fa-id-card me-2" aria-hidden="true"></i>Stammdaten · {{ metadata.get('fields', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-metadata-{{ analysis.id }}" class="accordion-collapse collapse {{ 'show' if analysis.mode == 'advanced' else '' }}" data-bs-parent="#law-agent-results-{{ analysis.id }}">
                         <div class="accordion-body">
                           {% if metadata.get('sampled') %}<p class="small text-warning">Nur Textauszüge analysiert – möglicherweise fehlen weitere Angaben.</p>{% endif %}
                           {% for entry in metadata.get('fields', []) %}
-                            <div class="border-bottom py-2">
+                            <div class="law-result-row">
                               <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-                                <span><span class="badge text-bg-secondary">{{ entry.field }}</span> <strong class="text-break">{{ entry.value }}</strong></span>
+                                <span><span class="badge text-bg-secondary">{{ law_field_names.get(entry.field, entry.field) }}</span> <strong class="text-break">{{ entry.value }}</strong></span>
                                 <button type="button" class="btn btn-outline-primary btn-sm" data-law-ai-apply-field="{{ entry.field }}" data-law-ai-value="{{ entry.value }}" title="Vorschlag manuell ins Formular übertragen">Ins Formular übernehmen</button>
                               </div>
-                              <blockquote class="border-start ps-2 small text-secondary mt-1 mb-0">{{ entry.evidence }}</blockquote>
+                              <blockquote class="law-quote small text-secondary mt-2 mb-0">{{ entry.evidence }}</blockquote>
                               {% if entry.source_start is defined %}
                                 <div class="small text-secondary">Textabschnitt {{ entry.section }} · Zeichen {{ entry.source_start + 1 }}–{{ entry.source_end }}
                                   {% if entry.quote_occurrences|default(1) > 1 %}· Das Zitat kommt {{ entry.quote_occurrences }}-mal in diesem Abschnitt vor; die genaue Fundstelle ist nicht eindeutig.{% endif %}
@@ -220,12 +335,12 @@
                       </div>
                     </div>
                     <div class="accordion-item">
-                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-outline-{{ analysis.id }}" aria-expanded="false">Gliederung und Markdown-Vorschläge · {{ structure.get('headings', [])|length }} Fundstellen</button></h4>
+                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-outline-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-list-ol me-2" aria-hidden="true"></i>Gliederung · {{ structure.get('headings', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-outline-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
                         <div class="accordion-body">
                           {% if structure.get('sampled') %}<p class="small text-warning">Nur Ausschnitte und Überschriften ausgewertet.</p>{% endif %}
                           {% for entry in structure.get('headings', []) %}
-                            <div class="py-2 border-bottom"><span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
+                            <div class="law-result-row"><span class="badge text-bg-secondary">Ebene {{ entry.level }}</span>
                               <code class="d-block text-break mt-1">{{ entry.markdown_suggestion }}</code>
                               <div class="small text-secondary">Original: {{ entry.quote }}</div>
                               {% if entry.source_start is defined %}
@@ -246,14 +361,14 @@
                       </div>
                     </div>
                     <div class="accordion-item">
-                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-verify-{{ analysis.id }}" aria-expanded="false">Texttreue und kritische Stellen · {{ verification.get('findings', [])|length }} Hinweise</button></h4>
+                      <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-verify-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Texttreue · {{ verification.get('findings', [])|length }} Hinweise</button></h4>
                       <div id="law-agent-verify-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
                         <div class="accordion-body">
                           {% if verification.get('sampled') %}<p class="small text-warning">Stichproben, keine Vollprüfung des Originals.</p>{% endif %}
                           {% for finding in verification.get('findings', []) %}
-                            <div class="border-start border-warning ps-3 py-2 mb-2">
+                            <div class="law-result-row border-start border-warning ps-3 mb-2">
                               <span class="badge text-bg-{{ 'danger' if finding.severity in ('critical', 'high') else 'warning' }}">{{ finding.severity }}</span>
-                              <blockquote class="small mt-1 mb-1 text-break">{{ finding.quote }}</blockquote>
+                              <blockquote class="law-quote small mt-2 mb-1">{{ finding.quote }}</blockquote>
                               {% if finding.source_start is defined %}<div class="small text-secondary">Textabschnitt {{ finding.section }} · Zeichen {{ finding.source_start + 1 }}–{{ finding.source_end }}
                                 {% if finding.quote_occurrences|default(1) > 1 %}· Zitat mehrfach vorhanden, genaue Position bitte manuell prüfen.{% endif %}</div>{% endif %}
                               <button type="button" class="btn btn-link btn-sm p-0"
@@ -284,9 +399,13 @@
           {% elif selected.status in ('staged', 'ocr_review') %}
             <div class="small alert alert-secondary">Der KI-Agent ist für diesen Benutzer oder die Organisation deaktiviert. Die manuelle Ortsrecht-Bearbeitung bleibt uneingeschränkt möglich.</div>
           {% endif %}
-          <form method="post" action="/laws-assistant/{{ selected.id }}/accept">
+          <form method="post" action="/laws-assistant/{{ selected.id }}/accept" data-law-review-form id="law-review-form">
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <div class="row g-3">
+              <div class="col-12">
+                <div class="law-section-title mb-1"><span class="law-section-icon"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></span><h3 class="h6 mb-0">Redaktionelle Bearbeitung und Übernahme</h3></div>
+                <p class="small text-secondary mb-1">Hier bearbeitest du den tatsächlichen Rechtstextentwurf. <strong>Änderungen werden erst durch „Geprüften Entwurf übernehmen“ gespeichert</strong> – keine automatische Zwischenspeicherung.</p>
+              </div>
               <div class="col-12">
                 <label class="form-label" for="law-ai-title">Geprüfter Titel</label>
                 <input class="form-control" id="law-ai-title" name="title" maxlength="400" required value="{{ selected.proposed_title }}">
@@ -320,44 +439,70 @@
                   {% for level, depth in level_options %}<option value="{{ level.id }}">{{ '   ' * depth }}{{ level.name }}</option>{% endfor %}
                 </select>
               </div>
-              <div class="col-12">
-                <label class="form-label" for="law-ai-body">Redaktionell geprüfter Markdown-Text</label>
-                <textarea class="form-control font-monospace" id="law-ai-body" name="body_md" rows="18"
-                          maxlength="2097152" spellcheck="false" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ selected.proposed_md }}</textarea>
-                <div class="form-text">Prüfen Sie Paragraphen, Daten, Geldbeträge, Anlagen und jede Abweichung vom Original. Ein unverlässlicher OCR-Text darf nicht ungeprüft übernommen werden.</div>
+              <div class="col-12" id="law-editor">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <label class="form-label fw-semibold mb-0" for="law-ai-body">Redaktionell geprüfter Markdown-Text</label>
+                  <span class="small text-secondary" data-law-editor-count aria-live="polite">Textstand aus Import</span>
+                </div>
+                <div class="row g-3">
+                  <div class="col-12 col-xxl-9">
+                    <textarea class="form-control font-monospace law-editor" id="law-ai-body" name="body_md" rows="20"
+                              maxlength="2097152" spellcheck="false" required
+                              aria-describedby="law-editor-hint" placeholder="# Titel&#10;&#10;§ 1 Geltungsbereich&#10;&#10;…">{{ selected.proposed_md }}</textarea>
+                    <p class="form-text" id="law-editor-hint">Wortlaut, Paragraphen, Beträge, Fristen, Verneinungen und Anlagen mit dem Original abgleichen. Die Gliederung rechts ist nur eine Orientierung im bearbeiteten Text.</p>
+                  </div>
+                  <aside class="col-12 col-xxl-3" aria-label="Gliederung im Entwurf">
+                    <div class="fw-semibold small mb-2"><i class="fa-solid fa-list-ul me-1" aria-hidden="true"></i>Dokumentnavigation</div>
+                    <div class="law-outline" data-law-editor-outline aria-live="off">
+                      <p class="text-secondary small mb-0">Überschriften werden beim Bearbeiten erkannt.</p>
+                    </div>
+                    <div class="small text-secondary mt-2">Klicke auf einen Eintrag, um die Stelle im Editor zu öffnen.</div>
+                  </aside>
+                </div>
+                <p class="small text-warning mt-2 mb-0" data-law-editor-dirty hidden>Du hast ungespeicherte Änderungen. Verlasse diese Seite nicht, bevor du den geprüften Entwurf übernommen hast.</p>
               </div>
               <div class="col-12">
-                <label class="form-check">
-                  <input class="form-check-input" name="confirmed" type="checkbox" value="1" required>
-                  <span class="form-check-label">Ich habe Titel, Text und Original selbst verglichen. Als <strong>unveröffentlichten Entwurf</strong> übernehmen.</span>
-                </label>
-              </div>
-              <div class="col-12">
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-file-circle-check me-1" aria-hidden="true"></i>Geprüften Entwurf übernehmen</button>
+                <div class="law-sticky-actions">
+                  <label class="form-check mb-2">
+                    <input class="form-check-input" name="confirmed" type="checkbox" value="1" required>
+                    <span class="form-check-label small">Ich habe <strong>Original, Titel und Text selbst verglichen</strong> und übernehme ausschließlich einen <strong>unveröffentlichten</strong> Rechtstextentwurf.</span>
+                  </label>
+                  <div class="law-actions align-items-center">
+                    <button type="submit" class="btn btn-primary" data-law-accept-submit><i class="fa-solid fa-file-circle-check me-1" aria-hidden="true"></i>Geprüften Entwurf übernehmen</button>
+                    <a href="/laws-assistant/{{ selected.id }}/original" class="btn btn-outline-secondary"><i class="fa-solid fa-file-arrow-down me-1" aria-hidden="true"></i>Original erneut ansehen</a>
+                  </div>
+                </div>
               </div>
             </div>
           </form>
-          <form method="post" action="/laws-assistant/{{ selected.id }}/discard" class="mt-3">
-            <input type="hidden" name="csrf" value="{{ csrf }}">
-            <label class="form-check small mb-2">
-              <input class="form-check-input" name="discard_confirmed" type="checkbox" value="1" required>
-              <span class="form-check-label">Diesen ungeprüften Entwurf einschließlich Original endgültig verwerfen.</span>
-            </label>
-            <button type="submit" class="btn btn-outline-danger btn-sm">Ungeprüften Import verwerfen</button>
-          </form>
+          <details class="mt-4 border-top pt-3">
+            <summary class="small text-secondary">Weitere Optionen: Import endgültig verwerfen</summary>
+            <form method="post" action="/laws-assistant/{{ selected.id }}/discard" class="mt-3" data-law-discard-form>
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <p class="small text-danger">Hierdurch werden der Arbeitsentwurf und das zugehörige Original gelöscht. Diese Aktion lässt sich nicht rückgängig machen.</p>
+              <label class="form-check small mb-2">
+                <input class="form-check-input" name="discard_confirmed" type="checkbox" value="1" required>
+                <span class="form-check-label">Ich möchte diesen Import einschließlich Original endgültig verwerfen.</span>
+              </label>
+              <button type="submit" class="btn btn-outline-danger btn-sm">Import endgültig verwerfen</button>
+            </form>
+          </details>
         {% endif %}
       </div>
-    </div>
+    </article>
     {% else %}
-    <div class="card"><div class="card-body text-center p-5">
-      <i class="fa-solid fa-scale-balanced fa-2x text-secondary mb-3" aria-hidden="true"></i>
-      <h2 class="h5">Original hochladen oder Arbeitsentwurf öffnen</h2>
-      <p class="text-secondary mb-0">Die Texte bleiben zunächst in Ihrem eigenen geschützten Arbeitsbereich und werden niemals automatisch veröffentlicht.</p>
+    <div class="law-surface"><div class="law-card-body text-center py-5 px-3">
+      <span class="law-section-icon mx-auto mb-3" style="width:3.2rem;height:3.2rem;border-radius:1rem"><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i></span>
+      <h2 class="h5">Starte mit einem Originaldokument</h2>
+      <p class="text-secondary mx-auto" style="max-width:32rem">Lade links eine Datei hoch oder wähle einen vorhandenen Arbeitsentwurf. Du wirst dann durch Texterkennung, optionale KI-Prüfung und manuelle Übernahme geführt.</p>
+      <p class="small text-secondary mb-0"><i class="fa-solid fa-lock me-1" aria-hidden="true"></i>Privater Arbeitsbereich, keine automatische Veröffentlichung.</p>
     </div></div>
     {% endif %}
   </div>
 </div>
+</div>
 {% block scripts %}
+<script src="/static/law-ai-workspace.js" defer></script>
 {% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}
 {% if selected and ai_enabled %}<script src="/static/law-ai-agents.js" defer></script>{% endif %}
 {% endblock %}
