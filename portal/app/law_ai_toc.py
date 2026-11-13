@@ -30,6 +30,8 @@ def toc_ranges(source: str) -> list[tuple[int, int]]:
             continue
         first = None
         entries = 0
+        page_entries = 0
+        repeated = False
         end = start + 1
         for index in range(start + 1, min(len(lines), start + 130)):
             clean = lines[index].strip()
@@ -42,16 +44,19 @@ def toc_ranges(source: str) -> list[tuple[int, int]]:
             token = re.sub(r"\s+\d{1,4}\s*$", "", clean)
             token = _PAGE_SUFFIX.sub("", token).strip()
             if is_entry and first and token == first and entries >= 2:
+                repeated = True
                 break
             if is_entry:
                 entries += 1
+                if _PAGE_SUFFIX.search(clean):
+                    page_entries += 1
                 if first is None:
                     first = token
             elif clean and entries >= 2 and not (
                     _PAGE_SUFFIX.search(clean) or re.match(r"^\d{1,4}\s*$", clean)):
                 break
             end = index + 1
-        if entries >= 2:
+        if entries >= 2 and (page_entries >= 1 or repeated):
             spans.append((offsets[start], offsets[end] if end < len(lines) else len(source)))
     return spans
 
