@@ -17,7 +17,7 @@ _EVENTS = (
 _KIND = re.compile(r"(?i)\b(Satzung|Verordnung|Richtlinie|Dienstanweisung|Geschäftsordnung|Bekanntmachung|Gesetz|Vertrag)\b")
 
 
-def hints(source: str) -> list[dict[str, str]]:
+def hints(source: str, *, allow_header: bool = True) -> list[dict[str, str]]:
     spans = toc_ranges(source)
     found = {}
     offset = 0
@@ -30,11 +30,11 @@ def hints(source: str) -> list[dict[str, str]]:
             offset += len(raw)
             continue
         # Title only from the document's opening header, not later citations.
-        if index < 16 and "title" not in found:
+        if allow_header and index < 16 and "title" not in found:
             match = re.fullmatch(r"#{1,2}\s+(.{8,200})", line)
             if match and not line.lower().endswith("inhaltsverzeichnis"):
                 found["title"] = {"field": "title", "value": match.group(1), "evidence": line}
-        if index < 26 and "doc_type" not in found:
+        if allow_header and index < 26 and "doc_type" not in found:
             match = _KIND.search(line)
             if match:
                 kind = match.group(1).casefold()
