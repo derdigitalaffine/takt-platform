@@ -34,6 +34,7 @@ PORTAL_ONLY = {
     "knowledge": "Internes Wissensmanagement mit Berechtigungsprüfung.",
     "prwahl": "Vertrauliche Wahlorganisation, ausschließlich intern mit Fachmandat.",
     "anliegen": "Interne Anliegen und ihre Bearbeitung.",
+    "internal_assets": "Interne Ressourcen und dienstliche Buchungen sind ausschließlich über die Portal-Anmeldung erreichbar.",
     "calendars": "Kalender, Urlaub und CalDAV laufen über die Portal-Anmeldung.",
     "tasks": "Interne Aufgaben und Zusammenarbeit.",
     "seminars": "Seminar- und Lehrgangsverwaltung.",
