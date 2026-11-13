@@ -67,14 +67,20 @@ def bisect(section: Section) -> tuple[Section, Section] | None:
     # Prefer a nearby paragraph break to avoid cutting a provision in two.
     low = max(MIN_RECOVERY_CHARS, middle - size // 7)
     high = min(size - MIN_RECOVERY_CHARS, middle + size // 7)
-    newline = section.text.rfind("\n", low, high)
-    pivot = newline + 1 if newline >= 0 else middle
+    before = section.text.rfind("\n", low, middle)
+    after = section.text.find("\n", middle, high)
+    candidates = [idx + 1 for idx in (before, after)
+                  if idx >= 0 and MIN_RECOVERY_CHARS <= idx + 1
+                  <= size - MIN_RECOVERY_CHARS]
+    # Nearest newline to the middle, not the *last* newline in the window:
+    # the latter can produce an unhelpful 65/35 split that still overflows.
+    pivot = min(candidates, key=lambda pos: abs(pos - middle)) if candidates else middle
     if not MIN_RECOVERY_CHARS <= pivot <= size - MIN_RECOVERY_CHARS:
         return None
     left = Section(section.number, section.start, section.start + pivot,
-                   section.text[:pivot], section.split_line or newline < 0)
+                   section.text[:pivot], section.split_line or not candidates)
     right = Section(section.number, section.start + pivot, section.end,
-                    section.text[pivot:], section.split_line or newline < 0)
+                    section.text[pivot:], section.split_line or not candidates)
     if left.text + right.text != section.text or left.end != right.start:
         raise ValueError("Fehler bei der verlustfreien Teilung der Rechtsquelle.")
     return left, right
