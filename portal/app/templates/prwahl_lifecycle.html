@@ -9,15 +9,15 @@
   <div class="d-flex gap-2 flex-wrap mb-3"><a class="btn btn-outline-primary" href="/personalratswahl/{{election.id}}/termine"><i class="fa-regular fa-calendar me-2"></i>Terminplanung & Einladungen</a><a class="btn btn-outline-primary" href="/personalratswahl/{{election.id}}?tab=tasks">Aufgaben und Fristen</a></div>
   <div class="pr-panel"><div class="pr-panel-head"><div><span class="pr-eyebrow">Wahlfahrplan</span><h2>Alle neun Phasen</h2><p>Die Einberufung der konstituierenden Sitzung und alle gesetzlichen Fristen anhand der aktuellen Fassung des LPersVG und des konkreten Wahlergebnisses prüfen.</p></div><span class="pr-pill">{{progress}} % dokumentiert</span></div>
   <div class="pr-progress" role="progressbar" aria-label="Dokumentierte Wahlphasen" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{progress}}"><span style="width:{{progress}}%"></span></div>
-  <div class="pr-lifecycle">
+  <div class="pr-lifecycle" aria-label="Neun Phasen der Personalratswahl">
   {% for stage, title, description in stages %}
   {% set item=milestones.get(stage) %}
   <section class="pr-life-step {{'pr-life-done' if item and item.completed_at else ''}}">
-    <div class="pr-life-number">{{'✓' if item and item.completed_at else loop.index}}</div>
-    <div class="pr-life-main"><div class="pr-life-heading"><h3>{{title}}</h3>{% if item and item.completed_at %}<span class="pr-pill">Nachweis erfasst</span>{% endif %}</div>
+    <div class="pr-life-number" aria-hidden="true">{{'✓' if item and item.completed_at else loop.index}}</div>
+    <div class="pr-life-main"><div class="pr-life-heading"><h3><span class="visually-hidden">Phase {{loop.index}} von {{stages|length}}: </span>{{title}}</h3>{% if item and item.completed_at %}<span class="pr-pill">Nachweis erfasst</span>{% endif %}</div>
       <p>{{description}}</p>
-      {% if item and item.completed_at %}<div class="pr-life-evidence"><strong>Nachweis:</strong> {{item.evidence}}{% if item.effective_on %} · {{item.effective_on.strftime('%d.%m.%Y')}}{% endif %}</div>{% elif can_edit %}
-      <details class="pr-life-action"><summary>Schritt dokumentieren</summary><form method="post" action="/personalratswahl/{{election.id}}/ablauf/{{stage}}/nachweis" class="row g-2 pt-3"><input type="hidden" name="csrf" value="{{csrf}}">
+      {% if item and item.completed_at %}<div class="pr-life-evidence" role="note"><strong>Nachweis erfasst:</strong> {{item.evidence}}{% if item.effective_on %} · {{item.effective_on.strftime('%d.%m.%Y')}}{% endif %}</div>{% elif can_edit %}
+      <details class="pr-life-action"><summary><i class="fa-solid fa-pen-to-square me-2" aria-hidden="true"></i>Nachweis für „{{title}}“ erfassen</summary><form method="post" action="/personalratswahl/{{election.id}}/ablauf/{{stage}}/nachweis" class="row g-2 pt-3"><input type="hidden" name="csrf" value="{{csrf}}">
         <div class="col-md-8"><label for="evidence-{{stage}}" class="form-label">Akten-/Beschluss-/Bekanntgabenachweis</label><input id="evidence-{{stage}}" name="evidence" class="form-control" maxlength="500" minlength="12" required placeholder="Niederschrift vom …, Ablageort, TOP …"></div>
         <div class="col-md-4"><label for="date-{{stage}}" class="form-label">Datum des Schritts</label><input id="date-{{stage}}" name="effective_on" class="form-control" type="date"></div>
         <div class="col-12"><button type="submit" class="btn btn-outline-primary btn-sm">Nachweis speichern</button></div>
