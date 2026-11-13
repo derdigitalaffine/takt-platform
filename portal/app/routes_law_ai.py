@@ -482,7 +482,7 @@ def law_ai_accept(
         raise HTTPException(409, "Der Arbeitsstand wurde inzwischen verarbeitet.")
     law = LawText(created_by=user.id)
     values = {
-        "title": title.strip(), "doc_type": doc_type,
+        "title": title.strip(), "doc_type": doc_type, "outline": outline,
         "level_id": level_id, "published": "0", "internal": "0",
         "short_title": short_title[:80],
         "issued_on": issued_on, "valid_from": valid_from, "valid_until": valid_until,
