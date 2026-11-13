@@ -119,7 +119,8 @@ def prwahl_schedule_calendar(request: Request, election_id: int, event_id: int,
                             include_children=False)
         db.add(calendar)
         db.flush()
-    members = db.scalars(select(PRMandate).where(PRMandate.election_id == election.id,
+    members = db.scalars(select(PRMandate).join(User, User.id == PRMandate.user_id).where(
+        PRMandate.election_id == election.id, User.active.is_(True),
         PRMandate.role.in_(["chair", "member", "clerk"]))).all()
     for mandate in members:
         if mandate.user_id != user.id and not db.scalar(select(CalendarGrant.id).where(
