@@ -4,7 +4,7 @@ Never link this table to the scheduled-publication worker. OCR and AI processes
 write only proposals here; only a separate authenticated editor action may
 create an unpublished LawText. The immutable uploaded original stays separate.
 """
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base, utcnow
@@ -34,3 +34,23 @@ class LawAiDraft(Base):
     created_at: Mapped[object] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     accepted_at: Mapped[object | None] = mapped_column(DateTime, nullable=True)
+
+
+class LawAiEditorialDraft(Base):
+    """Private working copy, separate from immutable OCR/LLM source evidence.
+
+    Not a LawText. It cannot be published and carries a revision for optimistic
+    concurrency. No source PDF or OCR source is modified by saving it.
+    """
+    __tablename__ = "law_ai_editorial_drafts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    draft_id: Mapped[int] = mapped_column(ForeignKey("law_ai_drafts.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    source_sha256: Mapped[str] = mapped_column(String(64), default="")
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    body_md: Mapped[str] = mapped_column(Text, default="")
+    fields_json: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[object] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (UniqueConstraint("draft_id", name="uq_law_ai_editorial_draft"),)
