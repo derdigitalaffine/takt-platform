@@ -378,13 +378,14 @@
                     Fundstellen sind Zeichenpositionen des OCR-/MarkItDown-Textes, keine amtlichen PDF-Seitenbelege.
                   </p>
                   <div class="law-results-summary" aria-label="Zusammenfassung der KI-Fundstellen">
-                    <span><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i><strong>{{ metadata.get('fields', [])|length }}</strong> Stammdaten</span>
-                    <span><i class="fa-solid fa-list-ol me-1" aria-hidden="true"></i><strong>{{ structure.get('headings', [])|length }}</strong> Gliederungen</span>
-                    <span><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>{{ verification.get('findings', [])|length }}</strong> Prüfhinweise</span>
+                    {% if 'law_metadata' in analysis_tasks %}                    <span><i class="fa-solid fa-id-card me-1" aria-hidden="true"></i><strong>{{ metadata.get('fields', [])|length }}</strong> Stammdaten</span>{% endif %}
+                    {% if 'law_structure' in analysis_tasks %}                    <span><i class="fa-solid fa-list-ol me-1" aria-hidden="true"></i><strong>{{ structure.get('headings', [])|length }}</strong> Gliederungen</span>{% endif %}
+                    {% if 'law_verify' in analysis_tasks %}                    <span><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>{{ verification.get('findings', [])|length }}</strong> Prüfhinweise</span>{% endif %}
                   </div>
                   <p class="small text-secondary">Öffne die passende Gruppe und übertrage nur nach Abgleich mit der Originaldatei. Die KI bietet keine OCR-Texttreue und keine amtliche oder juristische Richtigkeitsgarantie.</p>
                   {% set law_field_names = {'title': 'Titel', 'short_title': 'Kurztitel', 'doc_type': 'Dokumentart', 'level': 'Körperschaft', 'version_note': 'Fassungshinweis', 'issued_on': 'Ausfertigungsdatum', 'valid_from': 'Inkrafttreten', 'valid_until': 'Außerkrafttreten'} %}
                   <div class="accordion mb-2" id="law-agent-results-{{ analysis.id }}">
+                    {% if 'law_metadata' in analysis_tasks %}
                     <div class="accordion-item">
                       <h4 class="accordion-header"><button class="accordion-button {{ '' if analysis.mode == 'advanced' else 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-metadata-{{ analysis.id }}" aria-expanded="{{ 'true' if analysis.mode == 'advanced' else 'false' }}"><i class="fa-solid fa-id-card me-2" aria-hidden="true"></i>Stammdaten · {{ metadata.get('fields', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-metadata-{{ analysis.id }}" class="accordion-collapse collapse {{ 'show' if analysis.mode == 'advanced' else '' }}" data-bs-parent="#law-agent-results-{{ analysis.id }}">
@@ -408,6 +409,8 @@
                         </div>
                       </div>
                     </div>
+                    {% endif %}
+                    {% if 'law_structure' in analysis_tasks %}
                     <div class="accordion-item">
                       <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-outline-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-list-ol me-2" aria-hidden="true"></i>Gliederung · {{ structure.get('headings', [])|length }} Vorschläge</button></h4>
                       <div id="law-agent-outline-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
@@ -434,6 +437,8 @@
                         </div>
                       </div>
                     </div>
+                    {% endif %}
+                    {% if 'law_verify' in analysis_tasks %}
                     <div class="accordion-item">
                       <h4 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#law-agent-verify-{{ analysis.id }}" aria-expanded="false"><i class="fa-solid fa-shield-halved me-2" aria-hidden="true"></i>Texttreue · {{ verification.get('findings', [])|length }} Hinweise</button></h4>
                       <div id="law-agent-verify-{{ analysis.id }}" class="accordion-collapse collapse" data-bs-parent="#law-agent-results-{{ analysis.id }}">
@@ -457,10 +462,12 @@
                         </div>
                       </div>
                     </div>
+                    {% endif %}
                   </div>
                   <details class="small text-secondary mt-2">
                     <summary>Prüfprotokoll und Modellzuweisung</summary>
-                    <div>Prüf-ID: {{ analysis.id }} · Modus: {{ analysis.mode }} · Stand: {{ analysis.updated_at|local }}</div>
+                    <div>Prüf-ID: {{ analysis.id }} · Modus: {{ analysis.mode }} · Profil: {{ 'Lokales 24B–30B' if analysis.quality_profile == 'local_24b' else 'Standard' }} · Stand: {{ analysis.updated_at|local }}</div>
+                    <div>Ausgewählte Agenten: {{ analysis_tasks|join(', ') }} · JSON-Modus: {{ 'aktiviert' if analysis.json_mode else 'aus' }}</div>
                     <div class="font-monospace text-break">Text-SHA-256: {{ analysis.source_sha256 }}</div>
                     {% for task,label in agent_stages %}
                       {% if agent_routes.get(task) %}<div>{{ label }}: {{ agent_routes[task].name }} · {{ agent_routes[task].model_id }}</div>{% endif %}
