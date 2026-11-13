@@ -15,6 +15,11 @@
     <div><strong>Sicherer Vorbereitungsmodus</strong><span>Keine digitale Stimmabgabe. Fristen, Bekanntgaben und Vordrucke bedürfen der Prüfung nach LPersVG und WOLPersVG. Persönliche Wahlunterlagen bleiben im Fachbereich.</span></div>
   </div>
   <div class="pr-section-heading"><h2>Deine Wahl-Arbeitsbereiche</h2><span>{{ elections|length }} sichtbar</span></div>
+  <form class="pr-search" method="get" action="/personalratswahl" role="search" aria-label="Wahlbereiche durchsuchen">
+    <label for="pr-search-query">Wahlbereiche durchsuchen</label>
+    <div class="pr-search-controls"><input id="pr-search-query" name="q" type="search" class="form-control" maxlength="100" value="{{search_query}}" placeholder="Wahl, Dienststelle oder Wahlkörper" autocomplete="off"><button type="submit" class="btn btn-outline-primary"><i class="fa-solid fa-magnifying-glass me-2" aria-hidden="true"></i>Suchen</button>{% if search_query %}<a class="btn btn-outline-secondary" href="/personalratswahl">Zurücksetzen</a>{% endif %}</div>
+    {% if search_query %}<p class="pr-search-summary" role="status">{{elections|length}} Treffer für „{{search_query}}“</p>{% endif %}
+  </form>
   <div class="pr-election-grid">
     {% for election in elections %}
     <a class="pr-election-card" href="/personalratswahl/{{election.id}}">
@@ -26,7 +31,7 @@
       <i class="fa-solid fa-arrow-up-right-from-square pr-arrow" aria-hidden="true"></i>
     </a>
     {% else %}
-    <div class="pr-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><h3>Noch keine Wahlbereiche</h3><p>{% if can_create %}Beginne mit einer Dienststelle und einem geplanten Wahltermin. Anschließend begleitet dich TAKT durch die Organisation.{% else %}Du hast derzeit kein Mandat für einen Wahlbereich. Die Zuordnung erfolgt durch die fachlich zuständige Person.{% endif %}</p></div>
+    <div class="pr-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><h3>{{"Keine passenden Wahlbereiche" if search_query else "Noch keine Wahlbereiche"}}</h3><p>{% if search_query %}Versuche einen anderen Suchbegriff oder setze den Filter zurück.{% elif can_create %}Beginne mit einer Dienststelle und einem geplanten Wahltermin. Anschließend begleitet dich TAKT durch die Organisation.{% else %}Du hast derzeit kein Mandat für einen Wahlbereich. Die Zuordnung erfolgt durch die fachlich zuständige Person.{% endif %}</p></div>
     {% endfor %}
   </div>
   {% if can_create %}
