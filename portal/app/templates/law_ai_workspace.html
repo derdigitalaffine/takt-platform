@@ -163,11 +163,29 @@
             <p class="form-text mb-0">Benötigt den optionalen Compose-Dienst <code>law-ocr</code> (Profil <code>ocr</code>). Bei inaktivem Dienst bleibt der Auftrag in der Warteschlange.</p>
           </section>
           {% elif selected.status == 'ocr_queued' %}
-            <div class="alert alert-info" role="status" data-law-ocr-pending data-draft-id="{{ selected.id }}">
-              <i class="fa-solid fa-hourglass-half me-1" aria-hidden="true"></i>
-              Texterkennung beauftragt. Der Offline-Worker bearbeitet das Original; diese Seite aktualisiert sich nach Abschluss automatisch.
-              <a class="alert-link" href="/laws-assistant/{{ selected.id }}">Status neu laden</a>
-            </div>
+            <section class="law-surface mb-3" role="status" aria-label="OCR-Auftragsfortschritt" data-law-ocr-pending data-draft-id="{{ selected.id }}">
+              <div class="law-card-head">
+                <div class="law-section-title">
+                  <span class="law-section-icon"><i class="fa-solid fa-file-magnifying-glass" aria-hidden="true"></i></span>
+                  <h3 class="h6 mb-0">Texterkennung</h3>
+                </div>
+                <span class="badge text-bg-info" data-law-ocr-phase>Warteschlange</span>
+              </div>
+              <div class="law-card-body">
+                <div class="progress mb-3" role="progressbar" aria-label="Unbestimmter Fortschritt der Offline-Texterkennung">
+                  <div class="progress-bar progress-bar-striped progress-bar-animated w-100"></div>
+                </div>
+                <p class="small mb-1" data-law-ocr-hint>Der lokale Offline-Worker bearbeitet den Auftrag. Eine verlässliche Seiten-Prozentzahl ist derzeit nicht verfügbar.</p>
+                <div class="d-flex flex-wrap align-items-center gap-3 small text-secondary">
+                  <span data-law-ocr-clock>Auftragsdauer wird geprüft</span>
+                  <a href="/laws-assistant/{{ selected.id }}">Status manuell aktualisieren</a>
+                </div>
+                <div class="alert alert-warning small mt-3 mb-0" data-law-ocr-retry hidden>
+                  Der Auftrag dauert auffällig lange oder seine Warteschlange ist nicht erreichbar.
+                  Prüfe, ob der optionale Offline-Dienst <code>law-ocr</code> gestartet ist. Das Original bleibt gesichert; die automatische Statusprüfung wird fortgesetzt.
+                </div>
+              </div>
+            </section>
           {% elif selected.status == 'ocr_review' %}
             <div class="alert alert-warning"><strong>Automatisch erkannter Vorschlag – noch ungeprüft.</strong> MarkItDown und Tesseract können Inhalte falsch erkennen. Besonders Zahlen, Fristen, Verneinungen, Paragraphen und Tabellen am Original prüfen.</div>
             {% if ocr_warnings %}
