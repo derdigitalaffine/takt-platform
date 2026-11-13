@@ -5,7 +5,24 @@
 <div class="vb-root">
   <div class="vb-subheading"><a href="/verbandbuch" class="vb-back"><i class="fa-solid fa-arrow-left"></i> Verbandbuch</a><span class="vb-chip">Administration ohne Akteneinsicht</span></div>
   <header class="vb-page-head"><div class="vb-eyebrow">Fachkonfiguration</div><h1>Standorte & Zugriffsrechte</h1><p>Standorte mit der TAKT-Organisation verknüpfen und Personen ausdrücklich zum Erfassen oder zur fallbezogenen Einsicht berechtigen.</p></header>
-  {% if not ready %}<div class="alert alert-warning">Der getrennte Fachschlüssel <code>VERBANDBUCH_ENCRYPTION_KEY</code> ist nicht konfiguriert. Gesundheitsdaten können nicht gespeichert werden.</div>{% endif %}
+  <section class="vb-card vb-form-section mb-3" aria-labelledby="vb-key-title">
+    <div class="d-flex align-items-start gap-3"><span class="vb-icon"><i class="fa-solid fa-key"></i></span><div class="flex-grow-1">
+      <h2 id="vb-key-title">Fachverschlüsselung</h2>
+      <p class="text-secondary small mt-2 mb-2">Ein eigener Schlüssel schützt die Gesundheitsdaten unabhängig von der allgemeinen TAKT-Konfiguration. Er wird ausschließlich auf dem Server erzeugt und niemals im Browser angezeigt.</p>
+      {% if ready %}
+        <span class="vb-chip"><i class="fa-solid fa-circle-check"></i> Schlüssel eingerichtet · {{'Externe Secret-Verwaltung' if key_source == 'environment' else 'Geschützte Serverdatei'}}</span>
+        <p class="small text-secondary mt-2 mb-0">Eine Neuerzeugung ist gesperrt, damit bestehende Akten entschlüsselbar bleiben. Bitte die Schlüsseldatei bzw. das externe Secret in die verschlüsselte Datensicherung aufnehmen.</p>
+      {% elif key_source != 'missing' %}
+        <div class="alert alert-danger mt-2">Ein Schlüssel ist vorhanden, aber ungültig oder nicht lesbar. Bitte die Serverkonfiguration prüfen; eine Neuerzeugung ist zum Schutz vorhandener Akten gesperrt.</div>
+      {% else %}
+        <div class="alert alert-warning mt-2">Noch kein Fachschlüssel vorhanden. Die Erfassung ist gesperrt.</div>
+        <form method="post" action="/verbandbuch/schluessel/erzeugen" class="mt-3"><input type="hidden" name="csrf" value="{{csrf}}">
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-key me-2"></i>Sicheren Fachschlüssel jetzt erzeugen</button>
+        </form>
+        <p class="small text-secondary mt-2 mb-0">Einmalige Initialisierung. Kein Klartext-Schlüssel im Browser oder Audit. Der Server speichert die Datei mit eingeschränkten Dateirechten im persistenten TAKT-Datenverzeichnis. Erforderliche Backups und Freigaben bleiben separat.</p>
+      {% endif %}
+    </div></div>
+  </section>
   {% if not approved %}<div class="alert alert-info">Betriebsfreigabe steht aus. Die Erfassung bleibt bis zur dokumentierten Prüfung gesperrt.</div>{% endif %}
   <div class="vb-grid vb-main-grid">
     <section class="vb-card vb-form-section"><h2>Standort anlegen</h2>
