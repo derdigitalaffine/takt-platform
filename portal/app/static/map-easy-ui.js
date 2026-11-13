@@ -139,24 +139,8 @@
     }
   }
 
-  // Keep the existing source catalog browsing feature intact. A single
-  // optional chip adds the official DGM terrain download category.
-  var shortcuts = discovery.querySelector('.map-discovery-shortcuts');
-  var terrainChip;
-  if (shortcuts && !shortcuts.querySelector('[data-discovery-topic="Gelände"]')) {
-    terrainChip = el('button', 'btn btn-sm btn-outline-secondary');
-    terrainChip.type = 'button';
-    terrainChip.dataset.discoveryTopic = 'Gelände';
-    terrainChip.setAttribute('aria-pressed', 'false');
-    terrainChip.textContent = 'Gelände';
-    shortcuts.appendChild(terrainChip);
-    terrainChip.addEventListener('click', function () {
-      var select = document.getElementById('map-discovery-topic');
-      if (!select) return;
-      select.value = select.value === 'Gelände' ? '' : 'Gelände';
-      select.dispatchEvent(new Event('change', {bubbles: true}));
-    });
-  }
+  // Topic shortcuts, including Gelände, are declared in the original map
+  // markup so the existing catalog handlers bind exactly once.
 
   // Print/PDF is available to all viewers, but no longer occupies permanent
   // space below *every* toolbox pane.
