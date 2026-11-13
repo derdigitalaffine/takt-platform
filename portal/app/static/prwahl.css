@@ -91,3 +91,15 @@
 @media(max-width:640px){.pr-page .ds-page-actions{display:flex;flex-wrap:wrap;gap:.5rem;width:100%}.pr-page .ds-page-actions .btn{flex:1 1 100%}.pr-page .pr-panel{padding:1rem}.pr-page .pr-count-result{padding:.85rem}.pr-page .pr-header h1{overflow-wrap:anywhere}.pr-page .pr-tabs{scroll-snap-type:x proximity}.pr-page .pr-tabs a{scroll-snap-align:start}}
 @media(prefers-reduced-motion:reduce){.pr-page *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
 @media print {.pr-page .pr-panel,.pr-page .pr-count-result {box-shadow:none!important;break-inside:avoid}.pr-page .pr-tabs,.pr-page .ds-page-actions {display:none!important}}
+
+/* Task-oriented cockpit navigation: responsive, keyboard accessible, theme-aware. */
+.pr-quick-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;margin:0 0 1.25rem}
+.pr-quick-nav>a{display:flex;align-items:center;gap:.85rem;min-width:0;min-height:5.3rem;padding:1rem;border:1px solid var(--pr-stroke);border-radius:1rem;background:var(--pr-card);color:var(--pr-ink);text-decoration:none;transition:border-color .18s,box-shadow .18s,transform .18s}
+.pr-quick-nav>a>i:first-child{display:grid;place-items:center;flex:none;width:2.65rem;height:2.65rem;border-radius:.75rem;background:var(--pr-subtle);color:var(--bs-primary)}
+.pr-quick-nav>a>span{display:flex;flex:1;min-width:0;flex-direction:column;gap:.2rem}
+.pr-quick-nav strong{font-size:.94rem;line-height:1.3}.pr-quick-nav small{font-size:.78rem;color:var(--bs-secondary-color);line-height:1.35}
+.pr-quick-nav>a>i:last-child{color:var(--bs-secondary-color);font-size:.75rem}
+.pr-quick-nav>a:hover{border-color:var(--bs-primary);box-shadow:0 .5rem 1.25rem #00000010;transform:translateY(-2px)}
+.pr-page a:focus-visible,.pr-page button:focus-visible,.pr-page input:focus-visible,.pr-page select:focus-visible,.pr-page summary:focus-visible{outline:3px solid var(--bs-primary);outline-offset:3px}
+@media(max-width:900px){.pr-quick-nav{grid-template-columns:1fr}.pr-quick-nav>a{min-height:4.5rem}}
+@media(prefers-reduced-motion:reduce){.pr-quick-nav>a{transition:none}.pr-quick-nav>a:hover{transform:none}}
