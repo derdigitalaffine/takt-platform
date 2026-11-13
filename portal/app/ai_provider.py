@@ -90,7 +90,8 @@ async def _known_context_error(response) -> bool:
         "max_context_length_exceeded", "input_too_long",
     } for name in ("code", "type"))
 
-async def _request(provider, operation: str, key_enc: str, *, payload: dict | None = None) -> dict:
+async def _request(provider, operation: str, key_enc: str, *, payload: dict | None = None,
+                   timeout_seconds: int | None = None) -> dict:
     if not provider.active:
         raise AIProviderError("Der gewählte KI-Provider ist deaktiviert.")
     token = decrypt(key_enc)
@@ -100,7 +101,8 @@ async def _request(provider, operation: str, key_enc: str, *, payload: dict | No
     headers = {"Authorization": "Bearer " + token, "Accept": "application/json"}
     if payload is not None:
         headers["Content-Type"] = "application/json"
-    timeout = max(5, min(int(provider.timeout_seconds or 180), 180))
+    timeout = max(5, min(int(timeout_seconds if timeout_seconds is not None
+                             else (provider.timeout_seconds or 180)), 1800))
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as client:
             async with client.stream(
@@ -210,7 +212,8 @@ async def list_model_details(provider) -> list[dict]:
     return models
 
 
-async def complete(provider, messages: list[dict], *, image: bool = False, max_tokens: int = 1024) -> str:
+async def complete(provider, messages: list[dict], *, image: bool = False,
+                   max_tokens: int = 1024, timeout_seconds: int | None = None) -> str:
     payload = {
         "model": provider.model_id,
         "stream": False,  # OpenWebUI/Gemma profiles may require this.
@@ -218,7 +221,8 @@ async def complete(provider, messages: list[dict], *, image: bool = False, max_t
         "messages": messages,
     }
     result = await _request(provider, "chat/completions",
-                            provider.image_key_enc if image else provider.text_key_enc, payload=payload)
+                            provider.image_key_enc if image else provider.text_key_enc,
+                            payload=payload, timeout_seconds=timeout_seconds)
     choices = result.get("choices")
     if not isinstance(choices, list) or not choices:
         raise AIProviderError("Der KI-Provider hat keine Textantwort zurückgegeben.")
@@ -235,7 +239,7 @@ async def complete(provider, messages: list[dict], *, image: bool = False, max_t
 
 
 async def stream_completion(provider, messages: list[dict], *, image: bool = False,
-                            max_tokens: int = 1024):
+                            max_tokens: int = 1024, timeout_seconds: int | None = None):
     """Yield OpenAI-compatible SSE content tokens from a streaming provider.
 
     The caller is responsible for saving the complete answer. Non-streaming
@@ -251,7 +255,8 @@ async def stream_completion(provider, messages: list[dict], *, image: bool = Fal
                "max_tokens": max(64, min(int(max_tokens), 4096)), "messages": messages}
     headers = {"Authorization": "Bearer " + token,
                "Accept": "text/event-stream", "Content-Type": "application/json"}
-    timeout = max(5, min(int(provider.timeout_seconds or 180), 180))
+    timeout = max(5, min(int(timeout_seconds if timeout_seconds is not None
+                             else (provider.timeout_seconds or 180)), 1800))
     total = 0
     done = False
     data_lines = []
