@@ -3101,6 +3101,7 @@ from . import routes_sessions  # noqa: E402,F401
 from . import routes_circulations  # noqa: E402,F401
 from . import routes_laws  # noqa: E402,F401
 from . import routes_law_ai  # noqa: E402,F401  (Ortsrecht imports, never direct publication)
+from . import routes_law_ai_agents  # noqa: E402,F401  (read-only, human-initiated LLM suggestions)
 from . import routes_ai  # noqa: E402,F401
 from . import routes_knowledge  # noqa: E402,F401
 from . import routes_knowledge_review  # noqa: E402,F401
