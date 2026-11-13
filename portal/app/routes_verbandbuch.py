@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .db import Organization, User, LOCAL_TZ, utcnow
 from .organization import active_path
+from . import organization as org_access
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
 from . import verbandbuch as aid
 from .verbandbuch_models import (
-    FirstAidAudit, FirstAidCase, FirstAidCorrection, FirstAidGrant, FirstAidSite,
+    FirstAidAudit, FirstAidCase, FirstAidCorrection, FirstAidGrant, FirstAidOrgGrant, FirstAidSite,
 )
 
 
@@ -236,9 +237,70 @@ def verbandbuch_sites(
     orgs = db.scalars(select(Organization).where(Organization.active.is_(True)).order_by(Organization.name)).all()
     users = db.scalars(select(User).where(User.active.is_(True)).order_by(User.name)).all()
     grants = db.scalars(select(FirstAidGrant).order_by(FirstAidGrant.site_id, FirstAidGrant.role)).all()
+    org_grants = db.scalars(select(FirstAidOrgGrant).order_by(FirstAidOrgGrant.org_id, FirstAidOrgGrant.id)).all()
     return _private(render(request, "verbandbuch_sites.html", user, sites=sites, orgs=orgs, users=users,
-                           grants=grants, qr_base=settings.portal_base_url, make_qr=aid.qr_token,
+                           grants=grants, org_grants=org_grants, qr_base=settings.portal_base_url, make_qr=aid.qr_token,
                            ready=aid.ready(), approved=aid.approved(), key_source=aid.key_source()))
+
+
+@app.post("/verbandbuch/organisationen/berechtigungen", dependencies=[Depends(check_csrf)])
+async def verbandbuch_org_review_grant(request: Request,
+                                       user: User = Depends(current_user),
+                                       db: Session = Depends(get_db)):
+    """Explicit medical-file review permission inherited by active subunits.
+
+    A global admin may configure a grant, but may not grant it to themselves.
+    The recipient must separately have the global medical-review permission.
+    """
+    if not user.is_admin:
+        raise HTTPException(403)
+    form = await request.form()
+    try:
+        org_id, target_id = int(form.get("org_id") or 0), int(form.get("user_id") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(422, "Organisation und berechtigte Person auswählen.") from None
+    include_children = str(form.get("include_children") or "0")
+    if include_children not in {"0", "1"}:
+        raise HTTPException(422, "Ungültige Einstellung für Untereinheiten.")
+    if not active_path(db, org_id):
+        raise HTTPException(422, "Eine aktive Organisationseinheit auswählen.")
+    person = db.get(User, target_id)
+    if person is None or not person.active or "verbandbuch_review" not in person.perms:
+        raise HTTPException(422, "Die Person benötigt das globale Fachrecht zur Einsicht in Erste-Hilfe-Dokumentationen.")
+    if target_id == user.id:
+        raise HTTPException(403, "Eine Selbstzuweisung zur Einsicht in Gesundheitsdaten ist nicht zulässig.")
+    existing = db.scalar(select(FirstAidOrgGrant).where(
+        FirstAidOrgGrant.org_id == org_id, FirstAidOrgGrant.user_id == target_id,
+        FirstAidOrgGrant.role == "review"))
+    if existing:
+        existing.include_children = include_children == "1"
+        existing.created_by_id, existing.created_at = user.id, utcnow()
+    else:
+        db.add(FirstAidOrgGrant(org_id=org_id, user_id=target_id, role="review",
+                                include_children=include_children == "1", created_by_id=user.id))
+    org_access.audit(db, user, org_id, "first_aid_review_grant",
+                     target_user_id=target_id, include_children=include_children == "1")
+    db.commit()
+    flash(request, "Explizites Fachmandat gespeichert. Es gilt nur für aktive Organisationseinheiten und setzt das gesonderte globale Fachrecht voraus.")
+    return redirect("/verbandbuch/standorte")
+
+
+@app.post("/verbandbuch/organisationen/berechtigungen/{grant_id:int}/entziehen",
+          dependencies=[Depends(check_csrf)])
+def verbandbuch_org_review_revoke(request: Request, grant_id: int,
+                                  user: User = Depends(current_user),
+                                  db: Session = Depends(get_db)):
+    if not user.is_admin:
+        raise HTTPException(403)
+    grant = db.get(FirstAidOrgGrant, grant_id)
+    if grant is None:
+        raise HTTPException(404)
+    org_id, target_id = grant.org_id, grant.user_id
+    db.delete(grant)
+    org_access.audit(db, user, org_id, "first_aid_review_revoke", target_user_id=target_id)
+    db.commit()
+    flash(request, "Das hierarchische Fachmandat wurde sofort entzogen.")
+    return redirect("/verbandbuch/standorte")
 
 
 @app.post("/verbandbuch/schluessel/erzeugen", dependencies=[Depends(check_csrf)])
