@@ -103,6 +103,10 @@ def aggregate(stage: str, parts: list[tuple[Section, dict, bool]],
                 "section": section.number,
                 "source_start": absolute_pos,
                 "source_end": absolute_pos + len(quote),
+                # A quote can be repeated in the same source section. In that
+                # case no precise *semantic* occurrence is proven; prohibit
+                # direct one-click transformations in the UI.
+                "quote_occurrences": section.text.count(quote),
             })
             fingerprint = (candidate.get("field"), candidate.get("value"),
                            candidate.get("level"), quote, absolute_pos)
