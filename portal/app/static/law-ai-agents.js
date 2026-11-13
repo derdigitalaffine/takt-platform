@@ -44,6 +44,20 @@
 
   const editor = document.getElementById("law-ai-body");
 
+  // Python source offsets count Unicode code points. Browser textareas use
+  // UTF-16 offsets; correctly handle supplementary characters in OCR text.
+  function toTextAreaOffset(text, codePointOffset) {
+    if (!Number.isSafeInteger(codePointOffset) || codePointOffset < 0) return -1;
+    let position = 0;
+    let codePoints = 0;
+    for (const character of text) {
+      if (codePoints === codePointOffset) return position;
+      position += character.length;
+      codePoints += 1;
+    }
+    return codePoints === codePointOffset ? position : -1;
+  }
+
   document.querySelectorAll("[data-law-ai-apply-heading]").forEach((button) => {
     button.addEventListener("click", () => {
       if (!editor) return;
@@ -53,7 +67,8 @@
       const normalized = (line) => line.trim();
       const lines = editor.value.split("\n");
       const rawOffset = button.getAttribute("data-law-ai-offset") || "";
-      const offset = /^\d+$/.test(rawOffset) ? Number(rawOffset) : -1;
+      const offset = /^\d+$/.test(rawOffset)
+        ? toTextAreaOffset(editor.value, Number(rawOffset)) : -1;
       const targetLine = (offset >= 0 &&
                           editor.value.slice(offset, offset + quote.length).trim() === quote)
         ? editor.value.slice(0, offset).split("\n").length - 1 : -1;
@@ -80,7 +95,8 @@
       if (!editor) return;
       const quote = button.getAttribute("data-law-ai-locate") || "";
       const rawOffset = button.getAttribute("data-law-ai-offset") || "";
-      const offset = /^\d+$/.test(rawOffset) ? Number(rawOffset) : -1;
+      const offset = /^\d+$/.test(rawOffset)
+        ? toTextAreaOffset(editor.value, Number(rawOffset)) : -1;
       const exact = offset >= 0 && editor.value.slice(offset, offset + quote.length) === quote;
       const first = editor.value.indexOf(quote);
       const ambiguous = first >= 0 && editor.value.indexOf(quote, first + quote.length) >= 0;
