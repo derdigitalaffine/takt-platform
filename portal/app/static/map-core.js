@@ -74,7 +74,7 @@
     // gespeicherten Zustand anwenden
     (state.layers || []).forEach(function (s) {
       var l = layers.find(function (x) { return x.id === s.id; });
-      if (l) { l.visible = s.visible; l.opacity = s.opacity; if (s.time) { l.time = s.time; } }
+      if (l) { l.visible = s.visible; l.opacity = s.opacity; if (s.time) { l.time = s.time; } if (s.extrude != null) { l.extrude = !!s.extrude; } }
     });
     var bases = layers.filter(function (l) { return l.role === 'base'; });
     var overlays = layers.filter(function (l) { return l.role !== 'base'; });
@@ -138,11 +138,24 @@
         layout: { visibility: vis }, paint: { 'line-color': c, 'line-width': isParcel(l)?1:2, 'line-opacity': l.opacity } });
       map.addLayer({ id: 'lyr-' + l.id + '-point', type: 'circle', source: sid, filter: ['==', ['geometry-type'], 'Point'],
         layout: { visibility: vis }, paint: { 'circle-color': c, 'circle-radius': 5, 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5, 'circle-opacity': l.opacity } });
+      // Optional LoD1-style extrusion for WFS/GeoJSON building footprints with
+      // numeric height fields. This DOES NOT render CityGML LoD2 roof shapes.
+      // Guard against huge or invalid values; missing heights stay flat.
+      var buildingHeight=['max',0,['min',300,['to-number',
+        ['coalesce',['get','height'],['get','height_m'],
+          ['get','measuredHeight'],['*',3,['to-number',['get','building:levels'],0]]],0]]];
+      map.addLayer({id:'lyr-'+l.id+'-extrude',type:'fill-extrusion',source:sid,
+        filter:['==',['geometry-type'],'Polygon'],
+        layout:{visibility:vis==='visible'&&l.extrude?'visible':'none'},
+        paint:{'fill-extrusion-color':c,'fill-extrusion-opacity':Math.min(0.85,0.67*l.opacity),
+          'fill-extrusion-height':buildingHeight,
+          'fill-extrusion-base':0}});
+      if(l.extrude)map.setLayoutProperty('lyr-'+l.id+'-fill','visibility','none');
       if(isParcel(l)){if(l._labels)l._labels.destroy();l._labels=parcelLabels(map);map.setLayoutProperty('lyr-'+l.id+'-line','visibility',l.visible&&parcelStyle.boundaries?'visible':'none');}
       l._loaded = '';
       if (l.visible) { loadVector(l); }
     }
-    var vectorIds = function (l) { return ['lyr-' + l.id + '-fill', 'lyr-' + l.id + '-line', 'lyr-' + l.id + '-point']; };
+    var vectorIds = function (l) { return ['lyr-' + l.id + '-fill', 'lyr-' + l.id + '-line', 'lyr-' + l.id + '-point', 'lyr-' + l.id + '-extrude']; };
     function layerIds(l) { return (l.kind === 'wfs' || l.kind === 'geojson') ? vectorIds(l) : ['lyr-' + l.id]; }
 
     function loadVector(l) {
@@ -188,6 +201,12 @@
 
     function setVis(l, on) {
       layerIds(l).forEach(function (id) { if (map.getLayer(id)) { map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); } });
+      if(l.kind==='wfs'||l.kind==='geojson'){
+        if(map.getLayer('lyr-'+l.id+'-fill'))map.setLayoutProperty(
+          'lyr-'+l.id+'-fill','visibility',on&&!l.extrude?'visible':'none');
+        if(map.getLayer('lyr-'+l.id+'-extrude'))map.setLayoutProperty(
+          'lyr-'+l.id+'-extrude','visibility',on&&l.extrude?'visible':'none');
+      }
     }
     var api = {
       map: map, bases: bases, overlays: overlays,
@@ -217,12 +236,22 @@
         if (!l) { return; }
         l.opacity = value;
         if (map.getLayer('lyr-' + id)) { map.setPaintProperty('lyr-' + id, 'raster-opacity', value); }
+        if (map.getLayer('lyr-' + id + '-extrude'))
+          map.setPaintProperty('lyr-' + id + '-extrude', 'fill-extrusion-opacity', Math.min(0.85,0.67*value));
         if (map.getLayer('lyr-' + id + '-fill')) {
           map.setPaintProperty('lyr-' + id + '-fill', 'fill-opacity', (isParcel(l)?0.025:0.25) * value);
           map.setPaintProperty('lyr-' + id + '-line', 'line-opacity', value);
           map.setPaintProperty('lyr-' + id + '-point', 'circle-opacity', value);
         }
         if(l._labels)l._labels.update(l._features,l.visible&&parcelStyle.numbers&&value>0);
+        emit();
+      },
+      setExtrusion:function(id,enabled){
+        var l=overlays.find(function(x){return x.id===id;});
+        if(!l||(l.kind!=='wfs'&&l.kind!=='geojson'))return;
+        l.extrude=!!enabled;
+        if(l.custom)l.custom.extrude=l.extrude;
+        setVis(l,l.visible);
         emit();
       },
       setParcelStyle:function(style){parcelStyle=Object.assign(parcelStyle,style);overlays.forEach(function(l){if(!isParcel(l))return;if(map.getLayer('lyr-'+l.id+'-line'))map.setLayoutProperty('lyr-'+l.id+'-line','visibility',l.visible&&parcelStyle.boundaries?'visible':'none');if(l._labels)l._labels.update(l._features,l.visible&&parcelStyle.numbers&&l.opacity>0);});},
@@ -263,7 +292,7 @@
         var c = map.getCenter();
         return {
           center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch(), base: baseId, noBase: baseId === '',
-          layers: overlays.filter(function (l) { return !l.custom; }).map(function (l) { return { id: l.id, visible: l.visible, opacity: l.opacity, time: l.time || '' }; }),
+          layers: overlays.filter(function (l) { return !l.custom; }).map(function (l) { return { id: l.id, visible: l.visible, opacity: l.opacity, time: l.time || '', extrude: !!l.extrude }; }),
           custom: overlays.filter(function (l) { return l.custom; }).map(function (l) { return { def: Object.assign({}, l.custom, { time: l.time || '' }), opacity: l.opacity }; })
         };
       },
