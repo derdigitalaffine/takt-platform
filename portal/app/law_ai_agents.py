@@ -46,27 +46,48 @@ def source_hash(source: str) -> str:
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-def extract_context(source: str, stage: str) -> tuple[str, bool]:
-    """Explicitly show when a *sample*, not the entire legal text, is analyzed."""
+def extract_context(source: str, stage: str, *,
+                    context_limit: int = MAX_CONTEXT_CHARS) -> tuple[str, bool]:
+    """Sample transparently when the model has a smaller context window.
+
+    Exact full-source coverage is implemented by law_ai_coverage.sections(),
+    not by this *simple-mode* excerpt selector.
+    """
     if not 0 < len(source) <= MAX_SOURCE_CHARS:
         raise ValueError("Der Text ist für die KI-Analyse zu groß (max. 120.000 Zeichen).")
-    if len(source) <= MAX_CONTEXT_CHARS:
+    if not 2_000 <= context_limit <= MAX_CONTEXT_CHARS:
+        raise ValueError("Ungültige Kontextgrenze für die Ortsrecht-KI.")
+    if len(source) <= context_limit:
         return source, False
-    heads = [m.group(0).strip() for m in _HEADING.finditer(source)]
     if stage == "law_structure":
-        excerpts = "\n".join(heads[:90])[:9000]
-        context = source[:4500] + "\n\n[GLIEDERUNGSÜBERSICHT]\n" + excerpts + "\n\n[TEXTENDE]\n" + source[-3500:]
+        front = min(4500, context_limit // 3)
+        tail = min(3500, context_limit // 3)
+        headings = "\n".join(m.group(0).strip() for m in
+                             list(_HEADING.finditer(source))[:90])
+        body = headings[:max(0, context_limit - front - tail - 120)]
+        context = (source[:front] + "\n\n[GLIEDERUNGSÜBERSICHT]\n"
+                   + body + "\n\n[TEXTENDE]\n" + source[-tail:])
     elif stage == "law_metadata":
-        context = source[:9500] + "\n\n[TEXTENDE]\n" + source[-8200:]
-    else:
+        front = min(9500, context_limit // 2)
+        tail = min(8200, context_limit - front - 40)
+        context = source[:front] + "\n\n[TEXTENDE]\n" + source[-tail:]
+    elif stage == "law_verify":
+        front = min(4500, context_limit // 3)
+        tail = min(4500, context_limit // 3)
         risk_lines = [line.strip() for line in source.splitlines()
                       if _RISK_WORDS.search(line) and len(line) < 500]
-        context = source[:4500] + "\n\n[KRITISCHE FUNDSTELLEN]\n" + "\n".join(risk_lines[:42])[:8800] + "\n\n[TEXTENDE]\n" + source[-4500:]
-    return context[:MAX_CONTEXT_CHARS], True
+        body = "\n".join(risk_lines[:42])[:max(0, context_limit - front - tail - 120)]
+        context = (source[:front] + "\n\n[KRITISCHE FUNDSTELLEN]\n"
+                   + body + "\n\n[TEXTENDE]\n" + source[-tail:])
+    else:
+        raise ValueError("Unbekannte KI-Prüfstufe")
+    return context[:context_limit], True
 
 
-def prompt(stage: str, source: str) -> tuple[list[dict], bool]:
-    context, sampled = extract_context(source, stage)
+def prompt(stage: str, source: str, *,
+           context_limit: int = MAX_CONTEXT_CHARS) -> tuple[list[dict], bool]:
+    context, sampled = extract_context(source, stage,
+                                       context_limit=context_limit)
     shared = (
         "Du bist ein eng begrenzter, deutschsprachiger Redaktionsprüfer für kommunales Ortsrecht. "
         "Du DARFST weder rechtliche Gültigkeit feststellen noch einen Text veröffentlichen. "
