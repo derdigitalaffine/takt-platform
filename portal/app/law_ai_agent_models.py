@@ -17,6 +17,10 @@ class LawAiAnalysis(Base):
     source_sha256: Mapped[str] = mapped_column(String(64))
     source_chars: Mapped[int] = mapped_column(Integer)
     mode: Mapped[str] = mapped_column(String(16), default="simple")
+    # Immutable user-selected stages and inference strategy per consented job.
+    selected_tasks_json: Mapped[str] = mapped_column(Text, default='["law_structure","law_metadata","law_verify"]')
+    quality_profile: Mapped[str] = mapped_column(String(20), default="standard")
+    json_mode: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(16), default="queued")
     step: Mapped[str] = mapped_column(String(32), default="waiting")
     # The live UI receives only counters and *validated* finding counts.
