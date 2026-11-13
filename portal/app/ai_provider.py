@@ -205,7 +205,7 @@ async def stream_completion(provider, messages: list[dict], *, image: bool = Fal
         raise AIProviderError("Für den KI-Provider ist kein API-Zugang eingerichtet.")
     await validate_destination(provider.base_url, provider.allow_private)
     payload = {"model": provider.model_id, "stream": True,
-               "max_tokens": max(64, min(int(max_tokens), 2048)), "messages": messages}
+               "max_tokens": max(64, min(int(max_tokens), 4096)), "messages": messages}
     headers = {"Authorization": "Bearer " + token,
                "Accept": "text/event-stream", "Content-Type": "application/json"}
     timeout = max(5, min(int(provider.timeout_seconds or 180), 180))
