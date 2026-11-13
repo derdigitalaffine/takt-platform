@@ -59,3 +59,23 @@ def test_duplicate_labels_and_overvotes_rejected():
         check_count("list", 2, 100, 0, 0, [("A", 99)])
     with pytest.raises(HTTPException):
         check_count("person", 2, 100, 0, 0, [("A", 201)])
+
+
+@pytest.mark.parametrize("entries", [
+    [("A", 10), ("a", 5)],
+    [(" A ", 10), ("a", 5)],
+    [("", 10)],
+    [("A", -1)],
+    [("A", True)],
+    [("A", "10")],
+])
+def test_direct_dhondt_rejects_malformed_entries(entries):
+    with pytest.raises(HTTPException) as exc:
+        dhondt(entries, 2)
+    assert exc.value.status_code == 422
+
+
+def test_dhondt_zero_votes_are_rejected():
+    with pytest.raises(HTTPException) as exc:
+        dhondt([("A", 0), ("B", 0)], 1)
+    assert exc.value.status_code == 422
