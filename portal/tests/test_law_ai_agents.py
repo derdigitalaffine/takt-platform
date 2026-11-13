@@ -514,6 +514,20 @@ def test_stream_status_and_events_require_job_owner_and_ai_right(agent_routes):
 
 
 
+def _claim_specific_analysis(draft_id):
+    """Claim only this draft's job; other tests may leave older queued jobs."""
+    with SessionLocal() as db:
+        job = db.scalar(select(LawAiAnalysis).where(
+            LawAiAnalysis.draft_id == draft_id,
+            LawAiAnalysis.status == "queued",
+        ).order_by(LawAiAnalysis.id.desc()).limit(1))
+        assert job is not None
+        job.status = "running"
+        job.step = "preparing"
+        db.commit()
+        return job.id
+
+
 def test_agent_json_accepts_markdown_fence_and_plain_explanation_but_not_partial():
     fence = chr(96) * 3
     wrapped = ("Hier die belegten Ergebnisse:\n" + fence + "json\n" +
@@ -537,7 +551,7 @@ def test_advanced_review_bisects_invalid_response_with_same_approved_model(monke
     assert admin.post(f"/laws-assistant/{did}/agents", data={
         "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
     }).status_code == 303
-    jid = law_ai_agent_jobs._claim_next()
+    jid = _claim_specific_analysis(did)
     assert jid
     requests = []
 
@@ -576,7 +590,7 @@ def test_invalid_json_after_one_lossless_split_fails_closed(monkeypatch, agent_r
     assert admin.post(f"/laws-assistant/{did}/agents", data={
         "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
     }).status_code == 303
-    jid = law_ai_agent_jobs._claim_next()
+    jid = _claim_specific_analysis(did)
     requests = []
 
     async def broken(provider, messages, *, max_tokens=1024, **kwargs):
@@ -602,7 +616,7 @@ def test_output_truncation_triggers_safe_section_cascade(monkeypatch, agent_rout
     assert admin.post(f"/laws-assistant/{did}/agents", data={
         "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
     }).status_code == 303
-    jid = law_ai_agent_jobs._claim_next()
+    jid = _claim_specific_analysis(did)
     calls = []
 
     async def fake(provider, messages, *, max_tokens=1024, **kwargs):
@@ -629,7 +643,7 @@ def test_short_ortrecht_text_gets_one_compact_retry_not_an_unnecessary_split(mon
     assert admin.post(f"/laws-assistant/{did}/agents", data={
         "csrf": csrf, "mode": "simple", "transmission_confirmed": "1",
     }).status_code == 303
-    jid = law_ai_agent_jobs._claim_next()
+    jid = _claim_specific_analysis(did)
     attempts = []
 
     async def fake(provider, messages, *, max_tokens=1024, **kwargs):
@@ -675,7 +689,7 @@ def test_explicit_context_limit_is_recovered_without_switching_model(monkeypatch
     assert admin.post(f"/laws-assistant/{did}/agents", data={
         "csrf": csrf, "mode": "advanced", "transmission_confirmed": "1",
     }).status_code == 303
-    jid = law_ai_agent_jobs._claim_next()
+    jid = _claim_specific_analysis(did)
     calls = []
 
     async def provider_reply(provider, messages, *, max_tokens=1024, **kwargs):
