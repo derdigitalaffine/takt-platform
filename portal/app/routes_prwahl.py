@@ -14,9 +14,34 @@ from sqlalchemy.orm import Session
 from . import prwahl as pw
 from . import organization as org_access
 from .org_models import OrgMembership
-from .db import Organization, User, utcnow
+from .db import Organization, User, Group, GroupMember, utcnow
 from .prwahl_models import PRElection, PRMandate, PRTask, PRDocument, PRAudit
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
+
+
+def _eligible_staff_ids(db: Session, org_id: int) -> set[int]:
+    """Active staff assigned to the election node or any active descendant.
+
+    Use the central organization's active_path so disabled ancestors and
+    unrelated branches cannot leak into a board picker or be assigned by POST.
+    """
+    nodes = {node.id: node for node in db.scalars(select(Organization))}
+    if not org_access.active_path(db, org_id, nodes):
+        return set()
+    descendants = {node_id for node_id in nodes
+                   if org_id in org_access.active_path(db, node_id, nodes)}
+    if not descendants:
+        return set()
+    staff = set(db.scalars(select(OrgMembership.user_id).join(
+        User, User.id == OrgMembership.user_id).where(
+        OrgMembership.org_id.in_(descendants), User.active.is_(True))))
+    # Native group nodes are part of the same organizational tree, but their
+    # canonical memberships are stored separately from OrgMembership.
+    staff.update(db.scalars(select(GroupMember.user_id).join(
+        Group, Group.id == GroupMember.group_id).join(
+        User, User.id == GroupMember.user_id).where(
+        Group.org_id.in_(descendants), User.active.is_(True))))
+    return staff
 
 
 def _setup(user: User):
@@ -114,9 +139,9 @@ def prwahl_detail(request: Request, election_id: int, tab: str = "overview",
                        .order_by(PRAudit.id.desc()).limit(80)).all() if tab == "audit" else []
     # Avoid listing all platform accounts as potential election team members.
     # Only users explicitly assigned to the selected organization are eligible here.
-    users = db.scalars(select(User).join(OrgMembership, OrgMembership.user_id == User.id).where(
-        User.active.is_(True), OrgMembership.org_id == election.org_id).distinct()
-        .order_by(User.name)).all() if role in {"coordinator", "chair"} else []
+    eligible_ids = _eligible_staff_ids(db, election.org_id) if role in {"coordinator", "chair"} else set()
+    users = db.scalars(select(User).where(User.id.in_(eligible_ids))
+                       .order_by(User.name, User.id)).all() if eligible_ids else []
     return render(request, "prwahl_detail.html", user, election=election,
                   tab=tab, role=role, tasks=tasks, mandates=mandates,
                   users=users, documents=documents, audit=audit,
@@ -137,9 +162,8 @@ def prwahl_team(request: Request, election_id: int, user_id: int = Form(...),
     person = db.get(User, user_id)
     if person is None or not person.active:
         raise HTTPException(422, "Die Person ist nicht verfügbar.")
-    if not db.scalar(select(OrgMembership.id).where(
-        OrgMembership.org_id == election.org_id, OrgMembership.user_id == person.id)):
-        raise HTTPException(422, "Die Person gehört nicht zur gewählten Organisationseinheit. Bitte die Dienststellenzugehörigkeit vor der Mandatsvergabe prüfen.")
+    if person.id not in _eligible_staff_ids(db, election.org_id):
+        raise HTTPException(422, "Die Person gehört nicht zur gewählten Organisationseinheit oder einer aktiven Untereinheit.")
     appointment_reference = pw.clean(appointment_reference, 250)
     if role in {"chair", "member", "clerk"} and len(appointment_reference) < 6:
         raise HTTPException(422, "Bitte einen konkreten Bestellungs- oder Benennungsnachweis angeben.")

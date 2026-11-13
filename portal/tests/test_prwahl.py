@@ -9,6 +9,8 @@ from uuid import uuid4
 from sqlalchemy import select
 from app.db import Organization, SessionLocal, User
 from app.prwahl_models import PRElection, PRDocument, PRMandate
+from app.org_models import OrgMembership
+from app.routes_prwahl import _eligible_staff_ids
 from app.security import hash_password
 from conftest import csrf_of, login, settings
 
@@ -189,3 +191,32 @@ def test_invalid_scope_and_input_cannot_be_accepted():
     }).status_code == 422
     # Neither a legal E-vote API nor a generic /votes ballot is mounted under prwahl.
     assert owner.get(f"/personalratswahl/{eid}/stimmabgabe").status_code == 404
+
+
+def test_board_staff_picker_includes_descendants_but_excludes_siblings_and_disabled_branches():
+    """A parent election must see all staff below it, not only direct members."""
+    with SessionLocal() as db:
+        root = db.scalar(select(Organization).where(Organization.active.is_(True)))
+        assert root is not None
+        child = Organization(name="PRW Test Untereinheit", parent_id=root.id, active=True)
+        grandchild = Organization(name="PRW Test Team", parent_id=None, active=True)
+        disabled = Organization(name="PRW Test Inaktiv", parent_id=root.id, active=False)
+        db.add_all([child, grandchild, disabled])
+        db.flush()
+        grandchild.parent_id = child.id
+        people = [User(email=f"prwahl-tree-{uuid4().hex[:16]}@example.org",
+                       name="PRW Test Person", password_hash=hash_password("passwort-1234"),
+                       active=True, must_change_password=False, permissions="video") for _ in range(3)]
+        db.add_all(people)
+        db.flush()
+        db.add_all([OrgMembership(user_id=people[0].id, org_id=child.id),
+                    OrgMembership(user_id=people[1].id, org_id=grandchild.id),
+                    OrgMembership(user_id=people[2].id, org_id=disabled.id)])
+        db.flush()
+        found = _eligible_staff_ids(db, root.id)
+        assert people[0].id in found
+        assert people[1].id in found
+        assert people[2].id not in found
+        assert people[1].id in _eligible_staff_ids(db, child.id)
+        assert people[0].id not in _eligible_staff_ids(db, grandchild.id)
+        db.rollback()
