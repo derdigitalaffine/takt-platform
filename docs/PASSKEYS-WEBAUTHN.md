@@ -20,7 +20,7 @@ Unter Benutzer & Gruppen stehen Passkey-Anzahlen und für Administratoren eine W
 - Browser benötigen WebAuthn und einen gültigen Secure Context; localhost/http dient nur Entwicklungszwecken.
 - Registrierung und Anmeldung erzwingen User Verification und einen auffindbaren (resident/discoverable) Passkey.
 - Alle Challenges entstehen serverseitig, sind an Zweck und ggf. aktive Sitzung gebunden, laufen nach 5 Minuten ab und werden atomar einmalig vor der Signaturprüfung beansprucht.
-- Passkey-Signaturen, Challenge, Herkunft, RP-ID und Signaturzähler werden serverseitig geprüft. In der Datenbank stehen nur Credential-ID, öffentlicher Schlüssel, Signaturzähler und Metadaten; keine privaten Schlüssel.
+- Passkey-Signaturen, Challenge, Herkunft, RP-ID und Signaturzähler werden serverseitig geprüft. In der Datenbank stehen nur Credential-ID, zufällig erzeugter undurchsichtiger Benutzer-Handle, öffentlicher Schlüssel, Signaturzähler und Metadaten; keine privaten Schlüssel.
 - Registrierung und Entfernen erfordern eine gültige Anmeldung und erneute Passwortbestätigung (bei reinen OIDC-Konten eine frische OIDC-Authentifizierung).
 - CSRF-Schutz, IP-/Konten-Ratenbegrenzung und die vorhandene serverseitige Sitzungsregistrierung gelten weiterhin.
 - Die Passkey-Nutzung ersetzt weder bestehende OIDC-Konten noch die Admin-Konfiguration von Zwei-Faktor-Verfahren.
