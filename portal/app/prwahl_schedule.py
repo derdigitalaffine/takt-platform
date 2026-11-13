@@ -43,9 +43,12 @@ def local_to_utc(value):
         if dt.tzinfo is not None:
             raise ValueError()
         # Round-trip validation avoids silently shifting missing DST wall times.
-        aware = dt.replace(tzinfo=TZ)
+        aware = dt.replace(tzinfo=TZ, fold=0)
         utc = aware.astimezone(timezone.utc)
         if utc.astimezone(TZ).replace(tzinfo=None) != dt:
+            raise ValueError()
+        # Repeated autumn wall times are ambiguous: require an unambiguous time.
+        if dt.replace(tzinfo=TZ, fold=0).utcoffset() != dt.replace(tzinfo=TZ, fold=1).utcoffset():
             raise ValueError()
         return utc.replace(tzinfo=None)
     except (TypeError, ValueError):
