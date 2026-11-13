@@ -51,12 +51,17 @@
   function renderOverlays() {
     var box = document.getElementById('overlay-list');
     var cats = [], byCat = {};
+    var activeOnly = document.getElementById('overlay-only-active').checked;
     kit.overlays.forEach(function (l) {
+      if (activeOnly && !l.visible) { return; }
       if (filterText && (l.name + ' ' + (l.category || '') + ' ' + (l.description || '')).toLowerCase().indexOf(filterText) < 0) { return; }
       var c = l.category || 'Fachdaten';
       if (!byCat[c]) { byCat[c] = []; cats.push(c); }
       byCat[c].push(l);
     });
+    document.getElementById('overlay-count').textContent =
+      kit.overlays.filter(function (layer) { return layer.visible; }).length +
+      ' aktiv · ' + kit.overlays.length + ' verfügbar';
     var empty = document.getElementById('overlay-empty');
     empty.hidden = cats.length > 0;
     empty.textContent = filterText ? 'Keine passenden Ebenen. Ändern Sie den Suchbegriff.' : 'Keine Ebenen verfügbar.';
@@ -92,7 +97,10 @@
   list.addEventListener('change', function (ev) {
     var row = ev.target.closest('.layer-row');
     if (!row) { return; }
-    if (ev.target.hasAttribute('data-toggle')) { kit.setVisible(row.dataset.id, ev.target.checked); row.classList.toggle('is-on', ev.target.checked); }
+    if (ev.target.hasAttribute('data-toggle')) {
+      kit.setVisible(row.dataset.id, ev.target.checked);
+      renderOverlays();
+    }
     if (ev.target.hasAttribute('data-time-range')) {
       var l = kit.overlays.find(function (x) { return x.id === row.dataset.id; });
       kit.setTime(l.id, l.times[parseInt(ev.target.value, 10)]);
@@ -122,6 +130,7 @@
     if (ev.target.closest('[data-remove]')) { kit.removeOverlay(l.id); renderOverlays(); }
   });
   document.getElementById('layer-filter').addEventListener('input', function (ev) { filterText = ev.target.value.trim().toLowerCase(); renderOverlays(); });
+  document.getElementById('overlay-only-active').addEventListener('change', renderOverlays);
   renderBases();
   renderOverlays();
 
@@ -325,6 +334,199 @@
     map.on('load',function(){showPlan();if(plan.geometry&&!/^#\d+(?:\.\d+)?\/-?\d+(?:\.\d+)?\/-?\d/.test(location.hash)){var bounds=new maplibregl.LngLatBounds();plan.geometry.coordinates[0].forEach(function(p){bounds.extend(p);});map.fitBounds(bounds,{padding:50,maxZoom:17});}});
     map.on('style.load',showPlan);
   }
+
+  /* --- Geodaten entdecken -----------------------------------------------------------
+   * Metadata are public and fetched once. Only a deliberate click triggers
+   * GetCapabilities; private signed proxy URLs are never exposed to guests.
+   * Favorites contain source keys only, no location or saved-map contents.
+   */
+  var discovery=document.getElementById('map-discovery'), catalogEntries={},
+      catalogSelected=null, catalogCaps=null, sourceFavorites=[];
+  var catalogStatus=document.getElementById('map-discovery-status'),
+      catalogResults=document.getElementById('map-discovery-results'),
+      catalogPreview=document.getElementById('map-discovery-preview'),
+      catalogChoices=document.getElementById('map-discovery-choices'),
+      catalogActivation=document.getElementById('map-discovery-activation-status');
+  try{
+    var favoriteJson=JSON.parse(localStorage.getItem('map-source-favorites-v1')||'[]');
+    if(Array.isArray(favoriteJson))sourceFavorites=favoriteJson.filter(function(k){return typeof k==='string';}).slice(0,100);
+  }catch(_){}
+  function cleanSearch(value){return String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('de');}
+  function currentCatalog(){
+    var q=cleanSearch(document.getElementById('map-discovery-search').value.trim()).split(/\s+/).filter(Boolean),
+        region=document.getElementById('map-discovery-region').value,
+        topic=document.getElementById('map-discovery-topic').value,
+        favOnly=document.getElementById('map-discovery-favorites-only').checked;
+    return Object.keys(catalogEntries).filter(function(key){
+      var d=catalogEntries[key];
+      return (!region||d.region===region)&&(!topic||d.topic===topic)&&
+        (!favOnly||sourceFavorites.indexOf(key)>=0)&&
+        q.every(function(word){return cleanSearch([d.name,d.topic,d.region,d.provider,d.note].join(' ')).indexOf(word)>=0;});
+    }).sort(function(a,b){
+      var aa=catalogEntries[a],bb=catalogEntries[b];
+      var af=sourceFavorites.indexOf(a)>=0?0:1,bf=sourceFavorites.indexOf(b)>=0?0:1;
+      return af-bf || (aa.region==='Rheinland-Pfalz'?0:1)-(bb.region==='Rheinland-Pfalz'?0:1)
+        || aa.name.localeCompare(bb.name,'de');
+    });
+  }
+  function renderCatalog(){
+    var keys=currentCatalog();
+    document.getElementById('map-discovery-count').textContent=keys.length+' Quellen';
+    catalogStatus.textContent=keys.length?'Quelle wählen, um verfügbare Layer zu prüfen.':'Keine Treffer. Such- oder Themenfilter anpassen.';
+    catalogResults.innerHTML=keys.map(function(key){
+      var d=catalogEntries[key],fav=sourceFavorites.indexOf(key)>=0;
+      var isData=d.kind==='download',title=isData?'Download & Hinweise':'Ebenen auswählen';
+      return '<article class="map-source-row" data-source="'+esc(key)+'">'+
+        '<div class="source-main"><button type="button" class="source-title" data-source-open="'+esc(key)+'" title="'+esc(title)+'">'+esc(d.name)+'</button>'+
+        '<div class="source-meta">'+esc(d.region)+' · '+esc(d.topic)+' · '+esc(d.provider)+'</div>'+
+        '<div class="d-flex flex-wrap gap-1 mt-1"><span class="source-tag">'+esc(isData?d.format||'Download':d.kind.toUpperCase())+'</span>'+
+        '<span class="source-tag">'+esc(d.license)+'</span></div></div>'+
+        '<button class="source-fav" type="button" data-source-favorite="'+esc(key)+'" aria-pressed="'+(fav?'true':'false')+'" aria-label="'+(fav?'Favorit entfernen: ':'Als Favorit speichern: ')+esc(d.name)+'">'+
+        '<i class="'+(fav?'fa-solid':'fa-regular')+' fa-star" aria-hidden="true"></i></button></article>';
+    }).join('');
+    catalogResults.hidden=false;
+    catalogPreview.hidden=true;
+  }
+  function fillCatalogFilters(regions,topics){
+    [['map-discovery-region',regions],['map-discovery-topic',topics]].forEach(function(item){
+      var field=document.getElementById(item[0]);
+      (item[1]||[]).forEach(function(v){
+        var option=document.createElement('option');option.value=v;option.textContent=v;field.append(option);
+      });
+    });
+  }
+  fetch('/maps/library',{credentials:'same-origin'}).then(function(r){if(!r.ok)throw Error('Quellenverzeichnis nicht verfügbar');return r.json();}).then(function(d){
+    catalogEntries=Object.assign({},d.services||{},d.datasets||{});
+    fillCatalogFilters(d.regions,d.topics);
+    renderCatalog();
+  }).catch(function(){catalogStatus.textContent='Geodatenverzeichnis momentan nicht verfügbar. Vorhandene Ebenen können weiterhin genutzt werden.';});
+  ['map-discovery-search','map-discovery-region','map-discovery-topic','map-discovery-favorites-only'].forEach(function(id){
+    document.getElementById(id).addEventListener(id==='map-discovery-search'?'input':'change',renderCatalog);
+  });
+  document.getElementById('map-discovery-reset').addEventListener('click',function(){
+    ['map-discovery-search','map-discovery-region','map-discovery-topic'].forEach(function(id){document.getElementById(id).value='';});
+    document.getElementById('map-discovery-favorites-only').checked=false;
+    renderCatalog();
+  });
+  document.getElementById('map-discovery-back').addEventListener('click',function(){
+    catalogPreview.hidden=true;catalogResults.hidden=false;catalogActivation.textContent='';
+  });
+  catalogResults.addEventListener('click',function(ev){
+    var star=ev.target.closest('[data-source-favorite]');
+    if(star){
+      var key=star.dataset.sourceFavorite,ix=sourceFavorites.indexOf(key);
+      if(ix>=0)sourceFavorites.splice(ix,1);else sourceFavorites.unshift(key);
+      sourceFavorites=sourceFavorites.slice(0,100);
+      try{localStorage.setItem('map-source-favorites-v1',JSON.stringify(sourceFavorites));}catch(_){}
+      renderCatalog();return;
+    }
+    var button=ev.target.closest('[data-source-open]');
+    if(!button)return;
+    openCatalogSource(button.dataset.sourceOpen);
+  });
+  function discoveryPost(url,fields){
+    var body=new FormData();body.append('csrf',csrf);
+    Object.keys(fields||{}).forEach(function(key){body.append(key,fields[key]);});
+    return fetch(url,{method:'POST',body:body,credentials:'same-origin',headers:{'Accept':'application/json'}}).then(function(r){
+      return r.json().then(function(d){if(!r.ok||!d.ok)throw Error(d.error||'Dienst nicht erreichbar');return d;});
+    });
+  }
+  function openCatalogSource(key){
+    var spec=catalogEntries[key];if(!spec)return;
+    catalogSelected={key:key,spec:spec};catalogCaps=null;
+    document.getElementById('map-discovery-preview-title').textContent=spec.name;
+    document.getElementById('map-discovery-preview-info').textContent=spec.provider+' · '+spec.license+
+      (spec.note?' · '+spec.note:'');
+    catalogResults.hidden=true;catalogPreview.hidden=false;
+    catalogActivation.textContent='';
+    var button=document.getElementById('map-discovery-activate');
+    button.disabled=!meta.canEdit||spec.kind==='download';
+    if(spec.kind==='download'){
+      catalogChoices.innerHTML='<p class="small mb-2">'+esc(spec.note||'')+'</p>'+
+        '<div class="d-grid gap-2"><a class="btn btn-sm btn-outline-primary" href="'+esc(spec.download_url)+'" target="_blank" rel="noopener noreferrer">Amtliche Daten beziehen <i class="fa-solid fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></a>'+
+        '<a class="btn btn-sm btn-outline-secondary" href="'+esc(spec.source_url)+'" target="_blank" rel="noopener noreferrer">Produkt- und Lizenzinformationen</a></div>';
+      return;
+    }
+    if(!meta.canEdit){
+      catalogChoices.innerHTML='<p class="small">Zum Einblenden zusätzlicher Ebenen bitte im Portal anmelden. Die Karte und die bereits freigegebenen öffentlichen Ebenen bleiben ohne Anmeldung nutzbar.</p>';
+      return;
+    }
+    catalogChoices.textContent='Verfügbare Ebenen werden beim Anbieter geprüft …';
+    discoveryPost('/maps/library/'+encodeURIComponent(key)+'/layers',{}).then(function(data){
+      if(!catalogSelected||catalogSelected.key!==key)return;
+      catalogCaps=data;
+      var layers=(data.layers||[]).filter(function(l){return l.name&&l.supported!==false;});
+      if(!layers.length){catalogChoices.textContent='Keine kompatiblen Kartenebenen gefunden.';return;}
+      catalogChoices.innerHTML='<label class="visually-hidden" for="map-discovery-layer-filter">Ebenen filtern</label>'+
+        '<input id="map-discovery-layer-filter" class="form-control form-control-sm mb-2" type="search" placeholder="In dieser Quelle suchen …">'+
+        '<div data-discovery-options>'+layers.slice(0,180).map(function(l,i){
+          return '<label class="map-discovery-choice" data-name="'+esc(cleanSearch((l.title||l.name)+' '+l.name))+'">'+
+            '<input class="form-check-input" type="checkbox" data-layer-idx="'+i+'"'+(layers.length===1?' checked':'')+'>'+
+            '<span class="small"><strong>'+esc(l.title||l.name)+'</strong><span class="d-block text-secondary">'+esc(l.name)+'</span>'+
+              (l.abstract?'<span class="d-block text-secondary">'+esc(l.abstract).slice(0,300)+'</span>':'')+
+            '</span></label>';
+        }).join('')+'</div>'+
+        (layers.length>180?'<div class="small text-secondary mt-1">Die ersten 180 Ebenen werden angeboten. Für weitere Ebenen bitte den erweiterten Diensteditor verwenden.</div>':'');
+      catalogCaps.supported=layers.slice(0,180);
+      var filter=document.getElementById('map-discovery-layer-filter');
+      filter.addEventListener('input',function(){
+        var words=cleanSearch(filter.value).split(/\s+/).filter(Boolean);
+        catalogChoices.querySelectorAll('[data-name]').forEach(function(row){
+          row.hidden=!words.every(function(w){return row.dataset.name.indexOf(w)>=0;});
+        });
+      });
+    }).catch(function(e){
+      if(catalogSelected&&catalogSelected.key===key){
+        catalogChoices.textContent=e.message||'Quelle derzeit nicht verfügbar. Bitte später erneut versuchen.';
+      }
+    });
+  }
+  document.getElementById('map-discovery-activate').addEventListener('click',function(){
+    if(!catalogSelected||!catalogCaps||!meta.canEdit)return;
+    var spec=catalogSelected.spec,cap=catalogCaps;
+    var chosen=Array.prototype.map.call(catalogChoices.querySelectorAll('[data-layer-idx]:checked'),function(input){
+      return cap.supported[Number(input.dataset.layerIdx)];
+    }).filter(Boolean);
+    if(!chosen.length){catalogActivation.textContent='Bitte mindestens eine Ebene auswählen.';return;}
+    if(chosen.length>12){catalogActivation.textContent='Höchstens zwölf Ebenen gleichzeitig hinzufügen.';return;}
+    var button=this;button.disabled=true;catalogActivation.textContent='Ebenen werden zur Karte hinzugefügt …';
+    var defs=chosen.map(function(l){
+      var category=spec.topic+' · '+spec.region;
+      if(cap.type==='xyz')return {kind:'xyz',url:l.template,name:l.title,
+        category:category,service:{tile_size:spec.tile_size||256},
+        attribution:spec.attribution};
+      if(cap.type==='wmts')return {kind:'wmts',url:l.template,layers:l.name,
+        name:l.title,category:category,styles:l.styles||'',format:l.format||'image/png',
+        service:l.service||{},attribution:spec.attribution};
+      return {kind:cap.type,url:cap.url,layers:l.name,name:l.title,
+        category:category,version:cap.version||'',service:l.service||{},
+        times:l.times||[],time:l.time||'',attribution:spec.attribution};
+    });
+    var added=0,skipped=0,failed=0;
+    Promise.all(defs.map(function(def){
+      var exists=kit.overlays.some(function(l){
+        return l.custom&&l.custom.kind===def.kind&&l.custom.url===def.url&&
+          (l.custom.layers||'')===(def.layers||'');
+      });
+      if(exists){skipped++;return Promise.resolve();}
+      return discoveryPost('/maps/sign',{layer:JSON.stringify(def)}).then(function(result){
+        kit.addOverlay(result.layer);added++;
+      }).catch(function(){failed++;});
+    })).then(function(){
+      renderOverlays();
+      catalogActivation.textContent=added+' hinzugefügt'+(skipped?', '+skipped+' bereits vorhanden':'')+
+        (failed?', '+failed+' fehlgeschlagen':'')+'.';
+      if(added){toast(added+' Kartenebene(n) aktiviert');}
+      button.disabled=false;
+    });
+  });
+  var perspective=document.getElementById('map-3d-view');
+  function syncPerspective(){var active=map.getPitch()>10;perspective.setAttribute('aria-pressed',active?'true':'false');
+    perspective.classList.toggle('btn-primary',active);perspective.classList.toggle('btn-outline-secondary',!active);}
+  perspective.addEventListener('click',function(){map.easeTo({pitch:map.getPitch()>10?0:55,duration:500});});
+  map.on('pitchend',syncPerspective);
+  syncPerspective();
+
   if (!meta.canEdit) { return; }
 
   /* --- Eigene Layer hinzufügen ---------------------------------------------------------- */
