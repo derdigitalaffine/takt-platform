@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_res_macros.html" as rm with context %}
+{% block title %}Wochenplan · Interner Gerätepool{% endblock %}
+{% block head %}{{ super() }}<link rel="stylesheet" href="/static/internal-assets.css">{% endblock %}
+{% block content %}
+{% call rm.head('internal', [('Interner Gerätepool', '/resources/intern'), ('Wochenplan', '')], 'Material-Belegungsplan', 'Kapazitäten und Sperrzeiten für interne Gegenstände im Wochenüberblick.') %}
+  <a href="/resources/intern" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i>Zum Katalog</a>
+{% endcall %}
+<div class="res-pool">
+  <div class="res-pool-intro mb-4"><strong>Verfügbarkeit nach Tagen</strong><p class="small mb-0 mt-1">Die Tabelle zeigt den kleinsten freien Bestand je Tag. Auch stundenweise belegte Gegenstände können zu anderen Zeiten des Tages verfügbar sein. Für die genaue Prüfung wähle im Katalog einen Zeitraum. Persönliche Buchungsdetails werden hier nicht angezeigt.</p></div>
+  <form class="row g-2 align-items-end mb-3" method="get" action="/resources/intern/plan">
+    <div class="col-auto"><label for="pool-plan-category" class="form-label small">Kategorie</label><select name="category" id="pool-plan-category" class="form-select"><option value="">Alle Kategorien</option>{% for c in categories %}<option value="{{c}}" {% if c==category %}selected{% endif %}>{{c}}</option>{% endfor %}</select></div>
+    <div class="col-auto"><button class="btn btn-primary" type="submit">Anzeigen</button></div>
+    <div class="col-auto ms-auto d-flex gap-2"><a class="btn btn-outline-secondary" href="/resources/intern/plan?start={{prev}}{% if category %}&category={{category|urlencode}}{% endif %}" aria-label="Vorige Woche"><i class="fa-solid fa-chevron-left"></i></a><a class="btn btn-outline-secondary" href="/resources/intern/plan?start={{next}}{% if category %}&category={{category|urlencode}}{% endif %}" aria-label="Nächste Woche"><i class="fa-solid fa-chevron-right"></i></a></div>
+  </form>
+  <div class="card"><div class="table-responsive">
+    <table class="table table-bordered align-middle text-center mb-0 res-pool-week">
+      <thead><tr><th class="text-start">Gegenstand</th>{% for d in days %}<th>{{['Mo','Di','Mi','Do','Fr','Sa','So'][loop.index0]}}<div class="small text-secondary">{{d.strftime('%d.%m.')}}</div></th>{% endfor %}</tr></thead>
+      <tbody>{% for a, free in rows %}<tr><th scope="row" class="text-start"><div>{{a.name}}</div><span class="small text-secondary">{{a.category}} · {{a.quantity}} insgesamt</span></th>{% for n in free %}<td><span class="badge {{'text-bg-warning' if n == 0 else 'text-bg-success' if n==a.quantity else 'text-bg-info'}}">{{n}} frei</span></td>{% endfor %}</tr>{% else %}<tr><td colspan="8" class="text-secondary p-4">Für diese Kategorie sind keine aktiven Gegenstände erfasst.</td></tr>{% endfor %}</tbody>
+    </table>
+  </div></div>
+  <p class="small text-secondary mt-3">Der Wochenplan ist eine Übersicht und keine endgültige Verfügbarkeitszusage. Maßgeblich ist die atomare Bestandsprüfung beim Reservieren.</p>
+</div>
+{% endblock %}

@@ -3165,6 +3165,7 @@ from . import routes_payments  # noqa: E402,F401
 from . import routes_votes  # noqa: E402,F401
 from . import routes_resources  # noqa: E402,F401
 from . import routes_resources_public  # noqa: E402,F401
+from . import routes_internal_assets  # noqa: E402,F401
 from . import routes_signage  # noqa: E402,F401
 from . import routes_caretakers  # noqa: E402,F401
 from . import routes_qr  # noqa: E402,F401
