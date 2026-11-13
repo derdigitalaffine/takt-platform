@@ -2052,7 +2052,10 @@ def profile_security(request: Request, user: User = Depends(current_user), db: S
         stash_put(request, "totp_setup", secret)
         uri = twofa.provisioning_uri(secret, user)
         setup = {"secret": " ".join(secret[i:i + 4] for i in range(0, len(secret), 4)), "qr": twofa.qr_svg(uri)}
-    return render(request, "profile_security.html", user, allowed=twofa.allowed(cfg), required=twofa.required(user, cfg),
+    from .passkey_models import PasskeyCredential
+    passkeys = list(db.scalars(select(PasskeyCredential).where(PasskeyCredential.user_id == user.id)
+                              .order_by(PasskeyCredential.created_at.desc())))
+    return render(request, "profile_security.html", user, passkeys=passkeys, allowed=twofa.allowed(cfg), required=twofa.required(user, cfg),
                   methods=twofa.methods(user, cfg), setup=setup, recovery_left=twofa.recovery_left(user),
                   new_codes=stash_get(request, "recovery_codes", pop=True), mail_ready=notify.mail_configured(cfg),
                   my_sessions=sessions.rows(request, sessions.for_user(db, user.id)))
