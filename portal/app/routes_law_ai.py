@@ -218,9 +218,11 @@ def law_ai_accept(
 @app.post("/laws-assistant/{draft_id:int}/discard",
           dependencies=[Depends(check_csrf)])
 def law_ai_discard(
-    request: Request, draft_id: int,
+    request: Request, draft_id: int, discard_confirmed: str = Form(""),
     user: User = Depends(law_user), db: Session = Depends(get_db),
 ):
+    if discard_confirmed != "1":
+        raise HTTPException(422, "Das Verwerfen muss ausdrücklich bestätigt werden.")
     row = _own(db, draft_id, user)
     if row.status == "accepted":
         raise HTTPException(409, "Ein bereits übernommener Originalnachweis darf nicht entfernt werden.")
