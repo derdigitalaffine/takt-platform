@@ -178,8 +178,13 @@ def mark_interrupted() -> None:
 
 async def run_forever():
     mark_interrupted()
+    polls = 0
     while True:
+        job_id = None
         try:
+            if polls % 15 == 0:
+                await asyncio.to_thread(mark_interrupted)
+            polls += 1
             job_id = await asyncio.to_thread(_claim_next)
             if job_id is not None:
                 await process_one(job_id)
