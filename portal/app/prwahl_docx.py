@@ -59,12 +59,12 @@ def _field(label, value):
               'w:color="D9E2EA"/></w:pBdr><w:spacing w:after="200"/></w:pPr></w:p>')
 
 
-def build(election, doc) -> bytes:
+def build(election, doc, *, values_override=None, demo=False) -> bytes:
     name, reference, fields = FORM_KINDS[doc.kind]
-    data = document_values(doc)
+    data = values_override if values_override is not None else document_values(doc)
     created = utcnow().replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     top = (
-        _p("TAKT  /  PERSONALRATSWAHL  /  ARBEITSUNTERLAGE",
+        _p("MUSTER / FIKTIVE PERSONALRATSWAHL / NICHT RECHTSVERBINDLICH" if demo else "TAKT / PERSONALRATSWAHL / ARBEITSUNTERLAGE",
            bold=True, color="246E8D", size=16, after=120)
         + _p(name, bold=True, color="17283B", size=34, after=100)
         + _p(f"{reference}  ·  Dokumentversion {doc.revision}",
@@ -77,7 +77,7 @@ def build(election, doc) -> bytes:
         + _table_row("Geplanter Termin", election.election_day.strftime("%d.%m.%Y")
                      if election.election_day else "Noch offen")
         + "</w:tbl>"
-        + _p("PRÜFENTWURF · NICHT ZUR UNGEPRÜFTEN BEKANNTGABE",
+        + _p("MUSTER · KEIN AMTLICHES DOKUMENT" if demo else "PRÜFENTWURF · NICHT ZUR UNGEPRÜFTEN BEKANNTGABE",
              bold=True, color="B34253", size=19, after=330)
     )
     body = "".join(_field(label, data.get(key, "")) for key, label, _ in fields)
@@ -92,7 +92,7 @@ def build(election, doc) -> bytes:
              color="586B7B", size=19, after=70)
         + _p("Ort, Datum, eigenhändige Unterschrift(en) des zuständigen Wahlvorstands",
              color="586B7B", size=17, after=250)
-        + _p(f"Vertraulich · Prüfentwurf · Fassung {doc.revision}",
+        + _p(f'{"MUSTER · FIKTIVE DATEN" if demo else "Vertraulich · Prüfentwurf"} · Fassung {doc.revision}',
              color="586B7B", size=16, after=0)
     )
     document_xml = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
