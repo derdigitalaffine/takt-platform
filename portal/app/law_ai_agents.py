@@ -178,7 +178,7 @@ def validate(stage: str, answer: str, source: str) -> dict:
     if stage == "law_structure":
         candidates = result.get("headings")
         if not isinstance(candidates, list) or len(candidates) > 90:
-            raise ValueError("KI-Gliederung hat ein ungültiges Schema.")
+            raise InvalidAgentJSON("KI-Gliederung hat ein ungültiges Schema.")
         for item in candidates[:MAX_LIST_ITEMS]:
             if not isinstance(item, dict):
                 discarded += 1
@@ -195,7 +195,7 @@ def validate(stage: str, answer: str, source: str) -> dict:
     elif stage == "law_metadata":
         candidates = result.get("fields")
         if not isinstance(candidates, list) or len(candidates) > 60:
-            raise ValueError("KI-Stammdaten haben ein ungültiges Schema.")
+            raise InvalidAgentJSON("KI-Stammdaten haben ein ungültiges Schema.")
         for item in candidates[:MAX_LIST_ITEMS]:
             if not isinstance(item, dict):
                 discarded += 1
@@ -232,7 +232,7 @@ def validate(stage: str, answer: str, source: str) -> dict:
     elif stage == "law_verify":
         candidates = result.get("findings")
         if not isinstance(candidates, list) or len(candidates) > 70:
-            raise ValueError("KI-Gegenprüfung hat ein ungültiges Schema.")
+            raise InvalidAgentJSON("KI-Gegenprüfung hat ein ungültiges Schema.")
         for item in candidates[:MAX_LIST_ITEMS]:
             if not isinstance(item, dict):
                 discarded += 1
