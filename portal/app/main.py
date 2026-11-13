@@ -20,7 +20,8 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
@@ -353,6 +354,12 @@ def module_hosts() -> dict[str, str]:
 async def _module_host(request: Request, call_next):
     """Aufruf über die eigene Domain eines Moduls: nur dessen öffentliche Seiten und gemeinsame Hilfspfade;
     „/“ führt zur Einstiegsseite, alles andere zur gleichen Adresse unter der Portal-Domain."""
+    # Liveness and readiness are internal operational probes. They must not
+    # depend on the domain-routing map, which itself queries the database.
+    # Likewise, a browser's favicon request must not turn a DB outage into an
+    # unrelated 500 while the main HTML request is already failing.
+    if request.url.path in {"/healthz", "/readyz", "/favicon.ico"}:
+        return await call_next(request)
     host = (request.headers.get("host") or "").split(":")[0].strip().lower()
     key = module_hosts().get(host) if host else None
     if key is None:
@@ -740,7 +747,46 @@ def speechmind_ready(db: Session, user: User | None = None) -> bool:
 
 @app.get("/healthz", response_class=PlainTextResponse)
 def healthz():
+    """Liveness only: do not turn a temporary database problem into a 500."""
     return "ok"
+
+
+@app.get("/readyz", response_class=PlainTextResponse)
+def readyz():
+    """Readiness: fail closed when deployed ORM schema is missing migrations.
+
+    No SQL exception details are exposed publicly; use the server logs for
+    diagnosis. This is intentionally separate from /healthz (liveness).
+    """
+    required = {
+        "law_ai_drafts": {
+            "id", "ocr_job_key", "ocr_pages_json",
+            "ocr_warnings_json", "ocr_failure",
+        },
+        "law_ai_analyses": {
+            "id", "draft_id", "source_sha256",
+            "provider_map_json", "status",
+        },
+    }
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1")).scalar_one()
+            for table, columns in required.items():
+                # Table identifiers are fixed application constants, not input.
+                actual = {row[1] for row in db.execute(
+                    text(f"PRAGMA table_info('{table}')")).all()}
+                if not columns.issubset(actual):
+                    return PlainTextResponse(
+                        "not ready", status_code=503,
+                        headers={"Cache-Control": "no-store"},
+                    )
+    except SQLAlchemyError:
+        log.warning("Readiness probe failed: database unavailable or schema incomplete")
+        return PlainTextResponse(
+            "not ready", status_code=503,
+            headers={"Cache-Control": "no-store"},
+        )
+    return PlainTextResponse("ok", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/login")
