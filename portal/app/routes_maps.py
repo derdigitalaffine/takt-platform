@@ -385,7 +385,8 @@ def _clean_state(raw) -> dict:
         if isinstance(item, dict) and re.fullmatch(r"[sc][0-9a-f]{1,12}", str(item.get("id", ""))):
             layers.append({"id": item["id"], "visible": bool(item.get("visible")),
                            "opacity": max(0.0, min(1.0, float(item.get("opacity", 1) or 0))),
-                           "time": str(item.get("time") or "")[:40]})
+                           "time": str(item.get("time") or "")[:40],
+                           "extrude": bool(item.get("extrude", False))})
     out["layers"] = layers
     custom = []
     for item in raw.get("custom", [])[:30] if isinstance(raw.get("custom"), list) else []:
@@ -950,10 +951,103 @@ def admin_map_catalog(request: Request, key: str, user: User = Depends(maps_admi
     db.add(row);db.commit();flash(request,'Amtliche Ebene ergänzt. Vorhandene Layer und Startgrundkarte bleiben erhalten.');return redirect(f'/admin/maps/{row.id}')
 
 
+
+@app.get('/maps/library')
+def map_library_public(q: str = '', region: str = '', topic: str = ''):
+    """Public, metadata-only discovery. No external call or internal layer
+    is exposed, and neither service secrets nor saved private maps are read.
+    """
+    if 'maps' not in enabled_modules():
+        raise HTTPException(404)
+    result = catalog_library.discover(q[:160], region[:100], topic[:100])
+    return JSONResponse(result, headers={'Cache-Control': 'public, max-age=1800'})
+
+
+
+@app.get('/maps/library/{key}/overlay')
+def map_library_public_overlay(request: Request, key: str):
+    """A fixed, publicly licensed XYZ source can be activated by guests.
+
+    Unlike /maps/sign, this does not accept arbitrary URLs or user input.
+    In particular a private WMS, private MapLayer or a dataset-download is
+    never signed through this endpoint. It helps comply with volunteer tile
+    policies that require a publicly usable map, without registration.
+    """
+    if 'maps' not in enabled_modules():
+        raise HTTPException(404)
+    rate_limit(request, 'map-library-public-overlay', limit=30, window=60)
+    spec = catalog_library.CATALOG.get(key)
+    if not spec or spec['kind'] != 'xyz' or not key.startswith('orm-'):
+        raise HTTPException(404)
+    definition = mp.clean_custom({
+        'kind': 'xyz', 'name': spec['name'], 'url': spec['url'],
+        'category': spec['topic'] + ' · ' + spec['region'],
+        'attribution': spec['attribution'],
+        'service': {'tile_size': spec.get('tile_size', 256)},
+    })
+    if not definition:
+        raise HTTPException(404)
+    return JSONResponse(
+        {'ok': True, 'layer': mp.custom_config(definition, mp.sign(definition))},
+        headers={'Cache-Control': 'public, max-age=300'})
+
+
+
+@app.post('/maps/library/{key}/layers')
+async def map_library_layers(request: Request, key: str,
+                             user: User = Depends(map_user),
+                             _csrf: None = Depends(check_csrf)):
+    """Discover exact live OGC identifiers only after user interaction.
+
+    No arbitrary URL is accepted here. Every source is a curated public
+    service; all tile access still uses the existing signed, SSRF-protected
+    layer proxy. A failed service never breaks the GIS browser.
+    """
+    if 'maps' not in enabled_modules():
+        raise HTTPException(404)
+    rate_limit(request, 'map-library-discovery', limit=25, window=60)
+    spec = catalog_library.CATALOG.get(key)
+    if not spec:
+        raise HTTPException(404)
+    if spec['kind'] == 'xyz':
+        return JSONResponse({
+            'ok': True, 'type': 'xyz', 'url': spec['url'],
+            'title': spec['name'], 'version': '',
+            'layers': [{
+                'name': key, 'title': spec['name'], 'template': spec['url'],
+                'supported': True,
+                'service': {'tile_size': spec.get('tile_size', 256)},
+            }],
+            'source': {'key': key, **spec},
+        })
+    try:
+        result = await run_in_threadpool(
+            mp.query_service, spec['url'], spec['kind'], True)
+        layers = catalog_library.choices(spec, result)
+    except (ValueError, httpx.HTTPError, mp.ET.ParseError, mp.BlockedAddress):
+        return JSONResponse(
+            {'ok': False, 'error': 'Der externe Dienst ist momentan nicht verfügbar. '
+             'Bitte später erneut versuchen oder die Quelle beim Anbieter öffnen.'},
+            status_code=502)
+    if not layers:
+        return JSONResponse(
+            {'ok': False, 'error': 'Der Dienst bietet aktuell keine mit TAKT '
+             'kompatiblen Ebenen im unterstützten Koordinatensystem.'},
+            status_code=422)
+    return JSONResponse({
+        'ok': True, **result, 'layers': layers, 'source': {'key': key, **spec},
+    })
+
+
 def _library_choices(key):
     spec = catalog_library.CATALOG.get(key)
     if not spec:
         raise HTTPException(404)
+    if spec['kind'] == 'xyz':
+        layer = {'name': key, 'title': spec['name'], 'template': spec['url'],
+                 'supported': True, 'service': {'tile_size': spec.get('tile_size', 256)}}
+        return spec, {'type': 'xyz', 'url': spec['url'],
+                      'version': '', 'layers': [layer]}, [layer]
     result = mp.query_service(spec['url'], spec['kind'], True)
     return spec, result, catalog_library.choices(spec, result)
 
@@ -1005,7 +1099,8 @@ async def admin_map_library_import(request: Request, key: str, user: User = Depe
             attribution=spec['attribution'], category=(spec['region']+' · '+spec['topic'])[:100],
             description='\n'.join(filter(None, [chosen.get('abstract', ''), spec['note'], 'Quelle: '+spec['source_url'], 'Nutzung: '+spec['license']+' – '+spec['license_url']])),
             role=spec['role'], default_visible=False, enabled=False, public=False, in_forms=False,
-            position=position+added, proxy=True)
+            position=position+added, proxy=True,
+            tile_size=spec.get('tile_size', 256) if result['type'] == 'xyz' else 256)
         db.add(row)
         added += 1
     db.commit()
