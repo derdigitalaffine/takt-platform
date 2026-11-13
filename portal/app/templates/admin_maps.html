@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
 {% block title %}Kartenlayer{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/vendor/maplibre/maplibre-gl.css"><link rel="stylesheet" href="/static/map.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/maplibre/maplibre-gl.css"><link rel="stylesheet" href="/static/map.css"><link rel="stylesheet" href="/static/map-easy.css">{% endblock %}
 {% macro layer_rows(role) %}
 {% for l in layers if l.role == role %}
 <tr data-id="{{ l.id }}">
@@ -39,6 +39,11 @@
 
 {% include '_map_library.html' %}
 
+<details class="map-easy-details map-admin-3d mb-4" id="map-admin-3d">
+  <summary><span><i class="fa-solid fa-cubes-stacked me-2" aria-hidden="true"></i>3D-Gebäude und Geländemodelle
+    <small class="d-block text-secondary fw-normal mt-1">Optionaler Import von CityGML und DGM für die Kartenansicht</small></span>
+    <i class="fa-solid fa-chevron-down map-easy-chevron" aria-hidden="true"></i></summary>
+  <div class="map-admin-3d-body">
 <section class="card mb-4" id="lod2-preview" aria-labelledby="lod2-admin-title">
   <div class="card-header"><h2 class="h6 mb-0" id="lod2-admin-title"><i class="fa-solid fa-cubes-stacked me-2" aria-hidden="true"></i>Rheinland-Pfalz: LoD2-3D-Gebäudemodell</h2></div>
   <div class="card-body">
@@ -112,6 +117,8 @@
       Daten: © GeoBasis-DE / LVermGeoRP, dl-de/by-2-0 [Daten bearbeitet].</p>
   </div>
 </section>
+  </div>
+</details>
 <div class="row g-3 mb-4">
   <div class="col-6 col-xl-3">{{ m.stat('fa-layer-group', layers | length, 'Layer gesamt') }}</div>
   <div class="col-6 col-xl-3">{{ m.stat('fa-toggle-on', layers | selectattr('enabled') | list | length, 'aktiv') }}</div>
