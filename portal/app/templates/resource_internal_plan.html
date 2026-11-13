@@ -1,17 +1,16 @@
 {% extends "base.html" %}
-{% import "_res_macros.html" as rm with context %}
-{% block title %}Wochenplan · Interner Gerätepool{% endblock %}
+{% import "_internal_asset_macros.html" as iam with context %}
+{% block title %}Materialplan · Interne Ressourcen{% endblock %}
 {% block head %}{{ super() }}<link rel="stylesheet" href="/static/internal-assets.css">{% endblock %}
 {% block content %}
-{% call rm.head('internal', [('Interner Gerätepool', '/resources/intern'), ('Wochenplan', '')], 'Material-Belegungsplan', 'Kapazitäten und Sperrzeiten für interne Gegenstände im Wochenüberblick.') %}
-  <a href="/resources/intern" class="btn btn-outline-primary btn-sm"><i class="fa-solid fa-arrow-left me-1"></i>Zum Katalog</a>
+{% call iam.head('plan', [], 'Materialplan', 'Kapazitäten und Sperrzeiten für interne Gegenstände im Wochenüberblick.') %}
 {% endcall %}
 <div class="res-pool">
   <div class="res-pool-intro mb-4"><strong>Verfügbarkeit nach Tagen</strong><p class="small mb-0 mt-1">Die Tabelle zeigt den kleinsten freien Bestand je Tag. Auch stundenweise belegte Gegenstände können zu anderen Zeiten des Tages verfügbar sein. Für die genaue Prüfung wähle im Katalog einen Zeitraum. Persönliche Buchungsdetails werden hier nicht angezeigt.</p></div>
-  <form class="row g-2 align-items-end mb-3" method="get" action="/resources/intern/plan">
+  <form class="row g-2 align-items-end mb-3" method="get" action="/interne-ressourcen/plan">
     <div class="col-auto"><label for="pool-plan-category" class="form-label small">Kategorie</label><select name="category" id="pool-plan-category" class="form-select"><option value="">Alle Kategorien</option>{% for c in categories %}<option value="{{c}}" {% if c==category %}selected{% endif %}>{{c}}</option>{% endfor %}</select></div>
     <div class="col-auto"><button class="btn btn-primary" type="submit">Anzeigen</button></div>
-    <div class="col-auto ms-auto d-flex gap-2"><a class="btn btn-outline-secondary" href="/resources/intern/plan?start={{prev}}{% if category %}&category={{category|urlencode}}{% endif %}" aria-label="Vorige Woche"><i class="fa-solid fa-chevron-left"></i></a><a class="btn btn-outline-secondary" href="/resources/intern/plan?start={{next}}{% if category %}&category={{category|urlencode}}{% endif %}" aria-label="Nächste Woche"><i class="fa-solid fa-chevron-right"></i></a></div>
+    <div class="col-auto ms-auto d-flex gap-2"><a class="btn btn-outline-secondary" href="/interne-ressourcen/plan?start={{prev}}{% if category %}&category={{category|urlencode}}{% endif %}" aria-label="Vorige Woche"><i class="fa-solid fa-chevron-left"></i></a><a class="btn btn-outline-secondary" href="/interne-ressourcen/plan?start={{next}}{% if category %}&category={{category|urlencode}}{% endif %}" aria-label="Nächste Woche"><i class="fa-solid fa-chevron-right"></i></a></div>
   </form>
   <div class="card"><div class="table-responsive">
     <table class="table table-bordered align-middle text-center mb-0 res-pool-week">

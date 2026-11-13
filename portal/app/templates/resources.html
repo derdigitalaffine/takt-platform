@@ -4,7 +4,7 @@
 {% block title %}Ressourcen{% endblock %}
 {% block head %}{{ super() }}<link rel="stylesheet" href="/static/resources-polish.css">{% endblock %}
 {% block content %}
-{% call rm.head('home', [], 'Räume & Ressourcen', 'Buchungen, Anfragen und Belegung aller Räume, Plätze und Geräte.') %}
+{% call rm.head('home', [], 'Räume & Vermietung', 'Extern buchbare Räume, Plätze und Angebote: Anfragen, Belegung und Übergaben.') %}
   {% call m.action_menu() %}<a class="btn btn-outline-secondary" href="/r" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>Öffentlicher Katalog</a>{{ m.qr_button(public_url('resources', '/r'), 'Räume & Plätze buchen') }}
   {% if user.can('resources') %}<button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#res-import">Importieren</button>{% endif %}{% endcall %}
   {% if user.can('resources') %}<a class="btn btn-primary ds-primary" href="/resources/new"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Neue Ressource</a>{% endif %}

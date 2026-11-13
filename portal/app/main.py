@@ -212,7 +212,8 @@ MODULES = {
     "applications": ("Online-Anträge", "module_applications", ("/antraege", "/a/", "/processes")),
     "circulations": ("Umläufe & Aushänge", "module_circulations", ("/umlaeufe",)),
     "dms": ("Ablage (DMS)", "module_dms", ("/dms",)),
-    "resources": ("Ressourcenbuchung", "module_resources", ("/resources", "/r/", "/r", "/r-embed")),
+    "resources": ("Räume & Vermietung", "module_resources", ("/resources", "/r/", "/r", "/r-embed")),
+    "internal_assets": ("Interne Ressourcen", "module_internal_assets", ("/interne-ressourcen",)),
     "prwahl": ("Personalratswahl", "module_prwahl", ("/personalratswahl",)),
     "signage": ("Digital Signage", "module_signage", ("/signage",)),
     "krank": ("BlueOtter Krankmelder", "module_krank", ("/krank", "/krankmelder")),
@@ -235,6 +236,9 @@ def enabled_modules() -> set[str]:
 
 
 def module_for_path(path: str) -> str | None:
+    # Legacy-Links des bisherigen Gerätepool-Unterpunkts gehören zum eigenen Modul.
+    if path == "/resources/intern" or path.startswith("/resources/intern/"):
+        return "internal_assets"
     for key, (_, _, prefixes) in MODULES.items():
         for prefix in prefixes:
             if path == prefix or path.startswith(prefix.rstrip("/") + "/") or path.startswith(prefix + "-"):
@@ -2589,6 +2593,7 @@ def admin_modules(request: Request, user: User = Depends(admin_user), db: Sessio
                      Resource as ResourceModel, ShortLink, UserMap)
     from .db import Circulation, Seminar
     from .signage_models import SignageScreen
+    from .internal_asset_models import InternalAsset
     stats = {"seminars": db.scalar(select(func.count(Seminar.id))),"circulations": db.scalar(select(func.count(Circulation.id))), "bookings": db.scalar(select(func.count(BookingPage.id))),
              "dms": db.scalar(select(func.count(DmsRecord.id))),
              "maps": db.scalar(select(func.count(UserMap.id))),
@@ -2599,6 +2604,7 @@ def admin_modules(request: Request, user: User = Depends(admin_user), db: Sessio
              "polls": db.scalar(select(func.count(Poll.id))),
              "krank": db.scalar(select(func.count(KrankReport.id))),
              "resources": db.scalar(select(func.count(ResourceModel.id))),
+             "internal_assets": db.scalar(select(func.count(InternalAsset.id))),
              "signage": db.scalar(select(func.count(SignageScreen.id)))}
     return render(request, "admin_modules.html", user, all_modules=MODULES, stats=stats)
 

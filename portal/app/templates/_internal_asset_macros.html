@@ -1,0 +1,14 @@
+{# Eigene Fachnavigation für interne Bestands- und Materialplanung; keine Vermietungsunterseiten. #}
+{% import '_macros.html' as m with context %}
+{% macro head(tab, crumbs, title, lede='') -%}
+<nav class="ds-nav nav nav-pills small res-nav" aria-label="Interne Ressourcen">
+  <a class="nav-link {{ 'active' if tab == 'catalog' }}" href="/interne-ressourcen" {% if tab == 'catalog' %}aria-current="page"{% endif %}><i class="fa-solid fa-boxes-stacked me-1" aria-hidden="true"></i>Inventar &amp; Buchungen</a>
+  <a class="nav-link {{ 'active' if tab == 'plan' }}" href="/interne-ressourcen/plan" {% if tab == 'plan' %}aria-current="page"{% endif %}><i class="fa-solid fa-calendar-week me-1" aria-hidden="true"></i>Materialplan</a>
+</nav>
+<nav class="ds-breadcrumb res-crumbs small" aria-label="Pfad">
+  {% if tab == 'catalog' %}<span aria-current="page">Interne Ressourcen</span>
+  {% else %}<a href="/interne-ressourcen">Interne Ressourcen</a> <span aria-hidden="true" class="text-secondary">›</span> <span aria-current="page">{{title}}</span>{% endif %}
+</nav>
+{% set actions = caller() if caller else '' %}
+{% call m.page_header(title, lede) %}{{ actions }}{% endcall %}
+{%- endmacro %}

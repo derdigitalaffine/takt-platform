@@ -16,7 +16,8 @@
 - **[Kalender & Urlaub](module/kalender-urlaub.md):** Termine im Kalender, Urlaub im Urlaubsbereich. Eingetragen heißt nicht automatisch genehmigt.
 - **[Seminare & Lehrgänge](module/seminare.md):** Seminar suchen und anmelden – oder selbst Termine, Räume, Dozenten und Plätze planen.
 - **[Terminbuchung](module/terminbuchung.md):** Freie Sprechzeiten einstellen, Link teilen, Buchungen im Blick behalten.
-- **[Ressourcen & Belegung](module/ressourcen.md):** Raum, Auto oder Gerät suchen, freie Zeit wählen, Buchung bestätigen und gegebenenfalls bezahlen.
+- **[Räume & Vermietung](module/ressourcen.md):** Öffentlich buchbaren Raum oder Platz suchen, Zeit wählen, Buchung bestätigen und gegebenenfalls bezahlen.
+- **[Interne Ressourcen](module/interne-ressourcen.md):** Beamer, Pavillon, Biertische oder Dienstfahrzeug finden, intern reservieren, abholen und zurückgeben.
 - **[Digital Signage](module/digital-signage.md):** Anzeige oder Wegweiser konfigurieren, Zuordnungen prüfen, auf dem Bildschirm kontrollieren.
 - **[Zahlungen & Gebühren](module/zahlungen.md):** Betrag und Frist prüfen, bezahlen, Zahlungsstatus nachsehen.
 

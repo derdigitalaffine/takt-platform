@@ -22,11 +22,11 @@ STATUS_LABELS = {
 
 
 def _access(user: User, manage: bool = False) -> bool:
-    if "resources" not in enabled_modules():
-        raise HTTPException(404, "Die Ressourcenverwaltung ist deaktiviert.")
+    if "internal_assets" not in enabled_modules():
+        raise HTTPException(404, "Das Modul Interne Ressourcen ist deaktiviert.")
     if not user.active:
         raise HTTPException(403)
-    manager = user.can("resources") or user.can("internal_assets_manage")
+    manager = user.can("internal_assets_manage")
     if manage and not manager:
         raise HTTPException(403, "Nur Gerätepool-Verantwortliche dürfen Bestände und Ausgaben verwalten.")
     if not manager and not user.can("internal_assets_book"):
@@ -126,7 +126,7 @@ def _number(n: int, name: str, maximum: int = 100000) -> None:
         raise HTTPException(422, f"{name}: ungültige Anzahl.")
 
 
-@app.get("/resources/intern")
+@app.get("/interne-ressourcen")
 def internal_home(request: Request, user: User = Depends(current_user),
                   db: Session = Depends(get_db)):
     manager = _access(user)
@@ -170,7 +170,7 @@ def internal_home(request: Request, user: User = Depends(current_user),
                   today=to_local(now).strftime("%Y-%m-%dT%H:%M"))
 
 
-@app.get("/resources/intern/verfuegbarkeit")
+@app.get("/interne-ressourcen/verfuegbarkeit")
 def internal_availability(asset_id: int, start: str, end: str,
                           user: User = Depends(current_user),
                           db: Session = Depends(get_db)):
@@ -183,7 +183,7 @@ def internal_availability(asset_id: int, start: str, end: str,
     })
 
 
-@app.post("/resources/intern/lagerorte", dependencies=[Depends(check_csrf)])
+@app.post("/interne-ressourcen/lagerorte", dependencies=[Depends(check_csrf)])
 def internal_location_create(request: Request, name: str = Form(...),
                              building: str = Form(""), detail: str = Form(""),
                              user: User = Depends(current_user),
@@ -196,10 +196,10 @@ def internal_location_create(request: Request, name: str = Form(...),
     db.add(location)
     db.commit()
     flash(request, "Lagerort angelegt.")
-    return redirect("/resources/intern#lagerorte")
+    return redirect("/interne-ressourcen#lagerorte")
 
 
-@app.post("/resources/intern/gegenstaende", dependencies=[Depends(check_csrf)])
+@app.post("/interne-ressourcen/gegenstaende", dependencies=[Depends(check_csrf)])
 def internal_asset_create(request: Request, name: str = Form(...),
                           category: str = Form("Sonstiges"),
                           location_id: int = Form(0), location: str = Form(""),
@@ -224,10 +224,10 @@ def internal_asset_create(request: Request, name: str = Form(...),
     _event(db, asset.id, user, "created", f"{name}; Bestand {quantity}")
     db.commit()
     flash(request, "Interner Gegenstand angelegt.")
-    return redirect("/resources/intern#katalog")
+    return redirect("/interne-ressourcen#katalog")
 
 
-@app.post("/resources/intern/{asset_id:int}/bearbeiten", dependencies=[Depends(check_csrf)])
+@app.post("/interne-ressourcen/{asset_id:int}/bearbeiten", dependencies=[Depends(check_csrf)])
 def internal_asset_update(request: Request, asset_id: int,
                           name: str = Form(...), category: str = Form("Sonstiges"),
                           quantity: int = Form(...), location_id: int = Form(0),
@@ -257,10 +257,10 @@ def internal_asset_update(request: Request, asset_id: int,
     _event(db, asset.id, user, "changed", f"Bestand {before} → {quantity}, aktiv={asset.active}")
     db.commit()
     flash(request, "Gegenstand aktualisiert.")
-    return redirect("/resources/intern#katalog")
+    return redirect("/interne-ressourcen#katalog")
 
 
-@app.post("/resources/intern/{asset_id:int}/reservieren", dependencies=[Depends(check_csrf)])
+@app.post("/interne-ressourcen/{asset_id:int}/reservieren", dependencies=[Depends(check_csrf)])
 def internal_asset_reserve(request: Request, asset_id: int,
                            start: str = Form(...), end: str = Form(...),
                            quantity: int = Form(1), purpose: str = Form(""),
@@ -275,7 +275,7 @@ def internal_asset_reserve(request: Request, asset_id: int,
         raise HTTPException(409, "Dieser Gegenstand ist deaktiviert.")
     if _available(db, asset, starts_at, ends_at) < quantity:
         flash(request, "Der gewünschte Bestand ist im Zeitraum nicht verfügbar.", "error")
-        return redirect("/resources/intern#katalog")
+        return redirect("/interne-ressourcen#katalog")
     booking = InternalAssetReservation(
         asset_id=asset.id, user_id=user.id, starts_at=starts_at,
         ends_at=ends_at, quantity=quantity, purpose=purpose.strip()[:255],
@@ -285,10 +285,10 @@ def internal_asset_reserve(request: Request, asset_id: int,
     _event(db, asset.id, user, "reserved", f"{quantity} × {booking.purpose}", booking.id)
     db.commit()
     flash(request, "Interne Reservierung angelegt.")
-    return redirect("/resources/intern#reservierungen")
+    return redirect("/interne-ressourcen#reservierungen")
 
 
-@app.post("/resources/intern/{asset_id:int}/wartung", dependencies=[Depends(check_csrf)])
+@app.post("/interne-ressourcen/{asset_id:int}/wartung", dependencies=[Depends(check_csrf)])
 def internal_asset_maintenance_create(request: Request, asset_id: int,
                                       start: str = Form(...), end: str = Form(...),
                                       quantity: int = Form(1), reason: str = Form(""),
@@ -307,10 +307,10 @@ def internal_asset_maintenance_create(request: Request, asset_id: int,
     _event(db, asset.id, user, "maintenance", f"{quantity} Stück gesperrt: {hold.reason}")
     db.commit()
     flash(request, "Wartung / Sperrzeit angelegt.")
-    return redirect("/resources/intern#wartungen")
+    return redirect("/interne-ressourcen#wartungen")
 
 
-@app.post("/resources/intern/wartungen/{maintenance_id:int}/loeschen", dependencies=[Depends(check_csrf)])
+@app.post("/interne-ressourcen/wartungen/{maintenance_id:int}/loeschen", dependencies=[Depends(check_csrf)])
 def internal_maintenance_delete(request: Request, maintenance_id: int,
                                 user: User = Depends(current_user),
                                 db: Session = Depends(get_db)):
@@ -323,10 +323,10 @@ def internal_maintenance_delete(request: Request, maintenance_id: int,
     db.delete(hold)
     db.commit()
     flash(request, "Sperrzeit aufgehoben.")
-    return redirect("/resources/intern#wartungen")
+    return redirect("/interne-ressourcen#wartungen")
 
 
-@app.post("/resources/intern/buchungen/{booking_id:int}/{action}", dependencies=[Depends(check_csrf)])
+@app.post("/interne-ressourcen/buchungen/{booking_id:int}/{action}", dependencies=[Depends(check_csrf)])
 def internal_asset_transition(request: Request, booking_id: int, action: str,
                               note: str = Form(""), user: User = Depends(current_user),
                               db: Session = Depends(get_db)):
@@ -358,10 +358,10 @@ def internal_asset_transition(request: Request, booking_id: int, action: str,
     db.commit()
     flash(request, {"cancel": "Reservierung storniert.", "issue": "Ausgabe dokumentiert.",
                     "return": "Rückgabe dokumentiert."}[action])
-    return redirect("/resources/intern#reservierungen")
+    return redirect("/interne-ressourcen#reservierungen")
 
 
-@app.get("/resources/intern/plan")
+@app.get("/interne-ressourcen/plan")
 def internal_week_plan(request: Request, start: str = "", category: str = "",
                        user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Öffentliche Belegungsdichte nur für berechtigte interne Nutzer, ohne fremde Personendaten."""
@@ -391,7 +391,7 @@ def internal_week_plan(request: Request, start: str = "", category: str = "",
                   next=(first + timedelta(days=7)).isoformat())
 
 
-@app.get("/resources/intern/buchungen/{booking_id:int}/termin.ics")
+@app.get("/interne-ressourcen/buchungen/{booking_id:int}/termin.ics")
 def internal_booking_ical(booking_id: int, user: User = Depends(current_user),
                           db: Session = Depends(get_db)):
     """Kalenderexport ohne öffentlich teilbaren Buchungstoken."""
@@ -419,3 +419,21 @@ def internal_booking_ical(booking_id: int, user: User = Depends(current_user),
     return Response(cal.to_ical(), media_type="text/calendar; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="takt-material-{booking.id}.ics"',
                              "Cache-Control": "private, no-store"})
+
+
+# Alte gespeicherte Links funktionieren weiter, werden aber nur unter dem neuen Modul freigegeben.
+@app.get("/resources/intern", include_in_schema=False)
+@app.get("/resources/intern/{legacy_path:path}", include_in_schema=False)
+def internal_legacy_links(request: Request, legacy_path: str = "",
+                          user: User = Depends(current_user)):
+    _access(user)
+    import re
+    from fastapi.responses import RedirectResponse
+    allowed = legacy_path in ("", "plan", "verfuegbarkeit") or bool(
+        re.fullmatch(r"buchungen/\d+/termin\.ics", legacy_path))
+    if not allowed:
+        raise HTTPException(404)
+    new_url = "/interne-ressourcen" + ("/" + legacy_path if legacy_path else "")
+    if request.url.query:
+        new_url += "?" + request.url.query
+    return RedirectResponse(new_url, status_code=308)

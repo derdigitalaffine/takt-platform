@@ -32,6 +32,7 @@ MODULE_GUIDES = {
     "circulations": "umlaeufe-aushaenge.md",
     "dms": "ablage-dms.md",
     "resources": "ressourcen.md",
+    "internal_assets": "interne-ressourcen.md",
     "signage": "digital-signage.md",
     "krank": "krankmeldungen.md",
     "verbandbuch": "digitales-verbandbuch.md",
