@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .db import Organization, User, LOCAL_TZ, utcnow
+from .organization import active_path
 from .main import app, check_csrf, current_user, flash, get_db, redirect, render
 from . import verbandbuch as aid
 from .verbandbuch_models import (
@@ -33,7 +34,7 @@ def _open(user: User) -> None:
 
 def _site(db: Session, site_id: int) -> FirstAidSite:
     site = db.get(FirstAidSite, site_id)
-    if site is None or not site.active or not (org := db.get(Organization, site.org_id)) or not org.active:
+    if site is None or not site.active or not active_path(db, site.org_id):
         raise HTTPException(404, "Standort nicht verfügbar.")
     return site
 
@@ -259,7 +260,7 @@ async def verbandbuch_site_create(
     except (TypeError, ValueError):
         raise HTTPException(422, "Arbeitgeber / Organisation auswählen.") from None
     org = db.get(Organization, org_id)
-    if not 2 <= len(title) <= 160 or not org or not org.active:
+    if not 2 <= len(title) <= 160 or not org or not active_path(db, org.id):
         raise HTTPException(422, "Bitte einen gültigen Standort und eine aktive Organisation wählen.")
     db.add(FirstAidSite(org_id=org_id, title=title))
     aid.log_access(db, user.id, "site_create")
