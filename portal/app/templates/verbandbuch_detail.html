@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Geschützte Fachakte{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/verbandbuch.css">{% endblock %}
+{% block content %}
+<div class="vb-root vb-narrow">
+  <div class="vb-subheading vb-no-print"><a class="vb-back" href="/verbandbuch"><i class="fa-solid fa-arrow-left"></i> Fachablage</a><span class="vb-chip"><i class="fa-solid fa-lock"></i> Streng vertraulich</span></div>
+  <header class="vb-page-head"><div class="vb-eyebrow">Erste-Hilfe-Fachakte · Zugriff protokolliert</div><h1>EH-{{ entry.id[:8]|upper }}</h1><p>{{ site.title if site else 'Standort' }} · Dokumentiert {{ entry.created_at|local }}</p></header>
+  <div class="vb-actions vb-no-print mb-3"><a class="btn btn-outline-secondary" href="/verbandbuch/fall/{{entry.id}}/druck" target="_blank" rel="noopener"><i class="fa-solid fa-print me-1"></i>Druckansicht</a></div>
+  {% if entry.legal_hold %}<div class="alert alert-warning" role="status">Dieser Fall ist von der automatischen Löschung ausgenommen (fachlich begründete Löschsperre).</div>{% endif %}
+  <section class="vb-card vb-form-section"><h2>Dokumentation</h2><dl class="vb-data-list">
+    {% for key, label in labels.items() %}<div><dt>{{ label }}</dt><dd>{{ values.get(key) or '–' }}</dd></div>{% endfor %}
+    <div><dt>Aufbewahrung regulär bis</dt><dd>{{ entry.retention_due_at|local('%d.%m.%Y') }}</dd></div></dl>
+  </section>
+  <section class="vb-card vb-form-section vb-no-print"><h2>Nachvollziehbare Berichtigungen</h2>
+    {% if versions %}<p class="small text-secondary">Es gibt {{ versions|length }} zusätzliche Version(en). Frühere Versionen bleiben unverändert verschlüsselt erhalten.</p>
+      <ol class="vb-version-list">{% for version in versions %}<li>Version {{ version.revision + 1 }} · {{ version.changed_at|local }}</li>{% endfor %}</ol>
+    {% else %}<p class="text-secondary">Originalfassung; bisher keine Berichtigungen.</p>{% endif %}
+    {% if errors %}<div class="alert alert-danger" role="alert"><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+    <details class="vb-edit-details"><summary><i class="fa-solid fa-pen me-2"></i>Berichtigung dokumentieren</summary>
+      <form method="post" action="/verbandbuch/fall/{{entry.id}}/korrektur" class="vb-edit-form" autocomplete="off"><input type="hidden" name="csrf" value="{{csrf}}">
+      <p class="small text-secondary">Bitte den vollständigen Datensatz berichtigen. Die ursprünglichen Angaben werden nicht überschrieben.</p>
+      <div class="vb-fields">
+      {% for key, label in labels.items() %}<div class="vb-field {% if key in ['incident_description','injury','aid_description','witnesses'] %}vb-full{% endif %}"><label for="edit-{{key}}">{{ label }} {% if key in ['person_name','incident_at','incident_place','incident_description','injury','aid_at','aid_description','aider_name'] %}*{% endif %}</label>
+        {% if key == 'person_group' %}<select class="form-select" name="{{key}}" id="edit-{{key}}">{% for value, option in [('', 'Nicht angegeben'), ('beschaeftigt','Beschäftigte'),('gast','Gast / Besuch'),('extern','Fremdpersonal'),('ehrenamt','Ehrenamtliche'),('andere','Andere')] %}<option value="{{value}}" {% if values.get(key,'') == value %}selected{% endif %}>{{option}}</option>{% endfor %}</select>
+        {% elif key in ['incident_at','aid_at'] %}<input class="form-control" name="{{key}}" id="edit-{{key}}" type="datetime-local" value="{{values.get(key,'')}}" required>
+        {% elif key in ['incident_description','injury','aid_description'] %}<textarea class="form-control" name="{{key}}" id="edit-{{key}}" rows="3" required>{{values.get(key,'')}}</textarea>
+        {% else %}<input class="form-control" name="{{key}}" id="edit-{{key}}" value="{{values.get(key,'')}}" {% if key in ['person_name','incident_place','aider_name'] %}required{% endif %}>{% endif %}
+      </div>{% endfor %}
+      <div class="vb-field vb-full"><label for="reason">Grund der Berichtigung *</label><textarea class="form-control" id="reason" name="reason" maxlength="600" required rows="2" placeholder="Warum ist die Änderung erforderlich?"></textarea></div></div>
+      <div class="vb-actions"><button class="btn btn-primary" type="submit">Neue Version speichern</button></div>
+      </form>
+    </details>
+  </section>
+  {% if not entry.legal_hold %}<section class="vb-card vb-form-section vb-no-print"><details class="vb-edit-details"><summary><i class="fa-solid fa-shield-halved me-2"></i>Aufbewahrungssperre setzen</summary>
+    <p class="small text-secondary">Bei rechtlicher Pflicht zur längeren Aufbewahrung. Die Freigabe zum späteren Aufheben erfolgt außerhalb dieser ersten Version nach fachlichem Verfahren.</p>
+    <form method="post" action="/verbandbuch/fall/{{entry.id}}/sperren"><input type="hidden" name="csrf" value="{{csrf}}"><label for="hold-reason" class="form-label">Begründung *</label><textarea id="hold-reason" name="reason" class="form-control" required minlength="10" maxlength="600"></textarea><button type="submit" class="btn btn-outline-warning mt-2">Sperre setzen</button></form>
+  </details></section>{% endif %}
+  <p class="vb-confidential">VERTRAULICH – Personenbezogene Gesundheitsdaten. Nur zweckgebunden verwenden; Ausdrucke und Kopien vor unbefugtem Zugriff schützen.</p>
+</div>
+{% endblock %}

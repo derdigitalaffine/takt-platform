@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Erfassungsnachweis{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/verbandbuch.css">{% endblock %}
+{% block content %}
+<div class="vb-root vb-narrow"><div class="vb-card vb-receipt">
+  <span class="vb-success"><i class="fa-solid fa-circle-check"></i></span><h1>Dokumentation gespeichert</h1>
+  <p>Die Erste-Hilfe-Leistung wurde im geschützten Fachbereich erfasst. Hier erscheinen bewusst keine vertraulichen Gesundheitsangaben.</p>
+  <dl class="vb-receipt-list"><div><dt>Aktenzeichen</dt><dd><code>EH-{{ entry.id[:8]|upper }}</code></dd></div><div><dt>Erfasst am</dt><dd>{{ entry.created_at|local }}</dd></div>
+  <div><dt>Standort</dt><dd>{{ site.title if site else '–' }}</dd></div><div><dt>Aufbewahrung bis</dt><dd>{{ entry.retention_due_at|local('%d.%m.%Y') }} (vorbehaltlich einer begründeten Löschsperre)</dd></div></dl>
+  <div class="vb-actions"><a class="btn btn-primary" href="/verbandbuch">Zum Verbandbuch</a>{% if review %}<a class="btn btn-outline-primary" href="/verbandbuch/fall/{{entry.id}}">Fachakte öffnen</a>{% endif %}</div>
+</div></div>
+{% endblock %}

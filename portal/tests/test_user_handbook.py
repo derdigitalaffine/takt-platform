@@ -34,6 +34,7 @@ MODULE_GUIDES = {
     "resources": "ressourcen.md",
     "signage": "digital-signage.md",
     "krank": "krankmeldungen.md",
+    "verbandbuch": "digitales-verbandbuch.md",
 }
 EXTRA_GUIDES = ("meetings.md", "abwesenheiten.md", "zahlungen.md")
 

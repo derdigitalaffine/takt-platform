@@ -96,6 +96,8 @@ ITEMS: list[Item] = [
     Item("inbox", "work", "/forms/inbox", "fa-inbox", "Zum Ausfüllen", lambda c: "forms" in c.modules, _pre("/forms/inbox")),
     Item("absences", "work", "/abwesenheiten", "fa-umbrella-beach", "Abwesenheiten", lambda c: True,
          _pre("/abwesenheiten"), lambda c: _absence_badge(c)),
+    Item("verbandbuch", "personal", "/verbandbuch", "fa-kit-medical", "Digitales Verbandbuch",
+         lambda c: "verbandbuch" in c.modules and (c.admin or bool(c.user.perms & {"verbandbuch_capture", "verbandbuch_review"})), _pre("/verbandbuch")),
     Item("krank_me", "work", "/krank", "fa-notes-medical", "Krank melden", lambda c: bool(c.krank_nav),
          lambda p: p == "/krank" or (p.startswith("/krank/") and not p.startswith("/krank/meine"))),
     Item("krank_mine", "work", "/krank/meine", "fa-folder-open", "Meine Krankmeldungen", lambda c: bool(c.krank_nav),
@@ -200,7 +202,7 @@ FAMILIES = [
     ("resources", "res_planner", "res_bookings"), ("signage",), ("bookings",),
     ("forms", "inbox", "blocks", "locations"), ("app_inbox",), ("processes",),
     ("knowledge",), ("ai",), ("dms", "dms_persons", "dms_areas"), ("recht", "laws"), ("map", "maps"),
-    ("absences",), ("krank_me", "krank_mine", "krank_staff"),
+    ("absences",), ("verbandbuch",), ("krank_me", "krank_mine", "krank_staff"),
 ]
 CONTEXTS = [family for family in FAMILIES if len(family) > 1 and family[0] not in {"surveys", "resources"}]
 CONTEXT_ONLY = {i for family in FAMILIES for i in family[1:]}
@@ -234,6 +236,7 @@ DESCRIPTIONS = {
     "recht": ("Lesen und durchsuchen Sie Satzungen und Rechtstexte. Berechtigte Personen pflegen die Inhalte.", "Ortsrecht lesen · Rechtstexte suchen", "Gesetz Satzung Recht"),
     "map": ("Nutzen Sie geografische Informationen im Kartenbrowser und arbeiten Sie mit Ihren Karten.", "Kartenbrowser öffnen · Karten ansehen", "Karte Maps Geografie"),
     "absences": ("Planen Sie Abwesenheiten und stimmen Sie Vertretungen ab.", "Abwesenheiten öffnen · Vertretung abstimmen", "Urlaub Vertretung"),
+    "verbandbuch": ("Erste-Hilfe-Leistungen mobil vertraulich dokumentieren und nur mit eigenem Fachmandat prüfen. QR-Standorte, Berichtigungen und Löschfristen geschützt verwalten.", "Erste Hilfe erfassen · Meine Nachweise · Standorte & QR-Codes", "Verbandbuch Erste Hilfe DGUV Unfall Verbandkasten Verbandskasten Arbeitsschutz QR"),
     "krank_me": ("Erstellen und verfolgen Sie eigene Krankmeldungen. Zuständige Personen finden hier die freigegebene Bearbeitung.", "Krankmeldung erstellen · Eigene Meldungen", "Krank melden Krankmelder"),
 }
 for family in FAMILIES:
