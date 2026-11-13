@@ -1,11 +1,20 @@
 {% extends "auth.html" %}
-{% block title %}Anmelden{% endblock %}
+{% block title %}Anmelden<script src="/static/passkeys.js" defer></script>
+{% endblock %}
 {% block auth %}
 {% if ui.login_text %}<p class="text-center text-secondary">{{ ui.login_text }}</p>{% endif %}
 <div class="card shadow-sm">
   <div class="card-body p-4">
     <h1 class="h5 mb-3">Anmelden</h1>
     {% if oidc_ready %}<div class="mb-4"><a class="btn btn-primary w-100" href="/auth/oidc/start?next={{ next | urlencode }}"><i class="fa-solid fa-cloud me-2" aria-hidden="true"></i>{{oidc_label}}</a></div><p class="small text-secondary">Oder mit Ihrem lokalen Portalkonto anmelden:</p>{% endif %}
+    <section class="mb-3" data-passkey-panel aria-label="Mit Passkey anmelden">
+      <button class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-center gap-2"
+              type="button" data-passkey-login>
+        <i class="fa-solid fa-fingerprint" aria-hidden="true"></i>Mit Passkey anmelden
+      </button>
+      <p class="small text-secondary mt-2 mb-0" data-passkey-status role="status" aria-live="polite">Ohne Passwort – mit Fingerabdruck, Gesichtserkennung oder Gerätesperre.</p>
+    </section>
+    <div class="d-flex align-items-center gap-2 mb-3 text-secondary small"><span class="flex-grow-1 border-top"></span>Oder mit Passwort<span class="flex-grow-1 border-top"></span></div>
     <form method="post" action="/login">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="next" value="{{ next }}">
