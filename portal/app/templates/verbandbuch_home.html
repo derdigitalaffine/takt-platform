@@ -13,6 +13,7 @@
   </header>
   {% if not ready %}<div class="alert alert-warning" role="alert"><strong>Fachschlüssel fehlt.</strong> Vor der Erfassung muss ein eigener Verschlüsselungsschlüssel eingerichtet werden. Es werden keine Gesundheitsdaten unverschlüsselt übernommen.</div>{% endif %}
   {% if not approved %}<div class="alert alert-info" role="status"><strong>Produktivfreigabe ausstehend.</strong> Das Modul bleibt für echte Meldungen gesperrt, bis die Fach-/Datenschutzfreigaben dokumentiert und die Betriebsfreigabe gesetzt sind.</div>{% endif %}
+  <div class="vb-quick-guide"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span><strong>Wichtig:</strong> Jede Erste-Hilfe-Leistung dokumentieren – auch kleine Verletzungen. Einträge werden vertraulich aufbewahrt und nach fünf Jahren entsprechend den Aufbewahrungsregeln gelöscht.</span></div>
   <div class="vb-grid vb-tiles">
     <section class="vb-card vb-metric"><span class="vb-icon"><i class="fa-solid fa-pen-to-square"></i></span><strong>{{ capture|length }}</strong><span>Meine freigegebenen Standorte zum Erfassen</span></section>
     <section class="vb-card vb-metric"><span class="vb-icon"><i class="fa-regular fa-file-lines"></i></span><strong>{{ my_rows|length }}</strong><span>Meine letzten Dokumentationen (max. 40)</span></section>
