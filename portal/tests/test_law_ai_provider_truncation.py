@@ -64,3 +64,41 @@ def test_streaming_length_finish_reason_is_an_explicit_error(monkeypatch):
 
     with pytest.raises(ai_provider.AIOutputTruncated, match="Tokenlimit"):
         asyncio.run(read())
+
+
+
+@pytest.mark.parametrize("status,body", [
+    (413, {"error": {"message": "request too large"}}),
+    (400, {"error": {"code": "context_length_exceeded", "message": "too much input"}}),
+])
+def test_explicit_provider_input_context_limit_is_identified(monkeypatch, status, body):
+    async def no_dns(*args, **kwargs):
+        return None
+    monkeypatch.setattr(ai_provider, "validate_destination", no_dns)
+    monkeypatch.setattr(ai_provider, "decrypt", lambda _: "test")
+    real_client = httpx.AsyncClient
+
+    def fake_client(*args, **kwargs):
+        async def handler(_request):
+            return httpx.Response(status, json=body)
+        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+    monkeypatch.setattr(ai_provider.httpx, "AsyncClient", fake_client)
+    with pytest.raises(ai_provider.AIContextLimit, match="Eingabekontextlimit"):
+        asyncio.run(ai_provider.complete(_provider(), [{"role": "user", "content": "x"}]))
+
+
+def test_generic_http_400_is_not_misclassified_as_context_limit(monkeypatch):
+    async def no_dns(*args, **kwargs):
+        return None
+    monkeypatch.setattr(ai_provider, "validate_destination", no_dns)
+    monkeypatch.setattr(ai_provider, "decrypt", lambda _: "test")
+    real_client = httpx.AsyncClient
+
+    def fake_client(*args, **kwargs):
+        async def handler(_request):
+            return httpx.Response(400, json={"error": {"code": "bad_model"}})
+        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+    monkeypatch.setattr(ai_provider.httpx, "AsyncClient", fake_client)
+    with pytest.raises(ai_provider.AIProviderError, match="HTTP 400") as error:
+        asyncio.run(ai_provider.complete(_provider(), [{"role": "user", "content": "x"}]))
+    assert not isinstance(error.value, ai_provider.AIContextLimit)
