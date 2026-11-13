@@ -41,3 +41,23 @@ def test_workspace_exposes_three_granular_stages(agent_routes):
         assert 'value="' + item + '"' in response.text
     assert "/static/law-ai-diff.js" in response.text
     assert "law-original-diff" in response.text
+
+
+def test_discard_unused_draft_from_list_without_accepting():
+    from app.law_ai_models import LawAiDraft
+    admin = login(*ADMIN)
+    draft_id = _upload(admin)
+    landing = admin.get("/laws-assistant")
+    assert f"/laws-assistant/{draft_id}/discard" in landing.text
+    csrf = csrf_of(landing.text)
+    invalid = admin.post(f"/laws-assistant/{draft_id}/discard",
+                         data={"csrf": csrf, "discard_confirmed": ""})
+    assert invalid.status_code == 422
+    with SessionLocal() as db:
+        assert db.get(LawAiDraft, draft_id) is not None
+    removed = admin.post(f"/laws-assistant/{draft_id}/discard",
+                         data={"csrf": csrf, "discard_confirmed": "1"})
+    assert removed.status_code == 303, removed.text
+    with SessionLocal() as db:
+        assert db.get(LawAiDraft, draft_id) is None
+    assert admin.get(f"/laws-assistant/{draft_id}").status_code == 404
