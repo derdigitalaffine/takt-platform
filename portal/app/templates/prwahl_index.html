@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Personalratswahlen{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/prwahl.css">{% endblock %}
+{% block content %}
+<div class="pr-page">
+  <header class="ds-page-header pr-header">
+    <div class="ds-page-title">
+      <span class="pr-eyebrow"><i class="fa-solid fa-check-to-slot" aria-hidden="true"></i> Wahlorganisation · Rheinland-Pfalz</span>
+      <h1>Personalratswahlen</h1>
+      <p>Wahlen umsichtig organisieren, Unterlagen vorbereiten und jeden Arbeitsschritt nachvollziehbar dokumentieren.</p>
+    </div>
+    {% if can_create %}<div class="ds-page-actions"><a href="#pr-new" class="btn btn-primary"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Wahl vorbereiten</a></div>{% endif %}
+  </header>
+  <div class="pr-alert" role="note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+    <div><strong>Sicherer Vorbereitungsmodus</strong><span>Keine digitale Stimmabgabe. Fristen, Bekanntgaben und Vordrucke bedürfen der Prüfung nach LPersVG und WOLPersVG. Persönliche Wahlunterlagen bleiben im Fachbereich.</span></div>
+  </div>
+  <div class="pr-section-heading"><h2>Deine Wahl-Arbeitsbereiche</h2><span>{{ elections|length }} sichtbar</span></div>
+  <div class="pr-election-grid">
+    {% for election in elections %}
+    <a class="pr-election-card" href="/personalratswahl/{{election.id}}">
+      <span class="pr-card-icon"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></span>
+      <span class="pr-card-body"><small>{{ bodies.get(election.body_type, election.body_type) }}</small>
+        <strong>{{election.title}}</strong><span>{{election.service_name}}</span>
+        <em><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>{{election.election_day.strftime('%d.%m.%Y') if election.election_day else 'Wahltermin noch offen'}} · <span class="pr-status">Vorbereitung</span></em>
+      </span>
+      <i class="fa-solid fa-arrow-up-right-from-square pr-arrow" aria-hidden="true"></i>
+    </a>
+    {% else %}
+    <div class="pr-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><h3>Noch keine Wahlbereiche</h3><p>{% if can_create %}Beginne mit einer Dienststelle und einem geplanten Wahltermin. Anschließend begleitet dich TAKT durch die Organisation.{% else %}Du hast derzeit kein Mandat für einen Wahlbereich. Die Zuordnung erfolgt durch die fachlich zuständige Person.{% endif %}</p></div>
+    {% endfor %}
+  </div>
+  {% if can_create %}
+  <section class="pr-panel pr-create" id="pr-new" aria-labelledby="pr-create-heading">
+    <div class="pr-panel-head"><div><span class="pr-eyebrow">Schritt 1 / Wahl anlegen</span><h2 id="pr-create-heading">Neue Personalratswahl vorbereiten</h2><p>Alle Angaben bleiben änderbar. Es werden keine gesetzlichen Fristen automatisch festgelegt.</p></div></div>
+    <form action="/personalratswahl/neu" method="post" class="row g-3">
+      <input type="hidden" name="csrf" value="{{csrf}}">
+      <div class="col-lg-7"><label class="form-label" for="pr-title">Bezeichnung der Wahl <span class="text-danger">*</span></label><input class="form-control" id="pr-title" name="title" required maxlength="180" placeholder="z. B. Personalratswahl 2027"></div>
+      <div class="col-lg-5"><label class="form-label" for="pr-body">Wahlkörper <span class="text-danger">*</span></label><select class="form-select" id="pr-body" name="body_type" required>{% for code, label in bodies.items() %}<option value="{{code}}">{{label}}</option>{% endfor %}</select></div>
+      <div class="col-md-6"><label class="form-label" for="pr-org">Dienststelle / Organisation <span class="text-danger">*</span></label><select class="form-select" id="pr-org" name="org_id" required><option value="">Bitte wählen</option>{% for org in orgs %}<option value="{{org.id}}">{{org.name}}</option>{% endfor %}</select><div class="form-text">Der Wahlbereich ist an diese Dienststelle gebunden.</div></div>
+      <div class="col-md-3"><label class="form-label" for="pr-start">Erster Wahltag</label><input class="form-control" id="pr-start" name="election_day" type="date"></div>
+      <div class="col-md-3"><label class="form-label" for="pr-end">Letzter Wahltag</label><input class="form-control" id="pr-end" name="election_end_day" type="date"></div>
+      <div class="col-md-12"><label class="form-label" for="pr-location">Geplanter Wahlort</label><input class="form-control" id="pr-location" name="election_location" maxlength="240" placeholder="Wahllokal / Dienststelle"></div>
+      <div class="col-12 pr-form-actions"><span><i class="fa-solid fa-lock me-1" aria-hidden="true"></i> Nur berechtigte Fachmandate sehen die angelegte Wahl.</span><button class="btn btn-primary" type="submit">Arbeitsbereich anlegen <i class="fa-solid fa-arrow-right ms-1" aria-hidden="true"></i></button></div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

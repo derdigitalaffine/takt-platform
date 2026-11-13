@@ -80,6 +80,18 @@ def _absence_badge(c: Ctx) -> tuple[int, str]:
     return n, (f"{n} Bitte(n) um Vertretung" if n else "")
 
 
+def _prwahl_visible(c: Ctx) -> bool:
+    if "prwahl" not in c.modules:
+        return False
+    if c.can("prwahl_setup"):
+        return True
+    from sqlalchemy import select
+    from .db import SessionLocal
+    from .prwahl_models import PRMandate
+    with SessionLocal() as db:
+        return db.scalar(select(PRMandate.id).where(PRMandate.user_id == c.user.id).limit(1)) is not None
+
+
 def _krank_badge(c: Ctx) -> tuple[int, str]:
     n = c.krank_nav.get("badge", 0)
     return n, (f"{n} neue Meldungen bzw. offene eAU-Abrufe" if n else "")
@@ -87,6 +99,8 @@ def _krank_badge(c: Ctx) -> tuple[int, str]:
 
 ITEMS: list[Item] = [
     # Mein Arbeitsplatz
+    Item("prwahl", "work", "/personalratswahl", "fa-check-to-slot", "Personalratswahl",
+         _prwahl_visible, _pre("/personalratswahl")),
     Item("anliegen", "work", "/anliegen", "fa-inbox", "Interne Anliegen",
          lambda c: "anliegen" in c.modules, _pre("/anliegen")),
     Item("tasks", "work", "/tasks", "fa-list-check", "Meine Aufgaben",
@@ -196,7 +210,7 @@ BY_ID = {it.id: it for it in ITEMS}
 # Stable entry IDs preserve bookmarks and personal favorites.
 FAMILIES = [
     ("calendars",), ("leave",),
-    ("anliegen",), ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
+    ("prwahl",), ("anliegen",), ("tasks",), ("kanban",), ("circulations", "circulation_reports"),
     ("surveys", "polls", "votes"), ("shortlinks",),
     ("meetings", "meeting_plan"), ("seminars",),
     ("resources", "res_planner", "res_bookings"), ("signage",), ("bookings",),
@@ -214,6 +228,7 @@ ADMIN_SECTIONS = {
     "Portal & Betrieb": ["modules", "design", "public_nav", "sessions", "https", "domains", "trash"],
 }
 DESCRIPTIONS = {
+    "prwahl": ("Wahlvorbereitung und den Wahlvorstand fachlich getrennt organisieren. DIN-A4-Mustervordrucke als geschützte, versionierte Prüfentwürfe erzeugen.", "Wahl organisieren · Vordrucke erstellen", "Personalratswahl Wahlvorstand Wahlorganisation Wahlunterlagen Wahlausschreiben RLP"),
     "anliegen": ("Interne Mängel, Beschaffungen, Wünsche und vertrauliche Beschwerden erfassen und an zuständige Personen leiten.", "Anliegen einreichen · Bearbeitungsstand verfolgen", "Anliegen Mangel Bestellung Beschwerde Büromaterial Möbel"),
     "knowledge": ("Organisationswissen, Arbeitsanleitungen und Prozesse strukturiert dokumentieren, sicher teilen und ohne KI durchsuchen.", "Wissensräume öffnen · Prozesse und Beiträge finden", "Wissen Wissensmanagement Prozess Organisationsatlas Dokumentation FAQ Anleitung"),
     "ai": ("Der zentrale KI-Arbeitsplatz: Fragen beantworten, freigegebenes Wissen nutzen und vorausgefüllte Fachvorschläge prüfen.", "TAKT Agent öffnen · Wissen und Fachabläufe", "KI LLM AI Chat Gemma Wissen"),

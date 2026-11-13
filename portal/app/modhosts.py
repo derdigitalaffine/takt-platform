@@ -32,6 +32,7 @@ MODULE_PUBLIC = {
 PORTAL_ONLY = {
     "ai": "Agent und Chat benötigen eine Anmeldung.",
     "knowledge": "Internes Wissensmanagement mit Berechtigungsprüfung.",
+    "prwahl": "Vertrauliche Wahlorganisation, ausschließlich intern mit Fachmandat.",
     "anliegen": "Interne Anliegen und ihre Bearbeitung.",
     "calendars": "Kalender, Urlaub und CalDAV laufen über die Portal-Anmeldung.",
     "tasks": "Interne Aufgaben und Zusammenarbeit.",

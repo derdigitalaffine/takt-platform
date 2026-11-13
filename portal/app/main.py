@@ -213,6 +213,7 @@ MODULES = {
     "circulations": ("Umläufe & Aushänge", "module_circulations", ("/umlaeufe",)),
     "dms": ("Ablage (DMS)", "module_dms", ("/dms",)),
     "resources": ("Ressourcenbuchung", "module_resources", ("/resources", "/r/", "/r", "/r-embed")),
+    "prwahl": ("Personalratswahl", "module_prwahl", ("/personalratswahl",)),
     "signage": ("Digital Signage", "module_signage", ("/signage",)),
     "krank": ("BlueOtter Krankmelder", "module_krank", ("/krank", "/krankmelder")),
     "verbandbuch": ("Digitales Verbandbuch", "module_verbandbuch", ("/verbandbuch",)),
@@ -3213,6 +3214,9 @@ from . import routes_leave  # noqa: E402,F401
 from . import routes_calendars  # noqa: E402,F401
 from . import routes_birthdays  # noqa: E402,F401
 
+from . import routes_prwahl  # noqa: E402,F401  (separate protected election Fachdomäne)
+from . import routes_prwahl_workflow  # noqa: E402,F401
+from . import routes_prwahl_schedule  # noqa: E402,F401
 from . import routes_calendar_devices  # noqa: E402,F401
 
 from . import routes_caldav  # noqa: E402,F401
