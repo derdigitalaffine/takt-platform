@@ -8,6 +8,8 @@ normal portal test database.
 from sqlalchemy import create_engine, inspect, text
 
 from app import db as portal_db
+from app.law_ai_models import LawAiDraft
+from sqlalchemy.orm import Session
 
 
 OCR_COLUMNS = {
@@ -66,5 +68,12 @@ def test_old_ortsrecht_draft_schema_is_extended_without_losing_work(tmp_path, mo
         assert row.status == "staged"
         assert [row.ocr_job_key, row.ocr_pages_json,
                 row.ocr_warnings_json, row.ocr_failure] == ["", "[]", "[]", ""]
+        # The ORM query performed by GET /laws-assistant must no longer raise
+        # sqlite3.OperationalError: no such column: law_ai_drafts.ocr_job_key.
+        with Session(engine) as session:
+            draft = session.get(LawAiDraft, 77)
+            assert draft is not None
+            assert draft.proposed_md == "# Hausordnung\n\n§ 1 Test"
+            assert draft.ocr_job_key == ""
     finally:
         engine.dispose()
