@@ -190,7 +190,11 @@ async def process_one(job_id: int) -> None:
                             provider.model_id != routes[task]["model_id"] or
                             provider.base_url != routes[task]["destination"]):
                         raise ValueError("Der freigegebene KI-Datenempfänger wurde geändert.")
-                    messages, sampled = law_ai_agents.prompt(task, section.text)
+                    messages, sampled = law_ai_agents.prompt(
+                        task, section.text,
+                        context_limit=(6000 if depth and mode == "simple"
+                                       else law_ai_agents.MAX_CONTEXT_CHARS),
+                    )
                     if depth:
                         messages[0]["content"] += (
                             " KORREKTURVERSUCH: Gib ausschließlich EIN vollständiges "
