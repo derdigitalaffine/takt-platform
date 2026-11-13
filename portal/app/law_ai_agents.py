@@ -105,8 +105,11 @@ def prompt(stage: str, source: str, *,
             'Antworte exakt nach Schema {"headings":[{"quote":"wörtliche Überschriftszeile",'
             '"level":2}],"warnings":["kurzer Prüfhinweis"]}. '
             "Schlage maximal 6 besonders relevante Überschriften aus vorhandenen Zeilen vor; "
-            "level 1–5. Keine neuen Formulierungen. Änderungen an Wörtern, Satzzeichen "
-            "oder Rechtsfolgen sind verboten. Markdown-Ebene ist nur ein Darstellungsvorschlag."
+            "level 1–5. TAKT-Markdown verwendet # für den Dokumenttitel, ## für Teile/Abschnitte "
+            "und ### für Paragraphen/Artikel. Bereits vorhandene Markdown-Marker nicht verdoppeln. "
+            "Jede quote muss die exakte Quellzeile inklusive etwaiger #-Marker sein. "
+            "Keine neuen Formulierungen. Änderungen an Wörtern, Satzzeichen oder Rechtsfolgen "
+            "sind verboten. Markdown-Ebene ist nur ein Darstellungsvorschlag."
         )
     elif stage == "law_metadata":
         instructions = (
@@ -210,8 +213,17 @@ def validate(stage: str, answer: str, source: str) -> dict:
                     or quote.strip() not in [line.strip() for line in source.splitlines()]):
                 discarded += 1
                 continue
+            heading = re.sub(r"^#{1,6}\\s+", "", quote.strip())
+            # Prevent invalid constructs such as "### # § 1" and force
+            # the canonical hierarchy for statutory units.
+            if laws.NORM_RE.match(heading):
+                level = 3
+            elif laws.GROUP_RE.match(heading):
+                level = 2
+            elif level == 1 and heading != source.splitlines()[0].strip().lstrip("# "):
+                level = 2
             out.append({"quote": quote, "level": level,
-                        "markdown_suggestion": "#" * level + " " + quote.strip()})
+                        "markdown_suggestion": "#" * level + " " + heading})
         key = "headings"
     elif stage == "law_metadata":
         candidates = result.get("fields")
