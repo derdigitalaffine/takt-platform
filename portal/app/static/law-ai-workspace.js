@@ -115,6 +115,144 @@
     if (sourceNotice) sourceNotice.hidden = !dirty;
   }
 
+  // Explicit, editor-only structural aids; they do not invent normative words.
+  // No source text is persisted until the reviewer confirms legal acceptance.
+  const snippets = {
+    title: "# Titel der Satzung\n",
+    group: "## Erster Teil – Allgemeines\n",
+    norm: "### § 1 Geltungsbereich\n",
+    paragraph: "(1) ",
+    appendix: "## Anlage 1 – Bezeichnung\n",
+    reference: "[[§ 1]]",
+    table: "| Spalte 1 | Spalte 2 |\n| --- | --- |\n| Inhalt | Inhalt |\n",
+  };
+  $("[data-law-insert]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!editor) return;
+      const key = button.getAttribute("data-law-insert");
+      if (!Object.prototype.hasOwnProperty.call(snippets, key)) return;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const selectedText = editor.value.slice(start, end);
+      let insert = snippets[key];
+      if (selectedText && ["title", "group", "norm", "appendix"].includes(key) &&
+          !selectedText.includes("\n")) {
+        const prefix = snippets[key].match(/^#+ /)?.[0] || "";
+        insert = prefix + selectedText + "\n";
+      }
+      if (!["paragraph", "reference"].includes(key) &&
+          start > 0 && editor.value[start - 1] !== "\n") {
+        insert = "\n" + insert;
+      }
+      editor.setRangeText(insert, start, end, "end");
+      editor.dispatchEvent(new Event("input", { bubbles: true }));
+      editor.focus();
+    });
+  });
+
+  const canonicalButton = $("[data-law-canonical-preview]");
+  const canonicalPanel = $("[data-law-canonical-panel]");
+  const canonicalCount = $("[data-law-canonical-count]");
+  const canonicalList = $("[data-law-canonical-changes]");
+  const canonicalText = $("[data-law-canonical-text]");
+  const canonicalWarnings = $("[data-law-canonical-warnings]");
+  const canonicalApply = $("[data-law-canonical-apply]");
+  const canonicalConfirm = $("[data-law-canonical-confirm]");
+  let canonicalResult = null;
+  let canonicalBusy = false;
+  if (review && editor && canonicalButton && canonicalPanel) {
+    canonicalButton.addEventListener("click", async () => {
+      if (canonicalBusy) return;
+      const url = review.getAttribute("data-law-canonical-url") || "";
+      if (!/^\/laws-assistant\/\d+\/markdown\/preview$/.test(url)) return;
+      canonicalBusy = true;
+      canonicalButton.disabled = true;
+      canonicalResult = null;
+      canonicalPanel.hidden = false;
+      if (canonicalApply) canonicalApply.disabled = true;
+      if (canonicalConfirm) canonicalConfirm.checked = false;
+      if (canonicalCount) canonicalCount.textContent = "Gliederung wird erkannt …";
+      if (canonicalList) canonicalList.replaceChildren();
+      if (canonicalText) canonicalText.value = "";
+      if (canonicalWarnings) canonicalWarnings.textContent = "";
+      try {
+        const payload = new FormData();
+        payload.set("csrf", $('input[name="csrf"]', review)?.value || "");
+        const response = await fetch(url, {
+          method: "POST", body: payload,
+          credentials: "same-origin", cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(
+          response.status === 422
+            ? "Die Quelle ist für eine sichere vollständige Vorschau zu groß oder leer."
+            : "Die strukturierte Markdown-Vorschau ist nicht verfügbar."
+        );
+        const result = await response.json();
+        if (result.source_preserved !== true || typeof result.markdown !== "string"
+            || result.markdown.length > 150_000) {
+          throw new Error("Die Quelltexttreue konnte nicht nachgewiesen werden.");
+        }
+        canonicalResult = result;
+        if (canonicalCount) canonicalCount.textContent =
+          (result.suggested_changes || 0) + " Formateinfügungen · " +
+          (result.paragraphs || 0) + " Einzelvorschriften · " +
+          (result.groups || 0) + " Gruppen";
+        if (canonicalText) canonicalText.value = result.markdown;
+        if (canonicalWarnings) {
+          canonicalWarnings.textContent = (Array.isArray(result.warnings)
+            ? result.warnings.join(" ") + " " : "") + (result.note || "");
+        }
+        if (canonicalList && Array.isArray(result.changes)) {
+          for (const change of result.changes.slice(0, 60)) {
+            if (!change || typeof change.suggested_heading !== "string") continue;
+            const line = document.createElement("div");
+            line.className = "law-canonical-change";
+            const label = document.createElement("span");
+            label.className = "small text-secondary";
+            label.textContent = "Zeile " + change.line;
+            const suggestion = document.createElement("code");
+            suggestion.textContent = change.suggested_heading;
+            line.append(label, suggestion);
+            canonicalList.append(line);
+          }
+          if (result.changes.length > 60) {
+            const hint = document.createElement("p");
+            hint.className = "small text-secondary mt-2";
+            hint.textContent = "Weitere Vorschläge sind in der vollständigen Markdown-Vorschau enthalten.";
+            canonicalList.append(hint);
+          }
+        }
+        if (canonicalApply) canonicalApply.disabled = !canonicalConfirm?.checked;
+      } catch (error) {
+        if (canonicalCount) canonicalCount.textContent =
+          error.message || "Gliederungsvorschau fehlgeschlagen.";
+      } finally {
+        canonicalBusy = false;
+        canonicalButton.disabled = false;
+      }
+    });
+    canonicalConfirm?.addEventListener("change", () => {
+      if (canonicalApply) canonicalApply.disabled =
+        !canonicalConfirm.checked || !canonicalResult;
+    });
+    canonicalApply?.addEventListener("click", () => {
+      if (!canonicalResult || !canonicalConfirm?.checked) return;
+      if (dirty && !window.confirm(
+        "Die Markdown-Vorschau verwendet den ursprünglichen Importstand. " +
+        "Deine bisherigen Änderungen im Editor werden dadurch ersetzt. Fortfahren?"
+      )) return;
+      editor.value = canonicalResult.markdown;
+      editor.dispatchEvent(new Event("input", { bubbles: true }));
+      editor.focus();
+      editor.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (canonicalCount) canonicalCount.textContent =
+        "Formatierung in den Editor geladen – bitte Wortlaut und Gliederung prüfen.";
+      if (canonicalConfirm) canonicalConfirm.checked = false;
+      canonicalApply.disabled = true;
+    });
+  }
+
   const stats = $("[data-law-editor-count]");
   const outline = $("[data-law-editor-outline]");
   let outlineTimeout = null;
