@@ -312,6 +312,11 @@
                     <strong><i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>KI-Prüfung abgeschlossen.</strong>
                     Hinweise sind Vorschläge mit Fundstellen im importierten Text – keine amtliche oder juristische Bestätigung.
                   </div>
+                  <div class="law-actions mb-3">
+                    <a class="btn btn-outline-primary btn-sm" href="/laws-assistant/{{ selected.id }}/agents/{{ analysis.id }}/report">
+                      <i class="fa-solid fa-file-lines me-1" aria-hidden="true"></i>Prüfprotokoll ansehen und drucken
+                    </a>
+                  </div>
                   {% set structure = analysis_results.get('structure', {}) %}
                   {% set metadata = analysis_results.get('metadata', {}) %}
                   {% set verification = analysis_results.get('verification', {}) %}

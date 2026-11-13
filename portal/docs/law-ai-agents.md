@@ -62,6 +62,16 @@ Der Ortsrecht-Assistent unter `/laws-assistant` bietet einen responsiven, auf TA
 
 Hinweis: Anders als ein echter serverseitiger Zwischenstand ist die aktuelle Browserbearbeitung **bis zur expliziten Übernahme flüchtig**. Vor längerem Verlassen des Prüfplatzes entweder die geprüfte Fassung übernehmen oder den Text anderweitig sicher dokumentieren. Eine spätere echte private Zwischenstandspeicherung muss versioniert und getrennt vom OCR-Original implementiert werden, damit die Original-SHA und die bereits freigegebenen KI-Fundstellen nicht unbeabsichtigt verändert werden.
 
+## Exportierbarer privater KI-Prüfbericht
+
+Nach abgeschlossener Analyse steht im Ortsrecht-Prüfplatz die Aktion **„Prüfprotokoll ansehen und drucken“** zur Verfügung. Das neue HTML-Protokoll ist für A4-Druck oder lokales „Als PDF sichern“ im Browser optimiert. Es enthält die ursprüngliche hochgeladene Datei, SHA-256 des unveränderten Originals, SHA-256 des analysierten importierten Textstands, Analysemodus, tatsächlich beim Auftragsstart verwendete Modellzuweisungen, Abdeckungsangaben sowie getrennte Gliederungs-, Metadaten- und Texttreuehinweise mit Quellenpositionen.
+
+**Sicherheitsgrenzen:** Zugriff nur für den Eigentümer mit aktivem KI-/Ortsrechtmodul; nur erfolgreich abgeschlossene Analysen mit übereinstimmendem importiertem Text-SHA werden angezeigt. Veraltete, fremde oder unvollständige Berichte liefern HTTP 404/409. Auch beim Drucken erfolgt keine Freigabe, Veröffentlichung oder Veränderung des Rechtstexts. Unvertrauenswürdige Zitate werden HTML-escaped ausgegeben; CSP-konforme JavaScript-Aktion ohne Inline-Scripts. Print-Ausgaben sind ausschließlich redaktionelle Arbeitsunterlagen, keine amtlichen PDFs oder Rechtsgutachten.
+
+## Datenschutzfreundlicher Textvergleich
+
+Eine weitere Aktion im Editor erlaubt einen **technischen Vergleich** zwischen der aktuellen, ggf. ungespeicherten Arbeitsfassung und dem importierten OCR-/MarkItDown-Text. Eingabe wird nur an denselben owner- und CSRF-geschützten Portal-Endpunkt gesendet. Der Dienst speichert keine Vergleichstexte und zeigt bei großen Dokumenten transparent an, wenn eine sichere Vorschau nicht möglich ist. Syntax- und Wortmuster markieren Änderungen bei Zahlen/Beträgen, Negationen, Wirksamkeitsfristen und Rechtsverweisen, ohne die korrekte Rechtslage zu behaupten. Die Importquelle bleibt unverändert, und die redaktionelle Version wird nur nach bewusster Bestätigung übernommen.
+
 ## Live-Feedback und Streaming-Modelle
 
 Im KI-Provider unter **Administration → KI** kann Streaming ausdrücklich aktiviert werden (`stream_enabled`). Die Ortsrecht-Agenten erkennen diese vorhandene Provider-Einstellung je zugewiesenem Aufgabenmodell:

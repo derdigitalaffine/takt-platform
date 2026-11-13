@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from . import law_ai_agents, law_ai_agent_jobs, law_ai_coverage
 from .db import SessionLocal, User, get_settings, utcnow
 from .law_ai_agent_models import LawAiAnalysis
-from .main import app, check_csrf, get_db, rate_limit, redirect, require
+from .main import app, check_csrf, get_db, rate_limit, redirect, render, require
 from .routes_law_ai import _own
 
 law_user = require("laws")
@@ -169,6 +169,72 @@ def law_ai_agents_status(
     ).order_by(LawAiAnalysis.id.desc()).limit(1))
     return JSONResponse(_progress_payload(job),
                         headers={"Cache-Control": "private, no-store"})
+
+
+def _report_json(value: str, list_key: str) -> dict:
+    """Bound stored, untrusted model findings before rendering an HTML report."""
+    try:
+        data = json.loads(value or "{}")
+    except (ValueError, TypeError):
+        return {list_key: [], "warnings": ["Prüfdaten sind nicht auswertbar."]}
+    if not isinstance(data, dict):
+        return {list_key: [], "warnings": ["Prüfdaten sind nicht auswertbar."]}
+    entries = data.get(list_key)
+    warnings = data.get("warnings")
+    result = {
+        list_key: [x for x in entries[:150] if isinstance(x, dict)]
+        if isinstance(entries, list) else [],
+        "warnings": [str(x)[:250] for x in warnings[:50]]
+        if isinstance(warnings, list) else [],
+        "sampled": data.get("sampled") is True,
+    }
+    coverage = data.get("coverage")
+    result["coverage"] = coverage if isinstance(coverage, dict) else {}
+    return result
+
+
+@app.get("/laws-assistant/{draft_id:int}/agents/{job_id:int}/report")
+def law_ai_agent_report(
+    request: Request, draft_id: int, job_id: int,
+    user: User = Depends(law_user), db: Session = Depends(get_db),
+):
+    """Print-friendly, private and source-version-checked AI evidence report.
+
+    This is neither an official PDF nor legal approval. It never publishes or
+    modifies the editorial copy or the immutable imported OCR source.
+    """
+    _ai_permission(user, db)
+    draft = _own(db, draft_id, user)
+    job = db.get(LawAiAnalysis, job_id)
+    if job is None or job.draft_id != draft_id or job.requested_by != user.id:
+        raise HTTPException(404, "KI-Prüfbericht nicht gefunden.")
+    if job.status != "done":
+        raise HTTPException(409, "Ein Prüfbericht ist erst nach abgeschlossener Analyse verfügbar.")
+    if job.source_sha256 != law_ai_agents.source_hash(draft.proposed_md or ""):
+        raise HTTPException(409, "Die Textquelle hat sich geändert. Bitte neu analysieren.")
+    rate_limit(request, "law-ai-report", limit=60, window=3600, key=str(user.id))
+    try:
+        models = json.loads(job.provider_map_json)
+        if not isinstance(models, dict):
+            models = {}
+    except (ValueError, TypeError):
+        models = {}
+    results = {
+        "structure": _report_json(job.outline_json, "headings"),
+        "metadata": _report_json(job.metadata_json, "fields"),
+        "verification": _report_json(job.verification_json, "findings"),
+    }
+    response = render(
+        request, "law_ai_agent_report.html", user, selected=draft,
+        analysis=job, results=results, models=models,
+        agent_stages=law_ai_agents.STAGES,
+    )
+    response.headers.update({
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+        "X-Robots-Tag": "noindex, nofollow",
+    })
+    return response
 
 
 @app.post("/laws-assistant/{draft_id:int}/agents/{job_id:int}/cancel",
