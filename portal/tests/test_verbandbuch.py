@@ -217,3 +217,48 @@ def test_deactivation_revokes_qr_and_existing_grants(aid_env):
         user = db.scalar(select(User).where(User.email == email))
         assert not aid.may(db, user, site_id, "capture")
     assert creator.get("/verbandbuch/neu?s=" + aid.qr_token(site_id)).status_code == 404
+
+
+def test_frontend_key_setup_is_admin_only_and_persistent(aid_env, monkeypatch, tmp_path):
+    monkeypatch.delenv("VERBANDBUCH_ENCRYPTION_KEY", raising=False)
+    monkeypatch.setattr(aid, "_key_path", lambda: tmp_path / "private" / "fachschluessel.key")
+    # Andere Tests teilen die Datenbank und können bereits Fälle erzeugt haben.
+    # Für die isolierte Erstinitialisierung nur den Count-Guard simulieren.
+    class EmptyCases:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_):
+            return False
+        def scalar(self, *_):
+            return 0
+    monkeypatch.setattr(aid, "SessionLocal", EmptyCases)
+    admin = login("admin@example.org", "admin-passwort-123")
+    page = admin.get("/verbandbuch/standorte")
+    assert "Sicheren Fachschlüssel jetzt erzeugen" in page.text
+    token = csrf_of(page.text)
+    assert admin.post("/verbandbuch/schluessel/erzeugen", data={"csrf": "invalid"}).status_code == 400
+    site_id, email, _, _ = fixture_site()
+    regular = login(email, PASSWORD)
+    assert regular.post("/verbandbuch/schluessel/erzeugen", data={"csrf": csrf_of(regular.get("/verbandbuch/neu").text)}).status_code == 403
+    result = admin.post("/verbandbuch/schluessel/erzeugen", data={"csrf": token})
+    assert result.status_code == 303
+    path = aid._key_path()
+    assert path.is_file()
+    assert path.stat().st_mode & 0o077 == 0
+    secret = path.read_text().strip()
+    assert secret not in admin.get("/verbandbuch/standorte").text
+    assert aid.ready() and aid.key_source() == "file"
+    assert aid.open_sealed(aid.seal({"test": "gesichert"})) == {"test": "gesichert"}
+    assert admin.post("/verbandbuch/schluessel/erzeugen", data={"csrf": token}).status_code == 409
+    assert path.read_text().strip() == secret
+
+
+def test_invalid_external_key_does_not_get_replaced(aid_env, monkeypatch, tmp_path):
+    monkeypatch.setattr(aid, "_key_path", lambda: tmp_path / "fachschluessel.key")
+    monkeypatch.setenv("VERBANDBUCH_ENCRYPTION_KEY", "invalid")
+    assert aid.key_source() == "environment"
+    assert not aid.ready()
+    with pytest.raises(HTTPException) as error:
+        aid.generate_key_once()
+    assert error.value.status_code == 409
+    assert not aid._key_path().exists()
