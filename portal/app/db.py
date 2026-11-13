@@ -2984,6 +2984,15 @@ DEFAULT_SETTINGS = {
 
 # Spalten, die in späteren Versionen dazukamen (SQLite: ALTER TABLE ADD COLUMN)
 _NEW_COLUMNS = {
+    # Older live databases already have law_ai_drafts from the original staging
+    # release. SQLAlchemy.create_all() does NOT add later ORM columns, so the
+    # MarkItDown/Tesseract OCR rollout must migrate them explicitly.
+    "law_ai_drafts": {
+        "ocr_job_key": "VARCHAR(48) NOT NULL DEFAULT ''",
+        "ocr_pages_json": "TEXT NOT NULL DEFAULT '[]'",
+        "ocr_warnings_json": "TEXT NOT NULL DEFAULT '[]'",
+        "ocr_failure": "VARCHAR(180) NOT NULL DEFAULT ''",
+    },
     "knowledge_articles": {
         "authority": "VARCHAR(20) NOT NULL DEFAULT 'unconfirmed'",
         "review_due_on": "DATE",
