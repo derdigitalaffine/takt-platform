@@ -151,7 +151,7 @@ for key, title, layer_id, topic, role in [
              'Maßstab, Aktualität und Nutzbarkeit beachten.',
         attribution=RLP_ATTR)
 add('rp-atkis-basis', 'RP · ATKIS Basis-DLM – Objekte',
-    'https://www.geoportal.rlp.de/registry/wfs/606', 'Rheinland-Pfalz',
+    'https://geo5.service24.rlp.de/wfs/basisdlm_shape_rp.fcgi', 'Rheinland-Pfalz',
     'Topografie', 'LVermGeo Rheinland-Pfalz', RLP_OPEN,
     'DL-DE BY 2.0', BY, kind='wfs',
     note='Nur unterstützte WFS-Featuretypen mit begrenztem Kartenausschnitt; '
