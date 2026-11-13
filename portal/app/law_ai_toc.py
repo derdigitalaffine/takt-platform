@@ -42,7 +42,7 @@ def toc_ranges(source: str) -> list[tuple[int, int]]:
                 break
             is_entry = bool(_TOC_ENTRY.match(clean))
             # A repeated entry is most likely the beginning of the real law.
-            token = re.sub(r"^#{1,6}\\s+", "", _PAGE_SUFFIX.sub("", clean).strip())
+            token = re.sub(r"^#{1,6}\s+", "", _PAGE_SUFFIX.sub("", clean).strip())
             if not clean and entries >= 2:
                 blank_after_entries = True
             if is_entry and entries >= 2 and blank_after_entries and not _PAGE_SUFFIX.search(clean):
