@@ -88,7 +88,9 @@ def test_mixed_pdf_combines_native_pages_and_tesseract(monkeypatch, tmp_path):
     result = worker.extract(original, ".pdf")
     assert len(result["pages"]) == 2
     assert [page["engine"] for page in result["pages"]] == ["native-pdf", "tesseract"]
-    assert "§ 2" in result["markdown"] and "OCR-Quelle: Seite 2" in result["markdown"]
+    assert "§ 2" in result["markdown"]
+    assert result["pages"][1]["page"] == 2
+    assert "OCR-Quelle" not in result["markdown"]
     assert any("unsicher" in note for note in result["warnings"])
 
 
