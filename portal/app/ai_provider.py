@@ -220,9 +220,14 @@ async def complete(provider, messages: list[dict], *, image: bool = False,
         "max_tokens": max(64, min(int(max_tokens), 4096)),
         "messages": messages,
     }
+    # Preserve the previous request contract when no per-call timeout is
+    # supplied. Existing callers and adapters must not receive an extra kwarg.
+    request_kw = {"payload": payload}
+    if timeout_seconds is not None:
+        request_kw["timeout_seconds"] = timeout_seconds
     result = await _request(provider, "chat/completions",
                             provider.image_key_enc if image else provider.text_key_enc,
-                            payload=payload, timeout_seconds=timeout_seconds)
+                            **request_kw)
     choices = result.get("choices")
     if not isinstance(choices, list) or not choices:
         raise AIProviderError("Der KI-Provider hat keine Textantwort zurückgegeben.")
