@@ -124,3 +124,14 @@
 .map-discovery-source-links{display:flex;align-items:center;flex-wrap:wrap;gap:.35rem .8rem}
 .map-discovery-source-link{display:inline-flex;align-items:center;font-size:.78rem;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
 @media(max-width:767.98px){.map-discovery-shortcuts button{min-height:44px}}
+/* Opt-in synchronized comparison; the primary canvas retains pan/zoom control. */
+.map-compare-layer{position:absolute;inset:0;z-index:1;clip-path:inset(0 0 0 50%);pointer-events:none}
+.map-compare-canvas{position:absolute;inset:0}
+.map-compare-canvas .maplibregl-canvas{pointer-events:none!important}
+.map-compare-divider{position:absolute;top:0;bottom:0;left:50%;z-index:2;width:3px;transform:translateX(-50%);background:var(--bs-primary);box-shadow:0 0 0 1px rgba(255,255,255,.8);pointer-events:none}
+.map-compare-toolbar{position:absolute;top:.65rem;left:50%;z-index:5;transform:translateX(-50%);width:min(21rem,calc(100% - 7rem));padding:.65rem .8rem;border:1px solid var(--bs-border-color);border-radius:.75rem;background:var(--bs-body-bg);color:var(--bs-body-color);box-shadow:0 4px 18px #0002}
+.map-compare-toolbar-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.35rem;font-size:.85rem}
+.map-compare-toolbar .form-range{margin:.1rem 0 .35rem}
+.map-compare-toolbar label{display:block}
+.map-compare-layer[hidden],.map-compare-divider[hidden],.map-compare-toolbar[hidden]{display:none!important}
+@media(max-width:767.98px){.map-compare-toolbar{top:.5rem;left:auto;right:.5rem;transform:none;width:min(19rem,calc(100% - 1rem))}.map-compare-toolbar button{min-width:44px;min-height:44px}}
