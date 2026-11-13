@@ -21,6 +21,10 @@ class AIProviderError(Exception):
     """A deliberately redacted error safe to display to end users."""
 
 
+class AIOutputTruncated(AIProviderError):
+    """Model stopped at token/output limit; partial JSON must never be used."""
+
+
 def _host_check(url: str, allow_private: bool = False) -> None:
     try:
         p = urlsplit(url)
@@ -183,11 +187,15 @@ async def complete(provider, messages: list[dict], *, image: bool = False, max_t
     choices = result.get("choices")
     if not isinstance(choices, list) or not choices:
         raise AIProviderError("Der KI-Provider hat keine Textantwort zurückgegeben.")
+    if isinstance(choices[0], dict) and choices[0].get("finish_reason") in ("length", "max_tokens"):
+        raise AIOutputTruncated("Das KI-Modell hat die Antwort am Tokenlimit abgeschnitten.")
     msg = choices[0].get("message") if isinstance(choices[0], dict) else None
     content = msg.get("content") if isinstance(msg, dict) else None
     if not isinstance(content, str):
         raise AIProviderError("Der KI-Provider hat kein lesbares Nachrichtenfeld geliefert.")
-    return content[:40_000]
+    if len(content) > 40_000:
+        raise AIOutputTruncated("Die KI-Antwort hat das sichere Ausgabelimit überschritten.")
+    return content
 
 
 
@@ -262,8 +270,10 @@ async def stream_completion(provider, messages: list[dict], *, image: bool = Fal
                         if isinstance(content, str) and content:
                             total += len(content)
                             if total > 40_000:
-                                raise AIProviderError("Die Textantwort überschreitet das Ausgabelimit.")
+                                raise AIOutputTruncated("Die Streaming-Antwort überschreitet das Ausgabelimit.")
                             yield content
+                        if choice.get("finish_reason") in ("length", "max_tokens"):
+                            raise AIOutputTruncated("Das Streaming-Modell hat die Antwort am Tokenlimit abgeschnitten.")
                         if choice.get("finish_reason"):
                             done = True
                 if not done:
