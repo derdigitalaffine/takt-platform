@@ -169,3 +169,12 @@
 @media(prefers-reduced-motion:reduce){
   .map-easy-tab,.map-easy-chevron {transition:none}
 }
+
+/* Administrative advanced GIS imports stay available without filling the
+   everyday layer settings page; deep links open them automatically. */
+.map-admin-3d > summary {padding:.85rem 1rem}
+.map-admin-3d > summary small {line-height:1.45}
+.map-admin-3d-body {padding:.35rem .85rem .85rem}
+.map-admin-3d-body > .card:last-child {margin-bottom:0!important}
+.map-admin-3d-body > .card {box-shadow:none}
+@media(max-width:767.98px){.map-admin-3d-body{padding:.25rem .55rem .65rem}}
