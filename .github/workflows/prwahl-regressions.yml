@@ -1,0 +1,45 @@
+name: Personalratswahl regressions
+
+on:
+  pull_request:
+    paths:
+      - 'portal/app/prwahl*.py'
+      - 'portal/app/routes_prwahl*.py'
+      - 'portal/app/templates/prwahl*.html'
+      - 'portal/app/static/prwahl.css'
+      - 'portal/tests/test_prwahl*.py'
+      - 'portal/tests/test_user_handbook.py'
+      - 'docs/handbuch/module/personalratswahl.md'
+      - 'docs/BENUTZERHANDBUCH.md'
+      - '.github/workflows/prwahl-regressions.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'portal/app/prwahl*.py'
+      - 'portal/app/routes_prwahl*.py'
+      - 'portal/app/templates/prwahl*.html'
+      - 'portal/app/static/prwahl.css'
+      - 'portal/tests/test_prwahl*.py'
+      - '.github/workflows/prwahl-regressions.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  paper-election:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: portal/requirements.txt
+      - name: Install portal dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Assert scoped election logic, document and calendar regressions
+        run: python -m pytest -q tests/test_prwahl.py tests/test_prwahl_workflow.py tests/test_prwahl_schedule.py tests/test_prwahl_deadlines.py tests/test_prwahl_prefill.py tests/test_user_handbook.py

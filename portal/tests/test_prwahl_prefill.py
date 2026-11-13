@@ -25,10 +25,10 @@ def test_prefill_scoped_mandates_without_inventing_attendance():
     values, sources = prefill_fields(_election(), "board_notice", mandates=[(chair, person)])
     assert "Lena Beispiel" in values["board_members"]
     assert "Beschluss Muster" in values["reference"]
-    assert "prüfen" in sources["board_members"]
+    assert "keine nachgewiesene Bestellung" in sources["board_members"]
     minutes, _ = prefill_fields(_election(), "board_minutes", mandates=[(chair, person)])
-    assert "Lena Beispiel" in minutes["attendance"]
-    assert "session" not in minutes  # No meeting date is known.
+    assert "attendance" not in minutes  # A role never proves actual attendance.
+    assert "session" not in minutes  # No completed meeting is documented.
 
 
 def test_prefill_only_confirmed_aggregated_paper_counts():
@@ -47,3 +47,13 @@ def test_prefill_fills_planned_count_event_without_legal_confirmation():
     values, sources = prefill_fields(_election(), "election_notice", events=[event])
     assert "Sitzungssaal" in values["counting"]
     assert "Geplanter" in sources["counting"]
+
+
+def test_planned_constitution_does_not_fill_minutes_with_unverified_meeting():
+    appointment = SimpleNamespace(kind="constitution", status="planned", location="Rathaus",
+                                  starts_at=datetime(2027, 5, 1, 10, 0))
+    draft, _ = prefill_fields(_election(), "constitution_minutes", events=[appointment])
+    assert "meeting" not in draft
+    invite, source = prefill_fields(_election(), "constitution_invitation", events=[appointment])
+    assert "Rathaus" in invite["meeting"]
+    assert "Geplanter" in source["meeting"]

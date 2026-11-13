@@ -18,9 +18,17 @@ from conftest import csrf_of, login, settings
 def _user(*, admin=False, setup=False):
     email = f"prwahl-{uuid4().hex[:16]}@example.org"
     with SessionLocal() as db:
-        db.add(User(email=email, name="Test Wahlberechtigung", password_hash=hash_password("passwort-1234"),
-                    is_admin=admin, active=True, must_change_password=False,
-                    permissions="video,prwahl_setup" if setup else "video"))
+        person = User(email=email, name="Test Wahlberechtigung",
+                      password_hash=hash_password("passwort-1234"),
+                      is_admin=admin, active=True, must_change_password=False,
+                      permissions="video,prwahl_setup" if setup else "video")
+        db.add(person)
+        db.flush()
+        org = db.scalar(select(Organization).where(Organization.active.is_(True)))
+        if org is not None:
+            # Simulate an employed person in the election organization. The
+            # object-level PRMandate is still required for confidential access.
+            db.add(OrgMembership(user_id=person.id, org_id=org.id))
         db.commit()
     return login(email, "passwort-1234")
 
@@ -257,3 +265,38 @@ def test_fictional_demo_has_all_forms_and_is_separate_from_production():
     assert admin.get("/personalratswahl/demo/dokumente/board_notice/exe").status_code == 404
     with SessionLocal() as db:
         assert db.scalar(select(func.count()).select_from(PRElection)) == before
+
+
+def test_document_field_coverage_is_advisory_and_empty_review_is_blocked():
+    from app.prwahl import document_field_summary
+    assert document_field_summary("board_minutes", {})["has_content"] is False
+    stats = document_field_summary("board_minutes", {"session": "Geprüft"})
+    assert stats["has_content"] is True
+    assert stats["filled"] == 1 and stats["total"] > 1
+    assert "Tagesordnung" in stats["missing"]
+
+    editor = _user(setup=True)
+    eid = _create(editor)
+    blank_form = editor.get(f"/personalratswahl/{eid}/dokumente/neu/board_minutes")
+    assert "Angaben im Entwurf" in blank_form.text
+    saved = editor.post(f"/personalratswahl/{eid}/dokumente/speichern", data={
+        "csrf": csrf_of(blank_form.text), "kind": "board_minutes"
+    })
+    assert saved.status_code == 303
+    did = int(saved.headers["location"].split("/")[-1])
+    # A coordinator is not the reviewing chair; attach an explicit chair role.
+    chair_client = _user()
+    with SessionLocal() as db:
+        person = db.scalar(select(User).where(User.email.like("prwahl-%@example.org"))
+                           .order_by(User.id.desc()))
+        db.add(PRMandate(election_id=eid, user_id=person.id, role="chair",
+                         appointment_reference="Bestellung geprüft", assigned_by=person.id))
+        db.commit()
+    docpage = chair_client.get(f"/personalratswahl/{eid}/dokumente/{did}")
+    assert docpage.status_code == 200
+    denied = chair_client.post(f"/personalratswahl/{eid}/dokumente/{did}/pruefen", data={
+        "csrf": csrf_of(docpage.text), "resolution_reference": "Niederschrift zur Prüfung"
+    })
+    assert denied.status_code == 409
+    with SessionLocal() as db:
+        assert db.get(PRDocument, did).review_status == "draft"

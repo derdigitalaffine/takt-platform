@@ -197,3 +197,13 @@
 .pr-proposal-body .btn{margin-top:.3rem}
 @media(max-width:880px){.pr-proposal-grid{grid-template-columns:1fr}}
 @media(max-width:500px){.pr-proposal-card{flex-direction:column}.pr-proposal-date{min-width:0}}
+
+/* Document field coverage: advisory only, never legal readiness. */
+.pr-quality{border:1px solid var(--pr-stroke);background:var(--pr-subtle);border-radius:.85rem;padding:1rem;margin-bottom:1.15rem}
+.pr-quality-header{display:flex;justify-content:space-between;gap:.75rem;align-items:baseline;flex-wrap:wrap;font-size:.85rem}
+.pr-quality-header span{color:var(--bs-secondary-color);font-variant-numeric:tabular-nums}
+.pr-quality progress{display:block;width:100%;height:.5rem;border:0;border-radius:30px;overflow:hidden;accent-color:var(--bs-primary);margin:.6rem 0 .7rem}
+.pr-quality-missing summary{font-size:.83rem;font-weight:650;cursor:pointer;color:var(--bs-primary)}
+.pr-quality-missing ul{font-size:.8rem;line-height:1.6;color:var(--bs-secondary-color);margin:.6rem 0 0;padding-left:1.2rem}
+.pr-quality-good{font-size:.82rem;margin:0;color:var(--bs-secondary-color)}
+.pr-quality-disclaimer{font-size:.76rem;line-height:1.55;margin:.6rem 0 0;color:var(--bs-secondary-color)}

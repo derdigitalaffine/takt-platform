@@ -50,8 +50,9 @@ def prefill_fields(election, kind, *, mandates=(), events=(), rounds=()):
         put("members", team, "TAKT-Fachmandate, rechtliche Bestellung offen")
         put("chair", chair, "Zugewiesener Wahlvorstandsvorsitz")
     elif kind == "board_minutes":
-        put("attendance", team, "Fachmandate – tatsächliche Anwesenheit prüfen")
-        put("session", describe_event("board"), "Geplanter Wahlvorstandstermin")
+        # A mandate does not prove attendance, and a scheduled meeting does
+        # not prove a meeting took place. Official minutes must record facts.
+        pass
     elif kind in {"seats_protocol", "appointment_invitation"}:
         field = "session_on" if kind == "seats_protocol" else "meeting_on"
         put(field, describe_event("board"), "Geplanter Wahlvorstandstermin")
@@ -64,7 +65,8 @@ def prefill_fields(election, kind, *, mandates=(), events=(), rounds=()):
     elif kind == "constitution_invitation":
         put("meeting", describe_event("constitution"), "Geplanter Termin der konstituierenden Sitzung")
     elif kind == "constitution_minutes":
-        put("meeting", describe_event("constitution"), "Geplanter Termin – tatsächlichen Verlauf prüfen")
+        # Meeting minutes are completed only from the actual, verified record.
+        pass
     elif kind == "elected_notification":
         put("election", election.title, "Bezeichnung des Wahl-Arbeitsbereichs")
 
