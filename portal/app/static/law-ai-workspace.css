@@ -260,3 +260,9 @@
   .law-workspace .law-draft,
   .law-workspace .law-choice { transition: none; }
 }
+
+/* OCR-/KI-Übernahme: mehr Arbeitsfläche für lange Satzungen. */
+@media (min-width: 768px) {
+  .law-workspace .law-editor { min-height: 68vh; font-size: 1rem; line-height: 1.7; }
+  .law-workspace .law-outline { max-height: 65vh; }
+}
