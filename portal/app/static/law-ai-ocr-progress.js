@@ -17,6 +17,7 @@
       if (!response.ok) throw new Error("Statusabfrage fehlgeschlagen.");
       const data = await response.json();
       if (data.ready === true) {
+        if (window.LawReviewUX?.deferRefresh?.()) return;
         window.location.reload();
       }
     } catch (_error) {
