@@ -3219,6 +3219,7 @@ def _migrate() -> None:
 def init_db() -> None:
     from . import org_models, leave_models, calendar_models, leave_extensions  # noqa: F401
     from . import verbandbuch_models  # noqa: F401 – isolierte Erste-Hilfe-Fachtabellen
+    from . import internal_asset_models  # noqa: F401 – interne Materialplanung
     from . import task_models  # noqa: F401 – register additive native-task tables
     from . import ai_models  # noqa: F401 – register additive AI tables
     from . import law_ai_models  # noqa: F401 – isolated, unpublished law-import drafts

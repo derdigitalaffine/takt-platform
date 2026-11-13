@@ -5,7 +5,7 @@
    tab: home | planner | bookings | stats | clubs | caretakers | calendars | holidays | look #}
 {% macro head(tab, crumbs, title, lede='') -%}
 <ul class="ds-nav nav nav-pills small res-nav" aria-label="Ressourcen">
-  {% for key, href, icon, label, need in (('home', '/resources', 'fa-building', 'Übersicht', ''), ('planner', '/resources/planner', 'fa-table-cells', 'Planer', ''),
+  {% for key, href, icon, label, need in (('home', '/resources', 'fa-building', 'Übersicht', ''), ('planner', '/resources/planner', 'fa-table-cells', 'Planer', ''), ('internal', '/resources/intern', 'fa-boxes-stacked', 'Interner Gerätepool', 'resources'),
      ('bookings', '/resources/bookings', 'fa-list', 'Buchungen', ''), ('stats', '/resources/stats', 'fa-chart-column', 'Auswertung', ''),
      ('clubs', '/resources/clubs', 'fa-people-group', 'Vereine', 'resources'), ('caretakers', '/resources/caretakers', 'fa-user-gear', 'Hausmeister', 'resources'), ('calendars', '/resources/calendars', 'fa-calendar-week', 'Kalender-Links', ''),
      ('holidays', '/resources/holidays', 'fa-umbrella-beach', 'Feiertage', 'resources'), ('look', '/resources/darstellung', 'fa-palette', 'Darstellung', 'resources')) if not need or user.can(need) %}
