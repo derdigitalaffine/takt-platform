@@ -15,5 +15,7 @@ ENV PYTHONUNBUFFERED=1 \
     RECORDINGS_DIR=/recordings
 
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"
+# Readiness verifies both database connectivity and critical additive tables;
+# /healthz remains a DB-independent liveness probe.
+HEALTHCHECK --interval=30s --timeout=8s --start-period=30s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=6)"
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
