@@ -107,8 +107,17 @@
         <button class="btn btn-sm btn-outline-secondary w-100" type="button"
                 id="map-lod2-toggle" aria-pressed="false" disabled>LoD2-Dachformen in 3D anzeigen</button>
         <div class="small text-secondary mt-2" id="map-lod2-info" role="status">Verfügbarkeit wird geprüft …</div>
-        <p class="small text-secondary mb-0 mt-1">Lokale, räumlich begrenzte CityGML-Vorschau mit echten Dachflächen;
-          ohne Höhenabgleich mit DGM. Import durch Kartenadministration erforderlich.</p>
+        <div class="map-dgm-switch mt-2">
+          <label class="form-check form-switch mb-1">
+            <input type="checkbox" class="form-check-input" id="map-dgm-toggle" disabled>
+            <span class="form-check-label small"><i class="fa-solid fa-mountain-sun me-1" aria-hidden="true"></i>Amtliches DGM-Gelände einblenden</span>
+          </label>
+          <div class="small text-secondary" id="map-dgm-info" role="status">Geländedaten werden geprüft …</div>
+        </div>
+        <p class="small text-secondary mb-0 mt-2">Echte Dachflächen und optional trianguliertes Gelände
+          aus örtlichen amtlichen Importen. DGM und Gebäude werden relativ im selben
+          Höhenbezug dargestellt, <strong>nicht</strong> als geeichte Höhenkarte.
+          Kartenadministration erforderlich.</p>
       </section>
       <div class="map-view-switch mt-3">
         <button class="btn btn-sm btn-outline-secondary w-100" type="button" id="map-3d-view" aria-pressed="false"><i class="fa-solid fa-cube me-2" aria-hidden="true"></i>Karte schräg betrachten (3D-Ansicht)</button>
