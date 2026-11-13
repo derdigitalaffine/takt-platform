@@ -468,8 +468,8 @@ def law_ai_discard(
     if discard_confirmed != "1":
         raise HTTPException(422, "Das Verwerfen muss ausdrücklich bestätigt werden.")
     row = _own(db, draft_id, user)
-    if row.status == "accepted":
-        raise HTTPException(409, "Ein bereits übernommener Originalnachweis darf nicht entfernt werden.")
+    if row.status not in ("staged", "needs_ocr", "ocr_review", "ocr_failed"):
+        raise HTTPException(409, "Dieser Arbeitsstand kann nicht gelöscht werden.")
     if row.status == "ocr_queued":
         raise HTTPException(409, "OCR-Auftrag läuft noch. Nach Abschluss kann der Entwurf verworfen werden.")
     if db.scalar(select(LawAiAnalysis.id).where(
