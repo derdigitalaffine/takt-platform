@@ -142,3 +142,23 @@
 .pr-integration-disclaimer{display:flex;align-items:flex-start;gap:.55rem;color:var(--bs-secondary-color);font-size:.8rem;line-height:1.5;margin:1rem 0 0}
 .pr-integration-disclaimer i{margin-top:.15rem;color:var(--bs-primary)}
 @media(max-width:960px){.pr-integration-grid{grid-template-columns:1fr}}
+
+/* Fictional election demo is opt-in, read-only and separate from real workspaces. */
+.pr-demo-disclosure{border:1px dashed var(--pr-stroke);border-radius:1rem;background:var(--pr-subtle);margin:1rem 0}
+.pr-demo-disclosure summary{display:flex;align-items:center;gap:.85rem;padding:1rem;cursor:pointer;list-style:none}
+.pr-demo-disclosure summary::-webkit-details-marker{display:none}
+.pr-demo-disclosure summary>i:first-child{color:var(--bs-primary);font-size:1.2rem}
+.pr-demo-disclosure summary>span{display:flex;flex-direction:column;gap:.15rem;min-width:0;flex:1}
+.pr-demo-disclosure summary strong{font-size:.95rem}
+.pr-demo-disclosure summary small{font-size:.79rem;color:var(--bs-secondary-color)}
+.pr-demo-disclosure[open] summary>i:last-child{transform:rotate(180deg)}
+.pr-demo-disclosure-body{border-top:1px solid var(--pr-stroke);padding:1rem}
+.pr-demo-disclosure-body p{font-size:.85rem;color:var(--bs-secondary-color)}
+.pr-demo-page .pr-panel{scroll-margin-top:1.5rem}
+.pr-demo-timeline{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;counter-reset:demo}
+.pr-demo-timeline li{counter-increment:demo;position:relative;padding:1rem 1rem 1rem 3rem;border:1px solid var(--pr-stroke);border-radius:.8rem;background:var(--pr-subtle);min-width:0}
+.pr-demo-timeline li:before{content:counter(demo);position:absolute;left:.8rem;top:.9rem;width:1.6rem;height:1.6rem;border-radius:50%;display:grid;place-items:center;background:var(--bs-primary);color:white;font-weight:700;font-size:.75rem}
+.pr-demo-timeline strong,.pr-demo-timeline span{display:block;overflow-wrap:anywhere}
+.pr-demo-timeline strong{font-size:.88rem}.pr-demo-timeline span{font-size:.77rem;color:var(--bs-secondary-color);margin-top:.35rem}
+@media(max-width:950px){.pr-demo-timeline{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.pr-demo-timeline{grid-template-columns:1fr}}
