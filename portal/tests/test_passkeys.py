@@ -47,6 +47,7 @@ def test_registration_requires_reauth_csrf_and_secure_rp():
     assert opts["rp"]["id"] == "portal.example.org"
     assert opts["authenticatorSelection"]["residentKey"] == "required"
     assert opts["authenticatorSelection"]["userVerification"] == "required"
+    assert len(opts["user"]["id"]) >= 32  # opaque non-enumerable account handle
     assert good.headers["cache-control"] == "no-store"
 
 
@@ -77,7 +78,7 @@ def test_registration_and_discoverable_login_reject_challenge_replay(monkeypatch
     assert options.status_code == 200, options.text
     assert options.json()["userVerification"] == "required"
     monkeypatch.setattr(pk, "verify_authentication_response", lambda **kwargs: SimpleNamespace(
-        new_sign_count=2, credential_backed_up=True,
+        credential_id=cid, user_verified=True, new_sign_count=2, credential_backed_up=True,
     ))
     auth_payload = {"credential": {"type": "public-key", "id": encoded,
                                    "response": {"userHandle": None}}, "next": "/profile"}
