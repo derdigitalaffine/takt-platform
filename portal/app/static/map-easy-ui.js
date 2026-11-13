@@ -236,7 +236,9 @@
     var kit = api.kit;
     var currentOptions = Array.from(easyBase.options).map(function (o) { return o.value; });
     var expectedOptions = kit.bases.map(function (b) { return b.id; }).concat(['']);
-    if (currentOptions.join('|') !== expectedOptions.join('|')) {
+    if (easyBase.dataset.ready !== '1' ||
+        currentOptions.join('|') !== expectedOptions.join('|')) {
+      easyBase.dataset.ready = '1';
       easyBase.replaceChildren();
       kit.bases.forEach(function (base) {
         var option = document.createElement('option');
