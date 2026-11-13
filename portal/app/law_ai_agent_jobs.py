@@ -118,10 +118,10 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
     object before being persisted. Browser gets progress counters, not legal
     prose or partial/possibly malicious output.
     """
+    options = {"response_format": {"type": "json_object"}} if json_mode else {}
     if not provider.stream_enabled:
         return await asyncio.wait_for(
-            ai_provider.complete(provider, messages, max_tokens=max_tokens,
-                                 response_format={"type": "json_object"} if json_mode else None),
+            ai_provider.complete(provider, messages, max_tokens=max_tokens, **options),
             timeout=min(stage_timeout, remaining),
         )
 
@@ -131,8 +131,7 @@ async def _answer(provider, messages: list[dict], job_id: int, step: str,
         count = 0
         last = time.monotonic()
         async for fragment in ai_provider.stream_completion(
-            provider, messages, max_tokens=max_tokens,
-            response_format={"type": "json_object"} if json_mode else None,
+            provider, messages, max_tokens=max_tokens, **options,
         ):
             if not isinstance(fragment, str):
                 raise ValueError("Der Modellstream hat ein ungültiges Format.")
