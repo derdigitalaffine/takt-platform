@@ -462,6 +462,12 @@
                   <label class="form-label fw-semibold mb-0" for="law-ai-body">Redaktionell geprüfter Markdown-Text</label>
                   <span class="small text-secondary" data-law-editor-count aria-live="polite">Textstand aus Import</span>
                 </div>
+                <div id="law-md-quality" class="law-md-quality mb-3">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <button class="btn btn-outline-primary btn-sm" type="button" data-law-md-check><i class="fa-solid fa-list-check me-1" aria-hidden="true"></i>TAKT-Markdown prüfen und gliedern</button>
+                    <span class="small text-secondary" data-law-md-status role="status" aria-live="polite">Prüft den aktuellen Text gegen den tatsächlichen TAKT-Parser. Keine automatische Übernahme.</span>
+                  </div>
+                </div>
                 <div class="row g-3">
                   <div class="col-12 col-xxl-9">
                     <textarea class="form-control font-monospace law-editor" id="law-ai-body" name="body_md" rows="20"
@@ -521,6 +527,7 @@
 </div>
 {% block scripts %}
 <script src="/static/law-ai-workspace.js" defer></script>
+<script src="/static/law-md-quality.js" defer></script>
 {% if selected and selected.status == 'ocr_queued' %}<script src="/static/law-ai-ocr-progress.js" defer></script>{% endif %}
 {% if selected and ai_enabled %}<script src="/static/law-ai-agents.js" defer></script>{% endif %}
 {% endblock %}
