@@ -25,7 +25,7 @@ def test_prefill_scoped_mandates_without_inventing_attendance():
     values, sources = prefill_fields(_election(), "board_notice", mandates=[(chair, person)])
     assert "Lena Beispiel" in values["board_members"]
     assert "Beschluss Muster" in values["reference"]
-    assert "prüfen" in sources["board_members"]
+    assert "keine nachgewiesene Bestellung" in sources["board_members"]
     minutes, _ = prefill_fields(_election(), "board_minutes", mandates=[(chair, person)])
     assert "attendance" not in minutes  # A role never proves actual attendance.
     assert "session" not in minutes  # No completed meeting is documented.
