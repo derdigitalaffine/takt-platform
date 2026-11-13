@@ -619,3 +619,33 @@ def test_output_truncation_triggers_safe_section_cascade(monkeypatch, agent_rout
         assert job.status == "done", job.failure
         assert job.retry_attempts == 1
     assert len(calls) == 5
+
+
+
+def test_short_ortrecht_text_gets_one_compact_retry_not_an_unnecessary_split(monkeypatch, agent_routes):
+    admin = login(*ADMIN)
+    did = _upload(admin)
+    csrf = csrf_of(admin.get(f"/laws-assistant/{did}").text)
+    assert admin.post(f"/laws-assistant/{did}/agents", data={
+        "csrf": csrf, "mode": "simple", "transmission_confirmed": "1",
+    }).status_code == 303
+    jid = law_ai_agent_jobs._claim_next()
+    attempts = []
+
+    async def fake(provider, messages, *, max_tokens=1024, **kwargs):
+        attempts.append((provider.model_id, messages[0]["content"]))
+        if provider.model_id == "model-step-1":
+            if sum(x[0] == "model-step-1" for x in attempts) == 1:
+                return 'Hier sind die Ergebnisse ohne gültiges JSON.'
+            assert "KORREKTURVERSUCH" in messages[0]["content"]
+            return '{"headings":[]}'
+        return '{"fields":[]}' if provider.model_id == "model-step-2" else '{"findings":[]}'
+    monkeypatch.setattr(ai_provider, "complete", fake)
+    asyncio.run(law_ai_agent_jobs.process_one(jid))
+    with SessionLocal() as db:
+        job = db.get(LawAiAnalysis, jid)
+        assert job.status == "done", job.failure
+        assert job.progress_total == job.progress_done == 3
+        assert job.retry_attempts == 1
+        assert db.get(LawAiDraft, did).accepted_law_id is None
+    assert len(attempts) == 4
