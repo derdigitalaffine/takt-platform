@@ -74,3 +74,31 @@ def test_unrelated_document_without_toc_keeps_heading_untouched():
     source = "# Satzung\n\n§ 1 Aufgaben\n(1) Die Gemeinde nimmt Aufgaben wahr.\n"
     assert not law_ai_toc.toc_ranges(source)
     assert "### § 1 Aufgaben" in review(source)["proposed_md"]
+
+
+def test_plain_legal_body_titled_inhalt_is_not_misread_as_toc():
+    source = ("# Inhalt\\n\\n§ 1 Gegenstand\\n(1) Inhalt\\n\\n"
+              "§ 2 Geltung\\n(1) Hiermit gilt die Regel.")
+    source = source.replace("\\\\n", "\\n")
+    assert law_ai_toc.toc_ranges(source) == []
+
+
+def test_deterministic_hints_are_cited_and_do_not_guess():
+    from app.law_ai_metadata_hints import hints
+    result = {item["field"]: item for item in hints(SOURCE)}
+    assert result["title"]["value"] == "Satzung über Beiträge"
+    assert result["doc_type"]["value"] == "satzung"
+    assert result["issued_on"]["value"] == "2026-10-14"
+    assert result["valid_from"]["value"] == "2027-01-01"
+    for item in result.values():
+        assert item["evidence"] in SOURCE
+    truncated = hints("## Innerer Teil\\nAusgefertigt am 14.10.2026.".replace("\\\\n", "\\n"),
+                      allow_header=False)
+    assert "title" not in {item["field"] for item in truncated}
+
+
+def test_stage_metadata_complements_empty_llm_output_when_authorized():
+    result = validate("law_metadata", '{"fields":[]}', SOURCE, with_hints=True)
+    keys = {item["field"] for item in result["fields"]}
+    assert {"title", "doc_type", "issued_on", "valid_from"} <= keys
+    assert all(item.get("origin") == "rule_based" for item in result["fields"])
